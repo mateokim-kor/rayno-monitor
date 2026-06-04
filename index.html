@@ -224,6 +224,56 @@
     color:var(--ink2);border-radius:8px;font-size:11.5px;font-weight:700;padding:5px 11px;white-space:nowrap;transition:.15s}
   .vc-srcbtn:hover{border-color:var(--amber);color:var(--amber)}
 
+  /* ── 설정 탭 ── */
+  .set-card .cap{margin-bottom:14px}
+  .set-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .set-chip{display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;padding:4px 4px 4px 4px}
+  .set-input{border:0;background:transparent;color:var(--ink);font-family:var(--font);font-size:13px;font-weight:600;padding:5px 8px;outline:none;width:110px}
+  .set-del{border:0;background:transparent;color:var(--ink3);cursor:pointer;font-size:13px;font-weight:800;padding:2px 6px;border-radius:6px}
+  .set-del:hover{background:var(--neg-bg);color:var(--neg)}
+  .set-add{display:flex;gap:8px;margin-bottom:16px}
+  .set-add input{flex:1;max-width:280px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-family:var(--font);font-size:13px;padding:9px 12px;outline:none}
+  .set-add input:focus{border-color:var(--amber)}
+  .set-actions{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+
+  /* ── 리포트 탭 ── */
+  .rep-head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .rep-period{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .rep-badge{margin-top:12px;font-size:12.5px;color:var(--ink2);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;display:inline-block}
+  .rep-sec{margin-top:16px}
+  .rep-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0 16px}
+  .rk{background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
+  .rk-l{font-size:11.5px;color:var(--ink3);font-weight:700}
+  .rk-v{font-size:23px;font-weight:800;margin:4px 0;font-variant-numeric:tabular-nums}
+  .rk-m{font-size:11.5px;color:var(--ink3)}
+  .dlt{font-size:12px;font-weight:800;margin-left:4px}
+  .dlt.up{color:var(--pos)} .dlt.down{color:var(--neg)} .dlt.flat{color:var(--ink3)}
+  .rep-sentbar{display:flex;height:30px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+  .rep-sentbar .sb{display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden}
+  .rep-sentbar .sb.pos{background:var(--pos)} .rep-sentbar .sb.neg{background:var(--neg)} .rep-sentbar .sb.neu{background:var(--neu)}
+  .rep-trend{display:flex;flex-direction:column;gap:7px;margin-top:8px}
+  .rep-trow{display:flex;align-items:center;gap:10px;font-size:12.5px}
+  .rt-l{width:120px;flex:none;color:var(--ink);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rt-bar{flex:1;height:14px;background:var(--bg2);border-radius:7px;overflow:hidden}
+  .rt-bar i{display:block;height:100%;background:var(--neu);border-radius:7px}
+  .rt-n{width:54px;flex:none;text-align:right;font-variant-numeric:tabular-nums;color:var(--ink2);font-weight:700}
+  .rt-p{width:74px;flex:none;text-align:right;font-weight:700}
+  .rep-flag{background:var(--amber);color:#fff;font-size:10px;font-weight:800;border-radius:5px;padding:1px 6px;margin-left:4px}
+  .rep-2col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  .rep-3col{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}
+  @media(max-width:640px){.rep-2col,.rep-3col{grid-template-columns:1fr}}
+  .rep-subh{font-size:12.5px;font-weight:800;margin:4px 0 8px}
+  .rep-rrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .rep-rrow:last-child{border-bottom:0}
+  .rep-rdot{width:7px;height:7px;border-radius:50%;flex:none}
+  .rep-rv{flex:1;font-size:13px;color:var(--ink)}
+  .rep-rc{font-weight:800;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .rep-insights{display:flex;flex-direction:column;gap:9px}
+  .insight{font-size:13px;line-height:1.55;padding:11px 14px;border-radius:10px;border-left:3px solid var(--ink3);background:var(--bg2)}
+  .insight.good{border-left-color:var(--pos)} .insight.warn{border-left-color:var(--neg)} .insight.info{border-left-color:var(--neu)}
+  .insight b{font-weight:800}
+  .rep-detail-row{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+
   .full{grid-column:1/-1}
   .kw-list{display:flex;flex-wrap:wrap;gap:9px}
   .kw-chip{background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 13px;font-size:12.5px;display:flex;align-items:center;gap:9px}
@@ -441,7 +491,9 @@
   <!-- 내비게이션 + 누적 툴바 -->
   <div class="nav" id="nav">
     <button class="nav-btn on" data-view="dash">📊 대시보드</button>
+    <button class="nav-btn" data-view="report">📑 리포트</button>
     <button class="nav-btn admin-only" data-view="verify">✓ 데이터 검증 <span class="nav-badge" id="verifyBadge">0</span></button>
+    <button class="nav-btn admin-only" data-view="settings">⚙ 설정</button>
     <div class="nav-tools">
       <span class="acc-stat" id="accStat"></span>
       <span class="admin-flag" id="adminFlag">🔓 관리자 모드</span>
@@ -605,6 +657,9 @@
     <div id="verifyList"></div>
     <div id="verifyMore"></div>
   </div>
+
+  <div id="report" style="display:none"></div>
+  <div id="settings" style="display:none"></div>
 
   <footer>
     레이노 카페 모니터링 · 검증(verified) 데이터 우선 대시보드<br>
@@ -983,7 +1038,7 @@ function ingest(parsed, fname){
       added++;
     }
   });
-  const merged = { rows:[...map.values()], version:1 };
+  const merged = { rows:[...map.values()], version:1, config: store.config };
   saveStore(merged);
   rebuildRAW(fname);
   showDashboardUI();
@@ -1601,6 +1656,325 @@ function normDate(s){
 // ════════════════════════════════════════════════════
 //  데이터 검증 페이지
 // ════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════
+//  ⚙ 설정 탭 — 게시글 유형 관리 (관리자)
+// ════════════════════════════════════════════════════
+let typesDraft=null;
+function renderSettings(){
+  const box=document.getElementById('settings');
+  if(auth!=='admin'){ box.innerHTML='<div class="card"><div class="empty">관리자만 접근할 수 있습니다.</div></div>'; return; }
+  if(!typesDraft) typesDraft = effPostTypes().slice();
+  const chips = typesDraft.map((t,i)=>
+    `<div class="set-chip"><input class="set-input" data-i="${i}" value="${escapeHtml(t)}"><button class="set-del" data-i="${i}" title="삭제">✕</button></div>`).join('');
+  box.innerHTML = `
+   <div class="card set-card">
+     <h3><span class="dot"></span>게시글 유형 관리</h3>
+     <div class="cap">데이터 검증 화면에서 선택하는 ‘게시글 유형’ 목록입니다. 추가·수정·삭제 후 <b>저장</b>을 누르면 모든 사용자에게 동일하게 적용됩니다.
+       (이미 데이터에 입력된 유형은 목록에서 지워도 기존 통계에는 그대로 남습니다.)</div>
+     <div class="set-list" id="setList">${chips}</div>
+     <div class="set-add">
+       <input id="setNew" placeholder="새 유형 입력 (예: 배송문의)">
+       <button id="setAddBtn" class="viewbtn">＋ 추가</button>
+     </div>
+     <div class="set-actions">
+       <button id="setSave" class="vc-save" ${typesDirty()?'':'disabled'}>저장</button>
+       <button id="setReset" class="vc-revert">기본값으로</button>
+       <span class="vc-status ${typesDirty()?'dirty':''}" id="setStatus">${typesDirty()?'● 미저장 변경 있음':'현재 '+typesDraft.length+'개 유형'}</span>
+     </div>
+   </div>`;
+}
+function typesDirty(){
+  const cur=effPostTypes();
+  const d=(typesDraft||[]).map(s=>s.trim()).filter(Boolean);
+  return JSON.stringify(d)!==JSON.stringify(cur.map(s=>s.trim()));
+}
+document.getElementById('settings').addEventListener('input', e=>{
+  if(e.target.classList.contains('set-input')){
+    typesDraft[+e.target.dataset.i]=e.target.value;
+    const st=document.getElementById('setStatus'); if(st){ const dirty=typesDirty(); st.textContent=dirty?'● 미저장 변경 있음':'현재 '+typesDraft.length+'개 유형'; st.classList.toggle('dirty',dirty); }
+    const sv=document.getElementById('setSave'); if(sv) sv.disabled=!typesDirty();
+  }
+});
+document.getElementById('settings').addEventListener('click', e=>{
+  if(e.target.closest('.set-del')){ typesDraft.splice(+e.target.closest('.set-del').dataset.i,1); renderSettings(); return; }
+  if(e.target.id==='setAddBtn'){ const inp=document.getElementById('setNew'); const v=(inp.value||'').trim(); if(v && !typesDraft.includes(v)){ typesDraft.push(v); } renderSettings(); return; }
+  if(e.target.id==='setReset'){ typesDraft=CONFIG.postTypes.slice(); renderSettings(); return; }
+  if(e.target.id==='setSave'){
+    if(auth!=='admin'){ toast('관리자만 저장할 수 있습니다.',true); return; }
+    const clean=[...new Set(typesDraft.map(s=>s.trim()).filter(Boolean))];
+    if(!clean.length){ toast('최소 1개 유형이 필요합니다.',true); return; }
+    typesDraft=clean;
+    STORE.config = {...(STORE.config||{}), postTypes:clean};
+    saveStore(STORE);            // 클라우드 업로드
+    _typeUnionCache=null;        // 유형 캐시 무효화
+    renderSettings();
+    toast('게시글 유형을 저장했습니다 ('+clean.length+'개)');
+  }
+});
+document.getElementById('settings').addEventListener('keydown', e=>{
+  if(e.target.id==='setNew' && e.key==='Enter'){ e.preventDefault(); document.getElementById('setAddBtn').click(); }
+});
+
+// ════════════════════════════════════════════════════
+//  📑 리포트 탭 — 누적 데이터 기반 브랜드 운영 리포트
+// ════════════════════════════════════════════════════
+const RP = {mode:'all', month:'', from:'', to:''};
+let RP_ROWS = [];
+const rsent = r => r.vSent || r.aiSent || '';
+const rtype = r => r.vType || r.aiType || '';
+
+function monthShift(ym, delta){ let [y,m]=ym.split('-').map(Number); m+=delta; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return y+'-'+String(m).padStart(2,'0'); }
+function rpRows(p){
+  const rows=RAW.rows;
+  if(p.mode==='month'&&p.month) return rows.filter(r=>{const d=normDate(r.date); return d&&d.slice(0,7)===p.month;});
+  if(p.mode==='range'&&(p.from||p.to)) return rows.filter(r=>{const d=normDate(r.date); if(!d)return false; if(p.from&&d<p.from)return false; if(p.to&&d>p.to)return false; return true;});
+  return rows.slice();
+}
+function rpPrev(p){
+  if(p.mode==='month'&&p.month) return {mode:'month',month:monthShift(p.month,-1)};
+  if(p.mode==='range'&&p.from&&p.to){
+    const f=new Date(p.from), t=new Date(p.to); const len=Math.round((t-f)/86400000)+1;
+    const pt=new Date(f); pt.setDate(pt.getDate()-1); const pf=new Date(pt); pf.setDate(pf.getDate()-(len-1));
+    const iso=d=>d.toISOString().slice(0,10);
+    return {mode:'range',from:iso(pf),to:iso(pt)};
+  }
+  return null;
+}
+function rpLabel(p){
+  if(p.mode==='month'&&p.month){const [y,mo]=p.month.split('-');return `${y}년 ${+mo}월`;}
+  if(p.mode==='range'&&(p.from||p.to))return `${p.from||'처음'} ~ ${p.to||'끝'}`;
+  return '전체 기간';
+}
+function rpMetrics(set){
+  const total=set.length, posts=set.filter(r=>r.isPost).length, cmts=total-posts;
+  const s=set.map(rsent);
+  const pos=s.filter(x=>x==='긍정').length, neg=s.filter(x=>x==='부정').length, neu=s.filter(x=>x==='중립').length;
+  const classified=pos+neg+neu, posRate=classified?pos/classified*100:0, negRate=classified?neg/classified*100:0;
+  return {total,posts,cmts,pos,neg,neu,classified,posRate,negRate,net:posRate-negRate,cafes:new Set(set.map(r=>r.cafe)).size};
+}
+function rpBrandCounts(set){
+  const brands=[CONFIG.ownBrand,...COMPETITORS]; const cnt={}; brands.forEach(b=>cnt[b]=0);
+  set.forEach(r=>{ const t=(r.title||'')+' '+(r.body||''); brands.forEach(b=>{ if(t.includes(b)) cnt[b]+=occur(t,b); }); });
+  return cnt;
+}
+function rpTopValues(set, key, n){
+  const m={}; set.forEach(r=>{ (r[key]||'').split(',').map(s=>s.trim()).filter(Boolean).forEach(v=>{ m[v]=(m[v]||0)+1; }); });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n);
+}
+function rpTrend(set,p){
+  const dated=set.map(r=>({d:normDate(r.date),s:rsent(r)})).filter(x=>x.d);
+  if(!dated.length) return [];
+  const byMonth=(p.mode!=='month');
+  const map={};
+  dated.forEach(x=>{ let key; if(byMonth) key=x.d.slice(0,7); else {const day=+x.d.slice(8,10); key=(Math.floor((day-1)/7)+1)+'주차';}
+    map[key]=map[key]||{total:0,pos:0,neg:0,neu:0}; map[key].total++;
+    if(x.s==='긍정')map[key].pos++; else if(x.s==='부정')map[key].neg++; else if(x.s==='중립')map[key].neu++; });
+  return Object.keys(map).sort().map(k=>{const v=map[k],cl=v.pos+v.neg+v.neu;
+    return {label:byMonth?k.replace('-','.'):k, total:v.total, posRate:cl?Math.round(v.pos/cl*100):0, neg:v.neg};});
+}
+function dlt(cur,prev,pp){ // 변화량 문구
+  if(prev==null) return '';
+  const d=cur-prev;
+  const sign=d>0?'▲':d<0?'▼':'–';
+  const cls=d>0?'up':d<0?'down':'flat';
+  return `<span class="dlt ${cls}">${sign} ${pp?Math.abs(d).toFixed(1)+'%p':Math.abs(d).toLocaleString()}</span>`;
+}
+
+function renderReport(){
+  const box=document.getElementById('report');
+  if(!RAW || !RAW.rows.length){ box.innerHTML='<div class="card"><div class="empty">아직 데이터가 없습니다. 데이터가 쌓이면 리포트가 자동 생성됩니다.</div></div>'; return; }
+
+  // 기간 옵션(월) 채우기
+  const months=[...new Set(RAW.rows.map(r=>normDate(r.date).slice(0,7)).filter(Boolean))].sort();
+  if(RP.mode==='month' && !months.includes(RP.month)) RP.month=months[months.length-1]||'';
+  const dates=RAW.rows.map(r=>normDate(r.date)).filter(Boolean).sort();
+  if(dates.length){ if(!RP.from)RP.from=dates[0]; if(!RP.to)RP.to=dates[dates.length-1]; }
+
+  const cur=rpRows(RP); RP_ROWS=cur;
+  const prevP=rpPrev(RP); const prev=prevP?rpRows(prevP):null;
+  const M=rpMetrics(cur), P=prev?rpMetrics(prev):null;
+
+  // ── 기간 컨트롤 ──
+  const monthOpts=months.map(m=>{const [y,mo]=m.split('-');return `<option value="${m}" ${RP.month===m?'selected':''}>${y}년 ${+mo}월</option>`;}).join('');
+  const head=`
+   <div class="card rep-head">
+     <div class="rep-head-top">
+       <div><h2 style="margin:0">📑 분석 리포트</h2>
+         <div class="cap" style="margin-top:4px">누적 데이터 기반 · 감성은 검증값 우선(없으면 AI) 적용 · 기간을 바꾸면 리포트가 갱신됩니다</div></div>
+       <div class="rep-period">
+         <div class="seg" id="rpSeg">
+           <button data-rpm="all" class="${RP.mode==='all'?'on':''}">전체</button>
+           <button data-rpm="month" class="${RP.mode==='month'?'on':''}">월별</button>
+           <button data-rpm="range" class="${RP.mode==='range'?'on':''}">기간</button>
+         </div>
+         <select class="dt-select" id="rpMonth" style="display:${RP.mode==='month'?'':'none'}">${monthOpts}</select>
+         <span class="dt-range" id="rpRange" style="display:${RP.mode==='range'?'inline-flex':'none'}">
+           <input type="date" class="dt-input" id="rpFrom" value="${RP.from}" min="${dates[0]||''}" max="${dates[dates.length-1]||''}">
+           <span class="dt-tilde">~</span>
+           <input type="date" class="dt-input" id="rpTo" value="${RP.to}" min="${dates[0]||''}" max="${dates[dates.length-1]||''}">
+         </span>
+       </div>
+     </div>
+     <div class="rep-badge">분석 기간: <b>${rpLabel(RP)}</b>${prevP?` · 비교: ${rpLabel(prevP)}`:''}</div>
+   </div>`;
+
+  if(!cur.length){ box.innerHTML=head+'<div class="card"><div class="empty">선택한 기간에 데이터가 없습니다.</div></div>'; bindReport(); return; }
+
+  // ── 1. 핵심 요약 ──
+  const volDelta = P?dlt(M.total,P.total,false):'';
+  const prDelta  = P?dlt(M.posRate,P.posRate,true):'';
+  const summary=`
+   <div class="card rep-sec">
+     <h3><span class="dot"></span>핵심 요약</h3>
+     <div class="rep-kpis">
+       <div class="rk"><div class="rk-l">총 언급량</div><div class="rk-v">${M.total.toLocaleString()} ${volDelta}</div><div class="rk-m">게시글 ${M.posts} · 댓글 ${M.cmts}</div></div>
+       <div class="rk"><div class="rk-l">긍정률</div><div class="rk-v" style="color:var(--pos)">${M.posRate.toFixed(1)}% ${prDelta}</div><div class="rk-m">분류 ${M.classified}건 기준</div></div>
+       <div class="rk"><div class="rk-l">부정률</div><div class="rk-v" style="color:var(--neg)">${M.negRate.toFixed(1)}%</div><div class="rk-m">부정 ${M.neg}건</div></div>
+       <div class="rk"><div class="rk-l">순감성(긍정−부정)</div><div class="rk-v" style="color:${M.net>=0?'var(--pos)':'var(--neg)'}">${M.net>=0?'+':''}${M.net.toFixed(1)}%p</div><div class="rk-m">활동 카페 ${M.cafes}곳</div></div>
+     </div>
+     <div class="rep-sentbar">
+       <span class="sb pos" style="width:${M.classified?M.pos/M.classified*100:0}%">${M.pos?'긍정 '+M.pos:''}</span>
+       <span class="sb neg" style="width:${M.classified?M.neg/M.classified*100:0}%">${M.neg?'부정 '+M.neg:''}</span>
+       <span class="sb neu" style="width:${M.classified?M.neu/M.classified*100:0}%">${M.neu?'중립 '+M.neu:''}</span>
+     </div>
+   </div>`;
+
+  // ── 2. 추이 ──
+  const tr=rpTrend(cur,RP); const maxT=Math.max(1,...tr.map(t=>t.total));
+  const trendRows=tr.map(t=>`
+     <div class="rep-trow">
+       <div class="rt-l">${escapeHtml(t.label)}</div>
+       <div class="rt-bar"><i style="width:${t.total/maxT*100}%"></i></div>
+       <div class="rt-n">${t.total}건</div>
+       <div class="rt-p" style="color:${t.posRate>=50?'var(--pos)':t.posRate<30?'var(--neg)':'var(--ink2)'}">긍정 ${t.posRate}%</div>
+     </div>`).join('');
+  const trend=`
+   <div class="card rep-sec">
+     <h3><span class="dot"></span>언급량 · 긍정률 추이</h3>
+     <div class="cap">${RP.mode==='month'?'주차별':'월별'} 추이입니다.</div>
+     <div class="rep-trend">${trendRows||'<div class="empty">추이 데이터 부족</div>'}</div>
+   </div>`;
+
+  // ── 3. 경쟁사 비교 (SOV) ──
+  const bc=rpBrandCounts(cur); const bcEnt=Object.entries(bc).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+  const bcTotal=bcEnt.reduce((a,e)=>a+e[1],0);
+  const own=bc[CONFIG.ownBrand]||0; const ownShare=bcTotal?own/bcTotal*100:0;
+  let ownShareDelta='';
+  if(prev){ const pbc=rpBrandCounts(prev); const pt=Object.values(pbc).reduce((a,b)=>a+b,0); const ps=pt?(pbc[CONFIG.ownBrand]||0)/pt*100:0; ownShareDelta=dlt(ownShare,ps,true); }
+  const sovRows=bcEnt.map(([b,c])=>{const share=bcTotal?c/bcTotal*100:0; const mine=(b===CONFIG.ownBrand);
+    return `<div class="rep-trow"><div class="rt-l">${mine?'<b style="color:var(--amber)">'+escapeHtml(b)+' (자사)</b>':escapeHtml(b)}</div>
+      <div class="rt-bar"><i style="width:${share}%;background:${mine?'var(--amber)':'var(--ink3)'}"></i></div>
+      <div class="rt-n">${c}회</div><div class="rt-p">${share.toFixed(0)}%</div></div>`;}).join('');
+  const sov=`
+   <div class="card rep-sec">
+     <h3><span class="dot"></span>경쟁사 언급 비교 (점유율)</h3>
+     <div class="cap">본문·제목에서 브랜드명이 언급된 횟수 기준 · 자사 점유율 <b style="color:var(--amber)">${ownShare.toFixed(0)}%</b> ${ownShareDelta}</div>
+     <div class="rep-trend">${sovRows||'<div class="empty">브랜드 언급이 감지되지 않았습니다.</div>'}</div>
+   </div>`;
+
+  // ── 4. 긍정/부정 요인 ──
+  const posR=rpTopValues(cur,'posReason',6), negR=rpTopValues(cur,'negReason',6);
+  const rlist=(arr,color)=> arr.length? arr.map(([v,c])=>`<div class="rep-rrow"><span class="rep-rdot" style="background:${color}"></span><span class="rep-rv">${escapeHtml(v)}</span><span class="rep-rc">${c}</span></div>`).join('') : '<div class="empty">검증 분류 입력이 부족합니다. (검증 화면에서 ‘추가 분류’를 입력하면 채워집니다)</div>';
+  const reasons=`
+   <div class="card rep-sec">
+     <h3><span class="dot"></span>긍정 · 부정 요인 분석</h3>
+     <div class="rep-2col">
+       <div><div class="rep-subh" style="color:var(--pos)">👍 긍정 요인 TOP</div>${rlist(posR,'var(--pos)')}</div>
+       <div><div class="rep-subh" style="color:var(--neg)">👎 부정 요인 TOP</div>${rlist(negR,'var(--neg)')}</div>
+     </div>
+   </div>`;
+
+  // ── 5. 게시글 유형 분포 ──
+  const tc=Object.entries((()=>{const m={};cur.forEach(r=>{const t=rtype(r);if(t)m[t]=(m[t]||0)+1;});return m;})()).sort((a,b)=>b[1]-a[1]);
+  const tcMax=Math.max(1,...tc.map(e=>e[1]));
+  const actionable=['불만/AS','가격문의','시공/견적문의','추천요청','제품비교'];
+  const tcRows=tc.map(([t,c])=>{const hot=actionable.includes(t);
+    return `<div class="rep-trow"><div class="rt-l">${escapeHtml(t)}${hot?' <span class="rep-flag">주목</span>':''}</div>
+      <div class="rt-bar"><i style="width:${c/tcMax*100}%;background:${hot?'var(--amber)':'var(--neu)'}"></i></div>
+      <div class="rt-n">${c}건</div><div class="rt-p">${(c/cur.length*100).toFixed(0)}%</div></div>`;}).join('');
+  const types=`
+   <div class="card rep-sec">
+     <h3><span class="dot"></span>게시글 유형 분포</h3>
+     <div class="cap">‘주목’은 운영 대응이 필요한 유형(불만/AS·가격·견적·추천요청·비교)입니다.</div>
+     <div class="rep-trend">${tcRows||'<div class="empty">유형 분류 데이터가 없습니다.</div>'}</div>
+   </div>`;
+
+  // ── 6. 주목 카페 ──
+  const cs=(()=>{const m={};cur.forEach(r=>{const c=r.cafe;m[c]=m[c]||{total:0,neg:0};m[c].total++;if(rsent(r)==='부정')m[c].neg++;});
+    return Object.entries(m).map(([c,v])=>({c,...v,negRate:v.total?v.neg/v.total*100:0}));})();
+  const byVol=cs.slice().sort((a,b)=>b.total-a.total).slice(0,5);
+  const byNeg=cs.filter(x=>x.neg>0).sort((a,b)=>b.neg-a.neg).slice(0,5);
+  const cafeList=(arr,showNeg)=>arr.length?arr.map(x=>`<div class="rep-rrow"><span class="rep-rv">${escapeHtml(x.c)}</span><span class="rep-rc">${showNeg?`부정 ${x.neg} (${x.negRate.toFixed(0)}%)`:`${x.total}건`}</span></div>`).join(''):'<div class="empty">없음</div>';
+  const cafes=`
+   <div class="card rep-sec">
+     <h3><span class="dot"></span>주목 카페</h3>
+     <div class="rep-2col">
+       <div><div class="rep-subh">📈 언급량 상위</div>${cafeList(byVol,false)}</div>
+       <div><div class="rep-subh" style="color:var(--neg)">⚠ 부정 많은 카페</div>${cafeList(byNeg,true)}</div>
+     </div>
+   </div>`;
+
+  // ── 7. 제품 · 차종 언급 (있을 때만) ──
+  const prod=rpTopValues(cur,'product',6), car=rpTopValues(cur,'carModel',6), rec=rpTopValues(cur,'recommender',6);
+  let extra='';
+  if(prod.length||car.length||rec.length){
+    const mini=(title,arr)=>`<div><div class="rep-subh">${title}</div>${arr.length?arr.map(([v,c])=>`<div class="rep-rrow"><span class="rep-rv">${escapeHtml(v)}</span><span class="rep-rc">${c}</span></div>`).join(''):'<div class="empty">없음</div>'}</div>`;
+    extra=`<div class="card rep-sec"><h3><span class="dot"></span>제품 · 차종 · 추천 주체</h3><div class="rep-3col">${mini('제품',prod)}${mini('차종',car)}${mini('추천 주체',rec)}</div></div>`;
+  }
+
+  // ── 8. 제언 / 주의 신호 ──
+  const ins=[];
+  if(P){
+    if(M.total>=P.total*1.5 && P.total>=3) ins.push(['warn',`언급량이 직전 기간 대비 <b>${Math.round((M.total/P.total-1)*100)}% 급증</b>했습니다. 버즈 원인(이슈·캠페인) 점검이 필요합니다.`]);
+    else if(M.total<=P.total*0.6 && P.total>=3) ins.push(['info',`언급량이 직전 기간 대비 <b>${Math.round((1-M.total/P.total)*100)}% 감소</b>했습니다.`]);
+    if(M.posRate-P.posRate>=5) ins.push(['good',`긍정률이 직전 대비 <b>+${(M.posRate-P.posRate).toFixed(1)}%p</b> 개선됐습니다.`]);
+    if(P.posRate-M.posRate>=5) ins.push(['warn',`긍정률이 직전 대비 <b>${(M.posRate-P.posRate).toFixed(1)}%p</b> 하락했습니다. 부정 요인 점검을 권장합니다.`]);
+  }
+  if(M.negRate>=25) ins.push(['warn',`부정률이 <b>${M.negRate.toFixed(0)}%</b>로 높습니다. 아래 ‘부정 요인’과 부정 글을 우선 확인하세요.`]);
+  const asCnt=cur.filter(r=>rtype(r)==='불만/AS').length;
+  if(asCnt>0) ins.push(['warn',`<b>불만/AS</b> 유형 글이 <b>${asCnt}건</b> 있습니다. CS 대응이 필요할 수 있습니다.`,'as']);
+  const priceCnt=cur.filter(r=>{const t=rtype(r);return t==='가격문의'||t==='시공/견적문의';}).length;
+  if(priceCnt>=3) ins.push(['info',`가격·견적 문의가 <b>${priceCnt}건</b>으로 구매 관심이 감지됩니다. 가격/프로모션 메시지를 점검하세요.`]);
+  if(bcEnt.length){ const top=bcEnt[0]; if(top[0]!==CONFIG.ownBrand && top[1]>own) ins.push(['warn',`경쟁사 <b>${escapeHtml(top[0])}</b> 언급(${top[1]}회)이 자사(${own}회)보다 많습니다. 점유율 방어가 필요합니다.`]); }
+  if(M.posRate>=60 && M.negRate<15) ins.push(['good',`전반적으로 우호적인 여론입니다. 긍정 후기를 콘텐츠·리뷰 마케팅에 활용해 보세요.`]);
+  if(!ins.length) ins.push(['info','특이 신호는 없습니다. 안정적인 흐름입니다.']);
+  const insHtml=ins.map(it=>`<div class="insight ${it[0]}">${it[1]}${it[2]==='as'?' <button class="viewbtn" data-rep="as" style="margin-left:6px;padding:3px 10px">글 보기</button>':''}</div>`).join('');
+  const advice=`
+   <div class="card rep-sec">
+     <h3><span class="dot"></span>제언 · 주의 신호</h3>
+     <div class="rep-insights">${insHtml}</div>
+     <div class="rep-detail-row">
+       <button class="viewbtn" data-rep="neg">부정 글 보기</button>
+       <button class="viewbtn" data-rep="all" style="background:var(--ink2)">기간 전체 글 보기</button>
+     </div>
+   </div>`;
+
+  box.innerHTML = head+summary+trend+sov+reasons+types+cafes+extra+advice;
+  bindReport();
+}
+
+function bindReport(){
+  const seg=document.getElementById('rpSeg');
+  if(seg && !seg.dataset.bound){ /* 위임은 아래 #report 한 번만 */ }
+}
+document.getElementById('report').addEventListener('click', e=>{
+  const sb=e.target.closest('#rpSeg button');
+  if(sb){ RP.mode=sb.dataset.rpm; renderReport(); return; }
+  const rb=e.target.closest('[data-rep]');
+  if(rb){
+    const k=rb.dataset.rep;
+    let list=RP_ROWS, title='기간 전체 글·댓글', sub=rpLabel(RP);
+    if(k==='neg'){ list=RP_ROWS.filter(r=>rsent(r)==='부정'); title='부정 글·댓글'; }
+    else if(k==='as'){ list=RP_ROWS.filter(r=>rtype(r)==='불만/AS'); title='불만/AS 글·댓글'; }
+    openDetail(`${title}`, list, `${rpLabel(RP)} 기준`);
+  }
+});
+document.getElementById('report').addEventListener('change', e=>{
+  if(e.target.id==='rpMonth'){ RP.month=e.target.value; renderReport(); }
+  if(e.target.id==='rpFrom'){ RP.from=e.target.value; if(RP.from&&RP.to&&RP.to<RP.from)RP.to=RP.from; renderReport(); }
+  if(e.target.id==='rpTo'){ RP.to=e.target.value; if(RP.from&&RP.to&&RP.to<RP.from)RP.from=RP.to; renderReport(); }
+});
+
 function setView(v){
   if(state.view==='verify' && v!=='verify') flushCloudSave();  // 검증 화면을 떠날 때 클라우드 반영
   state.view=v;
@@ -1612,9 +1986,13 @@ function setView(v){
   document.getElementById('veriNote').style.display = dash?'block':'none';
   document.getElementById('filterStatus').style.display =
       (dash && (state.sentFilter||state.hiddenTypes.size))?'flex':'none';
-  document.getElementById('verify').style.display = dash?'none':'block';
+  document.getElementById('verify').style.display   = (v==='verify')?'block':'none';
+  document.getElementById('report').style.display   = (v==='report')?'block':'none';
+  document.getElementById('settings').style.display = (v==='settings')?'block':'none';
   if(dash && dashStale){ dashStale=false; buildTypeChips(); render(); }  // 미뤄둔 대시보드 갱신을 한 번에
-  if(!dash){ state.vfLimit=60; renderVerify(); }
+  if(v==='verify'){ state.vfLimit=60; renderVerify(); }
+  if(v==='report') renderReport();
+  if(v==='settings') renderSettings();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -1630,9 +2008,14 @@ function verifyRows(){
 }
 
 let _typeUnionCache=null;
+// 게시글 유형: 클라우드 설정(STORE.config.postTypes)이 있으면 그것을, 없으면 기본값
+function effPostTypes(){
+  const c=STORE.config;
+  return (c && Array.isArray(c.postTypes) && c.postTypes.length) ? c.postTypes : CONFIG.postTypes;
+}
 function typeUnion(){
   if(_typeUnionCache) return _typeUnionCache;
-  const set=new Set(POST_TYPES);
+  const set=new Set(effPostTypes());
   RAW.rows.forEach(r=>{ if(r.aiType) set.add(r.aiType); if(r.vType) set.add(r.vType); });
   _typeUnionCache=[...set];
   return _typeUnionCache;
@@ -1939,7 +2322,7 @@ async function clearAll(){
   if(!RAW || !RAW.rows.length) return;
   const n=RAW.rows.length;
   if(!confirm(`누적된 ${n.toLocaleString()}건을 모두 삭제할까요?\n검증한 내용도 함께 사라집니다.\n(먼저 「내보내기」로 백업을 권장합니다)`)) return;
-  STORE = { rows:[], version:1 };
+  STORE = { rows:[], version:1, config: STORE.config };
   await cloudSaveData();        // 빈 데이터로 클라우드 덮어쓰기
   location.reload();
 }
@@ -2002,7 +2385,7 @@ function applyAuthUI(){
   document.getElementById('adminBtn').style.display  = admin ? 'none' : '';  // 로그인 버튼: 비로그인 방문자
   document.getElementById('logoutBtn').style.display = admin ? '' : 'none';  // 로그아웃: 관리자
   document.getElementById('adminFlag').style.display = admin ? 'inline-flex' : 'none';
-  if(!admin && state.view==='verify') setView('dash');
+  if(!admin && (state.view==='verify'||state.view==='settings')) setView('dash');
   const hasData = !!(RAW && RAW.meta && RAW.meta.total>0);
   if(!hasData){
     document.getElementById('drop').style.display = admin ? 'block' : 'none';
