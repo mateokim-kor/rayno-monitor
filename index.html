@@ -12,13 +12,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
-    --bg:#0d1014; --bg2:#13171d; --card:#171c23; --card2:#1d242d;
-    --line:#283039; --line2:#333d49;
-    --ink:#e8edf2; --ink2:#9aa6b2; --ink3:#5f6c79;
-    --amber:#e8893b;   /* 검증 = 주황 (엑셀 검증칸 색 계승) */
+    --bg:#f4f6f9; --bg2:#eceff4; --card:#ffffff; --card2:#f7f9fc;
+    --line:#e3e7ee; --line2:#cfd6df;
+    --ink:#1b2430; --ink2:#56616f; --ink3:#8995a3;
+    --amber:#e07d2c;   /* 검증 = 주황 (엑셀 검증칸 색 계승) */
     --amber-d:#b9661f;
-    --pos:#3fb27f; --neg:#e0594f; --neu:#5b8bd0;
-    --pos-bg:rgba(63,178,127,.14); --neg-bg:rgba(224,89,79,.14); --neu-bg:rgba(91,139,208,.14);
+    --pos:#2f9e6e; --neg:#d24a40; --neu:#3f78c7;
+    --pos-bg:rgba(47,158,110,.12); --neg-bg:rgba(210,74,64,.12); --neu-bg:rgba(63,120,199,.12);
     --r:14px;
     --font:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
   }
@@ -84,7 +84,7 @@
 
   /* ── 검증 안내 배너 ── */
   .veri-note{display:none;margin-top:14px;background:rgba(232,137,59,.08);border:1px solid rgba(232,137,59,.28);
-             border-radius:11px;padding:11px 15px;font-size:12.5px;color:#f0c9a3;line-height:1.6}
+             border-radius:11px;padding:11px 15px;font-size:12.5px;color:var(--ink2);line-height:1.6}
   .veri-note b{color:var(--amber)}
 
   /* ── 대시보드 ── */
@@ -199,19 +199,30 @@
   /* ── 테이블 ── */
   .tbl-wrap{overflow:auto;border-radius:10px;border:1px solid var(--line)}
   table{width:100%;border-collapse:collapse;font-size:12.5px}
-  th,td{padding:9px 12px;text-align:left;white-space:nowrap}
+  th,td{padding:10px 12px;text-align:left;white-space:nowrap;vertical-align:middle}
   thead th{background:var(--bg2);color:var(--ink2);font-weight:700;font-size:11px;
            text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0}
+  #cafeTbl th:not(:first-child),#cafeTbl td:not(:first-child){text-align:center}
   tbody tr{border-top:1px solid var(--line)}
   tbody tr:hover{background:var(--card2)}
-  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  td.num{text-align:center;font-variant-numeric:tabular-nums}
   .bar-cell{min-width:120px}
-  .minibar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;width:90px;display:inline-block;vertical-align:middle;margin-right:8px}
+  .minibar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;width:72px;display:inline-block;vertical-align:middle;margin-right:8px}
   .minibar i{display:block;height:100%;background:var(--pos)}
   .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
   .pill.pos{background:var(--pos-bg);color:var(--pos)}
   .pill.neg{background:var(--neg-bg);color:var(--neg)}
   .pill.neu{background:var(--neu-bg);color:var(--neu)}
+  /* 카페별 요약 '보기' 버튼 */
+  .viewbtn{display:inline-flex;align-items:center;gap:4px;background:var(--amber);color:#fff;border:0;
+    border-radius:8px;font-family:var(--font);font-size:11.5px;font-weight:800;padding:6px 16px;cursor:pointer;
+    transition:.15s;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .viewbtn:hover{background:var(--amber-d);transform:translateY(-1px);box-shadow:0 3px 8px rgba(224,125,44,.3)}
+  .viewbtn:active{transform:translateY(0)}
+  /* 검증 카드 원문 보기 링크 */
+  .vc-srcbtn{margin-left:auto;text-decoration:none;background:var(--bg2);border:1px solid var(--line2);
+    color:var(--ink2);border-radius:8px;font-size:11.5px;font-weight:700;padding:5px 11px;white-space:nowrap;transition:.15s}
+  .vc-srcbtn:hover{border-color:var(--amber);color:var(--amber)}
 
   .full{grid-column:1/-1}
   .kw-list{display:flex;flex-wrap:wrap;gap:9px}
@@ -390,10 +401,11 @@
     background:rgba(232,137,59,.12);border:1px solid rgba(232,137,59,.35);border-radius:20px;padding:5px 12px}
   #emptyState{display:none;margin-top:22px}
   /* ── 브랜드 로고 ── */
-  .brand-logo{height:34px;width:auto;display:block}
+  .brand-logo{height:34px;width:auto;display:block;filter:brightness(0) saturate(0)}
+  .brand{cursor:pointer}
   .brand-div{width:1px;height:30px;background:var(--line2);flex:none}
   @media(max-width:520px){.brand-logo{height:26px}}
-  .lock-mark{width:auto;height:62px;margin:0 auto 18px;display:block;
+  .lock-mark{width:auto;height:62px;margin:0 auto 18px;display:block;filter:brightness(0) saturate(0);
              filter:drop-shadow(0 6px 18px rgba(232,137,59,.22))}
 </style>
 </head>
@@ -635,7 +647,7 @@
 <script>
 "use strict";
 Chart.defaults.font.family = '"Pretendard Variable",Pretendard,sans-serif';
-Chart.defaults.color = '#9aa6b2';
+Chart.defaults.color = '#56616f';
 Chart.defaults.font.size = 12;
 
 /* ════════════════════════════════════════════════════════════
@@ -1223,7 +1235,7 @@ function renderKPIs(rows){
 
   const cards=[
     {lab: isStrict?'총 수집 (검증)':'총 수집',  val:total.toLocaleString(),
-       meta:`게시글 ${posts} · 댓글 ${cmts}${isStrict?' · 검증 완료분':''}`, cls:'', sent:null},
+       meta:`게시글 ${posts} · 댓글 ${cmts}${isStrict?' · 검증 완료분':''}`, cls:'', sent:null, seeAll:true},
     {lab:'긍정',    val:pos,  meta:classified?`${(pos/classified*100).toFixed(1)}%`:'-', cls:'k-pos', sent:'긍정'},
     {lab:'부정',    val:neg,  meta:classified?`${(neg/classified*100).toFixed(1)}%`:'-', cls:'k-neg', sent:'부정'},
     {lab:'중립',    val:neu,  meta:classified?`${(neu/classified*100).toFixed(1)}%`:'-', cls:'k-neu', sent:'중립'},
@@ -1233,7 +1245,8 @@ function renderKPIs(rows){
     const clickable = !!c.sent;
     const active = c.sent && state.sentFilter===c.sent;
     const tag = clickable ? `<span class="tag">${active?'필터 ON':'클릭=필터'}</span>` : '';
-    const see = clickable ? `<button class="seebtn" data-see="${c.sent}">자세히 보기</button>` : '';
+    const see = clickable ? `<button class="seebtn" data-see="${c.sent}">자세히 보기</button>`
+              : (c.seeAll ? `<button class="seebtn" data-see="__total__">자세히 보기</button>` : '');
     return `<div class="kpi ${c.cls} ${clickable?'clickable':''} ${active?'active':''}"
               ${c.sent?`data-sent="${c.sent}"`:''}>
        ${tag}<div class="lab">${c.lab}</div>
@@ -1253,6 +1266,13 @@ function renderKPIs(rows){
     btn.addEventListener('click', e=>{
       e.stopPropagation();
       const s=btn.dataset.see;
+      if(s==='__total__'){
+        const base=VIEW.typeFiltered;
+        const list=(state.mode==='strict')?base.filter(isVerified):base;
+        openDetail(`총 수집${state.mode==='strict'?' (검증 완료)':''} · 글·댓글`, list,
+          '현재 집계에 포함된 게시글과 댓글입니다');
+        return;
+      }
       const list=VIEW.typeFiltered.filter(r=>sentOf(r)===s);
       const sCls=s==='긍정'?'pos':s==='부정'?'neg':'neu';
       openDetail(`<span class="tagm ${sCls}" style="font-size:14px">${s}</span> 글·댓글`, list,
@@ -1285,7 +1305,7 @@ const pctBarPlugin = {
     const data=chart.data.datasets[0].data, tot=data.reduce((a,b)=>a+(+b||0),0);
     if(!tot) return;
     ctx.save(); ctx.textAlign='center'; ctx.textBaseline='bottom';
-    ctx.font='700 11px "Pretendard Variable",Pretendard,sans-serif'; ctx.fillStyle='#cfd6dd';
+    ctx.font='700 11px "Pretendard Variable",Pretendard,sans-serif'; ctx.fillStyle='#56616f';
     meta.data.forEach((bar,i)=>{ const p=Math.round((+data[i]||0)/tot*100); ctx.fillText(p+'%', bar.x, bar.y-4); });
     ctx.restore();
   }
@@ -1304,14 +1324,14 @@ function renderSentiment(rows){
   const off = base.map((c,i)=> (state.sentFilter && labels[i]!==state.sentFilter) ? 4 : 0);
   makeChart('cSent',{
     type:'doughnut',
-    data:{labels,datasets:[{data,backgroundColor:bg,borderColor:'#171c23',borderWidth:3,offset:off}]},
+    data:{labels,datasets:[{data,backgroundColor:bg,borderColor:'#ffffff',borderWidth:3,offset:off}]},
     plugins:[pctDonutPlugin],
     options:{cutout:'60%',onClick:(e,el)=>{
         if(el.length){ const lab=labels[el[0].index];
           state.sentFilter=(state.sentFilter===lab)?null:lab; render(); }
       },
       plugins:{
-        legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle',color:'#f2f5f8',
+        legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle',color:'#1b2430',
           font:{size:13,weight:'600'},
           generateLabels(chart){
             const ds=chart.data.datasets[0];
@@ -1345,7 +1365,7 @@ function renderType(rows){
       },
       plugins:{legend:{display:false},
         tooltip:{callbacks:{label:c=>` ${c.raw}건 · ${Math.round(c.raw/tot*100)}%`}}},
-      scales:{x:{grid:{display:false}},y:{grid:{color:'#283039'},ticks:{precision:0},
+      scales:{x:{grid:{display:false}},y:{grid:{color:'#e3e7ee'},ticks:{precision:0},
         suggestedMax: Math.ceil(Math.max(...ent.map(e=>e[1]),1)*1.12)}}}
   });
 }
@@ -1365,7 +1385,7 @@ function renderTrend(rows){
       {label:'댓글',data:labels.map(d=>byDate[d].cmt),borderColor:COLORS.neu,backgroundColor:'rgba(91,139,208,.10)',fill:true,tension:.3,pointRadius:3},
     ]},
     options:{plugins:{legend:{position:'bottom',labels:{usePointStyle:true,pointStyle:'circle',padding:14}}},
-      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:'#283039'},ticks:{precision:0}}}}
+      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:8}},y:{grid:{color:'#e3e7ee'},ticks:{precision:0}}}}
   });
 }
 
@@ -1402,7 +1422,7 @@ function renderComp(rows){
           `'${b}'이(가) 언급된 글·댓글입니다`);
       },
       plugins:{legend:{display:false}},
-      scales:{x:{grid:{color:'#283039'},ticks:{precision:0}},y:{grid:{display:false}}}}
+      scales:{x:{grid:{color:'#e3e7ee'},ticks:{precision:0}},y:{grid:{display:false}}}}
   });
 }
 
@@ -1428,7 +1448,7 @@ function renderCafe(rows){
     <td class="num"><span class="pill neg">${e.neg}</span></td>
     <td class="num"><span class="pill neu">${e.neu}</span></td>
     <td class="bar-cell"><span class="minibar"><i style="width:${e.rate.toFixed(0)}%"></i></span>${e.rate.toFixed(0)}%</td>
-    <td><button class="seebtn" style="position:static" data-cafe="${escapeHtml(e.c)}">보기</button></td>
+    <td><button class="viewbtn" data-cafe="${escapeHtml(e.c)}">보기 →</button></td>
   </tr>`).join('');
   const tbl=document.getElementById('cafeTbl');
   tbl.innerHTML=head+'<tbody>'+body+'</tbody>';
@@ -1716,12 +1736,14 @@ function vCard(r){
   const body=escapeHtml(r.body||'').replace(/\n{3,}/g,'\n\n') || '<span style="color:var(--ink3)">(내용 없음)</span>';
   const titleBlock = r.isPost && r.title ? `<div class="vc-title">${escapeHtml(r.title)}</div>` : '';
   const parentBlock = (!r.isPost && r.parentTitle) ? `<div class="vc-parent">↳ 원글: ${escapeHtml(r.parentTitle)}</div>` : '';
+  const linkBtn = r.link ? `<a class="vc-srcbtn" href="${escapeHtml(r.link)}" target="_blank" rel="noopener">🔗 원문 보기</a>` : '';
   return `<div class="vcard editor ${done?'done':''} ${pending[r.id]?'dirty':''}" data-id="${r.id}">
     <div class="vc-top">
       <span class="tagm cafe">${escapeHtml(r.cafe)}</span>
       ${r.date?`<span class="tagm date">${escapeHtml(r.date)}</span>`:''}
       <span class="tagm kind ${r.isPost?'':'c'}">${kind}</span>
       <span class="vc-ai">${ai}</span>
+      ${linkBtn}
     </div>
     ${titleBlock}${parentBlock}
     <div class="vc-body ${longish?'clamp':''}">${body}</div>
@@ -2018,6 +2040,23 @@ document.getElementById('lockEmail').addEventListener('keydown', e=>{ if(e.key==
 document.getElementById('lockCancel').addEventListener('click', hideLock);
 document.getElementById('adminBtn').addEventListener('click', showLock);
 document.getElementById('logoutBtn').addEventListener('click', logout);
+
+// 좌상단 RAYNO 로고 클릭 → 대시보드 최초 화면·기본 설정으로 복귀
+function resetToHome(){
+  state.mode='strict'; state.scope='all'; state.sentFilter=null; state.hiddenTypes.clear();
+  state.dateMode='all'; state.month=''; state.from=''; state.to='';
+  state.excludeNone = CONFIG.excludeNoneByDefault;
+  document.querySelectorAll('#modeSeg button').forEach(b=>b.classList.toggle('on', b.dataset.mode===state.mode));
+  document.querySelectorAll('#scopeSeg button').forEach(b=>b.classList.toggle('on', b.dataset.scope===state.scope));
+  document.querySelectorAll('#dateModeSeg button').forEach(b=>b.classList.toggle('on', b.dataset.dm===state.dateMode));
+  document.querySelectorAll('#noneSeg button').forEach(b=>b.classList.toggle('on',(b.dataset.none==='exclude')===state.excludeNone));
+  const ms=document.getElementById('monthSel'); if(ms) ms.style.display='none';
+  const dr=document.getElementById('dateRange'); if(dr) dr.style.display='none';
+  if(RAW && RAW.meta && RAW.meta.total){ buildTypeChips(); render(); }
+  setView('dash');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+const brandEl=document.querySelector('.brand'); if(brandEl) brandEl.addEventListener('click', resetToHome);
 
 // CONFIG 문구·설정을 화면에 반영
 function applyConfigAndSettings(){
