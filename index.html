@@ -235,6 +235,19 @@
   .set-add input{flex:1;max-width:280px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-family:var(--font);font-size:13px;padding:9px 12px;outline:none}
   .set-add input:focus{border-color:var(--amber)}
   .set-actions{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:14px}
+  .set-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:640px){.set-grid{grid-template-columns:1fr}}
+  .set-field{display:flex;flex-direction:column;gap:5px}
+  .set-field span{font-size:11.5px;font-weight:700;color:var(--ink3)}
+  .set-text{background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-family:var(--font);font-size:13.5px;padding:9px 12px;outline:none}
+  .set-text:focus{border-color:var(--amber)}
+  .set-sub{font-size:12px;font-weight:800;color:var(--ink2);margin:14px 0 8px}
+  .set-savebar{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 16px;margin-bottom:16px;position:sticky;bottom:10px;box-shadow:0 4px 16px rgba(0,0,0,.06)}
+  .set-del-btn{background:transparent;border:1px solid var(--line2);border-radius:8px;color:var(--neg);font-family:var(--font);font-size:11.5px;font-weight:700;padding:6px 12px;cursor:pointer;margin-left:6px}
+  .set-del-btn:hover{background:var(--neg-bg);border-color:var(--neg)}
+  .up-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .up-tbl th{background:var(--bg2);color:var(--ink2);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:9px 12px;text-align:left}
+  .up-tbl td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:middle}
 
   /* ── 리포트 탭 ── */
   .rep-head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
@@ -531,6 +544,7 @@
     </div>
     <div class="err" id="err"></div>
     <input type="file" id="file" accept=".xlsx,.xls" hidden>
+    <input type="file" id="replaceFile" accept=".xlsx,.xls" hidden>
   </div>
 
   <!-- 내비게이션 + 누적 툴바 -->
@@ -798,6 +812,10 @@ const COLORS = {
 const SENT_VALUES = ['긍정','부정','중립'];
 const COMPETITORS = CONFIG.competitors;
 const POST_TYPES  = CONFIG.postTypes;
+// 설정(STORE.config)에서 덮어쓴 값이 있으면 그것을 사용 (관리자가 설정 탭에서 수정)
+function effText(k){ const c=STORE.config&&STORE.config.text; return (c&&c[k])||CONFIG.text[k]; }
+function effOwnBrand(){ return (STORE.config&&STORE.config.ownBrand)||CONFIG.ownBrand; }
+function effCompetitors(){ const c=STORE.config&&STORE.config.competitors; return (Array.isArray(c)&&c.length)?c:CONFIG.competitors; }
 const CLASS_FIELDS = [
   {key:'posReason',  col:'긍정이유', label:'긍정 이유', kind:'text',  ph:'예) 시야 선명, 단열 만족'},
   {key:'negReason',  col:'부정이유', label:'부정 이유', kind:'text',  ph:'예) 가격 부담, 기포'},
@@ -852,6 +870,8 @@ drop.addEventListener('drop', e=>{
   if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
 });
 fileInput.addEventListener('change', e=>{ if(e.target.files[0]){ handleFile(e.target.files[0]); e.target.value=''; } });
+const replaceFileInput = document.getElementById('replaceFile');
+if(replaceFileInput) replaceFileInput.addEventListener('change', e=>{ const f=e.target.files[0]; if(f){ handleFile(f, _replaceBatch); } _replaceBatch=null; e.target.value=''; });
 document.getElementById('reload').addEventListener('click', ()=>fileInput.click());
 
 document.getElementById('modeSeg').addEventListener('click', e=>{
@@ -910,7 +930,7 @@ document.getElementById('kwExclude').addEventListener('input', e=>{
 
 function showErr(msg){ errEl.textContent='⚠ '+msg; errEl.style.display='block'; }
 
-function handleFile(file){
+function handleFile(file, replaceBatch){
   if(auth!=='admin'){ toast('업로드는 관리자만 가능합니다.', true); return; }
   errEl.style.display='none';
   const reader = new FileReader();
@@ -918,7 +938,7 @@ function handleFile(file){
     try{
       const buf = e.target.result;
       const wb = XLSX.read(new Uint8Array(buf), {type:'array'});
-      parseWorkbook(wb, file.name);
+      parseWorkbook(wb, file.name, replaceBatch);
       cloudSaveRaw(file.name, buf);   // 원본 엑셀 클라우드 보관
     }catch(ex){ showErr('파일을 읽을 수 없습니다: '+ex.message); }
   };
@@ -926,7 +946,7 @@ function handleFile(file){
 }
 
 // ── 엑셀 파싱 ──
-function parseWorkbook(wb, fname){
+function parseWorkbook(wb, fname, replaceBatch){
   // "수집 데이터" 시트 찾기 (없으면 컬럼으로 추정)
   let sheetName = wb.SheetNames.find(n=>n.replace(/\s/g,'').includes('수집데이터'));
   if(!sheetName) sheetName = wb.SheetNames[0];
@@ -985,7 +1005,7 @@ function parseWorkbook(wb, fname){
   }
   if(!parsed.length){ showErr('데이터 행을 찾지 못했습니다.'); return; }
 
-  ingest(parsed, fname);
+  ingest(parsed, fname, {replace:replaceBatch});
 }
 
 // ════════════════════════════════════════════════════
@@ -1062,28 +1082,32 @@ function hashId(str){
 }
 
 // 새로 파싱한 행들을 기존 누적 데이터에 병합
-function ingest(parsed, fname){
+function ingest(parsed, fname, opts){
+  opts=opts||{};
   const store = loadStore();
   const map = new Map(store.rows.map(r=>[r.id, r]));
-  let maxSeq = store.rows.reduce((m,r)=>Math.max(m, r.seq||0), 0);
+  if(opts.replace){ for(const [id,r] of [...map]){ if(r.batch===opts.replace) map.delete(id); } }  // 교체: 기존 회차 제거
+  let maxSeq = [...map.values()].reduce((m,r)=>Math.max(m, r.seq||0), 0);
+  const batch = opts.replace || ('b'+Date.now().toString(36)+Math.random().toString(36).slice(2,6));
   let added=0, dup=0, adopted=0;
   parsed.forEach(nr=>{
     const ex = map.get(nr.id);
     if(ex){
       dup++;
-      // 웹에서 직접 검증한 값은 보존. 비어있으면 새 파일의 검증값/AI값으로 채움
       if(!ex.vSent && nr.vSent){ ex.vSent = nr.vSent; adopted++; }
       if(!ex.vType && nr.vType) ex.vType = nr.vType;
       if(!ex.aiSent && nr.aiSent) ex.aiSent = nr.aiSent;
       if(!ex.aiType && nr.aiType) ex.aiType = nr.aiType;
       CLASS_FIELDS.forEach(f=>{ if(!ex[f.key] && nr[f.key]) ex[f.key]=nr[f.key]; });
     }else{
-      nr.seq = ++maxSeq;
-      map.set(nr.id, nr);
-      added++;
+      nr.seq = ++maxSeq; nr.batch = batch;
+      map.set(nr.id, nr); added++;
     }
   });
-  const merged = { rows:[...map.values()], version:1, config: store.config };
+  const merged = { rows:[...map.values()], version:1, config: store.config||{} };
+  // 업로드 이력 기록(교체 시 기존 항목 갱신)
+  merged.config.uploads = (merged.config.uploads||[]).filter(u=>u.id!==batch);
+  merged.config.uploads.push({ id:batch, name:fname, at:new Date().toISOString(), added });
   saveStore(merged);
   rebuildRAW(fname);
   showDashboardUI();
@@ -1091,7 +1115,7 @@ function ingest(parsed, fname){
   buildTypeChips();
   render();
   refreshVerify();
-  let msg = `${fname} · 신규 ${added.toLocaleString()}건 추가`;
+  let msg = opts.replace ? `${fname} · 교체 완료 · 신규 ${added.toLocaleString()}건` : `${fname} · 신규 ${added.toLocaleString()}건 추가`;
   if(dup) msg += ` · 중복 ${dup.toLocaleString()}건 병합`;
   msg += ` → 누적 총 ${merged.rows.length.toLocaleString()}건`;
   toast(msg);
@@ -1490,8 +1514,8 @@ function renderTrend(rows){
 }
 
 function renderComp(rows){
-  const cnt={}; COMPETITORS.forEach(b=>cnt[b]=0);
-  rows.forEach(r=>{ const t=r.title+' '+r.body; COMPETITORS.forEach(b=>{ if(t.includes(b)) cnt[b]+=occur(t,b); }); });
+  const COMP=effCompetitors(); const cnt={}; COMP.forEach(b=>cnt[b]=0);
+  rows.forEach(r=>{ const t=r.title+' '+r.body; COMP.forEach(b=>{ if(t.includes(b)) cnt[b]+=occur(t,b); }); });
   const ent=Object.entries(cnt).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
   const canvas=document.getElementById('cComp');
   const box=canvas.parentElement;
@@ -1690,13 +1714,18 @@ document.getElementById('modalBody').addEventListener('click', e=>{
 
 // ── 유틸 ──
 function occur(t,b){ let n=0,i=0; while((i=t.indexOf(b,i))>=0){n++;i+=b.length;} return n; }
+const _ndCache=new Map();
 function normDate(s){
-  if(!s)return '';
-  const m=String(s).match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
-  if(m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
-  const m2=String(s).match(/(\d{1,2})[.\-/](\d{1,2})/);
-  if(m2) return `${String(m2[1]).padStart(2,'0')}-${String(m2[2]).padStart(2,'0')}`;
-  return String(s).trim();
+  if(s==null) return '';
+  const key=String(s);
+  if(_ndCache.has(key)) return _ndCache.get(key);
+  let out;
+  const m=key.match(/(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/);
+  if(m) out=`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  else { const m2=key.match(/(\d{1,2})[.\-/](\d{1,2})/);
+    out = m2 ? `${String(m2[1]).padStart(2,'0')}-${String(m2[2]).padStart(2,'0')}` : key.trim(); }
+  _ndCache.set(key,out);
+  return out;
 }
 // ════════════════════════════════════════════════════
 //  데이터 검증 페이지
@@ -1704,60 +1733,116 @@ function normDate(s){
 // ════════════════════════════════════════════════════
 //  ⚙ 설정 탭 — 게시글 유형 관리 (관리자)
 // ════════════════════════════════════════════════════
-let typesDraft=null;
+let setDraft=null;
+function setDraftInit(){
+  setDraft={ headerTitle:effText('headerTitle'), headerSub:effText('headerSub'),
+    ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice() };
+}
+function setDirty(){
+  if(!setDraft) return false;
+  const norm=o=>JSON.stringify({h:(o.headerTitle||'').trim(),s:(o.headerSub||'').trim(),b:(o.ownBrand||'').trim(),
+    c:(o.competitors||[]).map(x=>x.trim()).filter(Boolean),t:(o.postTypes||[]).map(x=>x.trim()).filter(Boolean)});
+  return norm(setDraft)!==norm({headerTitle:effText('headerTitle'),headerSub:effText('headerSub'),
+    ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes()});
+}
+function chipRow(grp,arr){
+  return arr.map((t,i)=>`<div class="set-chip"><input class="set-input" data-grp="${grp}" data-i="${i}" value="${escapeHtml(t)}"><button class="set-del" data-grp="${grp}" data-i="${i}" title="삭제">✕</button></div>`).join('');
+}
+function uploadHistoryHTML(){
+  const ups=((STORE.config&&STORE.config.uploads)||[]).slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
+  if(!ups.length) return '<div class="empty">아직 업로드 이력이 없습니다. (이 기능 적용 후 올린 파일부터 기록됩니다)</div>';
+  return `<div class="tbl-wrap"><table class="up-tbl"><thead><tr><th>업로드 일시</th><th>파일명</th><th>추가 건수</th><th></th></tr></thead><tbody>`+
+    ups.map(u=>{const dt=u.at?new Date(u.at):null;
+      const ds=dt?`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`:'-';
+      return `<tr><td>${ds}</td><td>${escapeHtml(u.name||'-')}</td><td style="text-align:center">${(u.added||0).toLocaleString()}</td>
+        <td style="text-align:right;white-space:nowrap"><button class="viewbtn up-replace" data-bid="${u.id}">교체</button>
+          <button class="set-del-btn up-delete" data-bid="${u.id}">삭제</button></td></tr>`;}).join('')+
+    `</tbody></table></div>`;
+}
 function renderSettings(){
   const box=document.getElementById('settings');
   if(auth!=='admin'){ box.innerHTML='<div class="card"><div class="empty">관리자만 접근할 수 있습니다.</div></div>'; return; }
-  if(!typesDraft) typesDraft = effPostTypes().slice();
-  const chips = typesDraft.map((t,i)=>
-    `<div class="set-chip"><input class="set-input" data-i="${i}" value="${escapeHtml(t)}"><button class="set-del" data-i="${i}" title="삭제">✕</button></div>`).join('');
+  if(!setDraft) setDraftInit();
+  const dirty=setDirty();
   box.innerHTML = `
    <div class="card set-card">
-     <h3><span class="dot"></span>게시글 유형 관리</h3>
-     <div class="cap">데이터 검증 화면에서 선택하는 ‘게시글 유형’ 목록입니다. 추가·수정·삭제 후 <b>저장</b>을 누르면 모든 사용자에게 동일하게 적용됩니다.
-       (이미 데이터에 입력된 유형은 목록에서 지워도 기존 통계에는 그대로 남습니다.)</div>
-     <div class="set-list" id="setList">${chips}</div>
-     <div class="set-add">
-       <input id="setNew" placeholder="새 유형 입력 (예: 배송문의)">
-       <button id="setAddBtn" class="viewbtn">＋ 추가</button>
+     <h3><span class="dot"></span>표시 정보</h3>
+     <div class="cap">상단 헤더에 표시되는 문구입니다.</div>
+     <div class="set-grid">
+       <label class="set-field"><span>헤더 제목</span><input class="set-text" data-k="headerTitle" value="${escapeHtml(setDraft.headerTitle)}"></label>
+       <label class="set-field"><span>헤더 부제목</span><input class="set-text" data-k="headerSub" value="${escapeHtml(setDraft.headerSub)}"></label>
      </div>
-     <div class="set-actions">
-       <button id="setSave" class="vc-save" ${typesDirty()?'':'disabled'}>저장</button>
-       <button id="setReset" class="vc-revert">기본값으로</button>
-       <span class="vc-status ${typesDirty()?'dirty':''}" id="setStatus">${typesDirty()?'● 미저장 변경 있음':'현재 '+typesDraft.length+'개 유형'}</span>
-     </div>
+   </div>
+   <div class="card set-card">
+     <h3><span class="dot"></span>브랜드 설정</h3>
+     <div class="cap">자사 브랜드명과 경쟁사 목록입니다. 리포트의 ‘경쟁사 언급 비교(점유율)’와 본문 언급 집계에 사용됩니다.</div>
+     <label class="set-field" style="max-width:300px"><span>자사 브랜드명</span><input class="set-text" data-k="ownBrand" value="${escapeHtml(setDraft.ownBrand)}"></label>
+     <div class="set-sub">경쟁사</div>
+     <div class="set-list">${chipRow('comp',setDraft.competitors)}</div>
+     <div class="set-add"><input id="compNew" placeholder="경쟁사 추가"><button class="viewbtn" data-add="comp">＋ 추가</button></div>
+   </div>
+   <div class="card set-card">
+     <h3><span class="dot"></span>게시글 유형</h3>
+     <div class="cap">데이터 검증 화면에서 선택하는 유형 목록입니다. 여기서 지운 유형은 검증 드롭다운에서 사라집니다. (이미 데이터에 입력된 유형은 통계에는 남습니다.)</div>
+     <div class="set-list">${chipRow('type',setDraft.postTypes)}</div>
+     <div class="set-add"><input id="typeNew" placeholder="유형 추가 (예: 배송문의)"><button class="viewbtn" data-add="type">＋ 추가</button></div>
+   </div>
+   <div class="set-savebar">
+     <button id="setSaveAll" class="vc-save" ${dirty?'':'disabled'}>설정 저장</button>
+     <button id="setResetAll" class="vc-revert">되돌리기</button>
+     <span class="vc-status ${dirty?'dirty':''}">${dirty?'● 미저장 변경 있음 — 저장하면 모든 사용자에게 적용됩니다':'저장됨'}</span>
+   </div>
+   <div class="card set-card">
+     <h3><span class="dot"></span>업로드 파일 이력</h3>
+     <div class="cap">일자별로 올린 엑셀 목록입니다. <b>교체</b>는 그 회차로 추가된 데이터를 새 엑셀로 바꾸고, <b>삭제</b>는 그 회차 데이터를 제거합니다. (다른 회차에서 중복으로 들어온 글은 유지됩니다.)</div>
+     ${uploadHistoryHTML()}
    </div>`;
 }
-function typesDirty(){
-  const cur=effPostTypes();
-  const d=(typesDraft||[]).map(s=>s.trim()).filter(Boolean);
-  return JSON.stringify(d)!==JSON.stringify(cur.map(s=>s.trim()));
+function updateSaveBar(){
+  const dirty=setDirty(); const b=document.getElementById('setSaveAll'); if(b) b.disabled=!dirty;
+  const st=document.querySelector('.set-savebar .vc-status'); if(st){ st.textContent=dirty?'● 미저장 변경 있음 — 저장하면 모든 사용자에게 적용됩니다':'저장됨'; st.classList.toggle('dirty',dirty); }
 }
+function saveAllSettings(){
+  if(auth!=='admin'){ toast('관리자만 저장할 수 있습니다.',true); return; }
+  const comps=[...new Set(setDraft.competitors.map(s=>s.trim()).filter(Boolean))];
+  const types=[...new Set(setDraft.postTypes.map(s=>s.trim()).filter(Boolean))];
+  if(!types.length){ toast('게시글 유형은 최소 1개가 필요합니다.',true); return; }
+  STORE.config = {...(STORE.config||{}),
+    text:{...((STORE.config&&STORE.config.text)||{}), headerTitle:(setDraft.headerTitle.trim()||CONFIG.text.headerTitle), headerSub:(setDraft.headerSub.trim()||CONFIG.text.headerSub)},
+    ownBrand:(setDraft.ownBrand.trim()||CONFIG.ownBrand), competitors:comps, postTypes:types };
+  saveStore(STORE); _typeUnionCache=null; setDraft=null;
+  applyConfigAndSettings(); renderSettings(); toast('설정을 저장했습니다');
+}
+function removeUploadBatch(bid){
+  const store=loadStore(); const before=store.rows.length;
+  store.rows=store.rows.filter(r=>r.batch!==bid);
+  store.config=store.config||{}; store.config.uploads=(store.config.uploads||[]).filter(u=>u.id!==bid);
+  saveStore(store); rebuildRAW(); buildTypeChips(); render(); refreshVerify(); renderSettings();
+  return before-store.rows.length;
+}
+let _replaceBatch=null;
 document.getElementById('settings').addEventListener('input', e=>{
-  if(e.target.classList.contains('set-input')){
-    typesDraft[+e.target.dataset.i]=e.target.value;
-    const st=document.getElementById('setStatus'); if(st){ const dirty=typesDirty(); st.textContent=dirty?'● 미저장 변경 있음':'현재 '+typesDraft.length+'개 유형'; st.classList.toggle('dirty',dirty); }
-    const sv=document.getElementById('setSave'); if(sv) sv.disabled=!typesDirty();
-  }
+  const t=e.target;
+  if(t.classList.contains('set-text')){ setDraft[t.dataset.k]=t.value; updateSaveBar(); }
+  else if(t.classList.contains('set-input')){ const grp=t.dataset.grp==='comp'?'competitors':'postTypes'; setDraft[grp][+t.dataset.i]=t.value; updateSaveBar(); }
 });
 document.getElementById('settings').addEventListener('click', e=>{
-  if(e.target.closest('.set-del')){ typesDraft.splice(+e.target.closest('.set-del').dataset.i,1); renderSettings(); return; }
-  if(e.target.id==='setAddBtn'){ const inp=document.getElementById('setNew'); const v=(inp.value||'').trim(); if(v && !typesDraft.includes(v)){ typesDraft.push(v); } renderSettings(); return; }
-  if(e.target.id==='setReset'){ typesDraft=CONFIG.postTypes.slice(); renderSettings(); return; }
-  if(e.target.id==='setSave'){
-    if(auth!=='admin'){ toast('관리자만 저장할 수 있습니다.',true); return; }
-    const clean=[...new Set(typesDraft.map(s=>s.trim()).filter(Boolean))];
-    if(!clean.length){ toast('최소 1개 유형이 필요합니다.',true); return; }
-    typesDraft=clean;
-    STORE.config = {...(STORE.config||{}), postTypes:clean};
-    saveStore(STORE);            // 클라우드 업로드
-    _typeUnionCache=null;        // 유형 캐시 무효화
-    renderSettings();
-    toast('게시글 유형을 저장했습니다 ('+clean.length+'개)');
-  }
+  const del=e.target.closest('.set-del');
+  if(del){ const grp=del.dataset.grp==='comp'?'competitors':'postTypes'; setDraft[grp].splice(+del.dataset.i,1); renderSettings(); return; }
+  const add=e.target.closest('[data-add]');
+  if(add){ const which=add.dataset.add; const inp=document.getElementById(which==='comp'?'compNew':'typeNew'); const v=(inp.value||'').trim();
+    const grp=which==='comp'?'competitors':'postTypes'; if(v && !setDraft[grp].includes(v)) setDraft[grp].push(v); renderSettings(); return; }
+  if(e.target.id==='setSaveAll'){ saveAllSettings(); return; }
+  if(e.target.id==='setResetAll'){ setDraft=null; renderSettings(); return; }
+  const rep=e.target.closest('.up-replace');
+  if(rep){ _replaceBatch=rep.dataset.bid; document.getElementById('replaceFile').click(); return; }
+  const dl=e.target.closest('.up-delete');
+  if(dl){ const bid=dl.dataset.bid; const u=((STORE.config&&STORE.config.uploads)||[]).find(x=>x.id===bid);
+    if(confirm(`이 업로드(${u?u.name:''})로 추가된 데이터를 삭제할까요? 되돌릴 수 없습니다.`)){ const n=removeUploadBatch(bid); toast(`${n.toLocaleString()}건 삭제됨`); } return; }
 });
 document.getElementById('settings').addEventListener('keydown', e=>{
-  if(e.target.id==='setNew' && e.key==='Enter'){ e.preventDefault(); document.getElementById('setAddBtn').click(); }
+  if(e.target.id==='compNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="comp"]').click(); }
+  if(e.target.id==='typeNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="type"]').click(); }
 });
 
 // ════════════════════════════════════════════════════
@@ -1799,7 +1884,7 @@ function rpMetrics(set){
   return {total,posts,cmts,pos,neg,neu,classified,posRate,negRate,net:posRate-negRate,cafes:new Set(set.map(r=>r.cafe)).size};
 }
 function rpBrandCounts(set){
-  const brands=[CONFIG.ownBrand,...COMPETITORS]; const cnt={}; brands.forEach(b=>cnt[b]=0);
+  const brands=[effOwnBrand(),...effCompetitors()]; const cnt={}; brands.forEach(b=>cnt[b]=0);
   set.forEach(r=>{ const t=(r.title||'')+' '+(r.body||''); brands.forEach(b=>{ if(t.includes(b)) cnt[b]+=occur(t,b); }); });
   return cnt;
 }
@@ -1883,11 +1968,30 @@ function pickerHTML(which){
     <div class="pick-list">${rows}</div>`;
 }
 // 자동 초안(관리자가 비워두면 표시)
-function autoInsightText(M,P,RP){
-  let s=`${rpLabel(RP)} 동안 총 ${M.total.toLocaleString()}건의 언급이 수집됐습니다. `;
-  if(M.classified) s+=`긍정률 ${M.posRate.toFixed(0)}%, 부정률 ${M.negRate.toFixed(0)}%로 순감성은 ${M.net>=0?'+':''}${M.net.toFixed(0)}%p입니다. `;
-  if(P){ const d=M.posRate-P.posRate; if(Math.abs(d)>=3) s+=`긍정률은 직전 기간 대비 ${d>=0?'+':''}${d.toFixed(0)}%p ${d>=0?'개선':'하락'}했습니다. `; }
-  return s.trim();
+function autoInsightText(ctx){
+  const {M,P,RP,OWN,own,ownShare,bcEnt,asCnt,priceCnt,negR,posR,byNeg}=ctx;
+  const L=[];
+  const stance = M.net>=20?'매우 우호적':M.net>=5?'대체로 긍정적':M.net<=-20?'부정 우위로 위험 신호':M.net<=-5?'다소 부정적':'중립적';
+  L.push(`${rpLabel(RP)} 기준 총 ${M.total.toLocaleString()}건이 수집됐고, 순감성 ${M.net>=0?'+':''}${M.net.toFixed(0)}%p로 여론은 ${stance}입니다.`);
+  if(P){
+    const dv=P.total?Math.round((M.total/P.total-1)*100):0, dp=M.posRate-P.posRate;
+    let mo=`직전 기간 대비 언급량 ${dv>=0?'+':''}${dv}%, 긍정률 ${dp>=0?'+':''}${dp.toFixed(0)}%p`;
+    mo += (dv>20&&dp>=0)?' — 양·질이 동반 개선되는 국면입니다.':(dv>20&&dp<0)?' — 노출은 늘었으나 호감도가 약화돼 리스크 관리가 필요합니다.':(dp>=5)?' — 호감도가 뚜렷이 개선됐습니다.':(dp<=-5)?' — 호감도 하락에 주의가 필요합니다.':' — 큰 변동은 없습니다.';
+    L.push(mo);
+  }
+  if(bcEnt&&bcEnt.length){
+    const lead=bcEnt[0];
+    if(lead[0]===OWN) L.push(`브랜드 언급 점유율은 자사가 ${ownShare.toFixed(0)}%로 선두입니다. 우위를 굳히는 메시지 전략이 유효합니다.`);
+    else L.push(`브랜드 언급에서 경쟁사 ‘${lead[0]}’가 상위입니다(자사 ${ownShare.toFixed(0)}%). 차별점(시야·단열·내구) 중심의 점유율 방어가 필요합니다.`);
+  }
+  if(asCnt>0 || M.negRate>=25){
+    const topNeg=(negR&&negR.length)?negR[0][0]:'부정 이슈';
+    L.push(`리스크: 부정률 ${M.negRate.toFixed(0)}%${asCnt?`·불만/AS ${asCnt}건`:''}. 핵심 불만 요인은 ‘${topNeg}’로 우선 대응이 필요합니다.`);
+  }
+  if(priceCnt>=3) L.push(`기회: 가격·견적 문의 ${priceCnt}건으로 구매 의향이 감지됩니다. 견적·프로모션 동선을 강화하면 전환을 기대할 수 있습니다.`);
+  else if(posR&&posR.length) L.push(`강점: 긍정 반응의 핵심은 ‘${posR[0][0]}’입니다. 후기·콘텐츠에서 이 메시지를 전면화하세요.`);
+  if(byNeg&&byNeg.length) L.push(`채널: ‘${byNeg[0].c}’에 부정 언급이 몰려 있어, 해당 카페 모니터링·대응을 우선순위로 권장합니다.`);
+  return L.join('\n');
 }
 function autoMarketingText(M,signals){
   const out=[];
@@ -1995,10 +2099,10 @@ function renderReport(){
   // ── 3. 경쟁사 비교 (SOV) ──
   const bc=rpBrandCounts(cur); const bcEnt=Object.entries(bc).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
   const bcTotal=bcEnt.reduce((a,e)=>a+e[1],0);
-  const own=bc[CONFIG.ownBrand]||0; const ownShare=bcTotal?own/bcTotal*100:0;
+  const OWN=effOwnBrand(); const own=bc[OWN]||0; const ownShare=bcTotal?own/bcTotal*100:0;
   let ownShareDelta='';
-  if(prev){ const pbc=rpBrandCounts(prev); const pt=Object.values(pbc).reduce((a,b)=>a+b,0); const ps=pt?(pbc[CONFIG.ownBrand]||0)/pt*100:0; ownShareDelta=dlt(ownShare,ps,true); }
-  const sovRows=bcEnt.map(([b,c])=>{const share=bcTotal?c/bcTotal*100:0; const mine=(b===CONFIG.ownBrand);
+  if(prev){ const pbc=rpBrandCounts(prev); const pt=Object.values(pbc).reduce((a,b)=>a+b,0); const ps=pt?(pbc[OWN]||0)/pt*100:0; ownShareDelta=dlt(ownShare,ps,true); }
+  const sovRows=bcEnt.map(([b,c])=>{const share=bcTotal?c/bcTotal*100:0; const mine=(b===OWN);
     return `<div class="rep-trow"><div class="rt-l">${mine?'<b style="color:var(--amber)">'+escapeHtml(b)+' (자사)</b>':escapeHtml(b)}</div>
       <div class="rt-bar"><i style="width:${share}%;background:${mine?'var(--amber)':'var(--ink3)'}"></i></div>
       <div class="rt-n">${c}회</div><div class="rt-p">${share.toFixed(0)}%</div></div>`;}).join('');
@@ -2072,7 +2176,7 @@ function renderReport(){
   if(asCnt>0) ins.push(['warn',`<b>불만/AS</b> 유형 글이 <b>${asCnt}건</b> 있습니다. CS 대응이 필요할 수 있습니다.`,'as']);
   const priceCnt=cur.filter(r=>{const t=rtype(r);return t==='가격문의'||t==='시공/견적문의';}).length;
   if(priceCnt>=3) ins.push(['info',`가격·견적 문의가 <b>${priceCnt}건</b>으로 구매 관심이 감지됩니다. 가격/프로모션 메시지를 점검하세요.`]);
-  if(bcEnt.length){ const top=bcEnt[0]; if(top[0]!==CONFIG.ownBrand && top[1]>own) ins.push(['warn',`경쟁사 <b>${escapeHtml(top[0])}</b> 언급(${top[1]}회)이 자사(${own}회)보다 많습니다. 점유율 방어가 필요합니다.`]); }
+  if(bcEnt.length){ const top=bcEnt[0]; if(top[0]!==OWN && top[1]>own) ins.push(['warn',`경쟁사 <b>${escapeHtml(top[0])}</b> 언급(${top[1]}회)이 자사(${own}회)보다 많습니다. 점유율 방어가 필요합니다.`]); }
   if(M.posRate>=60 && M.negRate<15) ins.push(['good',`전반적으로 우호적인 여론입니다. 긍정 후기를 콘텐츠·리뷰 마케팅에 활용해 보세요.`]);
   if(!ins.length) ins.push(['info','특이 신호는 없습니다. 안정적인 흐름입니다.']);
   const insHtml=ins.map(it=>`<div class="insight ${it[0]}">${it[1]}${it[2]==='as'?' <button class="viewbtn" data-rep="as" style="margin-left:6px;padding:3px 10px">글 보기</button>':''}</div>`).join('');
@@ -2087,10 +2191,10 @@ function renderReport(){
    </div>`;
 
   // ── 핵심 인사이트(상단) · 대표 게시물 · 마케팅 제안(하단) ──
-  const insightBlock = noteBlock('insight','💡 핵심 인사이트', autoInsightText(M,P,RP));
+  const insightBlock = noteBlock('insight','💡 핵심 인사이트', autoInsightText({M,P,RP,OWN,own,ownShare,bcEnt,asCnt,priceCnt,negR,posR,byNeg}));
   const repPos = repSection('pos',cur);
   const repNeg = repSection('neg',cur);
-  const signals = { price:priceCnt, as:asCnt, competitorLead:(bcEnt.length && bcEnt[0][0]!==CONFIG.ownBrand && bcEnt[0][1]>own) };
+  const signals = { price:priceCnt, as:asCnt, competitorLead:(bcEnt.length && bcEnt[0][0]!==OWN && bcEnt[0][1]>own) };
   const marketingBlock = noteBlock('marketing','📣 마케팅 / 세일즈 제안', autoMarketingText(M,signals));
 
   box.innerHTML = head + insightBlock + summary + repPos + repNeg + trend + sov + reasons + types + cafes + extra + advice + marketingBlock;
@@ -2247,7 +2351,9 @@ function editorControls(r){
   const opts=[['긍정','긍정'],['부정','부정'],['중립','중립'],['없음','없음'],['미검증','']];
   const cur=eff.vSent||'';
   const seg=opts.map(([lab,val])=>`<button class="vbtn ${cur===val?'on':''}" data-v="${val}">${lab}</button>`).join('');
-  const types=typeUnion(); const curT=eff.vType||'';
+  // 게시글 유형 후보 = 설정 탭에서 관리하는 목록만 (+ 이 행의 기존 값은 보존)
+  const types=effPostTypes().slice(); const curT=eff.vType||'';
+  if(curT && !types.includes(curT)) types.push(curT);
   const typeOpts=`<option value="">— 유형 선택 —</option>`
     + types.map(t=>`<option value="${escapeHtml(t)}" ${curT===t?'selected':''}>${escapeHtml(t)}</option>`).join('')
     + (curT&&!types.includes(curT)?`<option value="${escapeHtml(curT)}" selected>${escapeHtml(curT)}</option>`:'');
@@ -2624,9 +2730,9 @@ const brandEl=document.querySelector('.brand'); if(brandEl) brandEl.addEventList
 
 // CONFIG 문구·설정을 화면에 반영
 function applyConfigAndSettings(){
-  document.title = CONFIG.text.docTitle;
-  const ht=document.getElementById('headerTitle'); if(ht) ht.textContent=CONFIG.text.headerTitle;
-  const hs=document.getElementById('headerSub');   if(hs) hs.textContent=CONFIG.text.headerSub;
+  document.title = effText('docTitle');
+  const ht=document.getElementById('headerTitle'); if(ht) ht.textContent=effText('headerTitle');
+  const hs=document.getElementById('headerSub');   if(hs) hs.textContent=effText('headerSub');
   const kw=document.getElementById('kwExclude');    if(kw) kw.value=(state.excludeKeywords||[]).join(', ');
   document.querySelectorAll('#noneSeg button').forEach(b=>
     b.classList.toggle('on', (b.dataset.none==='exclude')===state.excludeNone));
