@@ -341,6 +341,10 @@
   .vc-revert:disabled{opacity:.4;cursor:default}
   .vc-status{font-size:12px;font-weight:700;color:var(--ink3)}
   .vc-status.dirty{color:var(--amber)}
+  .vc-clstoggle{margin-top:12px;background:transparent;border:1px dashed var(--line2);border-radius:8px;
+    color:var(--ink3);font-family:var(--font);font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer}
+  .vc-clstoggle:hover{border-color:var(--amber);color:var(--amber)}
+  .vc-class[hidden]{display:none}
   .vcard.dirty{border-left-color:var(--amber);box-shadow:0 0 0 1px rgba(232,137,59,.25) inset}
   .vcard.justsaved{animation:vsaved .7s ease}
   @keyframes vsaved{0%{box-shadow:0 0 0 2px var(--pos) inset}100%{box-shadow:none}}
@@ -442,8 +446,8 @@
     <div class="ctl-group">
       <span class="ctl-label">분석 기준</span>
       <div class="seg" id="modeSeg">
-        <button data-mode="prefer" class="on">검증 우선 (없으면 AI)</button>
-        <button data-mode="strict">검증값만</button>
+        <button data-mode="strict" class="on">검증 완료</button>
+        <button data-mode="prefer">전체</button>
       </div>
     </div>
     <div class="ctl-group">
@@ -717,8 +721,8 @@ function loadSettings(){ try{ const s=localStorage.getItem(SETKEY); if(s) return
 function saveSettings(patch){ const next={...loadSettings(), ...patch}; try{ localStorage.setItem(SETKEY, JSON.stringify(next)); }catch(e){} return next; }
 const _set0 = loadSettings();
 
-const state = { mode:'prefer', scope:'all', sentFilter:null, hiddenTypes:new Set(),
-                view:'dash', vfFilter:'todo', vfScope:'all', vfSearch:'', vfLimit:120,
+const state = { mode:'strict', scope:'all', sentFilter:null, hiddenTypes:new Set(),
+                view:'dash', vfFilter:'todo', vfScope:'all', vfSearch:'', vfLimit:60,
                 dateMode:'all', month:'', from:'', to:'',
                 excludeKeywords: Array.isArray(_set0.excludeKeywords) ? _set0.excludeKeywords : CONFIG.excludeKeywordsDefault.slice(),
                 excludeNone: (_set0.excludeNone!=null) ? _set0.excludeNone : CONFIG.excludeNoneByDefault };
@@ -984,6 +988,7 @@ function ingest(parsed, fname){
 // 저장소에서 RAW 재구성 (수집 순서 유지, idx·검증통계 재계산)
 function rebuildRAW(fname){
   const store = loadStore();
+  _typeUnionCache=null;   // 데이터 변경 시 유형 목록 캐시 무효화
   const rows = store.rows.slice().sort((a,b)=>(a.seq||0)-(b.seq||0));
   rows.forEach((r,i)=>r.idx=i);
   const vSentN = rows.filter(isVerified).length;
@@ -1187,11 +1192,11 @@ function renderVeriNote(){
   el.style.display='block';
   const sp=(m.vSentN/m.total*100).toFixed(0), tp=(m.vTypeN/m.total*100).toFixed(0);
   if(state.mode==='strict'){
-    el.innerHTML = `<b>검증값만</b> 모드 — 검증 칸이 입력된 행만 집계합니다. `+
+    el.innerHTML = `<b>검증 완료</b> 기준 — 사람이 검증한 값만 집계합니다. `+
       `현재 검증 입력: 감성 <b>${m.vSentN}건(${sp}%)</b> · 게시글유형 <b>${m.vTypeN}건(${tp}%)</b>. `+
-      `미입력 행은 분류에서 제외됩니다.`;
+      `미검증 행은 집계에서 제외됩니다.`;
   }else{
-    el.innerHTML = `<b>검증 우선</b> 모드 — 검증 칸이 있으면 그 값을, 없으면 AI값을 사용합니다. `+
+    el.innerHTML = `<b>전체</b> 기준 — 검증값이 있으면 그 값을, 없으면 AI값을 사용해 모두 집계합니다. `+
       `검증 입력 완료: 감성 <b>${m.vSentN}건(${sp}%)</b> · 게시글유형 <b>${m.vTypeN}건(${tp}%)</b>.`;
   }
   // 활성 기간 표시
@@ -1306,7 +1311,8 @@ function renderSentiment(rows){
           state.sentFilter=(state.sentFilter===lab)?null:lab; render(); }
       },
       plugins:{
-        legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle',
+        legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle',color:'#f2f5f8',
+          font:{size:13,weight:'600'},
           generateLabels(chart){
             const ds=chart.data.datasets[0];
             return chart.data.labels.map((lab,i)=>({
@@ -1588,7 +1594,7 @@ function setView(v){
       (dash && (state.sentFilter||state.hiddenTypes.size))?'flex':'none';
   document.getElementById('verify').style.display = dash?'none':'block';
   if(dash && dashStale){ dashStale=false; buildTypeChips(); render(); }  // 미뤄둔 대시보드 갱신을 한 번에
-  if(!dash){ state.vfLimit=120; renderVerify(); }
+  if(!dash){ state.vfLimit=60; renderVerify(); }
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -1603,10 +1609,13 @@ function verifyRows(){
   return rows;
 }
 
+let _typeUnionCache=null;
 function typeUnion(){
+  if(_typeUnionCache) return _typeUnionCache;
   const set=new Set(POST_TYPES);
   RAW.rows.forEach(r=>{ if(r.aiType) set.add(r.aiType); if(r.vType) set.add(r.vType); });
-  return [...set];
+  _typeUnionCache=[...set];
+  return _typeUnionCache;
 }
 
 function updateVerifyHeader(){
@@ -1633,6 +1642,21 @@ const pending = {};
 function effRow(r){ return pending[r.id] ? {...r, ...pending[r.id]} : r; }
 function isVerifiedId(id){ const r=RAW.rows.find(x=>x.id===id); return r ? isVerified(r) : false; }
 
+// 추가 분류 필드 HTML (필요할 때만 생성)
+function classFieldsHTML(eff){
+  return CLASS_FIELDS.map(f=>{
+    const val=escapeHtml(eff[f.key]||''); let chips='';
+    if(f.kind==='multi'||f.kind==='pick'){
+      const cv=(eff[f.key]||'').split(',').map(s=>s.trim()).filter(Boolean);
+      chips=`<div class="vp-chips">`+f.presets.map(p=>
+        `<span class="vp-chip ${cv.includes(p)?'on':''}" data-field="${f.key}" data-kind="${f.kind}" data-val="${escapeHtml(p)}">${escapeHtml(p)}</span>`
+      ).join('')+`</div>`;
+    }
+    return `<div class="vc-field"><label>${f.label}</label>
+      <input class="vc-input" data-field="${f.key}" value="${val}" placeholder="${escapeHtml(f.ph||'')}">${chips}</div>`;
+  }).join('');
+}
+
 // 공용 편집 컨트롤 (검증 카드 + 상세 모달에서 재사용) — 스테이징만, 저장은 버튼으로
 function editorControls(r){
   const eff=effRow(r);
@@ -1644,26 +1668,17 @@ function editorControls(r){
     + types.map(t=>`<option value="${escapeHtml(t)}" ${curT===t?'selected':''}>${escapeHtml(t)}</option>`).join('')
     + (curT&&!types.includes(curT)?`<option value="${escapeHtml(curT)}" selected>${escapeHtml(curT)}</option>`:'');
   const aiTypeTxt=r.aiType?`<span class="vc-aitype">AI추정: ${escapeHtml(r.aiType)}</span>`:'';
-  const fields=CLASS_FIELDS.map(f=>{
-    const val=escapeHtml(eff[f.key]||''); let chips='';
-    if(f.kind==='multi'||f.kind==='pick'){
-      const cv=(eff[f.key]||'').split(',').map(s=>s.trim()).filter(Boolean);
-      chips=`<div class="vp-chips">`+f.presets.map(p=>
-        `<span class="vp-chip ${cv.includes(p)?'on':''}" data-field="${f.key}" data-kind="${f.kind}" data-val="${escapeHtml(p)}">${escapeHtml(p)}</span>`
-      ).join('')+`</div>`;
-    }
-    return `<div class="vc-field"><label>${f.label}</label>
-      <input class="vc-input" data-field="${f.key}" value="${val}" placeholder="${escapeHtml(f.ph||'')}">${chips}</div>`;
-  }).join('');
+  const hasCls = CLASS_FIELDS.some(f=>eff[f.key]);   // 이미 입력된 분류가 있나
   const dirty=!!pending[r.id];
   const statusTxt = dirty?'● 미저장 변경 있음':(isVerified(r)?'✓ 검증 완료':'미검증');
+  // 추가 분류 필드는 펼칠 때만 생성(초기 렌더 가볍게 → 검증 화면 반응속도 개선)
   return `
     <div class="vc-sec-label">감성 ${dirty?'<span style="color:var(--amber)">(미저장)</span>':''}</div>
     <div class="vseg">${seg}</div>
     <div class="vc-sec-label">게시글 유형</div>
     <div class="vc-typewrap"><select class="vc-select" data-type="1">${typeOpts}</select>${aiTypeTxt}</div>
-    <div class="vc-sec-label">추가 분류</div>
-    <div class="vc-class">${fields}</div>
+    <button type="button" class="vc-clstoggle">${hasCls?'추가 분류 (입력됨) ▾':'＋ 추가 분류 입력'}</button>
+    <div class="vc-class" hidden></div>
     <div class="vc-actions">
       <button class="vc-save" ${dirty?'':'disabled'}>저장</button>
       <button class="vc-revert" ${dirty?'':'disabled'}>되돌리기</button>
@@ -1690,7 +1705,7 @@ function renderVerify(){
     ? `<button class="vf-more-btn" id="vfMore">+ ${Math.min(120, rows.length-shown.length)}건 더 보기 (전체 ${rows.length.toLocaleString()}건 중 ${shown.length.toLocaleString()}건)</button>`
     : (rows.length>120? `<div style="text-align:center;color:var(--ink3);font-size:12px;padding:8px">${rows.length.toLocaleString()}건 모두 표시됨</div>`:'');
   const mb=document.getElementById('vfMore');
-  if(mb) mb.addEventListener('click', ()=>{ state.vfLimit+=120; renderVerify(); });
+  if(mb) mb.addEventListener('click', ()=>{ state.vfLimit+=60; renderVerify(); });
 }
 
 function vCard(r){
@@ -1801,6 +1816,19 @@ function onEditorClick(e){
   if(e.target.closest('.vc-save')){ commitEditor(editorEl); return; }
   if(e.target.closest('.vc-revert')){ revertEditor(editorEl); return; }
 
+  const clsT=e.target.closest('.vc-clstoggle');
+  if(clsT){
+    const box=editorEl.querySelector('.vc-class');
+    if(!box.hasAttribute('data-built')){
+      const id=editorEl.dataset.id; const r=RAW.rows.find(x=>x.id===id);
+      box.innerHTML=classFieldsHTML(effRow(r||{id})); box.setAttribute('data-built','1'); box.removeAttribute('hidden');
+    }else{
+      box.toggleAttribute('hidden');
+    }
+    clsT.textContent = box.hasAttribute('hidden') ? '＋ 추가 분류 입력' : '－ 추가 분류 접기';
+    return;
+  }
+
   const chip=e.target.closest('.vp-chip');
   if(chip){
     const key=chip.dataset.field, kind=chip.dataset.kind, val=chip.dataset.val;
@@ -1837,20 +1865,20 @@ document.getElementById('verifyList').addEventListener('change', onEditorChange)
 // 검증 페이지 컨트롤
 document.getElementById('vfFilterSeg').addEventListener('click', e=>{
   if(e.target.tagName!=='BUTTON')return;
-  state.vfFilter=e.target.dataset.vf; state.vfLimit=120;
+  state.vfFilter=e.target.dataset.vf; state.vfLimit=60;
   [...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));
   renderVerify();
 });
 document.getElementById('vfScopeSeg').addEventListener('click', e=>{
   if(e.target.tagName!=='BUTTON')return;
-  state.vfScope=e.target.dataset.vfscope; state.vfLimit=120;
+  state.vfScope=e.target.dataset.vfscope; state.vfLimit=60;
   [...e.currentTarget.children].forEach(b=>b.classList.toggle('on',b===e.target));
   renderVerify();
 });
 let vfSearchTimer;
 document.getElementById('vfSearch').addEventListener('input', e=>{
   state.vfSearch=e.target.value; clearTimeout(vfSearchTimer);
-  vfSearchTimer=setTimeout(()=>{ state.vfLimit=120; renderVerify(); },250);
+  vfSearchTimer=setTimeout(()=>{ state.vfLimit=60; renderVerify(); },250);
 });
 
 // 내비게이션
