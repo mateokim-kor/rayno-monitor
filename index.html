@@ -74,7 +74,7 @@
     font-family:var(--font);font-size:12.5px;font-weight:600;padding:7px 10px;outline:none}
   .dt-select{min-width:118px;cursor:pointer}
   .dt-select:focus,.dt-input:focus{border-color:var(--amber)}
-  .dt-input{color-scheme:dark}
+  .dt-input{color-scheme:light}
   .dt-range{display:inline-flex;align-items:center;gap:6px}
   .dt-tilde{color:var(--ink3);font-weight:700}
   .ctl-spacer{flex:1}
@@ -273,6 +273,51 @@
   .insight.good{border-left-color:var(--pos)} .insight.warn{border-left-color:var(--neg)} .insight.info{border-left-color:var(--neu)}
   .insight b{font-weight:800}
   .rep-detail-row{display:flex;gap:9px;margin-top:14px;flex-wrap:wrap}
+
+  /* 대표 게시물 */
+  .rep-sub2{font-size:11px;font-weight:700;color:var(--ink3);margin-left:6px}
+  .rep-sub2.sel{color:var(--amber)}
+  .rep-quotes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-top:6px}
+  .rep-quote{border:1px solid var(--line);border-left:3px solid var(--ink3);border-radius:10px;padding:12px 13px;background:var(--bg2)}
+  .rep-quote.pos{border-left-color:var(--pos)} .rep-quote.neg{border-left-color:var(--neg)}
+  .rep-q-top{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:7px}
+  .rep-q-title{font-weight:800;font-size:13px;margin-bottom:4px;color:var(--ink)}
+  .rep-q-body{font-size:12.5px;line-height:1.55;color:var(--ink2)}
+  .rep-q-foot{margin-top:8px}
+  .rep-pickbtn{margin-top:12px;background:transparent;border:1px dashed var(--line2);border-radius:8px;color:var(--ink3);font-family:var(--font);font-size:12px;font-weight:700;padding:7px 12px;cursor:pointer}
+  .rep-pickbtn:hover{border-color:var(--amber);color:var(--amber)}
+  .rep-picker{margin-top:12px;border:1px solid var(--line2);border-radius:10px;padding:12px;background:var(--card2)}
+  .pick-head{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--ink2);margin-bottom:10px;flex-wrap:wrap}
+  .pick-cnt{color:var(--amber)}
+  .pick-list{display:flex;flex-direction:column;gap:4px;max-height:300px;overflow:auto}
+  .pick-row{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer;border:1px solid transparent}
+  .pick-row:hover{background:var(--bg2)}
+  .pick-row.on{background:rgba(224,125,44,.1);border-color:var(--amber)}
+  .pick-chk{width:17px;height:17px;border:1px solid var(--line2);border-radius:5px;display:grid;place-items:center;font-size:11px;color:#fff;font-weight:800;flex:none;background:var(--card)}
+  .pick-row.on .pick-chk{background:var(--amber);border-color:var(--amber)}
+  .pick-meta{font-size:11.5px;color:var(--ink3);flex:none}
+  .pick-t{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+
+  /* 관리자 편집 노트 */
+  .rep-note-card{border-top:3px solid var(--amber)}
+  .rep-note-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
+  .rep-note-text{font-size:13.5px;line-height:1.7;color:var(--ink)}
+  .rep-note-edit{background:transparent;border:1px solid var(--line2);border-radius:8px;color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer;white-space:nowrap}
+  .rep-note-edit:hover{border-color:var(--amber);color:var(--amber)}
+  .rep-note-ta{width:100%;min-height:130px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-family:var(--font);font-size:13.5px;line-height:1.65;padding:11px 13px;outline:none;resize:vertical;box-sizing:border-box}
+  .rep-note-ta:focus{border-color:var(--amber)}
+  .rep-note-actions{display:flex;gap:8px;margin-top:10px}
+
+  /* 인쇄(PDF 저장) */
+  @media print{
+    body{background:#fff !important}
+    .nav, footer, #dash, #verify, #settings, #controls, #typeBar, #veriNote, #filterStatus{display:none !important}
+    #report{display:block !important}
+    .rep-period, #rpPdf, .rep-pickbtn, .rep-picker, .rep-note-edit, .rep-detail-row, .vc-srcbtn, .insight .viewbtn{display:none !important}
+    .card{break-inside:avoid; box-shadow:none !important; border:1px solid #ddd}
+    .rep-quotes,.rep-quote,.rep-trow,.insight{break-inside:avoid}
+    .modal-bg{display:none !important}
+  }
 
   .full{grid-column:1/-1}
   .kw-list{display:flex;flex-wrap:wrap;gap:9px}
@@ -1725,7 +1770,8 @@ const rtype = r => r.vType || r.aiType || '';
 
 function monthShift(ym, delta){ let [y,m]=ym.split('-').map(Number); m+=delta; while(m<1){m+=12;y--;} while(m>12){m-=12;y++;} return y+'-'+String(m).padStart(2,'0'); }
 function rpRows(p){
-  const rows=RAW.rows;
+  // 감성이 '없음'인 데이터는 리포트에서 제외
+  const rows=RAW.rows.filter(r=>rsent(r)!=='없음');
   if(p.mode==='month'&&p.month) return rows.filter(r=>{const d=normDate(r.date); return d&&d.slice(0,7)===p.month;});
   if(p.mode==='range'&&(p.from||p.to)) return rows.filter(r=>{const d=normDate(r.date); if(!d)return false; if(p.from&&d<p.from)return false; if(p.to&&d>p.to)return false; return true;});
   return rows.slice();
@@ -1780,6 +1826,96 @@ function dlt(cur,prev,pp){ // 변화량 문구
   return `<span class="dlt ${cls}">${sign} ${pp?Math.abs(d).toFixed(1)+'%p':Math.abs(d).toLocaleString()}</span>`;
 }
 
+// ── 관리자 작성 노트(핵심 인사이트 · 마케팅 제안) : 기간별 저장 ──
+function periodKey(p){ if(p.mode==='month'&&p.month)return 'm:'+p.month; if(p.mode==='range'&&(p.from||p.to))return 'r:'+(p.from||'')+'_'+(p.to||''); return 'all'; }
+function cfgNotes(){ STORE.config=STORE.config||{}; const n=STORE.config.notes=STORE.config.notes||{}; n.insight=n.insight||{}; n.marketing=n.marketing||{}; return n; }
+function getNote(kind){ return cfgNotes()[kind][periodKey(RP)]||''; }
+function setNote(kind,text){ cfgNotes()[kind][periodKey(RP)]=text; saveStore(STORE); }
+
+// ── 대표 게시물(긍정/부정) 관리자 선정 : 전역 ID 저장 ──
+function getRep(which){ STORE.config=STORE.config||{}; const k=which==='pos'?'repPos':'repNeg'; return Array.isArray(STORE.config[k])?STORE.config[k]:[]; }
+function setRep(which,ids){ STORE.config=STORE.config||{}; STORE.config[which==='pos'?'repPos':'repNeg']=ids.slice(0,3); saveStore(STORE); }
+function autoRep(set,sent,n){
+  return set.filter(r=>rsent(r)===sent)
+    .sort((a,b)=>{const at=a.title?1:0,bt=b.title?1:0; if(bt!==at)return bt-at; return (b.body||'').length-(a.body||'').length;})
+    .slice(0,n);
+}
+function repRows(which,cur){
+  const sent=which==='pos'?'긍정':'부정'; const ids=getRep(which);
+  if(ids.length){ const byId=new Map(RAW.rows.map(r=>[r.id,r])); const sel=ids.map(id=>byId.get(id)).filter(Boolean); if(sel.length) return sel; }
+  return autoRep(cur,sent,3);
+}
+function repCard(r){
+  const sent=rsent(r); const cls=sent==='긍정'?'pos':sent==='부정'?'neg':'neu';
+  const kind=r.isPost?'게시글':'댓글';
+  const raw=(r.body||''); const body=escapeHtml(raw.slice(0,170))+(raw.length>170?'…':'');
+  const link=r.link?`<a class="vc-srcbtn" href="${escapeHtml(r.link)}" target="_blank" rel="noopener" style="margin-left:0">🔗 원문</a>`:'';
+  return `<div class="rep-quote ${cls}">
+    <div class="rep-q-top"><span class="tagm cafe">${escapeHtml(r.cafe)}</span>${r.date?`<span class="tagm date">${escapeHtml(r.date)}</span>`:''}<span class="tagm kind ${r.isPost?'':'c'}">${kind}</span><span class="tagm ${cls}">${sent||'-'}</span></div>
+    ${r.title?`<div class="rep-q-title">${escapeHtml(r.title)}</div>`:''}
+    <div class="rep-q-body">${body||'(내용 없음)'}</div>
+    <div class="rep-q-foot">${link}</div>
+  </div>`;
+}
+function repSection(which,cur){
+  const sent=which==='pos'?'긍정':'부정';
+  const label=which==='pos'?'대표 긍정 게시물':'대표 부정 게시물';
+  const rows=repRows(which,cur); const selected=getRep(which).length>0;
+  const cards=rows.length?rows.map(repCard).join(''):`<div class="empty">${sent} 게시물이 없습니다.</div>`;
+  const adminBtn=(auth==='admin')?`<button class="rep-pickbtn" data-pick="${which}">✏ 대표글 ${selected?'변경':'선택'}</button>`:'';
+  return `<div class="card rep-sec">
+     <h3><span class="dot"></span>${label} <span class="rep-sub2">${selected?'관리자 선정':'자동 추천'}</span></h3>
+     <div class="rep-quotes">${cards}</div>
+     ${adminBtn}
+     <div class="rep-picker" data-which="${which}" hidden></div>
+   </div>`;
+}
+let pickState={which:null, sel:[]};
+function pickerHTML(which){
+  const sent=which==='pos'?'긍정':'부정';
+  const cands=RP_ROWS.filter(r=>rsent(r)===sent).slice(0,80);
+  const rows=cands.map(r=>{const on=pickState.sel.includes(r.id); const t=escapeHtml(r.title||(r.body||'').slice(0,46));
+    return `<div class="pick-row ${on?'on':''}" data-id="${r.id}"><span class="pick-chk">${on?'✓':''}</span><span class="pick-meta">${escapeHtml(r.cafe)}${r.date?' · '+escapeHtml(r.date):''}</span><span class="pick-t">${t||'(제목 없음)'}</span></div>`;
+  }).join('')||'<div class="empty">선택할 게시물이 없습니다.</div>';
+  return `<div class="pick-head">대표 게시물 선택 (최대 3개) <b class="pick-cnt">${pickState.sel.length}/3</b><span style="flex:1"></span>
+      <button class="viewbtn pick-save" data-which="${which}">저장</button>
+      <button class="vc-revert pick-close">닫기</button></div>
+    <div class="pick-list">${rows}</div>`;
+}
+// 자동 초안(관리자가 비워두면 표시)
+function autoInsightText(M,P,RP){
+  let s=`${rpLabel(RP)} 동안 총 ${M.total.toLocaleString()}건의 언급이 수집됐습니다. `;
+  if(M.classified) s+=`긍정률 ${M.posRate.toFixed(0)}%, 부정률 ${M.negRate.toFixed(0)}%로 순감성은 ${M.net>=0?'+':''}${M.net.toFixed(0)}%p입니다. `;
+  if(P){ const d=M.posRate-P.posRate; if(Math.abs(d)>=3) s+=`긍정률은 직전 기간 대비 ${d>=0?'+':''}${d.toFixed(0)}%p ${d>=0?'개선':'하락'}했습니다. `; }
+  return s.trim();
+}
+function autoMarketingText(M,signals){
+  const out=[];
+  if(M.posRate>=55) out.push('• 긍정 후기를 리뷰·콘텐츠 마케팅 소재로 활용');
+  if(signals.price>=3) out.push('• 가격·견적 문의가 많음 → 프로모션/견적 이벤트 검토');
+  if(signals.as>0) out.push('• 불만/AS 건 신속 대응으로 부정 여론 확산 방지');
+  if(signals.competitorLead) out.push('• 경쟁사 언급 우위 → 차별점(시야·단열·품질) 강조 캠페인');
+  out.push('• 활동량 많은 카페 중심으로 체험단·이벤트 집행 검토');
+  return out.join('\n');
+}
+// 관리자 편집 노트 블록(핵심 인사이트 · 마케팅 제안)
+let repDrafts={insight:'',marketing:''};
+function noteBlock(kind,title,autoText){
+  const saved=getNote(kind);
+  const text=saved||autoText||'';
+  repDrafts[kind]=text;
+  const tag = saved ? '<span class="rep-sub2 sel">관리자 작성</span>'
+            : (text ? '<span class="rep-sub2">자동 초안</span>' : '');
+  const edit=(auth==='admin')?`<button class="rep-note-edit" data-note="${kind}">✏ 수정</button>`:'';
+  const body = text ? `<div class="rep-note-text">${escapeHtml(text).replace(/\n/g,'<br>')}</div>`
+                    : `<div class="empty">아직 작성된 내용이 없습니다.${auth==='admin'?" ‘수정’을 눌러 작성하세요.":''}</div>`;
+  return `<div class="card rep-sec rep-note-card">
+     <div class="rep-note-head"><h3 style="margin:0"><span class="dot"></span>${title} ${tag}</h3>${edit}</div>
+     <div class="rep-note" data-notebody="${kind}">${body}</div>
+   </div>`;
+}
+function printReport(){ if(typeof window!=='undefined' && window.print) window.print(); }
+
 function renderReport(){
   const box=document.getElementById('report');
   if(!RAW || !RAW.rows.length){ box.innerHTML='<div class="card"><div class="empty">아직 데이터가 없습니다. 데이터가 쌓이면 리포트가 자동 생성됩니다.</div></div>'; return; }
@@ -1813,6 +1949,7 @@ function renderReport(){
            <span class="dt-tilde">~</span>
            <input type="date" class="dt-input" id="rpTo" value="${RP.to}" min="${dates[0]||''}" max="${dates[dates.length-1]||''}">
          </span>
+         <button class="viewbtn" id="rpPdf" title="인쇄 창에서 ‘PDF로 저장’을 선택하세요">📄 PDF 저장</button>
        </div>
      </div>
      <div class="rep-badge">분석 기간: <b>${rpLabel(RP)}</b>${prevP?` · 비교: ${rpLabel(prevP)}`:''}</div>
@@ -1949,7 +2086,14 @@ function renderReport(){
      </div>
    </div>`;
 
-  box.innerHTML = head+summary+trend+sov+reasons+types+cafes+extra+advice;
+  // ── 핵심 인사이트(상단) · 대표 게시물 · 마케팅 제안(하단) ──
+  const insightBlock = noteBlock('insight','💡 핵심 인사이트', autoInsightText(M,P,RP));
+  const repPos = repSection('pos',cur);
+  const repNeg = repSection('neg',cur);
+  const signals = { price:priceCnt, as:asCnt, competitorLead:(bcEnt.length && bcEnt[0][0]!==CONFIG.ownBrand && bcEnt[0][1]>own) };
+  const marketingBlock = noteBlock('marketing','📣 마케팅 / 세일즈 제안', autoMarketingText(M,signals));
+
+  box.innerHTML = head + insightBlock + summary + repPos + repNeg + trend + sov + reasons + types + cafes + extra + advice + marketingBlock;
   bindReport();
 }
 
@@ -1958,12 +2102,49 @@ function bindReport(){
   if(seg && !seg.dataset.bound){ /* 위임은 아래 #report 한 번만 */ }
 }
 document.getElementById('report').addEventListener('click', e=>{
+  // PDF 저장
+  if(e.target.closest('#rpPdf')){ printReport(); return; }
+  // 기간 세그먼트
   const sb=e.target.closest('#rpSeg button');
   if(sb){ RP.mode=sb.dataset.rpm; renderReport(); return; }
+
+  // ── 관리자 노트 편집(핵심 인사이트 / 마케팅 제안) ──
+  const noteBtn=e.target.closest('.rep-note-edit');
+  if(noteBtn){ if(auth!=='admin')return; const kind=noteBtn.dataset.note;
+    const bodyEl=document.querySelector(`[data-notebody="${kind}"]`);
+    const cur=getNote(kind)||repDrafts[kind]||'';
+    bodyEl.innerHTML=`<textarea class="rep-note-ta">${escapeHtml(cur)}</textarea>
+      <div class="rep-note-actions"><button class="viewbtn" data-notesave="${kind}">저장</button>
+      <button class="vc-revert" data-notecancel="${kind}">취소</button></div>`;
+    const ta=bodyEl.querySelector('textarea'); ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length); return; }
+  const noteSave=e.target.closest('[data-notesave]');
+  if(noteSave){ const kind=noteSave.dataset.notesave;
+    const ta=document.querySelector(`[data-notebody="${kind}"] textarea`);
+    setNote(kind, (ta.value||'').trim()); renderReport(); toast('저장되었습니다'); return; }
+  if(e.target.closest('[data-notecancel]')){ renderReport(); return; }
+
+  // ── 대표 게시물 선택(관리자) ──
+  const pickBtn=e.target.closest('.rep-pickbtn');
+  if(pickBtn){ if(auth!=='admin')return; const which=pickBtn.dataset.pick;
+    const panel=document.querySelector(`.rep-picker[data-which="${which}"]`);
+    if(!panel) return;
+    if(!panel.hasAttribute('hidden')){ panel.setAttribute('hidden',''); panel.innerHTML=''; return; }
+    pickState={which, sel:getRep(which).slice()};
+    panel.innerHTML=pickerHTML(which); panel.removeAttribute('hidden'); return; }
+  const pickRow=e.target.closest('.pick-row');
+  if(pickRow){ const id=pickRow.dataset.id; const i=pickState.sel.indexOf(id);
+    if(i>=0) pickState.sel.splice(i,1);
+    else { if(pickState.sel.length>=3){ toast('최대 3개까지 선택할 수 있습니다.',true); return; } pickState.sel.push(id); }
+    const panel=pickRow.closest('.rep-picker'); panel.innerHTML=pickerHTML(pickState.which); return; }
+  const pickSave=e.target.closest('.pick-save');
+  if(pickSave){ setRep(pickSave.dataset.which, pickState.sel); renderReport(); toast('대표 게시물을 저장했습니다'); return; }
+  if(e.target.closest('.pick-close')){ renderReport(); return; }
+
+  // 상세 보기 버튼
   const rb=e.target.closest('[data-rep]');
   if(rb){
     const k=rb.dataset.rep;
-    let list=RP_ROWS, title='기간 전체 글·댓글', sub=rpLabel(RP);
+    let list=RP_ROWS, title='기간 전체 글·댓글';
     if(k==='neg'){ list=RP_ROWS.filter(r=>rsent(r)==='부정'); title='부정 글·댓글'; }
     else if(k==='as'){ list=RP_ROWS.filter(r=>rtype(r)==='불만/AS'); title='불만/AS 글·댓글'; }
     openDetail(`${title}`, list, `${rpLabel(RP)} 기준`);
