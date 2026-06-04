@@ -342,6 +342,8 @@
   .vc-status{font-size:12px;font-weight:700;color:var(--ink3)}
   .vc-status.dirty{color:var(--amber)}
   .vcard.dirty{border-left-color:var(--amber);box-shadow:0 0 0 1px rgba(232,137,59,.25) inset}
+  .vcard.justsaved{animation:vsaved .7s ease}
+  @keyframes vsaved{0%{box-shadow:0 0 0 2px var(--pos) inset}100%{box-shadow:none}}
 
   /* 상세 모달 인라인 편집기 */
   .rec-edit-btn{margin-top:9px;background:transparent;border:1px solid var(--line2);border-radius:8px;
@@ -895,10 +897,18 @@ async function cloudLoadData(){
   cloudReady = true;
 }
 
-// 클라우드에 데이터 저장 (관리자만) — 마지막 저장이 우선
-let _saveSeq = 0;
-async function cloudSaveData(){
-  if(!SB || auth!=='admin') return;
+// 클라우드에 데이터 저장 (관리자만) — 빠른 연속 저장은 묶어서 업로드(디바운스)
+let _saveSeq = 0, _cloudTimer=null, _cloudPending=false;
+function cloudSaveData(){
+  if(!SB || auth!=='admin') return;     // STORE(메모리)는 이미 갱신됨 — 업로드만 지연
+  _cloudPending=true;
+  clearTimeout(_cloudTimer);
+  _cloudTimer=setTimeout(flushCloudSave, 700);
+}
+async function flushCloudSave(){
+  clearTimeout(_cloudTimer); _cloudTimer=null;
+  if(!_cloudPending || !SB || auth!=='admin') return;
+  _cloudPending=false;
   const seq = ++_saveSeq;
   try{
     const body = JSON.stringify(STORE);
@@ -906,9 +916,13 @@ async function cloudSaveData(){
     if(error) throw error;
     if(seq===_saveSeq) updateAccStat();
   }catch(e){
+    _cloudPending=true;   // 실패 시 다음 기회에 재시도되도록 표시
     toast('⚠ 클라우드 저장 실패: '+(e.message||e)+' · 관리자 로그인 상태를 확인하세요', true);
   }
 }
+// 탭을 닫거나 숨길 때, 화면 전환/로그아웃 시 남은 변경을 즉시 반영
+window.addEventListener('beforeunload', ()=>{ if(_cloudPending) flushCloudSave(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) flushCloudSave(); });
 
 // 업로드한 원본 엑셀을 클라우드에 보관 (관리자만)
 async function cloudSaveRaw(fname, arrayBuffer){
@@ -1562,6 +1576,7 @@ function normDate(s){
 //  데이터 검증 페이지
 // ════════════════════════════════════════════════════
 function setView(v){
+  if(state.view==='verify' && v!=='verify') flushCloudSave();  // 검증 화면을 떠날 때 클라우드 반영
   state.view=v;
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.view===v));
   const dash = (v==='dash');
@@ -1572,6 +1587,7 @@ function setView(v){
   document.getElementById('filterStatus').style.display =
       (dash && (state.sentFilter||state.hiddenTypes.size))?'flex':'none';
   document.getElementById('verify').style.display = dash?'none':'block';
+  if(dash && dashStale){ dashStale=false; buildTypeChips(); render(); }  // 미뤄둔 대시보드 갱신을 한 번에
   if(!dash){ state.vfLimit=120; renderVerify(); }
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -1700,6 +1716,7 @@ function vCard(r){
 }
 
 // 공통 저장: changes 반영 → 저장 → RAW 재구성 → 대시보드/헤더 갱신
+let dashStale=false;   // 검증 중 대시보드 갱신을 미뤘는지
 function saveRow(id, changes){
   if(auth!=='admin'){ toast('데이터 수정은 관리자만 가능합니다.', true); return false; }
   const store=loadStore();
@@ -1708,8 +1725,8 @@ function saveRow(id, changes){
   Object.assign(r, changes);
   saveStore(store);
   rebuildRAW();
-  buildTypeChips();
-  render();
+  if(state.view==='dash'){ buildTypeChips(); render(); }
+  else { dashStale=true; }     // 검증 화면에선 무거운 차트 갱신을 미룸(전환 시 한 번에)
   updateAccStat();
   updateVerifyHeader();
   return true;
@@ -1734,10 +1751,26 @@ function commitEditor(editorEl){
   if(!changes){ return; }
   if(!saveRow(id, changes)) return;
   delete pending[id];
-  toast('저장되었습니다');
   if(editorEl.closest('#verifyList')){
-    const y=window.scrollY; renderVerify(); window.scrollTo(0,y);
+    const card=editorEl.closest('.vcard');
+    const verified=isVerifiedId(id);
+    const leaves = (state.vfFilter==='todo' && verified) || (state.vfFilter==='done' && !verified);
+    if(leaves){
+      // 현재 필터에서 벗어나는 카드만 부드럽게 제거 (목록 전체 재렌더 없음)
+      card.style.transition='opacity .25s, transform .25s';
+      card.style.opacity='0'; card.style.transform='scale(.98)';
+      setTimeout(()=>{ card.remove();
+        if(!document.querySelector('#verifyList .vcard')) renderVerify(); // 비면 안내문구
+      }, 240);
+    }else{
+      // 제자리 갱신: 미저장 표시 해제 + 완료 상태 반영
+      card.classList.toggle('done', verified);
+      markDirty(editorEl);
+      card.classList.add('justsaved'); setTimeout(()=>card.classList.remove('justsaved'), 700);
+    }
+    toast('저장되었습니다');
   }else{
+    toast('저장되었습니다');
     refreshModalAfterEdit();   // 상세 모달 컨텍스트
   }
 }
@@ -1745,9 +1778,14 @@ function revertEditor(editorEl){
   const id=editorEl.dataset.id;
   delete pending[id];
   if(editorEl.closest('#verifyList')){
-    const y=window.scrollY; renderVerify(); window.scrollTo(0,y);
+    // 저장값 기준으로 해당 카드만 다시 렌더 (목록 전체 재렌더 없음)
+    const r=RAW.rows.find(x=>x.id===id);
+    if(r){
+      const card=editorEl.closest('.vcard');
+      const tmp=document.createElement('div'); tmp.innerHTML=vCard(r);
+      card.replaceWith(tmp.firstElementChild);
+    }
   }else{
-    // 모달: 편집기를 저장값 기준으로 다시 렌더
     const r=RAW.rows.find(x=>x.id===id);
     if(r) editorEl.innerHTML=editorControls(r);
   }
@@ -1900,6 +1938,7 @@ function lockErr(msg){
   const inp=document.getElementById('lockInput'); inp.value=''; inp.focus();
 }
 async function logout(){
+  flushCloudSave();
   try{ if(SB) await SB.auth.signOut(); }catch(e){}
   auth='viewer';
   applyAuthUI(); setView('dash');
