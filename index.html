@@ -347,6 +347,10 @@
   .wcfg-chip.pii::after{content:'개인정보';font-size:9px;opacity:.7;margin-left:2px}
   .mt-val{width:140px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--ink);font-family:var(--font);font-size:13px;padding:6px 9px;text-align:right;outline:none}
   .mt-val:focus{border-color:var(--amber)}
+  .rep-clk{cursor:pointer;border-radius:8px;transition:.12s}
+  .rep-clk:hover{background:var(--bg2)}
+  .rep-clk.rep-on{background:rgba(224,125,44,.1)}
+  .rep-clk.rep-on .rt-l{color:var(--amber);font-weight:800}
   .rep-note-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
   .rep-note-text{font-size:13.5px;line-height:1.7;color:var(--ink)}
   .rep-note-edit{background:transparent;border:1px solid var(--line2);border-radius:8px;color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer;white-space:nowrap}
@@ -2905,7 +2909,11 @@ function defaultWarrConfig(cols){
 }
 function mergeWarr(parsed){
   const map=new Map((WARR.rows||[]).map(r=>[r.__id,r]));
-  parsed.rows.forEach((rec,i)=>{ const id=rec['No']||rec['시리얼번호']&&rec['시공일자']?(rec['시리얼번호']+'|'+rec['시공일자']+'|'+i):hashId(JSON.stringify(rec)); rec.__id=String(id); map.set(rec.__id,rec); });
+  parsed.rows.forEach((rec,i)=>{
+    const id = rec['No'] ? rec['No']
+             : (rec['시리얼번호'] && rec['시공일자']) ? (rec['시리얼번호']+'|'+rec['시공일자'])
+             : hashId(JSON.stringify(rec));
+    rec.__id=String(id); map.set(rec.__id,rec); });
   const cols=[...new Set([...(WARR.columns||[]), ...parsed.columns])];
   WARR={ rows:[...map.values()], columns:cols, config:WARR.config||defaultWarrConfig(cols), version:1 };
   // 새 컬럼이 생겼는데 config가 기존이면 그대로 둠(관리자가 추가 선택)
@@ -2948,42 +2956,92 @@ function warrCfgHTML(){
       <button class="vc-revert" id="warrCfgClose">닫기</button>
     </div></div>`;
 }
+// 품질보증서 뷰 상태: 집계 단위 + 기간 + 지부 필터
+const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', _min:'', _max:'' };
+function weekKey(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d; const off=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-off);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
+function warrBranchCol(){ const c=WARR.columns||[]; return c.includes('담당지부')?'담당지부':(c.includes('대리점구분')?'대리점구분':null); }
+function warrDateStr(r){ const cfg=WARR.config||defaultWarrConfig(WARR.columns||[]); const d=normDate(r[cfg.dateCol]); return /^\d{4}-\d{2}/.test(d)?d:''; }
+function warrRangeRecs(){ let recs=(WARR.rows||[]);
+  if(WV.scope==='range' && (WV.from||WV.to)) recs=recs.filter(r=>{ const d=warrDateStr(r); if(!d)return false; if(WV.from&&d<WV.from)return false; if(WV.to&&d>WV.to)return false; return true; });
+  return recs; }
+function warrApplyBranch(recs){ const bc=warrBranchCol(); return (bc&&WV.branch!=='전체')?recs.filter(r=>(r[bc]||'')===WV.branch):recs; }
+function warrTrend(recs){
+  const map={};
+  recs.forEach(r=>{ const d=warrDateStr(r); if(!d)return; let key,label;
+    if(WV.gran==='day'){ key=d.slice(0,10); label=key.slice(5).replace('-','/'); }
+    else if(WV.gran==='week'){ key=weekKey(d); label=key.slice(5).replace('-','/')+'주'; }
+    else { key=d.slice(0,7); label=key.replace('-','.'); }
+    (map[key]=map[key]||{label,n:0}).n++; });
+  let keys=Object.keys(map).sort();
+  const cap=WV.gran==='day'?90:WV.gran==='week'?52:240;
+  let capped=false; if(keys.length>cap){ keys=keys.slice(-cap); capped=true; }
+  return { rows:keys.map(k=>map[k]), capped };
+}
 function renderWarranty(){
   const box=document.getElementById('rWarranty');
-  const recs=(WARR.rows||[]);
-  const cfgCard = (auth==='admin' && warrCfgOpen && recs.length) ? warrCfgHTML() : '';
-  if(!recs.length){ box.innerHTML=cfgCard+warrEmptyHTML(); return; }
+  const all=(WARR.rows||[]);
+  const cfgCard=(auth==='admin'&&warrCfgOpen&&all.length)?warrCfgHTML():'';
+  if(!all.length){ box.innerHTML=cfgCard+warrEmptyHTML(); return; }
   const cfg=WARR.config||defaultWarrConfig(WARR.columns||[]);
-  const ymOf=r=>normYM(r[cfg.dateCol]);
-  const byMonth={}; recs.forEach(r=>{ const ym=ymOf(r); if(ym) byMonth[ym]=(byMonth[ym]||0)+1; });
-  const months=Object.keys(byMonth).sort(); const maxM=Math.max(1,...months.map(m=>byMonth[m]));
-  const lastM=months[months.length-1], prevM=months.length>1?months[months.length-2]:null;
-  const lastN=lastM?byMonth[lastM]:0, prevN=prevM?byMonth[prevM]:null;
-  let mDelta=''; if(prevN){const d=lastN-prevN,pct=Math.round(d/prevN*100); mDelta=`<span class="dlt ${d>0?'up':d<0?'down':'flat'}">${d>0?'▲':d<0?'▼':'–'} ${Math.abs(pct)}%</span>`;}
-  const distinct=col=>{ const s=new Set(); recs.forEach(r=>{const v=(r[col]||'').trim(); if(v)s.add(v);}); return s.size; };
-  const storeCol = (WARR.columns||[]).includes('매장명')?'매장명':null;
-  const trend=months.map(m=>`<div class="rep-trow"><div class="rt-l">${m}</div><div class="rt-bar"><i style="width:${byMonth[m]/maxM*100}%;background:var(--amber)"></i></div><div class="rt-n">${byMonth[m]}건</div><div class="rt-p"></div></div>`).join('')||'<div class="empty">날짜 컬럼을 인식하지 못했습니다. ⚙ 표시 설정에서 날짜 컬럼을 지정하세요.</div>';
-  const topOf=(col,n)=>{ const m={}; recs.forEach(r=>{const v=(r[col]||'').trim(); if(v)m[v]=(m[v]||0)+1;}); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n); };
+  const bc=warrBranchCol();
+  if(bc && WV.branch!=='전체' && !all.some(r=>(r[bc]||'')===WV.branch)) WV.branch='전체';
+  const dates=all.map(warrDateStr).filter(Boolean).sort();
+  const minD=dates[0]||'', maxD=dates[dates.length-1]||''; WV._min=minD; WV._max=maxD;
+  const recsRange=warrRangeRecs();
+  const recs=warrApplyBranch(recsRange);
+  const TOPN=10;
+  const granBtn=(g,t)=>`<button data-g="${g}" class="${WV.gran===g?'on':''}">${t}</button>`;
+  const branchOpts = bc ? (()=>{ const m={}; recsRange.forEach(r=>{const v=(r[bc]||'').trim(); if(v)m[v]=(m[v]||0)+1;});
+      const ent=Object.entries(m).sort((a,b)=>b[1]-a[1]);
+      return `<option value="전체" ${WV.branch==='전체'?'selected':''}>전체 지부 (${recsRange.length})</option>`+
+        ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.branch===v?'selected':''}>${escapeHtml(v)} (${c})</option>`).join(''); })() : '';
+  const controls=`
+    <div class="card">
+      <div class="rep-head-top">
+        <div><h3 style="margin:0"><span class="dot"></span>기간 · 단위 · 지부</h3>
+          <div class="cap">집계 단위와 기간을 고르고, 지부를 선택하면 해당 지부 데이터만 표시됩니다.</div></div>
+        <div class="rep-period">
+          <div class="seg" id="wvGran">${granBtn('day','일별')}${granBtn('week','주별')}${granBtn('month','월별')}</div>
+          <div class="seg" id="wvScope"><button data-s="all" class="${WV.scope==='all'?'on':''}">전체기간</button><button data-s="range" class="${WV.scope==='range'?'on':''}">기간지정</button></div>
+          <span class="dt-range" id="wvRange" style="display:${WV.scope==='range'?'inline-flex':'none'}">
+            <input type="date" class="dt-input" id="wvFrom" value="${WV.from||minD}" min="${minD}" max="${maxD}">
+            <span class="dt-tilde">~</span>
+            <input type="date" class="dt-input" id="wvTo" value="${WV.to||maxD}" min="${minD}" max="${maxD}"></span>
+          ${bc?`<select class="dt-select" id="wvBranch">${branchOpts}</select>`:''}
+        </div>
+      </div>
+      <div class="rep-badge">단위 <b>${WV.gran==='day'?'일별':WV.gran==='week'?'주별':'월별'}</b> · 기간 <b>${WV.scope==='range'?`${WV.from||minD} ~ ${WV.to||maxD}`:'전체'}</b> · 지부 <b>${escapeHtml(WV.branch)}</b> · <b>${recs.length.toLocaleString()}</b>건${WV.branch!=='전체'?` · <span id="wvClearBranch" style="cursor:pointer;color:var(--amber);font-weight:800">지부 필터 해제 ✕</span>`:''}</div>
+    </div>`;
+  const distinct=(set,col)=>{ const s=new Set(); set.forEach(r=>{const v=(r[col]||'').trim(); if(v)s.add(v);}); return s.size; };
+  const tr=warrTrend(recs); const maxT=Math.max(1,...tr.rows.map(x=>x.n));
+  const lastB=tr.rows[tr.rows.length-1], prevB=tr.rows.length>1?tr.rows[tr.rows.length-2]:null;
+  let bDelta=''; if(prevB&&prevB.n){const d=lastB.n-prevB.n,pct=Math.round(d/prevB.n*100); bDelta=`<span class="dlt ${d>0?'up':d<0?'down':'flat'}">${d>0?'▲':d<0?'▼':'–'} ${Math.abs(pct)}%</span>`;}
+  const unitTxt=WV.gran==='day'?'일':WV.gran==='week'?'주':'월';
+  const storeCol=(WARR.columns||[]).includes('매장명')?'매장명':null;
+  const kpis=`<div class="card"><h3><span class="dot"></span>발급 요약 <span class="rep-sub2">기준: ${escapeHtml(cfg.dateCol||'-')}</span></h3>
+      <div class="rep-kpis">
+        <div class="rk"><div class="rk-l">총 발급</div><div class="rk-v">${recs.length.toLocaleString()}<span style="font-size:12px;color:var(--ink3)"> 건</span></div><div class="rk-m">${tr.rows.length}${unitTxt} 구간</div></div>
+        <div class="rk"><div class="rk-l">최근 ${unitTxt} 발급</div><div class="rk-v">${lastB?lastB.n.toLocaleString():0} ${bDelta}</div><div class="rk-m">${lastB?lastB.label:'-'}</div></div>
+        <div class="rk"><div class="rk-l">${storeCol?'매장 수':'지역 수'}</div><div class="rk-v">${storeCol?distinct(recs,'매장명'):distinct(recs,'대리점지역(도)')}</div><div class="rk-m">고유 값</div></div>
+        <div class="rk"><div class="rk-l">차종 수</div><div class="rk-v">${(WARR.columns||[]).includes('차종')?distinct(recs,'차종'):'-'}</div><div class="rk-m">고유 값</div></div>
+      </div></div>`;
+  const trendRows=tr.rows.length?tr.rows.map(b=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(b.label)}</div><div class="rt-bar"><i style="width:${b.n/maxT*100}%;background:var(--amber)"></i></div><div class="rt-n">${b.n}건</div><div class="rt-p"></div></div>`).join(''):'<div class="empty">선택한 조건에 데이터가 없습니다. (날짜 컬럼은 ⚙ 표시 설정에서 변경)</div>';
+  const trendCard=`<div class="card"><h3><span class="dot"></span>${WV.gran==='day'?'일별':WV.gran==='week'?'주별':'월별'} 발급 추이</h3>${tr.capped?'<div class="cap">최근 구간만 표시합니다.</div>':''}<div class="rep-trend">${trendRows}</div></div>`;
   const palette=['var(--neu)','var(--pos)','var(--amber)','var(--neg)'];
-  const breakdownCards=(cfg.breakdownCols||[]).map((col,i)=>{ const arr=topOf(col,8); const mx=Math.max(1,...arr.map(e=>e[1]));
-    const bars=arr.length?arr.map(([v,c])=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${c/mx*100}%;background:${palette[i%palette.length]}"></i></div><div class="rt-n">${c}건</div><div class="rt-p">${(c/recs.length*100).toFixed(0)}%</div></div>`).join(''):'<div class="empty">데이터 없음</div>';
-    return `<div class="card"><h3><span class="dot"></span>${escapeHtml(col)} 구성</h3><div class="rep-trend">${bars}</div></div>`; }).join('');
+  const topOf=(set,col,n)=>{ const m={}; set.forEach(r=>{const v=(r[col]||'').trim(); if(v)m[v]=(m[v]||0)+1;}); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n); };
+  const breakdownCards=(cfg.breakdownCols||[]).map((col,i)=>{
+    const isBranch=(col===bc); const srcSet=isBranch?recsRange:recs; const arr=topOf(srcSet,col,TOPN); const mx=Math.max(1,...arr.map(e=>e[1])); const tot=srcSet.length||1;
+    const bars=arr.length?arr.map(([v,c])=>`<div class="rep-trow ${isBranch?'rep-clk':''} ${isBranch&&WV.branch===v?'rep-on':''}" ${isBranch?`data-branch="${escapeHtml(v)}"`:''}><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${c/mx*100}%;background:${palette[i%palette.length]}"></i></div><div class="rt-n">${c}건</div><div class="rt-p">${(c/tot*100).toFixed(0)}%</div></div>`).join(''):'<div class="empty">데이터 없음</div>';
+    return `<div class="card"><h3><span class="dot"></span>${escapeHtml(col)} 구성 ${isBranch?'<span class="rep-sub2">클릭=필터</span>':''}</h3><div class="rep-trend">${bars}</div></div>`; }).join('');
   const tcols=(cfg.tableCols&&cfg.tableCols.length?cfg.tableCols:(WARR.columns||[]).slice(0,8));
   const thead=tcols.map(c=>`<th>${escapeHtml(c)}</th>`).join('');
-  const sorted=recs.slice().sort((a,b)=>String(ymOf(b)||'').localeCompare(String(ymOf(a)||'')));
-  const tbody=sorted.slice(0,200).map(r=>`<tr>${tcols.map(c=>`<td>${escapeHtml(r[c]||'-')}</td>`).join('')}</tr>`).join('');
-  box.innerHTML = cfgCard + `
-    <div class="card"><h3><span class="dot"></span>보증서 발급 요약 <span class="rep-sub2">기준: ${escapeHtml(cfg.dateCol||'-')}</span></h3>
-      <div class="rep-kpis">
-        <div class="rk"><div class="rk-l">총 발급</div><div class="rk-v">${recs.length.toLocaleString()}<span style="font-size:12px;color:var(--ink3)"> 건</span></div><div class="rk-m">${months.length}개월</div></div>
-        <div class="rk"><div class="rk-l">최근월 발급</div><div class="rk-v">${lastN.toLocaleString()} ${mDelta}</div><div class="rk-m">${lastM||'-'}</div></div>
-        <div class="rk"><div class="rk-l">${storeCol?'매장 수':'대리점 지역 수'}</div><div class="rk-v">${storeCol?distinct('매장명'):distinct('대리점지역(도)')}</div><div class="rk-m">고유 값</div></div>
-        <div class="rk"><div class="rk-l">차종 수</div><div class="rk-v">${(WARR.columns||[]).includes('차종')?distinct('차종'):'-'}</div><div class="rk-m">고유 값</div></div>
-      </div></div>
-    <div class="card"><h3><span class="dot"></span>월별 발급 추이</h3><div class="rep-trend">${trend}</div></div>
-    ${breakdownCards?`<div class="biz-grid">${breakdownCards}</div>`:''}
-    <div class="card"><h3><span class="dot"></span>발급 내역 ${recs.length>200?'(최근 200건)':''}</h3>
-      <div class="cap">표에 보일 컬럼은 ⚙ 표시 설정에서 변경할 수 있습니다.</div>
+  const sorted=recs.slice().sort((a,b)=>String(warrDateStr(b)).localeCompare(String(warrDateStr(a))));
+  const tbody=sorted.slice(0,200).map(r=>`<tr>${tcols.map(c=>`<td>${escapeHtml(r[c]||'-')}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${tcols.length}"><div class="empty">데이터 없음</div></td></tr>`;
+  box.innerHTML = cfgCard + controls + kpis + trendCard +
+    (breakdownCards?`<div class="biz-grid">${breakdownCards}</div>`:'') +
+    `<div class="card"><h3><span class="dot"></span>발급 내역 ${recs.length>200?'(최근 200건)':''}</h3>
+      <div class="cap">표 컬럼은 ⚙ 표시 설정에서 변경할 수 있습니다.</div>
       <div class="tbl-wrap"><table><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table></div></div>`;
 }
 
@@ -3081,6 +3139,11 @@ document.getElementById('warrFileInput').addEventListener('change', e=>{ const f
 
 // 레이노 영역 위임 (보증서 설정 칩/저장 + 수기 표 추가/삭제/저장)
 document.getElementById('raynoApp').addEventListener('click', async e=>{
+  // 품질보증서: 집계 단위 / 기간 / 지부 필터
+  const gb=e.target.closest('#wvGran button'); if(gb){ WV.gran=gb.dataset.g; renderWarranty(); return; }
+  const sb=e.target.closest('#wvScope button'); if(sb){ WV.scope=sb.dataset.s; if(WV.scope==='range'){ if(!WV.from)WV.from=WV._min; if(!WV.to)WV.to=WV._max; } renderWarranty(); return; }
+  const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
+  if(e.target.id==='wvClearBranch'){ WV.branch='전체'; renderWarranty(); return; }
   // 보증서 표시설정 칩 토글
   const chip=e.target.closest('.wcfg-chip');
   if(chip){ const grp=chip.closest('.wcfg-chips').dataset.grp; const col=chip.dataset.col;
@@ -3105,6 +3168,11 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
 });
 document.getElementById('raynoApp').addEventListener('keydown', e=>{
   if(e.target.id==='mtVal' && e.key==='Enter'){ e.preventDefault(); const a=document.getElementById('mtAdd'); if(a)a.click(); }
+});
+document.getElementById('raynoApp').addEventListener('change', e=>{
+  if(e.target.id==='wvBranch'){ WV.branch=e.target.value; renderWarranty(); }
+  if(e.target.id==='wvFrom'){ WV.from=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.to=WV.from; renderWarranty(); }
+  if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; renderWarranty(); }
 });
 
 
