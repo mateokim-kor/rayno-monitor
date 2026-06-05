@@ -584,7 +584,7 @@
   <!-- 내비게이션 + 누적 툴바 -->
   <div class="appsw" id="appSwitcher" style="display:none">
     <button class="appsw-btn on" data-ws="cafe">📡 카페 모니터링</button>
-    <button class="appsw-btn admin-only" data-ws="rayno">📊 레이노 데이터</button>
+    <button class="appsw-btn" data-ws="rayno">📊 레이노 데이터</button>
   </div>
   <div class="nav" id="nav">
     <button class="nav-btn on" data-view="dash">📊 대시보드</button>
@@ -774,9 +774,10 @@
       <button class="nav-btn" data-rview="search">🔎 검색량</button>
       <button class="nav-btn" data-rview="revenue">💰 매출</button>
       <div class="nav-tools">
-        <span class="admin-flag" style="display:inline-flex">🔓 관리자 전용</span>
+        <span class="admin-flag" id="raynoAdminFlag" style="display:none">🔓 관리자 모드</span>
         <button class="acc-btn" id="warrAddBtn">＋ 보증서 엑셀</button>
         <button class="acc-btn" id="warrCfgBtn">⚙ 표시 설정</button>
+        <button class="acc-btn" id="raynoLoginBtn">🔐 관리자 로그인</button>
         <button class="acc-btn" id="raynoLogoutBtn">로그아웃</button>
       </div>
     </div>
@@ -2787,8 +2788,8 @@ async function logout(){
 function applyAuthUI(){
   const admin=(auth==='admin');
   document.querySelectorAll('.admin-only').forEach(el=>{ el.style.display = admin ? '' : 'none'; });
-  const sw=document.getElementById('appSwitcher'); if(sw) sw.style.display = admin ? 'flex' : 'none';
-  if(!admin){ raynoUnlocked=false; if(workspace==='rayno') setWorkspace('cafe'); }
+  const sw=document.getElementById('appSwitcher'); if(sw) sw.style.display='flex';
+  if(workspace==='rayno' && raynoUnlocked){ renderWarranty(); renderMetric('search'); renderMetric('revenue'); applyRaynoAuth(); }   // 권한 바뀌면 모든 레이노 화면 갱신
   document.getElementById('adminBtn').style.display  = admin ? 'none' : '';  // 로그인 버튼: 비로그인 방문자
   document.getElementById('logoutBtn').style.display = admin ? '' : 'none';  // 로그아웃: 관리자
   document.getElementById('adminFlag').style.display = admin ? 'inline-flex' : 'none';
@@ -2922,6 +2923,7 @@ function handleWarrFile(file){
   rd.readAsArrayBuffer(file);
 }
 function warrEmptyHTML(){
+  if(auth!=='admin') return `<div class="card biz-empty"><div class="be-ico">📜</div><div class="be-t">품질보증서 데이터가 없습니다</div><div class="be-s">아직 등록된 데이터가 없습니다.</div></div>`;
   return `<div class="card biz-empty"><div class="be-ico">📜</div><div class="be-t">품질보증서 데이터가 없습니다</div>
     <div class="be-s">상단 <b>＋ 보증서 엑셀</b> 버튼으로 발급 내역 파일을 올리면 자동으로 컬럼을 인식해 요약·추이·구성을 보여줍니다.<br>
     표시할 항목은 <b>⚙ 표시 설정</b>에서 고를 수 있습니다.</div></div>`;
@@ -3027,12 +3029,19 @@ function setRView(v){
   document.querySelectorAll('#raynoNav .nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.rview===v));
   Object.values(RVIEW_BOX).forEach(id=>{const el=document.getElementById(id); if(el)el.style.display='none';});
   const el=document.getElementById(RVIEW_BOX[v]); if(el) el.style.display='block';
-  // 보증서 전용 버튼은 보증서 탭에서만
-  document.getElementById('warrAddBtn').style.display = (v==='warranty')?'':'none';
-  document.getElementById('warrCfgBtn').style.display = (v==='warranty')?'':'none';
+  applyRaynoAuth();                      // 편집 버튼은 관리자에게만
   if(v==='warranty') renderWarranty();
   else if(v==='search') renderMetric('search');
   else renderMetric('revenue');
+}
+function applyRaynoAuth(){
+  const admin=(auth==='admin');
+  const set=(id,show)=>{const el=document.getElementById(id); if(el)el.style.display=show?'':'none';};
+  set('raynoAdminFlag', admin);
+  set('raynoLoginBtn', !admin);
+  set('raynoLogoutBtn', admin);
+  set('warrAddBtn', admin && rview==='warranty');
+  set('warrCfgBtn', admin && rview==='warranty');
 }
 async function openRayno(){
   const lock=document.getElementById('raynoLock'), nav=document.getElementById('raynoNav');
@@ -3046,7 +3055,6 @@ async function openRayno(){
   await ensureBiz(); await ensureWarr(); setRView(rview);
 }
 async function setWorkspace(ws){
-  if(ws==='rayno' && auth!=='admin'){ toast('레이노 데이터는 관리자 전용입니다.',true); return; }
   workspace=ws;
   document.querySelectorAll('.appsw-btn').forEach(b=>b.classList.toggle('on', b.dataset.ws===ws));
   const rayno=(ws==='rayno');
@@ -3064,6 +3072,7 @@ function raynoTryUnlock(){
 document.getElementById('appSwitcher').addEventListener('click', e=>{ const b=e.target.closest('.appsw-btn'); if(b) setWorkspace(b.dataset.ws); });
 document.getElementById('raynoNav').addEventListener('click', e=>{ const b=e.target.closest('.nav-btn'); if(b&&b.dataset.rview) setRView(b.dataset.rview); });
 document.getElementById('raynoLogoutBtn').addEventListener('click', logout);
+document.getElementById('raynoLoginBtn').addEventListener('click', showLock);
 document.getElementById('raynoPwGo').addEventListener('click', raynoTryUnlock);
 document.getElementById('raynoPw').addEventListener('keydown', e=>{ if(e.key==='Enter') raynoTryUnlock(); });
 document.getElementById('warrAddBtn').addEventListener('click', ()=>document.getElementById('warrFileInput').click());
