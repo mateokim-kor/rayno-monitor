@@ -314,6 +314,21 @@
   /* 관리자 편집 노트 */
   .rep-note-card{border-top:3px solid var(--amber)}
   .rep-dept-head{border-top:3px solid var(--neu)}
+
+  /* 앱 전환(대분류) + 레이노 데이터 */
+  .appsw{display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap}
+  .appsw-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-family:var(--font);font-size:14px;font-weight:800;padding:11px 20px;border-radius:12px;cursor:pointer;transition:.15s}
+  .appsw-btn:hover{border-color:var(--amber);color:var(--ink)}
+  .appsw-btn.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .biz-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  @media(max-width:820px){.biz-grid{grid-template-columns:1fr}}
+  .biz-chart{position:relative;height:230px;margin-top:6px}
+  .biz-empty{text-align:center;padding:48px 20px}
+  .biz-empty .be-ico{font-size:40px;margin-bottom:10px}
+  .biz-empty .be-t{font-size:16px;font-weight:800;color:var(--ink);margin-bottom:6px}
+  .biz-empty .be-s{font-size:13px;color:var(--ink2);line-height:1.7}
+  .biz-tpl{display:inline-block;text-align:left;margin-top:14px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-size:12.5px;color:var(--ink2)}
+  .biz-tpl code{color:var(--amber);font-weight:700}
   .rep-note-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
   .rep-note-text{font-size:13.5px;line-height:1.7;color:var(--ink)}
   .rep-note-edit{background:transparent;border:1px solid var(--line2);border-radius:8px;color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer;white-space:nowrap}
@@ -549,6 +564,10 @@
   </div>
 
   <!-- 내비게이션 + 누적 툴바 -->
+  <div class="appsw" id="appSwitcher" style="display:none">
+    <button class="appsw-btn on" data-ws="cafe">📡 카페 모니터링</button>
+    <button class="appsw-btn admin-only" data-ws="rayno">📊 레이노 데이터</button>
+  </div>
   <div class="nav" id="nav">
     <button class="nav-btn on" data-view="dash">📊 대시보드</button>
     <button class="nav-btn" data-view="report">📑 리포트</button>
@@ -721,6 +740,23 @@
   <div id="report" style="display:none"></div>
   <div id="settings" style="display:none"></div>
 
+  <div id="raynoApp" style="display:none">
+    <div class="nav" id="raynoNav">
+      <button class="nav-btn on" data-rview="biz">📈 실적 대시보드</button>
+      <button class="nav-btn" data-rview="warranty">📜 품질보증서</button>
+      <div class="nav-tools">
+        <span class="admin-flag" style="display:inline-flex">🔓 관리자 전용</span>
+        <button class="acc-btn" id="bizAddBtn">＋ 실적 엑셀</button>
+        <button class="acc-btn" id="warrAddBtn">＋ 보증서 엑셀</button>
+        <button class="acc-btn" id="raynoLogoutBtn">로그아웃</button>
+      </div>
+    </div>
+    <div id="rBiz"></div>
+    <div id="rWarranty" style="display:none"></div>
+    <input type="file" id="bizFile" accept=".xlsx,.xls" hidden>
+    <input type="file" id="warrFileInput" accept=".xlsx,.xls" hidden>
+  </div>
+
   <footer>
     레이노 카페 모니터링 · 검증(verified) 데이터 우선 대시보드<br>
     모든 분석은 브라우저 안에서만 처리되며 파일은 외부로 전송되지 않습니다.
@@ -837,6 +873,8 @@ const SUPA = {
   key:    'sb_publishable_ufZf1JHhUKuSkc-BrFmGTA_CRF1WQ9S',
   bucket: 'rayno',
   dataFile: 'data.json',
+  bizFile:  'biz.json',
+  warrFile: 'warranty.json',
 };
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
@@ -2717,6 +2755,8 @@ async function logout(){
 function applyAuthUI(){
   const admin=(auth==='admin');
   document.querySelectorAll('.admin-only').forEach(el=>{ el.style.display = admin ? '' : 'none'; });
+  const sw=document.getElementById('appSwitcher'); if(sw) sw.style.display = admin ? 'flex' : 'none';
+  if(!admin && workspace==='rayno') setWorkspace('cafe');
   document.getElementById('adminBtn').style.display  = admin ? 'none' : '';  // 로그인 버튼: 비로그인 방문자
   document.getElementById('logoutBtn').style.display = admin ? '' : 'none';  // 로그아웃: 관리자
   document.getElementById('adminFlag').style.display = admin ? 'inline-flex' : 'none';
@@ -2761,6 +2801,7 @@ document.getElementById('logoutBtn').addEventListener('click', logout);
 
 // 좌상단 RAYNO 로고 클릭 → 대시보드 최초 화면·기본 설정으로 복귀
 function resetToHome(){
+  if(workspace!=='cafe') setWorkspace('cafe');
   state.mode='strict'; state.scope='all'; state.sentFilter=null; state.hiddenTypes.clear();
   state.dateMode='all'; state.month=''; state.from=''; state.to='';
   state.excludeNone = CONFIG.excludeNoneByDefault;
@@ -2777,6 +2818,207 @@ function resetToHome(){
 const brandEl=document.querySelector('.brand'); if(brandEl) brandEl.addEventListener('click', resetToHome);
 
 // CONFIG 문구·설정을 화면에 반영
+// ════════════════════════════════════════════════════
+//  📊 레이노 데이터 워크스페이스 (실적 · 품질보증서) — 관리자 전용
+// ════════════════════════════════════════════════════
+let BIZ={rows:[],version:1}, WARR={rows:[],version:1};
+let bizLoaded=false, warrLoaded=false;
+let workspace='cafe', rview='biz';
+async function cloudLoadJSON(file){ if(!SB)return null; try{ const {data,error}=await SB.storage.from(SUPA.bucket).download(file+'?cb='+Date.now()); if(error||!data)return null; return JSON.parse(await data.text()); }catch(e){ return null; } }
+async function cloudSaveJSON(file,obj){ if(!SB||auth!=='admin')return false; try{ const {error}=await SB.storage.from(SUPA.bucket).upload(file, JSON.stringify(obj), {upsert:true, contentType:'application/json'}); if(error)throw error; return true; }catch(e){ toast('⚠ 저장 실패: '+(e.message||e),true); return false; } }
+async function ensureBiz(){ if(bizLoaded)return; const j=await cloudLoadJSON(SUPA.bizFile); if(j&&j.rows)BIZ=j; bizLoaded=true; }
+async function ensureWarr(){ if(warrLoaded)return; const j=await cloudLoadJSON(SUPA.warrFile); if(j&&j.rows)WARR=j; warrLoaded=true; }
+
+function normYM(s){
+  const str=String(s==null?'':s);
+  const m=str.match(/(\d{4})\D{0,2}(\d{1,2})/);
+  if(m && +m[2]>=1 && +m[2]<=12) return `${m[1]}-${String(+m[2]).padStart(2,'0')}`;
+  const d=normDate(str); const m2=String(d).match(/^(\d{4})-(\d{2})/); return m2?`${m2[1]}-${m2[2]}`:'';
+}
+function parseNum(v){ if(v==null||v==='')return null; const n=Number(String(v).replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:null; }
+
+function parseBizWB(wb){
+  const sh=wb.SheetNames.find(n=>/실적|월별|매출|sales|biz/i.test(n))||wb.SheetNames[0];
+  const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sh],{header:1,defval:''});
+  let hr=-1;
+  for(let i=0;i<Math.min(aoa.length,10);i++){ const j=aoa[i].map(c=>String(c).replace(/\s/g,'')).join('|');
+    if(/(연월|년월|기간|날짜|월)/.test(j) && /(검색|판매|롤|매출|금액)/.test(j)){ hr=i; break; } }
+  if(hr<0) return null;
+  const H=aoa[hr].map(c=>String(c).replace(/\s/g,''));
+  const find=re=>H.findIndex(h=>re.test(h));
+  const ci={ ym:find(/연월|년월|기간|날짜|월별|^월|date/i), search:find(/검색/), rolls:find(/롤|판매/), revenue:find(/매출|금액|매액/) };
+  if(ci.ym<0) return null;
+  const present={search:ci.search>=0, rolls:ci.rolls>=0, revenue:ci.revenue>=0};
+  const out=[];
+  for(let i=hr+1;i<aoa.length;i++){ const r=aoa[i]; if(!r||r.every(c=>String(c).trim()===''))continue;
+    const ym=normYM(r[ci.ym]); if(!ym)continue; const row={ym};
+    if(present.search) row.search=parseNum(r[ci.search]);
+    if(present.rolls) row.rolls=parseNum(r[ci.rolls]);
+    if(present.revenue) row.revenue=parseNum(r[ci.revenue]);
+    out.push(row); }
+  return {rows:out, present};
+}
+function mergeBiz(parsed){
+  const map=new Map((BIZ.rows||[]).map(r=>[r.ym,r]));
+  parsed.rows.forEach(nr=>{ const ex=map.get(nr.ym);
+    if(ex){ if(nr.search!=null)ex.search=nr.search; if(nr.rolls!=null)ex.rolls=nr.rolls; if(nr.revenue!=null)ex.revenue=nr.revenue; }
+    else map.set(nr.ym,nr); });
+  BIZ={ rows:[...map.values()].sort((a,b)=>a.ym.localeCompare(b.ym)), version:1 };
+}
+function handleBizFile(file){
+  if(auth!=='admin'){ toast('관리자만 업로드할 수 있습니다.',true); return; }
+  const rd=new FileReader();
+  rd.onload=async e=>{ try{ const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    const p=parseBizWB(wb);
+    if(!p||!p.rows.length){ toast('실적 데이터를 인식하지 못했습니다. 헤더(연월·검색량·롤판매수·매출액)를 확인하세요.',true); return; }
+    mergeBiz(p); bizLoaded=true; await cloudSaveJSON(SUPA.bizFile,BIZ); renderBiz();
+    toast(`${file.name} · ${p.rows.length}개월 반영 → 누적 ${BIZ.rows.length}개월`);
+  }catch(ex){ toast('파일 오류: '+ex.message,true); } };
+  rd.readAsArrayBuffer(file);
+}
+function parseWarrWB(wb){
+  const sh=wb.SheetNames.find(n=>/보증|증서|warranty/i.test(n))||wb.SheetNames[0];
+  const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sh],{header:1,defval:''});
+  let hr=-1;
+  for(let i=0;i<Math.min(aoa.length,10);i++){ const j=aoa[i].map(c=>String(c).replace(/\s/g,'')).join('|');
+    if(/(발급|보증|증서|제품|차종|지역)/.test(j)){ hr=i; break; } }
+  if(hr<0) return null;
+  const H=aoa[hr].map(c=>String(c).replace(/\s/g,''));
+  const find=re=>H.findIndex(h=>re.test(h));
+  const ci={ date:find(/발급|일자|날짜|date/i), no:find(/보증번호|증서번호|번호|no/i), product:find(/제품|필름|모델/), car:find(/차종|차량/), region:find(/지역|시공점|대리점|업체|매장/) };
+  const out=[];
+  for(let i=hr+1;i<aoa.length;i++){ const r=aoa[i]; if(!r||r.every(c=>String(c).trim()===''))continue;
+    const date=ci.date>=0?normDate(r[ci.date]):''; const ym=date&&/^\d{4}-\d{2}/.test(date)?date.slice(0,7):'';
+    const rec={ date, ym, no:ci.no>=0?String(r[ci.no]||'').trim():'', product:ci.product>=0?String(r[ci.product]||'').trim():'',
+      car:ci.car>=0?String(r[ci.car]||'').trim():'', region:ci.region>=0?String(r[ci.region]||'').trim():'' };
+    if(!date && !rec.no && !rec.product) continue;
+    rec.id = rec.no || hashId([date,rec.product,rec.car,rec.region,i].join('|'));
+    out.push(rec); }
+  return out;
+}
+function mergeWarr(recs){
+  const map=new Map((WARR.rows||[]).map(r=>[r.id,r]));
+  recs.forEach(r=>map.set(r.id,r));
+  WARR={ rows:[...map.values()].sort((a,b)=>(b.date||'').localeCompare(a.date||'')), version:1 };
+}
+function handleWarrFile(file){
+  if(auth!=='admin'){ toast('관리자만 업로드할 수 있습니다.',true); return; }
+  const rd=new FileReader();
+  rd.onload=async e=>{ try{ const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+    const recs=parseWarrWB(wb);
+    if(!recs||!recs.length){ toast('보증서 데이터를 인식하지 못했습니다. 헤더(발급일·보증번호·제품·차종·지역)를 확인하세요.',true); return; }
+    mergeWarr(recs); warrLoaded=true; await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty();
+    toast(`${file.name} · ${recs.length}건 반영 → 누적 ${WARR.rows.length}건`);
+  }catch(ex){ toast('파일 오류: '+ex.message,true); } };
+  rd.readAsArrayBuffer(file);
+}
+
+function drawBizChart(id,rows,key,label,color){
+  if(!document.getElementById(id)) return;
+  makeChart(id,{ type:'line',
+    data:{ labels:rows.map(r=>r.ym), datasets:[{label, data:rows.map(r=>r[key]==null?null:r[key]),
+      borderColor:color, backgroundColor:color+'22', borderWidth:2, pointRadius:3, tension:.3, spanGaps:true, fill:true}] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>label+': '+(c.parsed.y!=null?c.parsed.y.toLocaleString():'-')}} },
+      scales:{ x:{grid:{display:false}}, y:{grid:{color:'#e3e7ee'}, ticks:{callback:v=>v>=10000?(v/10000).toLocaleString()+'만':v.toLocaleString()}} } } });
+}
+function bizEmptyHTML(){
+  return `<div class="card biz-empty"><div class="be-ico">📈</div><div class="be-t">실적 데이터가 없습니다</div>
+    <div class="be-s">상단 <b>＋ 실적 엑셀</b> 버튼으로 월별 실적 파일을 올리면 검색량·판매·매출 추이가 표시됩니다.</div>
+    <div class="biz-tpl">권장 엑셀 양식 (첫 행 = 헤더)<br><code>연월</code> · <code>브랜드검색량</code> · <code>롤판매수</code> · <code>매출액</code><br>예) 2025-01 · 12000 · 320 · 85000000</div></div>`;
+}
+function renderBiz(){
+  const box=document.getElementById('rBiz');
+  const rows=(BIZ.rows||[]).slice().sort((a,b)=>a.ym.localeCompare(b.ym));
+  if(!rows.length){ box.innerHTML=bizEmptyHTML(); return; }
+  const last=rows[rows.length-1], prev=rows.length>1?rows[rows.length-2]:null;
+  const kpi=(label,key,unit)=>{ const v=last[key], pv=prev?prev[key]:null; let delta='';
+    if(v!=null&&pv!=null&&pv!==0){ const d=v-pv,pct=Math.round(d/pv*100); delta=`<span class="dlt ${d>0?'up':d<0?'down':'flat'}">${d>0?'▲':d<0?'▼':'–'} ${Math.abs(pct)}%</span>`; }
+    const sum=rows.reduce((a,r)=>a+(r[key]||0),0);
+    return `<div class="rk"><div class="rk-l">${label}</div><div class="rk-v">${v!=null?v.toLocaleString():'–'}<span style="font-size:12px;color:var(--ink3);font-weight:600"> ${unit}</span> ${delta}</div><div class="rk-m">최근월 ${last.ym} · 누계 ${sum.toLocaleString()}${unit}</div></div>`; };
+  const tbody=rows.slice().reverse().map(r=>`<tr><td>${r.ym}</td><td class="num">${r.search!=null?r.search.toLocaleString():'–'}</td><td class="num">${r.rolls!=null?r.rolls.toLocaleString():'–'}</td><td class="num">${r.revenue!=null?r.revenue.toLocaleString():'–'}</td></tr>`).join('');
+  box.innerHTML=`
+    <div class="card"><h3><span class="dot"></span>실적 요약 <span class="rep-sub2">최근월 ${last.ym}</span></h3>
+      <div class="rep-kpis">${kpi('브랜드 검색량','search','')}${kpi('롤 판매수','rolls','롤')}${kpi('매출액','revenue','원')}</div></div>
+    <div class="biz-grid">
+      <div class="card"><h3><span class="dot"></span>브랜드 검색량 추이</h3><div class="biz-chart"><canvas id="bizSearch"></canvas></div></div>
+      <div class="card"><h3><span class="dot"></span>롤 판매수 추이</h3><div class="biz-chart"><canvas id="bizRolls"></canvas></div></div>
+      <div class="card"><h3><span class="dot"></span>매출액 추이</h3><div class="biz-chart"><canvas id="bizRev"></canvas></div></div>
+    </div>
+    <div class="card"><h3><span class="dot"></span>월별 실적 표</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>연월</th><th>검색량</th><th>롤 판매수</th><th>매출액</th></tr></thead><tbody>${tbody}</tbody></table></div></div>`;
+  drawBizChart('bizSearch',rows,'search','검색량','#3f78c7');
+  drawBizChart('bizRolls',rows,'rolls','롤 판매수','#2f9e6e');
+  drawBizChart('bizRev',rows,'revenue','매출액','#e07d2c');
+}
+function warrEmptyHTML(){
+  return `<div class="card biz-empty"><div class="be-ico">📜</div><div class="be-t">품질보증서 데이터가 없습니다</div>
+    <div class="be-s">상단 <b>＋ 보증서 엑셀</b> 버튼으로 발급 내역 파일을 올리면 발급 추이·구성이 표시됩니다.</div>
+    <div class="biz-tpl">권장 엑셀 양식 (첫 행 = 헤더)<br><code>발급일</code> · <code>보증번호</code> · <code>제품</code> · <code>차종</code> · <code>지역</code></div></div>`;
+}
+function renderWarranty(){
+  const box=document.getElementById('rWarranty');
+  const recs=(WARR.rows||[]);
+  if(!recs.length){ box.innerHTML=warrEmptyHTML(); return; }
+  const byMonth={}; recs.forEach(r=>{ if(r.ym) byMonth[r.ym]=(byMonth[r.ym]||0)+1; });
+  const months=Object.keys(byMonth).sort(); const maxM=Math.max(1,...months.map(m=>byMonth[m]));
+  const lastM=months[months.length-1], prevM=months.length>1?months[months.length-2]:null;
+  const lastN=lastM?byMonth[lastM]:0, prevN=prevM?byMonth[prevM]:null;
+  let mDelta=''; if(prevN){const d=lastN-prevN,pct=Math.round(d/prevN*100); mDelta=`<span class="dlt ${d>0?'up':d<0?'down':'flat'}">${d>0?'▲':d<0?'▼':'–'} ${Math.abs(pct)}%</span>`;}
+  const top=(key,n)=>{ const m={}; recs.forEach(r=>{const v=(r[key]||'').trim(); if(v)m[v]=(m[v]||0)+1;}); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n); };
+  const prod=top('product',8), region=top('region',8), car=top('car',8);
+  const bars=(arr,color)=>arr.length?arr.map(([v,c])=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${c/Math.max(1,arr[0][1])*100}%;background:${color}"></i></div><div class="rt-n">${c}건</div><div class="rt-p"></div></div>`).join(''):'<div class="empty">데이터 없음</div>';
+  const trend=months.map(m=>`<div class="rep-trow"><div class="rt-l">${m}</div><div class="rt-bar"><i style="width:${byMonth[m]/maxM*100}%;background:var(--amber)"></i></div><div class="rt-n">${byMonth[m]}건</div><div class="rt-p"></div></div>`).join('');
+  const tbl=recs.slice(0,200).map(r=>`<tr><td>${escapeHtml(r.date||'-')}</td><td>${escapeHtml(r.no||'-')}</td><td>${escapeHtml(r.product||'-')}</td><td>${escapeHtml(r.car||'-')}</td><td>${escapeHtml(r.region||'-')}</td></tr>`).join('');
+  box.innerHTML=`
+    <div class="card"><h3><span class="dot"></span>보증서 발급 요약</h3>
+      <div class="rep-kpis">
+        <div class="rk"><div class="rk-l">총 발급</div><div class="rk-v">${recs.length.toLocaleString()}<span style="font-size:12px;color:var(--ink3)"> 건</span></div><div class="rk-m">${months.length}개월</div></div>
+        <div class="rk"><div class="rk-l">최근월 발급</div><div class="rk-v">${lastN.toLocaleString()} ${mDelta}</div><div class="rk-m">${lastM||'-'}</div></div>
+        <div class="rk"><div class="rk-l">제품 종류</div><div class="rk-v">${prod.length}</div><div class="rk-m">상위 ${prod.length}종</div></div>
+        <div class="rk"><div class="rk-l">지역/시공점</div><div class="rk-v">${region.length}</div><div class="rk-m">상위 ${region.length}곳</div></div>
+      </div></div>
+    <div class="card"><h3><span class="dot"></span>월별 발급 추이</h3><div class="rep-trend">${trend}</div></div>
+    <div class="biz-grid">
+      <div class="card"><h3><span class="dot"></span>제품별</h3><div class="rep-trend">${bars(prod,'var(--neu)')}</div></div>
+      <div class="card"><h3><span class="dot"></span>지역별</h3><div class="rep-trend">${bars(region,'var(--pos)')}</div></div>
+      <div class="card"><h3><span class="dot"></span>차종별</h3><div class="rep-trend">${bars(car,'var(--amber)')}</div></div>
+    </div>
+    <div class="card"><h3><span class="dot"></span>발급 내역 ${recs.length>200?'(최근 200건)':''}</h3>
+      <div class="tbl-wrap"><table><thead><tr><th>발급일</th><th>보증번호</th><th>제품</th><th>차종</th><th>지역</th></tr></thead><tbody>${tbl}</tbody></table></div></div>`;
+}
+
+const CAFE_VIEW_IDS=['nav','dash','controls','typeBar','veriNote','filterStatus','verify','report','settings','emptyState','drop'];
+function hideCafe(){ CAFE_VIEW_IDS.forEach(id=>{const el=document.getElementById(id); if(el)el.style.display='none';}); }
+function showCafe(){
+  document.getElementById('nav').style.display='flex';
+  if(RAW && RAW.meta && RAW.meta.total){ setView(state.view||'dash'); } else { applyAuthUI(); }
+}
+function setRView(v){
+  rview=v;
+  document.querySelectorAll('#raynoNav .nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.rview===v));
+  document.getElementById('rBiz').style.display = v==='biz'?'block':'none';
+  document.getElementById('rWarranty').style.display = v==='warranty'?'block':'none';
+  if(v==='biz') renderBiz(); else renderWarranty();
+}
+async function setWorkspace(ws){
+  if(ws==='rayno' && auth!=='admin'){ toast('레이노 데이터는 관리자 전용입니다.',true); return; }
+  workspace=ws;
+  document.querySelectorAll('.appsw-btn').forEach(b=>b.classList.toggle('on', b.dataset.ws===ws));
+  const rayno=(ws==='rayno');
+  document.getElementById('raynoApp').style.display = rayno?'block':'none';
+  if(rayno){ hideCafe(); await ensureBiz(); await ensureWarr(); setRView(rview); }
+  else { showCafe(); }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.getElementById('appSwitcher').addEventListener('click', e=>{ const b=e.target.closest('.appsw-btn'); if(b) setWorkspace(b.dataset.ws); });
+document.getElementById('raynoNav').addEventListener('click', e=>{ const b=e.target.closest('.nav-btn'); if(b&&b.dataset.rview) setRView(b.dataset.rview); });
+document.getElementById('raynoLogoutBtn').addEventListener('click', logout);
+document.getElementById('bizAddBtn').addEventListener('click', ()=>document.getElementById('bizFile').click());
+document.getElementById('warrAddBtn').addEventListener('click', ()=>document.getElementById('warrFileInput').click());
+document.getElementById('bizFile').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleBizFile(f); e.target.value=''; });
+document.getElementById('warrFileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleWarrFile(f); e.target.value=''; });
+
 function applyConfigAndSettings(){
   document.title = effText('docTitle');
   const ht=document.getElementById('headerTitle'); if(ht) ht.textContent=effText('headerTitle');
