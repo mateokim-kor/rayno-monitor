@@ -351,6 +351,17 @@
   .rep-clk:hover{background:var(--bg2)}
   .rep-clk.rep-on{background:rgba(224,125,44,.1)}
   .rep-clk.rep-on .rt-l{color:var(--amber);font-weight:800}
+  .mchips{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .mchips-lbl{font-size:11px;font-weight:700;color:var(--ink3)}
+  .mchip{display:inline-flex;align-items:center;background:var(--bg2);border:1px solid var(--line2);border-radius:8px;color:var(--ink2);font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer;transition:.12s}
+  .mchip:hover{border-color:var(--amber);color:var(--ink)}
+  .mchip.on{background:var(--amber);border-color:var(--amber);color:#fff}
+  .lbl-list{display:flex;flex-direction:column;gap:6px;margin:8px 0;max-height:320px;overflow:auto;padding-right:4px}
+  .lbl-row{display:flex;align-items:center;gap:8px}
+  .lbl-raw{flex:1;min-width:0;font-size:12px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lbl-arrow{color:var(--ink3)}
+  .lbl-in{width:130px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--ink);font-family:var(--font);font-size:12.5px;padding:6px 9px;outline:none}
+  .lbl-in:focus{border-color:var(--amber)}
   .rep-note-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
   .rep-note-text{font-size:13.5px;line-height:1.7;color:var(--ink)}
   .rep-note-edit{background:transparent;border:1px solid var(--line2);border-radius:8px;color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer;white-space:nowrap}
@@ -2904,9 +2915,15 @@ function defaultWarrConfig(cols){
   const dateCol = has('시공일자')?'시공일자':(has('등록날짜')?'등록날짜':(cols.find(c=>/일자|날짜/.test(c))||cols[0]));
   const pBreak=['담당지부','대리점지역(도)','차종','제조사'].filter(has);
   const pTable=['시공일자','담당지부','매장명','대리점지역(도)','대리점지역(시군구)','차종','제조사','모델명','신차/중고차'].filter(has);
+  const pSum=['매장명','대리점지역(도)','차종'].filter(has);
   return { dateCol, breakdownCols:(pBreak.length?pBreak:cols.filter(c=>!WARR_PII.includes(c)).slice(0,4)),
-           tableCols:(pTable.length?pTable:cols.filter(c=>!WARR_PII.includes(c)).slice(0,8)) };
+           tableCols:(pTable.length?pTable:cols.filter(c=>!WARR_PII.includes(c)).slice(0,8)),
+           summaryCols:(pSum.length?pSum:cols.filter(c=>!WARR_PII.includes(c)).slice(0,3)),
+           labelMap:{} };
 }
+function ensureWarrCfg(){ const cfg=WARR.config=WARR.config||defaultWarrConfig(WARR.columns||[]);
+  cfg.summaryCols=cfg.summaryCols||defaultWarrConfig(WARR.columns||[]).summaryCols;
+  cfg.labelMap=cfg.labelMap||{}; return cfg; }
 function mergeWarr(parsed){
   const map=new Map((WARR.rows||[]).map(r=>[r.__id,r]));
   parsed.rows.forEach((rec,i)=>{
@@ -2937,25 +2954,48 @@ function warrEmptyHTML(){
     표시할 항목은 <b>⚙ 표시 설정</b>에서 고를 수 있습니다.</div></div>`;
 }
 function warrCfgHTML(){
-  const cols=WARR.columns||[], cfg=WARR.config||defaultWarrConfig(cols);
+  const cols=WARR.columns||[], cfg=ensureWarrCfg();
   const dateOpts=cols.map(c=>`<option value="${escapeHtml(c)}" ${cfg.dateCol===c?'selected':''}>${escapeHtml(c)}</option>`).join('');
   const chip=(c,on)=>`<span class="wcfg-chip ${on?'on':''} ${WARR_PII.includes(c)?'pii':''}" data-col="${escapeHtml(c)}">${escapeHtml(c)}</span>`;
+  const sChips=cols.map(c=>chip(c,(cfg.summaryCols||[]).includes(c))).join('');
   const bChips=cols.map(c=>chip(c,cfg.breakdownCols.includes(c))).join('');
   const tChips=cols.map(c=>chip(c,cfg.tableCols.includes(c))).join('');
+  // 값 라벨 편집
+  const lblColOpts = `<option value="">— 컬럼 선택 —</option>`+cols.map(c=>`<option value="${escapeHtml(c)}" ${warrLabelCol===c?'selected':''}>${escapeHtml(c)}</option>`).join('');
+  let lblEditor='';
+  if(warrLabelCol && cols.includes(warrLabelCol)){
+    const lm=(cfg.labelMap[warrLabelCol]||{});
+    const vals=[...new Set((WARR.rows||[]).map(r=>(r[warrLabelCol]||'').trim()).filter(Boolean))].sort();
+    const capped=vals.length>80; const show=vals.slice(0,80);
+    lblEditor=`<div class="cap" style="margin-top:8px">아래 원본 값에 보여줄 이름을 입력하세요. 같은 이름을 쓰면 합산됩니다. (예: <code>AU-PH-2795-F95</code> → <code>F95</code>) 빈칸이면 원본 그대로 표시.</div>
+      <div class="lbl-list">${show.map(v=>`<div class="lbl-row"><span class="lbl-raw" title="${escapeHtml(v)}">${escapeHtml(v)}</span><span class="lbl-arrow">→</span><input class="lbl-in" data-raw="${escapeHtml(v)}" value="${escapeHtml(lm[v]!=null?lm[v]:autoSuffix(v))}" placeholder="표시 이름"></div>`).join('')}</div>
+      ${capped?'<div class="cap">값이 많아 상위 80개만 표시합니다.</div>':''}
+      <div class="set-savebar" style="position:static;margin-top:10px"><button class="vc-save" id="warrLabelSave">라벨 저장</button>
+        <button class="vc-revert" id="warrLabelClear">이 컬럼 라벨 초기화</button></div>`;
+  }
   return `<div class="card" id="warrCfgCard" style="border-top:3px solid var(--neu)">
     <h3 style="margin:0"><span class="dot"></span>표시 항목 설정 <span class="rep-sub2">관리자</span></h3>
     <div class="cap">엑셀에서 인식한 ${cols.length}개 컬럼 중 화면에 노출할 항목을 고르세요. (개인정보 항목은 점선 표시 — 꼭 필요할 때만 켜세요)</div>
+    <div class="set-sub">발급 요약 카드(고유값 수) <span class="rep-sub2">‘총 발급·최근 발급’ 외에 보여줄 항목</span></div>
+    <div class="wcfg-chips" data-grp="summary">${sChips}</div>
     <div class="set-sub">날짜(추이 기준) 컬럼</div>
     <select class="dt-select" id="warrDateSel">${dateOpts}</select>
     <div class="set-sub">분석(구성) 컬럼 <span class="rep-sub2">클릭해서 켜기/끄기</span></div>
     <div class="wcfg-chips" data-grp="breakdown">${bChips}</div>
     <div class="set-sub">발급 내역 표 컬럼</div>
     <div class="wcfg-chips" data-grp="table">${tChips}</div>
+    <div class="set-sub">값 표시 이름(라벨) 편집 <span class="rep-sub2">구성 차트에서 보일 이름</span></div>
+    <select class="dt-select" id="warrLabelSel">${lblColOpts}</select>
+    ${lblEditor}
     <div class="set-savebar" style="position:static;margin-top:14px">
       <button class="vc-save" id="warrCfgSave">설정 저장</button>
       <button class="vc-revert" id="warrCfgClose">닫기</button>
     </div></div>`;
 }
+let warrLabelCol='';
+function autoSuffix(raw){ const p=String(raw).split('-'); return p.length>1?p[p.length-1].trim():String(raw); }
+function warrLabelOf(col,raw){ const lm=(WARR.config&&WARR.config.labelMap&&WARR.config.labelMap[col])||{}; return (lm[raw]!=null&&lm[raw]!=='')?lm[raw]:raw; }
+function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(a[0],a[1],0).getDate(); return {from:`${ym}-01`, to:`${ym}-${String(last).padStart(2,'0')}`}; }
 // 품질보증서 뷰 상태: 집계 단위 + 기간 + 지부 필터
 const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', _min:'', _max:'' };
 function weekKey(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d; const off=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-off);
@@ -2983,7 +3023,7 @@ function renderWarranty(){
   const all=(WARR.rows||[]);
   const cfgCard=(auth==='admin'&&warrCfgOpen&&all.length)?warrCfgHTML():'';
   if(!all.length){ box.innerHTML=cfgCard+warrEmptyHTML(); return; }
-  const cfg=WARR.config||defaultWarrConfig(WARR.columns||[]);
+  const cfg=ensureWarrCfg();
   const bc=warrBranchCol();
   if(bc && WV.branch!=='전체' && !all.some(r=>(r[bc]||'')===WV.branch)) WV.branch='전체';
   const dates=all.map(warrDateStr).filter(Boolean).sort();
@@ -2996,6 +3036,9 @@ function renderWarranty(){
       const ent=Object.entries(m).sort((a,b)=>b[1]-a[1]);
       return `<option value="전체" ${WV.branch==='전체'?'selected':''}>전체 지부 (${recsRange.length})</option>`+
         ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.branch===v?'selected':''}>${escapeHtml(v)} (${c})</option>`).join(''); })() : '';
+  const allMonths=[...new Set(all.map(r=>warrDateStr(r).slice(0,7)).filter(s=>/^\d{4}-\d{2}$/.test(s)))].sort().reverse().slice(0,12);
+  const monthChip=ym=>{ const r=monthRange(ym); const on=(WV.scope==='range'&&WV.from===r.from&&WV.to===r.to); const a=ym.split('-'); return `<span class="mchip ${on?'on':''}" data-ym="${ym}">${a[0]}년 ${+a[1]}월</span>`; };
+  const monthChips=allMonths.length?`<div class="mchips"><span class="mchips-lbl">월 바로가기</span>${allMonths.map(monthChip).join('')}<span class="mchip ${WV.scope==='all'?'on':''}" data-ym="__all">전체</span></div>`:'';
   const controls=`
     <div class="card">
       <div class="rep-head-top">
@@ -3011,6 +3054,7 @@ function renderWarranty(){
           ${bc?`<select class="dt-select" id="wvBranch">${branchOpts}</select>`:''}
         </div>
       </div>
+      ${monthChips}
       <div class="rep-badge">단위 <b>${WV.gran==='day'?'일별':WV.gran==='week'?'주별':'월별'}</b> · 기간 <b>${WV.scope==='range'?`${WV.from||minD} ~ ${WV.to||maxD}`:'전체'}</b> · 지부 <b>${escapeHtml(WV.branch)}</b> · <b>${recs.length.toLocaleString()}</b>건${WV.branch!=='전체'?` · <span id="wvClearBranch" style="cursor:pointer;color:var(--amber);font-weight:800">지부 필터 해제 ✕</span>`:''}</div>
     </div>`;
   const distinct=(set,col)=>{ const s=new Set(); set.forEach(r=>{const v=(r[col]||'').trim(); if(v)s.add(v);}); return s.size; };
@@ -3018,20 +3062,20 @@ function renderWarranty(){
   const lastB=tr.rows[tr.rows.length-1], prevB=tr.rows.length>1?tr.rows[tr.rows.length-2]:null;
   let bDelta=''; if(prevB&&prevB.n){const d=lastB.n-prevB.n,pct=Math.round(d/prevB.n*100); bDelta=`<span class="dlt ${d>0?'up':d<0?'down':'flat'}">${d>0?'▲':d<0?'▼':'–'} ${Math.abs(pct)}%</span>`;}
   const unitTxt=WV.gran==='day'?'일':WV.gran==='week'?'주':'월';
-  const storeCol=(WARR.columns||[]).includes('매장명')?'매장명':null;
-  const kpis=`<div class="card"><h3><span class="dot"></span>발급 요약 <span class="rep-sub2">기준: ${escapeHtml(cfg.dateCol||'-')}</span></h3>
+  const sumLabel=col=>({'매장명':'매장 수','대리점지역(도)':'지역 수','대리점지역(시군구)':'시군구 수','차종':'차종 수','제조사':'제조사 수','담당지부':'지부 수','모델명':'모델 수','신차/중고차':'신차/중고 구분'}[col]||`${col} 종류`);
+  const sumCards=(cfg.summaryCols||[]).filter(c=>(WARR.columns||[]).includes(c)).map(col=>`<div class="rk"><div class="rk-l">${escapeHtml(sumLabel(col))}</div><div class="rk-v">${distinct(recs,col)}</div><div class="rk-m">고유 값</div></div>`).join('');
+  const kpis=`<div class="card"><h3><span class="dot"></span>발급 요약 <span class="rep-sub2">기준: ${escapeHtml(cfg.dateCol||'-')}${auth==='admin'?' · ⚙에서 항목 변경':''}</span></h3>
       <div class="rep-kpis">
         <div class="rk"><div class="rk-l">총 발급</div><div class="rk-v">${recs.length.toLocaleString()}<span style="font-size:12px;color:var(--ink3)"> 건</span></div><div class="rk-m">${tr.rows.length}${unitTxt} 구간</div></div>
         <div class="rk"><div class="rk-l">최근 ${unitTxt} 발급</div><div class="rk-v">${lastB?lastB.n.toLocaleString():0} ${bDelta}</div><div class="rk-m">${lastB?lastB.label:'-'}</div></div>
-        <div class="rk"><div class="rk-l">${storeCol?'매장 수':'지역 수'}</div><div class="rk-v">${storeCol?distinct(recs,'매장명'):distinct(recs,'대리점지역(도)')}</div><div class="rk-m">고유 값</div></div>
-        <div class="rk"><div class="rk-l">차종 수</div><div class="rk-v">${(WARR.columns||[]).includes('차종')?distinct(recs,'차종'):'-'}</div><div class="rk-m">고유 값</div></div>
+        ${sumCards}
       </div></div>`;
   const trendRows=tr.rows.length?tr.rows.map(b=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(b.label)}</div><div class="rt-bar"><i style="width:${b.n/maxT*100}%;background:var(--amber)"></i></div><div class="rt-n">${b.n}건</div><div class="rt-p"></div></div>`).join(''):'<div class="empty">선택한 조건에 데이터가 없습니다. (날짜 컬럼은 ⚙ 표시 설정에서 변경)</div>';
   const trendCard=`<div class="card"><h3><span class="dot"></span>${WV.gran==='day'?'일별':WV.gran==='week'?'주별':'월별'} 발급 추이</h3>${tr.capped?'<div class="cap">최근 구간만 표시합니다.</div>':''}<div class="rep-trend">${trendRows}</div></div>`;
   const palette=['var(--neu)','var(--pos)','var(--amber)','var(--neg)'];
-  const topOf=(set,col,n)=>{ const m={}; set.forEach(r=>{const v=(r[col]||'').trim(); if(v)m[v]=(m[v]||0)+1;}); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n); };
+  const topOf=(set,col,n,useLabel)=>{ const m={}; set.forEach(r=>{let v=(r[col]||'').trim(); if(!v)return; if(useLabel)v=warrLabelOf(col,v); m[v]=(m[v]||0)+1;}); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n); };
   const breakdownCards=(cfg.breakdownCols||[]).map((col,i)=>{
-    const isBranch=(col===bc); const srcSet=isBranch?recsRange:recs; const arr=topOf(srcSet,col,TOPN); const mx=Math.max(1,...arr.map(e=>e[1])); const tot=srcSet.length||1;
+    const isBranch=(col===bc); const srcSet=isBranch?recsRange:recs; const arr=topOf(srcSet,col,TOPN,!isBranch); const mx=Math.max(1,...arr.map(e=>e[1])); const tot=srcSet.length||1;
     const bars=arr.length?arr.map(([v,c])=>`<div class="rep-trow ${isBranch?'rep-clk':''} ${isBranch&&WV.branch===v?'rep-on':''}" ${isBranch?`data-branch="${escapeHtml(v)}"`:''}><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${c/mx*100}%;background:${palette[i%palette.length]}"></i></div><div class="rt-n">${c}건</div><div class="rt-p">${(c/tot*100).toFixed(0)}%</div></div>`).join(''):'<div class="empty">데이터 없음</div>';
     return `<div class="card"><h3><span class="dot"></span>${escapeHtml(col)} 구성 ${isBranch?'<span class="rep-sub2">클릭=필터</span>':''}</h3><div class="rep-trend">${bars}</div></div>`; }).join('');
   const tcols=(cfg.tableCols&&cfg.tableCols.length?cfg.tableCols:(WARR.columns||[]).slice(0,8));
@@ -3144,12 +3188,21 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const sb=e.target.closest('#wvScope button'); if(sb){ WV.scope=sb.dataset.s; if(WV.scope==='range'){ if(!WV.from)WV.from=WV._min; if(!WV.to)WV.to=WV._max; } renderWarranty(); return; }
   const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
   if(e.target.id==='wvClearBranch'){ WV.branch='전체'; renderWarranty(); return; }
+  const mc=e.target.closest('.mchip'); if(mc){ const ym=mc.dataset.ym;
+    if(ym==='__all'){ WV.scope='all'; } else { const r=monthRange(ym); WV.scope='range'; WV.from=r.from; WV.to=r.to; }
+    renderWarranty(); return; }
+  if(e.target.id==='warrLabelSave'){ const cfg=ensureWarrCfg(); cfg.labelMap[warrLabelCol]=cfg.labelMap[warrLabelCol]||{};
+    document.querySelectorAll('#warrCfgCard .lbl-in').forEach(inp=>{ const raw=inp.dataset.raw, v=(inp.value||'').trim();
+      if(v && v!==raw) cfg.labelMap[warrLabelCol][raw]=v; else delete cfg.labelMap[warrLabelCol][raw]; });
+    await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty(); toast('값 라벨을 저장했습니다'); return; }
+  if(e.target.id==='warrLabelClear'){ const cfg=ensureWarrCfg(); delete cfg.labelMap[warrLabelCol];
+    await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty(); toast('이 컬럼 라벨을 초기화했습니다'); return; }
   // 보증서 표시설정 칩 토글
   const chip=e.target.closest('.wcfg-chip');
   if(chip){ const grp=chip.closest('.wcfg-chips').dataset.grp; const col=chip.dataset.col;
-    const key=grp==='breakdown'?'breakdownCols':'tableCols';
-    WARR.config=WARR.config||defaultWarrConfig(WARR.columns||[]);
-    const arr=WARR.config[key]; const i=arr.indexOf(col);
+    const key=grp==='breakdown'?'breakdownCols':grp==='summary'?'summaryCols':'tableCols';
+    const cfg=ensureWarrCfg(); cfg[key]=cfg[key]||[];
+    const arr=cfg[key]; const i=arr.indexOf(col);
     if(i>=0) arr.splice(i,1); else arr.push(col);
     chip.classList.toggle('on'); return; }
   if(e.target.id==='warrCfgSave'){ const sel=document.getElementById('warrDateSel'); if(sel) WARR.config.dateCol=sel.value;
@@ -3170,6 +3223,7 @@ document.getElementById('raynoApp').addEventListener('keydown', e=>{
   if(e.target.id==='mtVal' && e.key==='Enter'){ e.preventDefault(); const a=document.getElementById('mtAdd'); if(a)a.click(); }
 });
 document.getElementById('raynoApp').addEventListener('change', e=>{
+  if(e.target.id==='warrLabelSel'){ warrLabelCol=e.target.value; renderWarranty(); return; }
   if(e.target.id==='wvBranch'){ WV.branch=e.target.value; renderWarranty(); }
   if(e.target.id==='wvFrom'){ WV.from=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.to=WV.from; renderWarranty(); }
   if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; renderWarranty(); }
