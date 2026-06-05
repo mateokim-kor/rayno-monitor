@@ -313,6 +313,7 @@
 
   /* 관리자 편집 노트 */
   .rep-note-card{border-top:3px solid var(--amber)}
+  .rep-dept-head{border-top:3px solid var(--neu)}
   .rep-note-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
   .rep-note-text{font-size:13.5px;line-height:1.7;color:var(--ink)}
   .rep-note-edit{background:transparent;border:1px solid var(--line2);border-radius:8px;color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer;white-space:nowrap}
@@ -1913,9 +1914,11 @@ function dlt(cur,prev,pp){ // 변화량 문구
 
 // ── 관리자 작성 노트(핵심 인사이트 · 마케팅 제안) : 기간별 저장 ──
 function periodKey(p){ if(p.mode==='month'&&p.month)return 'm:'+p.month; if(p.mode==='range'&&(p.from||p.to))return 'r:'+(p.from||'')+'_'+(p.to||''); return 'all'; }
-function cfgNotes(){ STORE.config=STORE.config||{}; const n=STORE.config.notes=STORE.config.notes||{}; n.insight=n.insight||{}; n.marketing=n.marketing||{}; return n; }
-function getNote(kind){ return cfgNotes()[kind][periodKey(RP)]||''; }
-function setNote(kind,text){ cfgNotes()[kind][periodKey(RP)]=text; saveStore(STORE); }
+function cfgNotes(){ STORE.config=STORE.config||{}; return STORE.config.notes=STORE.config.notes||{}; }
+function getNote(kind){ const n=cfgNotes(); return (n[kind] && n[kind][periodKey(RP)])||''; }
+function setNote(kind,text){ const n=cfgNotes(); n[kind]=n[kind]||{};
+  if(text && text.trim()) n[kind][periodKey(RP)]=text.trim(); else if(n[kind]) delete n[kind][periodKey(RP)];
+  saveStore(STORE); }
 
 // ── 대표 게시물(긍정/부정) 관리자 선정 : 전역 ID 저장 ──
 function getRep(which){ STORE.config=STORE.config||{}; const k=which==='pos'?'repPos':'repNeg'; return Array.isArray(STORE.config[k])?STORE.config[k]:[]; }
@@ -2001,6 +2004,43 @@ function autoMarketingText(M,signals){
   if(signals.competitorLead) out.push('• 경쟁사 언급 우위 → 차별점(시야·단열·품질) 강조 캠페인');
   out.push('• 활동량 많은 카페 중심으로 체험단·이벤트 집행 검토');
   return out.join('\n');
+}
+// ── 부서별 추천(영업 / 브랜드전략 / 품질혁신) 자동 초안 ──
+function autoSalesText(c){
+  const L=[];
+  if(c.priceCnt>=1) L.push(`• 가격·견적 문의 ${c.priceCnt}건은 구매 임박 리드입니다 — 해당 글·카페를 리스트업해 견적 상담/시공점 연결로 신속 응대하세요.`);
+  if(c.recCnt>=1) L.push(`• ‘추천요청’ 글 ${c.recCnt}건에 자사 시공 사례·후기가 노출되도록 제휴 시공점·영업 담당을 연계하세요.`);
+  if(c.byVol&&c.byVol.length) L.push(`• 활동 상위 카페(${c.byVol.slice(0,2).map(x=>x.c).join(', ')})를 우선 영업 타깃으로 — 체험단·공동구매·제휴 이벤트를 제안하세요.`);
+  if(c.posR&&c.posR.length) L.push(`• 긍정 포인트 ‘${c.posR[0][0]}’를 영업 레퍼런스(후기·사례집)로 정리해 상담 자료로 활용하세요.`);
+  if(c.bcEnt&&c.bcEnt.length&&c.bcEnt[0][0]!==c.OWN) L.push(`• 경쟁사 ‘${c.bcEnt[0][0]}’를 검토 중인 고객용 비교 우위 토크스크립트를 준비하세요.`);
+  if(c.asCnt>0) L.push(`• 불만/AS 고객은 이탈 위험군 — CS와 공동으로 리커버리(보상·재시공 안내)를 진행하세요.`);
+  L.push('• 추천 업무: 월간 리드 리스트(견적·추천 문의) 작성 → 시공점 배분 → 전환율 추적.');
+  return L.join('\n');
+}
+function autoBrandText(c){
+  const L=[];
+  if(c.bcEnt&&c.bcEnt.length){
+    if(c.bcEnt[0][0]===c.OWN) L.push(`• 언급 점유율 1위(${c.ownShare.toFixed(0)}%) — 카테고리 리더십 메시지로 기준을 선점하는 캠페인을 권장합니다.`);
+    else L.push(`• 자사 점유율 ${c.ownShare.toFixed(0)}%로 경쟁사 ‘${c.bcEnt[0][0]}’ 열위 — 차별점(${c.posR&&c.posR.length?c.posR[0][0]:'시야·단열·내구'}) 중심 비교 캠페인으로 점유율을 높이세요.`);
+  }
+  if(c.posR&&c.posR.length) L.push(`• 긍정 키워드 ‘${c.posR.slice(0,2).map(x=>x[0]).join(', ')}’를 핵심 브랜드 메시지로 콘텐츠(리뷰·블로그·영상)에 반영하세요.`);
+  if(c.negR&&c.negR.length) L.push(`• 부정 인식 ‘${c.negR[0][0]}’에 대한 해명·개선 커뮤니케이션(FAQ·시공 가이드)으로 신뢰를 보완하세요.`);
+  if(c.P){ const dp=c.M.posRate-c.P.posRate;
+    if(dp<=-5) L.push('• 긍정률 하락 국면 — 메시지 톤·캠페인을 점검하고 우호 여론 회복 콘텐츠가 필요합니다.');
+    else if(dp>=5) L.push('• 긍정률 상승 모멘텀 — 신제품·프로모션 메시지를 키울 적기입니다.'); }
+  L.push('• 추천 업무: 카페별 타깃 콘텐츠 캘린더 수립, 긍정 후기 UGC 확보, 분기 브랜드 헬스(점유율·감성) 리포팅.');
+  return L.join('\n');
+}
+function autoQualityText(c){
+  const L=[];
+  if(c.negR&&c.negR.length) L.push(`• 부정 요인 1순위 ‘${c.negR[0][0]}’${c.negR[1]?`, ‘${c.negR[1][0]}’`:''} — 근본원인(시공/제품/물류) 분석 후 개선 과제로 등록하세요.`);
+  else L.push('• 검증 시 ‘부정 이유’ 분류 입력을 늘리면 품질 이슈를 더 정밀하게 추적할 수 있습니다.');
+  if(c.asCnt>0) L.push(`• 불만/AS ${c.asCnt}건 — 접수~처리 SLA와 재발방지 체크리스트를 점검하고 유형별 클레임을 집계하세요.`);
+  if(c.prod&&c.prod.length) L.push(`• 언급 제품 ‘${c.prod[0][0]}’의 부정 사례를 별도 모니터링해 제품별 품질 편차를 확인하세요.`);
+  if(c.car&&c.car.length) L.push(`• 차종 ‘${c.car[0][0]}’ 관련 시공 이슈(곡면·열성형 등) 여부를 점검하세요.`);
+  if(c.byNeg&&c.byNeg.length) L.push(`• 부정이 몰린 ‘${c.byNeg[0].c}’의 글을 정성 리뷰해 특정 시공점·배치 이슈인지 확인하세요.`);
+  L.push('• 추천 업무: 부정 사유 태깅 표준화 → 월간 클레임 Top5 트래킹 → 시공 표준·교육 업데이트.');
+  return L.join('\n');
 }
 // 관리자 편집 노트 블록(핵심 인사이트 · 마케팅 제안)
 let repDrafts={insight:'',marketing:''};
@@ -2190,14 +2230,22 @@ function renderReport(){
      </div>
    </div>`;
 
-  // ── 핵심 인사이트(상단) · 대표 게시물 · 마케팅 제안(하단) ──
-  const insightBlock = noteBlock('insight','💡 핵심 인사이트', autoInsightText({M,P,RP,OWN,own,ownShare,bcEnt,asCnt,priceCnt,negR,posR,byNeg}));
+  // ── 핵심 인사이트(상단) · 부서별 추천 · 대표 게시물 · 마케팅 제안(하단) ──
+  const recCnt=cur.filter(r=>rtype(r)==='추천요청').length;
+  const repCtx={M,P,RP,OWN,own,ownShare,bcEnt,asCnt,priceCnt,recCnt,negR,posR,byNeg,byVol,prod,car};
+  const insightBlock = noteBlock('insight','💡 핵심 인사이트', autoInsightText(repCtx));
+  const deptHead = `<div class="card rep-sec rep-dept-head"><h3 style="margin:0"><span class="dot"></span>🏢 부서별 실행 제안</h3>
+     <div class="cap">이 기간 데이터를 바탕으로 부서 관점별 추천을 자동 작성했습니다. 각 항목은 관리자가 수정할 수 있습니다.</div></div>`;
+  const deptBlock = deptHead
+     + noteBlock('sales','👔 영업팀 — 영업 관점', autoSalesText(repCtx))
+     + noteBlock('brand','📣 브랜드전략실 — 마케팅·브랜드 전략 관점', autoBrandText(repCtx))
+     + noteBlock('quality','🔧 품질혁신팀 — 품질혁신 관점', autoQualityText(repCtx));
   const repPos = repSection('pos',cur);
   const repNeg = repSection('neg',cur);
   const signals = { price:priceCnt, as:asCnt, competitorLead:(bcEnt.length && bcEnt[0][0]!==OWN && bcEnt[0][1]>own) };
   const marketingBlock = noteBlock('marketing','📣 마케팅 / 세일즈 제안', autoMarketingText(M,signals));
 
-  box.innerHTML = head + insightBlock + summary + repPos + repNeg + trend + sov + reasons + types + cafes + extra + advice + marketingBlock;
+  box.innerHTML = head + insightBlock + deptBlock + summary + repPos + repNeg + trend + sov + reasons + types + cafes + extra + advice + marketingBlock;
   bindReport();
 }
 
