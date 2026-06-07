@@ -2940,9 +2940,11 @@ function parseWarrWB(wb){
   let hr=aoa.findIndex(r=>r && r.some(c=>String(c).trim()!==''));
   if(hr<0) return null;
   const H=aoa[hr].map(c=>String(c).trim());
+  const hasKey = H.includes('No')||H.includes('시리얼번호');
   const recs=[];
   for(let i=hr+1;i<aoa.length;i++){ const r=aoa[i]; if(!r||r.every(c=>String(c).trim()===''))continue;
     const rec={}; H.forEach((h,ci)=>{ if(h) rec[h]=String(r[ci]==null?'':r[ci]).trim(); });
+    if(hasKey && !isWarrCertRow(rec)) continue;   // 합계·중복헤더·빈 행 제외
     recs.push(rec); }
   return { columns:H.filter(Boolean), rows:recs };
 }
@@ -2966,9 +2968,16 @@ function warrRecKey(rec){
   if(rec['No']) return 'N:'+rec['No'];
   return 'H:'+hashId(JSON.stringify(rec));
 }
-function warrDedupe(){   // 기존 누적 데이터를 시리얼번호 기준으로 합치기
+function isWarrCertRow(rec){
+  const no=(rec['No']||'').toString().trim();
+  const ser=(rec['시리얼번호']||'').toString().trim();
+  if(no==='No' || ser==='시리얼번호') return false;   // 중간에 섞인 중복 헤더 행
+  return !!(no || ser);                                 // 식별자 없으면 합계/빈 행으로 보고 제외
+}
+function warrDedupe(){   // 기존 누적 데이터를 시리얼번호 기준으로 합치기 + 비(非)보증서 행 제거
+  const hasKey=(WARR.columns||[]).includes('No')||(WARR.columns||[]).includes('시리얼번호');
   const map=new Map();
-  (WARR.rows||[]).forEach(r=>{ const k=warrRecKey(r); r.__id=k; map.set(k,r); });
+  (WARR.rows||[]).forEach(r=>{ if(hasKey && !isWarrCertRow(r)) return; const k=warrRecKey(r); r.__id=k; map.set(k,r); });
   const before=(WARR.rows||[]).length; WARR.rows=[...map.values()];
   return before-WARR.rows.length;
 }
