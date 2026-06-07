@@ -2540,7 +2540,8 @@ function vCard(r){
   const body=escapeHtml(r.body||'').replace(/\n{3,}/g,'\n\n') || '<span style="color:var(--ink3)">(내용 없음)</span>';
   const titleBlock = r.isPost && r.title ? `<div class="vc-title">${escapeHtml(r.title)}</div>` : '';
   const parentBlock = (!r.isPost && r.parentTitle) ? `<div class="vc-parent">↳ 원글: ${escapeHtml(r.parentTitle)}</div>` : '';
-  const linkBtn = r.link ? `<a class="vc-srcbtn" href="${escapeHtml(r.link)}" target="_blank" rel="noopener">🔗 원문 보기</a>` : '';
+  const linkUrl = r.link || (!r.isPost ? r.parentLink : '');
+  const linkBtn = linkUrl ? `<a class="vc-srcbtn" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">🔗 원문 ${r.isPost?'보기':'글 보기'}</a>` : '';
   return `<div class="vcard editor ${done?'done':''} ${pending[r.id]?'dirty':''}" data-id="${r.id}">
     <div class="vc-top">
       <span class="tagm cafe">${escapeHtml(r.cafe)}</span>
