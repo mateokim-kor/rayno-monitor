@@ -1025,15 +1025,16 @@ function handleFile(file, replaceBatch){
     try{
       const buf = e.target.result;
       const wb = XLSX.read(new Uint8Array(buf), {type:'array'});
-      parseWorkbook(wb, file.name, replaceBatch);
-      cloudSaveRaw(file.name, buf);   // 원본 엑셀 클라우드 보관
+      const rawPath = rawObjectPath(file.name);          // 원본 보관 경로(이력에 기록)
+      parseWorkbook(wb, file.name, replaceBatch, rawPath);
+      cloudSaveRaw(rawPath, buf);                          // 원본 엑셀 클라우드 보관
     }catch(ex){ showErr('파일을 읽을 수 없습니다: '+ex.message); }
   };
   reader.readAsArrayBuffer(file);
 }
 
 // ── 엑셀 파싱 ──
-function parseWorkbook(wb, fname, replaceBatch){
+function parseWorkbook(wb, fname, replaceBatch, rawPath){
   // "수집 데이터" 시트 찾기 (없으면 컬럼으로 추정)
   let sheetName = wb.SheetNames.find(n=>n.replace(/\s/g,'').includes('수집데이터'));
   if(!sheetName) sheetName = wb.SheetNames[0];
@@ -1092,7 +1093,7 @@ function parseWorkbook(wb, fname, replaceBatch){
   }
   if(!parsed.length){ showErr('데이터 행을 찾지 못했습니다.'); return; }
 
-  ingest(parsed, fname, {replace:replaceBatch});
+  ingest(parsed, fname, {replace:replaceBatch, raw:rawPath});
 }
 
 // ════════════════════════════════════════════════════
@@ -1148,14 +1149,45 @@ window.addEventListener('beforeunload', ()=>{ if(_cloudPending) flushCloudSave()
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) flushCloudSave(); });
 
 // 업로드한 원본 엑셀을 클라우드에 보관 (관리자만)
-async function cloudSaveRaw(fname, arrayBuffer){
+function rawObjectPath(fname){
+  const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  const safe = String(fname).replace(/[^\w.\-가-힣]/g,'_');
+  return `uploads/${ts}_${safe}`;
+}
+function rawSafeName(fname){ return String(fname).replace(/[^\w.\-가-힣]/g,'_'); }
+async function cloudSaveRaw(path, arrayBuffer){
   if(!SB || auth!=='admin') return;
   try{
-    const ts = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    const safe = String(fname).replace(/[^\w.\-가-힣]/g,'_');
-    await SB.storage.from(SUPA.bucket).upload(`uploads/${ts}_${safe}`, new Blob([arrayBuffer]),
+    await SB.storage.from(SUPA.bucket).upload(path, new Blob([arrayBuffer]),
       { upsert:false, contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   }catch(e){ /* 원본 보관 실패는 분석에 영향 없음 */ }
+}
+function publicRawUrl(path, origName){
+  const enc = path.split('/').map(encodeURIComponent).join('/');
+  return `${SUPA.url}/storage/v1/object/public/${SUPA.bucket}/${enc}?download=${encodeURIComponent(origName||'download.xlsx')}`;
+}
+let _rawListCache=null;
+async function cloudListRaw(){
+  if(_rawListCache) return _rawListCache;
+  if(!SB) return [];
+  try{ const {data,error}=await SB.storage.from(SUPA.bucket).list('uploads',{limit:1000});
+    if(error) throw error;
+    _rawListCache=(data||[]).map(o=>'uploads/'+o.name); return _rawListCache;
+  }catch(e){ return []; }
+}
+async function downloadUpload(u){
+  if(!u){ return; }
+  if(u.raw){ window.open(publicRawUrl(u.raw, u.name), '_blank'); return; }
+  // 이력에 경로가 없는 과거 업로드 → 보관함 목록에서 파일명으로 매칭
+  const objs = await cloudListRaw();
+  const safe = '_'+rawSafeName(u.name);
+  const cand = objs.filter(o=>o.endsWith(safe));
+  if(!cand.length){ toast('원본 파일을 찾을 수 없습니다. (이 기능 적용 이전 업로드분일 수 있어요)', true); return; }
+  let pick = cand[0];
+  if(cand.length>1 && u.at){ const atKey=String(u.at).replace(/[:.]/g,'-').slice(0,19);
+    pick = cand.map(o=>({o,ts:o.slice('uploads/'.length,'uploads/'.length+19)}))
+               .sort((a,b)=>Math.abs(a.ts.localeCompare(atKey))-Math.abs(b.ts.localeCompare(atKey)))[0].o; }
+  window.open(publicRawUrl(pick, u.name), '_blank');
 }
 
 // 행 고유키 = 카페·날짜·종류·제목·본문·링크 조합 → 같은 글은 다시 올려도 1건
@@ -1194,7 +1226,7 @@ function ingest(parsed, fname, opts){
   const merged = { rows:[...map.values()], version:1, config: store.config||{} };
   // 업로드 이력 기록(교체 시 기존 항목 갱신)
   merged.config.uploads = (merged.config.uploads||[]).filter(u=>u.id!==batch);
-  merged.config.uploads.push({ id:batch, name:fname, at:new Date().toISOString(), added });
+  merged.config.uploads.push({ id:batch, name:fname, at:new Date().toISOString(), added, raw:(opts.raw||'') });
   saveStore(merged);
   rebuildRAW(fname);
   showDashboardUI();
@@ -1842,7 +1874,8 @@ function uploadHistoryHTML(){
     ups.map(u=>{const dt=u.at?new Date(u.at):null;
       const ds=dt?`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`:'-';
       return `<tr><td>${ds}</td><td>${escapeHtml(u.name||'-')}</td><td style="text-align:center">${(u.added||0).toLocaleString()}</td>
-        <td style="text-align:right;white-space:nowrap"><button class="viewbtn up-replace" data-bid="${u.id}">교체</button>
+        <td style="text-align:right;white-space:nowrap"><button class="viewbtn up-dl" data-bid="${u.id}">⬇ 다운로드</button>
+          <button class="viewbtn up-replace" data-bid="${u.id}">교체</button>
           <button class="set-del-btn up-delete" data-bid="${u.id}">삭제</button></td></tr>`;}).join('')+
     `</tbody></table></div>`;
 }
@@ -1921,6 +1954,8 @@ document.getElementById('settings').addEventListener('click', e=>{
     const grp=which==='comp'?'competitors':'postTypes'; if(v && !setDraft[grp].includes(v)) setDraft[grp].push(v); renderSettings(); return; }
   if(e.target.id==='setSaveAll'){ saveAllSettings(); return; }
   if(e.target.id==='setResetAll'){ setDraft=null; renderSettings(); return; }
+  const dlb=e.target.closest('.up-dl');
+  if(dlb){ const u=((STORE.config&&STORE.config.uploads)||[]).find(x=>x.id===dlb.dataset.bid); downloadUpload(u); return; }
   const rep=e.target.closest('.up-replace');
   if(rep){ _replaceBatch=rep.dataset.bid; document.getElementById('replaceFile').click(); return; }
   const dl=e.target.closest('.up-delete');
