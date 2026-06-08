@@ -515,6 +515,9 @@
     font-family:var(--font);font-size:12px;font-weight:700;padding:8px 13px;cursor:pointer}
   .vc-revert:hover:not(:disabled){border-color:var(--neg);color:var(--neg)}
   .vc-revert:disabled{opacity:.4;cursor:default}
+  .vc-confirm{background:var(--pos);border:0;border-radius:9px;color:#fff;font-family:var(--font);
+    font-weight:800;font-size:12.5px;padding:7px 12px;cursor:pointer}
+  .vc-confirm:hover{filter:brightness(.94)}
   .vc-status{font-size:12px;font-weight:700;color:var(--ink3)}
   .vc-status.dirty{color:var(--amber)}
   .vc-clstoggle{margin-top:12px;background:transparent;border:1px dashed var(--line2);border-radius:8px;
@@ -763,6 +766,7 @@
         </div>
         <div class="ctl-group">
           <button class="acc-btn admin-only" id="autoVerifyBtn">🤖 자동 검증 실행</button>
+          <button class="acc-btn admin-only" id="confirmAllAutoBtn" style="display:none">✅ 자동(검토) 모두 검증 완료</button>
         </div>
         <div class="ctl-group">
           <span class="ctl-label">범위</span>
@@ -2658,6 +2662,7 @@ function editorControls(r){
     <div class="vc-actions">
       <button class="vc-save" ${dirty?'':'disabled'}>저장</button>
       <button class="vc-revert" ${dirty?'':'disabled'}>되돌리기</button>
+      ${r.vsrc==='auto'?`<button class="vc-confirm" title="자동 검증 결과를 사람이 확정 → 검증 완료로 이동">✓ 검증 완료</button>`:''}
       <span class="vc-status ${dirty?'dirty':''}">${statusTxt}</span>
     </div>`;
 }
@@ -2751,6 +2756,8 @@ async function optimizeAll(){
 function renderVerify(){
   if(!RAW){ return; }
   updateVerifyHeader();
+  const cab=document.getElementById('confirmAllAutoBtn');
+  if(cab){ const hasAuto=RAW.rows.some(r=>r.vsrc==='auto'); cab.style.display=(state.vfFilter==='auto'&&auth==='admin'&&hasAuto)?'':'none'; }
   const rows = verifyRows();
   const listEl=document.getElementById('verifyList');
   const moreEl=document.getElementById('verifyMore');
@@ -2827,6 +2834,40 @@ function stage(editorEl, changes){
   pending[id]={...(pending[id]||{}), ...changes};
   markDirty(editorEl);
 }
+// 자동(검토) 행을 사람이 확정 → 검증 완료(manual)로 승격 (학습 정답으로 사용됨)
+function dropCardFromList(card){
+  card.style.transition='opacity .25s, transform .25s';
+  card.style.opacity='0'; card.style.transform='scale(.98)';
+  setTimeout(()=>{ card.remove();
+    if(!document.querySelector('#verifyList .vcard')) renderVerify(); }, 240);
+}
+function confirmAuto(editorEl){
+  const id=editorEl.dataset.id;
+  const r=RAW.rows.find(x=>x.id===id); if(!r) return;
+  const eff=effRow(r);
+  const changes={...(pending[id]||{}), vsrc:'manual', vconf:100};
+  if(!changes.vSent) changes.vSent=eff.vSent||r.vSent||'';     // 자동 예측 감성 그대로 확정
+  if(changes.vType==null && (eff.vType||r.vType)) changes.vType=eff.vType||r.vType;
+  if(!changes.vSent){ toast('감성을 먼저 선택해주세요.', true); return; }
+  if(!saveRow(id, changes)) return;
+  delete pending[id];
+  if(state.vfFilter==='auto' || state.vfFilter==='todo'){ dropCardFromList(editorEl.closest('.vcard')); }
+  else { renderVerify(); }
+  toast('검증 완료로 이동했습니다.');
+}
+function confirmAllAuto(){
+  if(auth!=='admin'){ toast('관리자만 가능합니다.', true); return; }
+  const store=loadStore();
+  let n=0;
+  store.rows.forEach(r=>{ if(r.vsrc==='auto' && isVerified(r)){ r.vsrc='manual'; r.vconf=100; n++; } });
+  if(!n){ toast('검토할 자동 검증 데이터가 없습니다.'); return; }
+  if(!window.confirm(`자동(검토) ${n.toLocaleString()}건을 모두 검증 완료로 확정합니다. (이 데이터는 학습 정답으로 사용됩니다) 진행할까요?`)) return;
+  saveStore(store); rebuildRAW();
+  if(state.view==='dash'){ buildTypeChips(); render(); } else dashStale=true;
+  updateAccStat(); updateVerifyHeader();
+  renderVerify();
+  toast(`${n.toLocaleString()}건을 검증 완료로 이동했습니다.`);
+}
 function commitEditor(editorEl){
   const id=editorEl.dataset.id, changes=pending[id];
   if(!changes){ return; }
@@ -2882,6 +2923,7 @@ function onEditorClick(e){
 
   if(e.target.closest('.vc-save')){ commitEditor(editorEl); return; }
   if(e.target.closest('.vc-revert')){ revertEditor(editorEl); return; }
+  if(e.target.closest('.vc-confirm')){ confirmAuto(editorEl); return; }
 
   const clsT=e.target.closest('.vc-clstoggle');
   if(clsT){
@@ -2931,6 +2973,7 @@ document.getElementById('verifyList').addEventListener('change', onEditorChange)
 
 // 검증 페이지 컨트롤
 document.getElementById('autoVerifyBtn').addEventListener('click', autoVerifyAll);
+document.getElementById('confirmAllAutoBtn').addEventListener('click', confirmAllAuto);
 document.getElementById('vfFilterSeg').addEventListener('click', e=>{
   if(e.target.tagName!=='BUTTON')return;
   state.vfFilter=e.target.dataset.vf; state.vfLimit=60;
