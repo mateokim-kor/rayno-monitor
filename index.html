@@ -366,7 +366,12 @@
   .lbl-in{width:130px;background:var(--bg2);border:1px solid var(--line2);border-radius:7px;color:var(--ink);font-family:var(--font);font-size:12.5px;padding:6px 9px;outline:none}
   .lbl-in:focus{border-color:var(--amber)}
   .rep-note-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}
-  .rep-note-text{font-size:13.5px;line-height:1.7;color:var(--ink)}
+  .rep-note-text{font-size:13.5px;line-height:1.8;color:var(--ink2)}
+  .rep-note-text strong{font-weight:800;color:var(--ink)}
+  .rep-note-text .rep-hl{color:var(--amber);font-weight:800}
+  .rep-note-text .rep-pos{color:var(--pos);font-weight:800}
+  .rep-note-text .rep-neg{color:var(--neg);font-weight:800}
+  .rep-note-text .rep-idea{display:block;margin-top:10px;padding:10px 12px;background:rgba(245,180,60,.10);border-left:3px solid var(--amber);border-radius:8px;color:var(--ink)}
   .rep-note-edit{background:transparent;border:1px solid var(--line2);border-radius:8px;color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer;white-space:nowrap}
   .rep-note-edit:hover{border-color:var(--amber);color:var(--amber)}
   .rep-note-ta{width:100%;min-height:130px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--ink);font-family:var(--font);font-size:13.5px;line-height:1.65;padding:11px 13px;outline:none;resize:vertical;box-sizing:border-box}
@@ -601,7 +606,7 @@
 
   <!-- 내비게이션 + 누적 툴바 -->
   <div class="appsw" id="appSwitcher" style="display:none">
-    <button class="appsw-btn on" data-ws="cafe">📡 카페 모니터링</button>
+    <button class="appsw-btn on" data-ws="cafe">📡 온라인 모니터링</button>
     <button class="appsw-btn" data-ws="rayno">📊 레이노 데이터</button>
     <button class="appsw-btn" data-ws="settings">⚙ 설정</button>
   </div>
@@ -833,6 +838,12 @@
         <div class="modal-cap" id="modalCap"></div>
       </div>
       <div class="modal-tools">
+        <div class="seg" id="modalSentSeg">
+          <button data-ms="all" class="on">전체</button>
+          <button data-ms="긍정">긍정</button>
+          <button data-ms="중립">중립</button>
+          <button data-ms="부정">부정</button>
+        </div>
         <input class="modal-search" id="modalSearch" placeholder="목록 내 검색…">
         <button class="modal-x" id="modalClose" aria-label="닫기">✕</button>
       </div>
@@ -1751,6 +1762,7 @@ function renderKeywords(rows){
 //  상세 보기 모달
 // ════════════════════════════════════════════════════
 let MODAL_ROWS = [];   // 현재 모달에 표시 중인 원본 행
+let MODAL_SENT = 'all';   // 모달 내 감성 필터
 
 function openDetail(titleHtml, rows, capText){
   MODAL_ROWS = rows.slice().sort((a,b)=>a.idx-b.idx);
@@ -1758,6 +1770,8 @@ function openDetail(titleHtml, rows, capText){
     `<span class="badge">${rows.length}건</span>`;
   document.getElementById('modalCap').textContent = capText || '항목을 클릭하면 원문으로 이동할 수 있습니다';
   document.getElementById('modalSearch').value='';
+  MODAL_SENT='all';
+  document.querySelectorAll('#modalSentSeg button').forEach(b=>b.classList.toggle('on', b.dataset.ms==='all'));
   renderModalList('');
   const bg=document.getElementById('modalBg');
   bg.classList.add('open');
@@ -1771,7 +1785,12 @@ function closeDetail(){
 function renderModalList(q){
   q=(q||'').trim().toLowerCase();
   let list=MODAL_ROWS;
+  if(MODAL_SENT!=='all') list=list.filter(r=>sentOf(r)===MODAL_SENT);
   if(q) list=list.filter(r=>(r.title+' '+r.body+' '+r.cafe).toLowerCase().includes(q));
+  // 감성 세그먼트에 건수 표시
+  const cnt={'긍정':0,'중립':0,'부정':0}; MODAL_ROWS.forEach(r=>{const s=sentOf(r); if(cnt[s]!=null)cnt[s]++;});
+  document.querySelectorAll('#modalSentSeg button').forEach(b=>{ const k=b.dataset.ms;
+    b.textContent = k==='all'?`전체 ${MODAL_ROWS.length}`:`${k} ${cnt[k]||0}`; });
   const el=document.getElementById('modalBody');
   if(!list.length){ el.innerHTML='<div class="modal-empty">표시할 항목이 없습니다.</div>'; return; }
   el.innerHTML=list.map(r=>recCard(r)).join('');
@@ -1830,6 +1849,9 @@ document.getElementById('modalClose').addEventListener('click', closeDetail);
 document.getElementById('modalBg').addEventListener('click', e=>{ if(e.target.id==='modalBg') closeDetail(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDetail(); });
 document.getElementById('modalSearch').addEventListener('input', e=>renderModalList(e.target.value));
+document.getElementById('modalSentSeg').addEventListener('click', e=>{ const b=e.target.closest('button[data-ms]'); if(!b)return;
+  MODAL_SENT=b.dataset.ms; document.querySelectorAll('#modalSentSeg button').forEach(x=>x.classList.toggle('on', x===b));
+  renderModalList(document.getElementById('modalSearch').value); });
 
 // 상세 모달 인라인 편집 (관리자) — 편집기 컨트롤은 공용 핸들러 사용
 document.getElementById('modalBody').addEventListener('click', onEditorClick);
@@ -2109,29 +2131,33 @@ function pickerHTML(which){
 }
 // 자동 초안(관리자가 비워두면 표시)
 function autoInsightText(ctx){
-  const {M,P,RP,OWN,own,ownShare,bcEnt,asCnt,priceCnt,negR,posR,byNeg}=ctx;
+  const {M,P,RP,OWN,ownShare,bcEnt,asCnt,priceCnt,negR,posR,byNeg}=ctx;
   const L=[];
-  const stance = M.net>=20?'매우 우호적':M.net>=5?'대체로 긍정적':M.net<=-20?'부정 우위로 위험 신호':M.net<=-5?'다소 부정적':'중립적';
-  L.push(`${rpLabel(RP)} 기준 총 ${M.total.toLocaleString()}건이 수집됐고, 순감성 ${M.net>=0?'+':''}${M.net.toFixed(0)}%p로 여론은 ${stance}입니다.`);
-  if(P){
-    const dv=P.total?Math.round((M.total/P.total-1)*100):0, dp=M.posRate-P.posRate;
-    let mo=`직전 기간 대비 언급량 ${dv>=0?'+':''}${dv}%, 긍정률 ${dp>=0?'+':''}${dp.toFixed(0)}%p`;
-    mo += (dv>20&&dp>=0)?' — 양·질이 동반 개선되는 국면입니다.':(dv>20&&dp<0)?' — 노출은 늘었으나 호감도가 약화돼 리스크 관리가 필요합니다.':(dp>=5)?' — 호감도가 뚜렷이 개선됐습니다.':(dp<=-5)?' — 호감도 하락에 주의가 필요합니다.':' — 큰 변동은 없습니다.';
-    L.push(mo);
-  }
-  if(bcEnt&&bcEnt.length){
-    const lead=bcEnt[0];
-    if(lead[0]===OWN) L.push(`브랜드 언급 점유율은 자사가 ${ownShare.toFixed(0)}%로 선두입니다. 우위를 굳히는 메시지 전략이 유효합니다.`);
-    else L.push(`브랜드 언급에서 경쟁사 ‘${lead[0]}’가 상위입니다(자사 ${ownShare.toFixed(0)}%). 차별점(시야·단열·내구) 중심의 점유율 방어가 필요합니다.`);
-  }
-  if(asCnt>0 || M.negRate>=25){
-    const topNeg=(negR&&negR.length)?negR[0][0]:'부정 이슈';
-    L.push(`리스크: 부정률 ${M.negRate.toFixed(0)}%${asCnt?`·불만/AS ${asCnt}건`:''}. 핵심 불만 요인은 ‘${topNeg}’로 우선 대응이 필요합니다.`);
-  }
-  if(priceCnt>=3) L.push(`기회: 가격·견적 문의 ${priceCnt}건으로 구매 의향이 감지됩니다. 견적·프로모션 동선을 강화하면 전환을 기대할 수 있습니다.`);
-  else if(posR&&posR.length) L.push(`강점: 긍정 반응의 핵심은 ‘${posR[0][0]}’입니다. 후기·콘텐츠에서 이 메시지를 전면화하세요.`);
-  if(byNeg&&byNeg.length) L.push(`채널: ‘${byNeg[0].c}’에 부정 언급이 몰려 있어, 해당 카페 모니터링·대응을 우선순위로 권장합니다.`);
+  const stance = M.net>=20?'++매우 우호적++':M.net>=5?'++대체로 긍정적++':M.net<=-20?'~~부정 우위(위험)~~':M.net<=-5?'~~다소 부정적~~':'중립적';
+  L.push(`📊 **여론 종합** — ${rpLabel(RP)} 동안 **${M.total.toLocaleString()}건**이 수집됐습니다. 순감성 ==${M.net>=0?'+':''}${M.net.toFixed(0)}%p== (긍정 ${M.posRate.toFixed(0)}% · 부정 ${M.negRate.toFixed(0)}%)로 여론은 ${stance}입니다.`);
+  if(P){ const dv=P.total?Math.round((M.total/P.total-1)*100):0, dp=M.posRate-P.posRate;
+    const tag=(dv>20&&dp>=0)?'++양·질 동반 개선 국면++ — 모멘텀을 키울 적기입니다.':(dv>20&&dp<0)?'~~노출↑·호감도↓~~ — 확산 전에 메시지 리스크를 잡아야 합니다.':(dp>=5)?'++호감도 뚜렷이 개선++.':(dp<=-5)?'~~호감도 하락~~ — 원인 점검이 필요합니다.':'큰 변동은 없습니다.';
+    L.push(`📈 **모멘텀** — 직전 대비 언급량 ==${dv>=0?'+':''}${dv}%==, 긍정률 ==${dp>=0?'+':''}${dp.toFixed(0)}%p==. ${tag}`); }
+  if(bcEnt&&bcEnt.length){ const lead=bcEnt[0];
+    if(lead[0]===OWN) L.push(`🏆 **점유율** — 브랜드 언급 1위(자사 ==${ownShare.toFixed(0)}%==). 카테고리 기준을 선점하는 ‘레퍼런스 리더’ 포지셔닝이 유효합니다.`);
+    else L.push(`⚔ **점유율** — 경쟁사 ‘**${lead[0]}**’가 상위(자사 ==${ownShare.toFixed(0)}%==). ~~열위 구간~~이므로 시야·단열·내구 차별점 비교 메시지로 방어·역전이 필요합니다.`); }
+  if(asCnt>0||M.negRate>=25){ const topNeg=(negR&&negR.length)?negR[0][0]:'부정 이슈';
+    L.push(`⚠ **리스크** — 부정률 ==${M.negRate.toFixed(0)}%==${asCnt?` · 불만/AS ~~${asCnt}건~~`:''}. 핵심 불만은 ‘~~${topNeg}~~’ — 표준 응대 스크립트와 공개 해명으로 ++확산 차단++이 우선입니다.`); }
+  if(priceCnt>=3) L.push(`💰 **기회** — 가격·견적 문의 ==${priceCnt}건==으로 ++구매 의향++이 감지됩니다. 견적→상담→시공점 동선을 짧게 만들면 전환을 끌어올릴 수 있습니다.`);
+  else if(posR&&posR.length) L.push(`💪 **강점** — 긍정 반응의 핵심은 ‘++${posR[0][0]}++’. 후기·콘텐츠 전면에 이 메시지를 배치하세요.`);
+  if(byNeg&&byNeg.length) L.push(`📍 **채널** — 부정 언급이 ‘**${byNeg[0].c}**’에 집중되어 있습니다. 이 카페를 ~~집중 모니터링~~ 대상으로 지정하고 응대 우선순위를 부여하세요.`);
+  const idea=brightIdea(ctx); if(idea) L.push('💡 '+idea);
   return L.join('\n');
+}
+function brightIdea(ctx){
+  const {posR,negR,bcEnt,OWN,priceCnt,byNeg,asCnt}=ctx;
+  const I=[];
+  if(priceCnt>=3) I.push(`견적 문의 글에 자동 안내할 ‘**3분 셀프 견적기**’(차종·전면/측면 선택 → 예상가·가까운 시공점)를 만들어 ++관심을 즉시 리드로++ 전환하세요.`);
+  if(bcEnt&&bcEnt.length&&bcEnt[0][0]!==OWN) I.push(`경쟁사 검토 글이 보이는 카페에 ‘**${bcEnt[0][0]} vs 자사** 핵심 비교표’를 선제 배포해 ++비교 프레임을 선점++하세요.`);
+  if(negR&&negR.length) I.push(`부정 1순위 ‘~~${negR[0][0]}~~’를 정면으로 다루는 ‘**오해와 진실** 카드뉴스’로 검색·재방문 시 ++신뢰를 반전++시키세요.`);
+  if(posR&&posR.length) I.push(`‘**${posR[0][0]}**’ 키워드 1분 숏폼 후기 + 카페 인증 이벤트로 ++UGC를 자가 증식++시키세요.`);
+  if(asCnt>0&&byNeg&&byNeg.length) I.push(`불만 글에 24시간 내 ‘**담당자 실명 댓글 + 보상 안내**’ 표준 대응으로 ~~부정 후기~~를 공개 회복 사례로 전환하세요.`);
+  return I.length?`**반짝이는 아이디어** — ${I[0]}`:'';
 }
 function autoMarketingText(M,signals){
   const out=[];
@@ -2145,42 +2171,50 @@ function autoMarketingText(M,signals){
 // ── 부서별 추천(영업 / 브랜드전략 / 품질혁신) 자동 초안 ──
 function autoSalesText(c){
   const L=[];
-  if(c.priceCnt>=1) L.push(`• 가격·견적 문의 ${c.priceCnt}건은 구매 임박 리드입니다 — 해당 글·카페를 리스트업해 견적 상담/시공점 연결로 신속 응대하세요.`);
-  if(c.recCnt>=1) L.push(`• ‘추천요청’ 글 ${c.recCnt}건에 자사 시공 사례·후기가 노출되도록 제휴 시공점·영업 담당을 연계하세요.`);
-  if(c.byVol&&c.byVol.length) L.push(`• 활동 상위 카페(${c.byVol.slice(0,2).map(x=>x.c).join(', ')})를 우선 영업 타깃으로 — 체험단·공동구매·제휴 이벤트를 제안하세요.`);
-  if(c.posR&&c.posR.length) L.push(`• 긍정 포인트 ‘${c.posR[0][0]}’를 영업 레퍼런스(후기·사례집)로 정리해 상담 자료로 활용하세요.`);
-  if(c.bcEnt&&c.bcEnt.length&&c.bcEnt[0][0]!==c.OWN) L.push(`• 경쟁사 ‘${c.bcEnt[0][0]}’를 검토 중인 고객용 비교 우위 토크스크립트를 준비하세요.`);
-  if(c.asCnt>0) L.push(`• 불만/AS 고객은 이탈 위험군 — CS와 공동으로 리커버리(보상·재시공 안내)를 진행하세요.`);
-  L.push('• 추천 업무: 월간 리드 리스트(견적·추천 문의) 작성 → 시공점 배분 → 전환율 추적.');
+  if(c.priceCnt>=1) L.push(`• 가격·견적 문의 ==${c.priceCnt}건==은 ++구매 임박 리드++ — 해당 글·카페를 리스트업해 **견적 상담·시공점 연결**로 24시간 내 응대하세요.`);
+  if(c.recCnt>=1) L.push(`• ‘추천요청’ 글 ==${c.recCnt}건==에 자사 시공 사례·후기가 노출되도록 **제휴 시공점·영업 담당**을 연계하세요.`);
+  if(c.byVol&&c.byVol.length) L.push(`• 활동 상위 카페(**${c.byVol.slice(0,2).map(x=>x.c).join(', ')}**)를 ++우선 영업 타깃++으로 — 체험단·공동구매·제휴 이벤트를 제안하세요.`);
+  if(c.posR&&c.posR.length) L.push(`• 긍정 포인트 ‘++${c.posR[0][0]}++’를 영업 레퍼런스(후기·사례집)로 정리해 상담 자료로 활용하세요.`);
+  if(c.bcEnt&&c.bcEnt.length&&c.bcEnt[0][0]!==c.OWN) L.push(`• 경쟁사 ‘**${c.bcEnt[0][0]}**’ 검토 고객용 ~~비교 우위 토크스크립트~~를 준비해 상담 이탈을 막으세요.`);
+  if(c.asCnt>0) L.push(`• 불만/AS 고객은 ~~이탈 위험군~~ — CS와 공동으로 **리커버리(보상·재시공 안내)**를 진행하세요.`);
+  L.push(`💡 **반짝이는 아이디어** — 매주 ‘**핫 리드 Top10**’(견적·추천 문의 글)을 자동 집계해 시공점에 배분하고, 2주 뒤 ++전환 여부를 역추적++해 영업 ROI를 수치화하세요.`);
   return L.join('\n');
 }
 function autoBrandText(c){
   const L=[];
   if(c.bcEnt&&c.bcEnt.length){
-    if(c.bcEnt[0][0]===c.OWN) L.push(`• 언급 점유율 1위(${c.ownShare.toFixed(0)}%) — 카테고리 리더십 메시지로 기준을 선점하는 캠페인을 권장합니다.`);
-    else L.push(`• 자사 점유율 ${c.ownShare.toFixed(0)}%로 경쟁사 ‘${c.bcEnt[0][0]}’ 열위 — 차별점(${c.posR&&c.posR.length?c.posR[0][0]:'시야·단열·내구'}) 중심 비교 캠페인으로 점유율을 높이세요.`);
+    if(c.bcEnt[0][0]===c.OWN) L.push(`• 언급 점유율 ==1위(${c.ownShare.toFixed(0)}%)== — ++카테고리 리더십++ 메시지로 ‘기준이 되는 브랜드’ 포지션을 선점하세요.`);
+    else L.push(`• 자사 점유율 ==${c.ownShare.toFixed(0)}%==로 경쟁사 ‘**${c.bcEnt[0][0]}**’에 ~~열위~~ — 차별점(${c.posR&&c.posR.length?c.posR[0][0]:'시야·단열·내구'}) 중심 **비교 캠페인**으로 점유율을 끌어올리세요.`);
   }
-  if(c.posR&&c.posR.length) L.push(`• 긍정 키워드 ‘${c.posR.slice(0,2).map(x=>x[0]).join(', ')}’를 핵심 브랜드 메시지로 콘텐츠(리뷰·블로그·영상)에 반영하세요.`);
-  if(c.negR&&c.negR.length) L.push(`• 부정 인식 ‘${c.negR[0][0]}’에 대한 해명·개선 커뮤니케이션(FAQ·시공 가이드)으로 신뢰를 보완하세요.`);
+  if(c.posR&&c.posR.length) L.push(`• 긍정 키워드 ‘++${c.posR.slice(0,2).map(x=>x[0]).join(', ')}++’를 핵심 브랜드 메시지로 콘텐츠(리뷰·블로그·영상)에 일관 반영하세요.`);
+  if(c.negR&&c.negR.length) L.push(`• 부정 인식 ‘~~${c.negR[0][0]}~~’에 대한 **해명·개선 커뮤니케이션**(FAQ·시공 가이드)으로 신뢰를 보완하세요.`);
   if(c.P){ const dp=c.M.posRate-c.P.posRate;
-    if(dp<=-5) L.push('• 긍정률 하락 국면 — 메시지 톤·캠페인을 점검하고 우호 여론 회복 콘텐츠가 필요합니다.');
-    else if(dp>=5) L.push('• 긍정률 상승 모멘텀 — 신제품·프로모션 메시지를 키울 적기입니다.'); }
-  L.push('• 추천 업무: 카페별 타깃 콘텐츠 캘린더 수립, 긍정 후기 UGC 확보, 분기 브랜드 헬스(점유율·감성) 리포팅.');
+    if(dp<=-5) L.push(`• ~~긍정률 하락 국면~~ — 메시지 톤·캠페인을 점검하고 우호 여론 회복 콘텐츠가 필요합니다.`);
+    else if(dp>=5) L.push(`• ++긍정률 상승 모멘텀++ — 신제품·프로모션 메시지를 키울 적기입니다.`); }
+  L.push(`💡 **반짝이는 아이디어** — 분기마다 ‘**브랜드 헬스 지수**(점유율·순감성·긍정키워드)’를 한 장으로 시각화해, 경쟁사 대비 우리 위치를 ++한눈에 보이는 추세 그래프++로 경영진에 공유하세요.`);
   return L.join('\n');
 }
 function autoQualityText(c){
   const L=[];
-  if(c.negR&&c.negR.length) L.push(`• 부정 요인 1순위 ‘${c.negR[0][0]}’${c.negR[1]?`, ‘${c.negR[1][0]}’`:''} — 근본원인(시공/제품/물류) 분석 후 개선 과제로 등록하세요.`);
-  else L.push('• 검증 시 ‘부정 이유’ 분류 입력을 늘리면 품질 이슈를 더 정밀하게 추적할 수 있습니다.');
-  if(c.asCnt>0) L.push(`• 불만/AS ${c.asCnt}건 — 접수~처리 SLA와 재발방지 체크리스트를 점검하고 유형별 클레임을 집계하세요.`);
-  if(c.prod&&c.prod.length) L.push(`• 언급 제품 ‘${c.prod[0][0]}’의 부정 사례를 별도 모니터링해 제품별 품질 편차를 확인하세요.`);
-  if(c.car&&c.car.length) L.push(`• 차종 ‘${c.car[0][0]}’ 관련 시공 이슈(곡면·열성형 등) 여부를 점검하세요.`);
-  if(c.byNeg&&c.byNeg.length) L.push(`• 부정이 몰린 ‘${c.byNeg[0].c}’의 글을 정성 리뷰해 특정 시공점·배치 이슈인지 확인하세요.`);
-  L.push('• 추천 업무: 부정 사유 태깅 표준화 → 월간 클레임 Top5 트래킹 → 시공 표준·교육 업데이트.');
+  if(c.negR&&c.negR.length) L.push(`• 불만 1순위 ‘~~${c.negR[0][0]}~~’${c.negR[1]?`, ‘~~${c.negR[1][0]}~~’`:''} — **근본원인(시공/제품/물류)**을 분리 분석해 개선 과제로 등록하세요.`);
+  else L.push(`• 검증 시 ‘부정 이유’ 분류 입력을 늘리면 품질 이슈를 ++더 정밀하게++ 추적할 수 있습니다.`);
+  if(c.asCnt>0) L.push(`• 불만/AS ==${c.asCnt}건== — **접수~처리 SLA**와 재발방지 체크리스트를 점검하고, 클레임을 유형별로 집계하세요.`);
+  if(c.prod&&c.prod.length) L.push(`• 언급 제품 ‘**${c.prod[0][0]}**’의 부정 사례를 별도 모니터링해 ++제품별 품질 편차++를 확인하세요.`);
+  if(c.car&&c.car.length) L.push(`• 차종 ‘**${c.car[0][0]}**’ 관련 시공 이슈(곡면·열성형 등) 여부를 점검하세요.`);
+  if(c.byNeg&&c.byNeg.length) L.push(`• 부정이 몰린 ‘**${c.byNeg[0].c}**’의 글을 정성 리뷰해 ~~특정 시공점·배치 이슈~~인지 확인하세요.`);
+  L.push(`💡 **반짝이는 아이디어** — 불만 글의 키워드를 ‘**증상→원인→조치**’ 3단 코드로 태깅해 ‘**월간 클레임 Top5 → 시공 표준·교육 업데이트**’로 닫는 ++품질 개선 루프++를 운영하세요.`);
   return L.join('\n');
 }
 // 관리자 편집 노트 블록(핵심 인사이트 · 마케팅 제안)
 let repDrafts={insight:'',marketing:''};
+function mdLite(s){
+  let h=escapeHtml(s||'');
+  h=h.replace(/\*\*([^*]+?)\*\*/g,'<strong>$1</strong>');
+  h=h.replace(/==([^=]+?)==/g,'<span class="rep-hl">$1</span>');
+  h=h.replace(/\+\+([^+]+?)\+\+/g,'<span class="rep-pos">$1</span>');
+  h=h.replace(/~~([^~]+?)~~/g,'<span class="rep-neg">$1</span>');
+  return h.split('\n').map(line=> /^\s*💡/.test(line)?`<span class="rep-idea">${line}</span>`:line).join('<br>');
+}
 function noteBlock(kind,title,autoText){
   const saved=getNote(kind);
   const text=saved||autoText||'';
@@ -2188,7 +2222,7 @@ function noteBlock(kind,title,autoText){
   const tag = saved ? '<span class="rep-sub2 sel">관리자 작성</span>'
             : (text ? '<span class="rep-sub2">자동 초안</span>' : '');
   const edit=(auth==='admin')?`<button class="rep-note-edit" data-note="${kind}">✏ 수정</button>`:'';
-  const body = text ? `<div class="rep-note-text">${escapeHtml(text).replace(/\n/g,'<br>')}</div>`
+  const body = text ? `<div class="rep-note-text">${mdLite(text)}</div>`
                     : `<div class="empty">아직 작성된 내용이 없습니다.${auth==='admin'?" ‘수정’을 눌러 작성하세요.":''}</div>`;
   return `<div class="card rep-sec rep-note-card">
      <div class="rep-note-head"><h3 style="margin:0"><span class="dot"></span>${title} ${tag}</h3>${edit}</div>
@@ -2376,7 +2410,7 @@ function renderReport(){
   const deptBlock = deptHead
      + noteBlock('sales','👔 영업팀 — 영업 관점', autoSalesText(repCtx))
      + noteBlock('brand','📣 브랜드전략실 — 마케팅·브랜드 전략 관점', autoBrandText(repCtx))
-     + noteBlock('quality','🔧 품질혁신팀 — 품질혁신 관점', autoQualityText(repCtx));
+     + noteBlock('quality','🔧 품질혁신팀 — CS·제품 품질 개선 관점', autoQualityText(repCtx));
   const repPos = repSection('pos',cur);
   const repNeg = repSection('neg',cur);
   const signals = { price:priceCnt, as:asCnt, competitorLead:(bcEnt.length && bcEnt[0][0]!==OWN && bcEnt[0][1]>own) };
