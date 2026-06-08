@@ -23,7 +23,7 @@
     --font:"Pretendard Variable",Pretendard,-apple-system,system-ui,sans-serif;
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-font-smoothing:antialiased;line-height:1.55}
   body{
     background-image:
       radial-gradient(1100px 500px at 88% -8%, rgba(232,137,59,.10), transparent 60%),
@@ -192,7 +192,7 @@
   @media(max-width:920px){.cols{grid-template-columns:1fr}}
   .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px 18px 16px}
   .card h3{font-size:13.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:2px;display:flex;align-items:center;gap:8px}
-  .card .cap{font-size:11px;color:var(--ink3);margin-bottom:14px}
+  .card .cap{font-size:11px;color:var(--ink3);margin-bottom:14px;line-height:1.65}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);flex:none}
   .chart-box{position:relative;height:248px}
 
@@ -371,6 +371,7 @@
   .rep-note-text .rep-hl{color:var(--amber);font-weight:800}
   .rep-note-text .rep-pos{color:var(--pos);font-weight:800}
   .rep-note-text .rep-neg{color:var(--neg);font-weight:800}
+  .rep-note-text .rep-muted{color:var(--ink3);font-weight:600}
   .rep-note-text .rep-idea{display:block;margin-top:10px;padding:10px 12px;background:rgba(245,180,60,.10);border-left:3px solid var(--amber);border-radius:8px;color:var(--ink)}
   .rep-note-edit{background:transparent;border:1px solid var(--line2);border-radius:8px;color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:6px 12px;cursor:pointer;white-space:nowrap}
   .rep-note-edit:hover{border-color:var(--amber);color:var(--amber)}
@@ -437,6 +438,9 @@
   .vf-search{background:var(--bg2);border:1px solid var(--line);border-radius:9px;color:var(--ink);
              font-family:var(--font);font-size:12.5px;padding:8px 12px;min-width:220px;outline:none}
   .vf-search:focus{border-color:var(--amber)}
+  .vf-date{background:var(--bg2);border:1px solid var(--line);border-radius:9px;color:var(--ink);
+           font-family:var(--font);font-size:12.5px;padding:7px 10px;outline:none}
+  .vf-date:focus{border-color:var(--amber)}
 
   .vcard{border:1px solid var(--line);border-radius:12px;padding:14px 15px;margin-bottom:11px;background:var(--card);
          border-left:3px solid var(--ink3);transition:.15s}
@@ -633,8 +637,8 @@
     <div class="ctl-group">
       <span class="ctl-label">분석 기준</span>
       <div class="seg" id="modeSeg">
-        <button data-mode="strict" class="on">검증 완료</button>
-        <button data-mode="prefer">전체</button>
+        <button data-mode="strict" class="on" title="사람이 직접 검증한 감성값만으로 집계합니다">검증값만</button>
+        <button data-mode="prefer" title="검증값이 없는 글은 AI 추정값까지 포함해 집계합니다">전체(AI 포함)</button>
       </div>
     </div>
     <div class="ctl-group">
@@ -775,6 +779,13 @@
             <button data-vfscope="post">게시글</button>
             <button data-vfscope="comment">댓글</button>
           </div>
+        </div>
+        <div class="ctl-group">
+          <span class="ctl-label">기간</span>
+          <input type="date" class="vf-date" id="vfFrom">
+          <span style="color:var(--ink3)">~</span>
+          <input type="date" class="vf-date" id="vfTo">
+          <button class="acc-btn" id="vfDateClear">전체 기간</button>
         </div>
         <div class="ctl-group" style="flex:1;min-width:220px">
           <span class="ctl-label">검색 (제목·본문·카페)</span>
@@ -980,6 +991,7 @@ const _set0 = loadSettings();
 
 const state = { mode:'strict', scope:'all', sentFilter:null, hiddenTypes:new Set(),
                 view:'dash', vfFilter:'todo', vfScope:'all', vfSearch:'', vfLimit:60,
+                vfFrom:'', vfTo:'',
                 dateMode:'all', month:'', from:'', to:'',
                 excludeKeywords: Array.isArray(_set0.excludeKeywords) ? _set0.excludeKeywords : CONFIG.excludeKeywordsDefault.slice(),
                 excludeNone: (_set0.excludeNone!=null) ? _set0.excludeNone : CONFIG.excludeNoneByDefault };
@@ -1487,11 +1499,11 @@ function renderVeriNote(){
   el.style.display='block';
   const sp=(m.vSentN/m.total*100).toFixed(0), tp=(m.vTypeN/m.total*100).toFixed(0);
   if(state.mode==='strict'){
-    el.innerHTML = `<b>검증 완료</b> 기준 — 사람이 검증한 값만 집계합니다. `+
+    el.innerHTML = `<b>검증값만</b> 기준 — 사람이 검증한 감성값만 집계합니다. `+
       `현재 검증 입력: 감성 <b>${m.vSentN}건(${sp}%)</b> · 게시글유형 <b>${m.vTypeN}건(${tp}%)</b>. `+
       `미검증 행은 집계에서 제외됩니다.`;
   }else{
-    el.innerHTML = `<b>전체</b> 기준 — 검증값이 있으면 그 값을, 없으면 AI값을 사용해 모두 집계합니다. `+
+    el.innerHTML = `<b>전체(AI 포함)</b> 기준 — 검증값이 있으면 그 값을, 없으면 AI 추정값을 사용해 모두 집계합니다. `+
       `검증 입력 완료: 감성 <b>${m.vSentN}건(${sp}%)</b> · 게시글유형 <b>${m.vTypeN}건(${tp}%)</b>.`;
   }
   // 활성 기간 표시
@@ -2248,7 +2260,7 @@ function autoSalesText(c){
 function autoBrandText(c){
   const L=[];
   if(c.coEnt&&c.coEnt.length){ const lead=c.coEnt[0]; const p=c.coTotal?Math.round(lead[1]/c.coTotal*100):0;
-    L.push(`• ‘레이노’ 글에 가장 자주 함께 언급된 경쟁사는 ‘**${lead[0]}**’(==${lead[1].toLocaleString()}건·${p}%==) — **${lead[0]} vs 레이노** 비교 콘텐츠로 ++비교 프레임을 선점++하세요. <span style="color:var(--ink3)">(검색 기반 데이터라 ‘점유율’은 자사 편향 → 동시 언급을 신호로 사용)</span>`); }
+    L.push(`• ‘레이노’ 글에 가장 자주 함께 언급된 경쟁사는 ‘**${lead[0]}**’(==${lead[1].toLocaleString()}건·${p}%==) — **${lead[0]} vs 레이노** 비교 콘텐츠로 ++비교 프레임을 선점++하세요. %%(검색 기반 데이터라 ‘점유율’은 자사 편향 → 동시 언급을 신호로 사용)%%`); }
   else L.push(`• 함께 거론된 경쟁사가 적어 ++지명 관심(레이노 단독 검토)++ 위주입니다 — 브랜드 자산(후기·시그니처 메시지)을 강화해 검색 유입을 전환으로 연결하세요.`);
   if(c.posR&&c.posR.length) L.push(`• 긍정 키워드 ‘++${c.posR.slice(0,2).map(x=>x[0]).join(', ')}++’를 핵심 브랜드 메시지로 콘텐츠(리뷰·블로그·영상)에 일관 반영하세요.`);
   if(c.negR&&c.negR.length) L.push(`• 부정 인식 ‘~~${c.negR[0][0]}~~’에 대한 **해명·개선 커뮤니케이션**(FAQ·시공 가이드)으로 신뢰를 보완하세요.`);
@@ -2277,6 +2289,7 @@ function mdLite(s){
   h=h.replace(/==([^=]+?)==/g,'<span class="rep-hl">$1</span>');
   h=h.replace(/\+\+([^+]+?)\+\+/g,'<span class="rep-pos">$1</span>');
   h=h.replace(/~~([^~]+?)~~/g,'<span class="rep-neg">$1</span>');
+  h=h.replace(/%%([^%]+?)%%/g,'<span class="rep-muted">$1</span>');
   return h.split('\n').map(line=> /^\s*💡/.test(line)?`<span class="rep-idea">${line}</span>`:line).join('<br>');
 }
 function noteBlock(kind,title,autoText){
@@ -2574,6 +2587,11 @@ function verifyRows(){
   let rows = RAW.rows.slice();
   if(state.vfScope==='post')    rows = rows.filter(r=>r.isPost);
   if(state.vfScope==='comment') rows = rows.filter(r=>!r.isPost);
+  if(state.vfFrom || state.vfTo){
+    rows = rows.filter(r=>{ const d=normDate(r.date); if(!d) return false;
+      if(state.vfFrom && d<state.vfFrom) return false;
+      if(state.vfTo   && d>state.vfTo)   return false; return true; });
+  }
   if(state.vfFilter==='todo') rows = rows.filter(r=>!isVerified(r));
   if(state.vfFilter==='done') rows = rows.filter(r=> isVerified(r) && r.vsrc!=='auto');
   if(state.vfFilter==='auto') rows = rows.filter(r=>r.vsrc==='auto').sort((a,b)=>(a.vconf||0)-(b.vconf||0));
@@ -2974,6 +2992,9 @@ document.getElementById('verifyList').addEventListener('change', onEditorChange)
 // 검증 페이지 컨트롤
 document.getElementById('autoVerifyBtn').addEventListener('click', autoVerifyAll);
 document.getElementById('confirmAllAutoBtn').addEventListener('click', confirmAllAuto);
+document.getElementById('vfFrom').addEventListener('change', e=>{ state.vfFrom=e.target.value; state.vfLimit=60; renderVerify(); });
+document.getElementById('vfTo').addEventListener('change', e=>{ state.vfTo=e.target.value; state.vfLimit=60; renderVerify(); });
+document.getElementById('vfDateClear').addEventListener('click', ()=>{ state.vfFrom=''; state.vfTo=''; const a=document.getElementById('vfFrom'),b=document.getElementById('vfTo'); if(a)a.value=''; if(b)b.value=''; state.vfLimit=60; renderVerify(); });
 document.getElementById('vfFilterSeg').addEventListener('click', e=>{
   if(e.target.tagName!=='BUTTON')return;
   state.vfFilter=e.target.dataset.vf; state.vfLimit=60;
