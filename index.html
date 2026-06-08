@@ -818,6 +818,7 @@
 
   <div id="settingsApp" style="display:none">
     <div id="setGate" style="display:none"></div>
+    <div id="setOptHost"></div>
     <div id="setAccessHost"></div>
     <div id="setCafeHost"></div>
     <div id="setWarrHost"></div>
@@ -2664,6 +2665,30 @@ function autoVerifyAll(){
   state.vfLimit=60; refreshVerify(); updateVerifyHeader(); renderVerify();
   toast(n>0?`${n.toLocaleString()}건을 자동 검증했습니다 · 학습 ${M.n.toLocaleString()}건 기반 · 신뢰도 낮은 항목부터 검토하세요`:'새로 자동 검증할 항목이 없습니다.');
 }
+async function optimizeAll(){
+  const res={cafeBefore:0,cafeAfter:0,cafeRemoved:0,warrBefore:0,warrAfter:0,warrRemoved:0};
+  // 1) 카페 데이터: 중복(같은 내용) 합치기 + 빈 항목 제거 (검증값 보존)
+  const store=loadStore();
+  res.cafeBefore=store.rows.length;
+  const map=new Map();
+  store.rows.forEach(r=>{ const k=r.id||rowKey(r);
+    if(map.has(k)){ const ex=map.get(k); if(!isVerified(ex)&&isVerified(r)) map.set(k,r); }   // 검증된 쪽 우선
+    else map.set(k,r); });
+  let rows=[...map.values()].filter(r=> (r.cafe||r.title||r.body) );   // 완전 빈 행 제거
+  res.cafeAfter=rows.length; res.cafeRemoved=res.cafeBefore-rows.length;
+  store.rows=rows;
+  // 2) 내부 캐시 재계산
+  _typeUnionCache=null; if(_ndCache&&_ndCache.clear) _ndCache.clear();
+  saveStore(store); rebuildRAW();
+  // 3) 품질보증서: 중복·비(非)보증서 행 정리
+  if(WARR&&WARR.rows&&WARR.rows.length){ res.warrBefore=WARR.rows.length;
+    const removed=warrDedupe(); res.warrRemoved=removed; res.warrAfter=WARR.rows.length;
+    if(removed>0){ try{ await cloudSaveJSON(SUPA.warrFile,WARR); }catch(e){} } }
+  // 4) 화면 갱신
+  if(state.view==='dash'){ buildTypeChips(); render(); } else dashStale=true;
+  if(typeof refreshVerify==='function') refreshVerify();
+  return res;
+}
 function renderVerify(){
   if(!RAW){ return; }
   updateVerifyHeader();
@@ -3541,20 +3566,31 @@ function ensureCafeSettingsHost(){
   const s=document.getElementById('settings');
   if(s && s.parentElement!==cH){ s.style.display='block'; cH.appendChild(s); }
 }
+function optimizeHTML(){
+  return `<div class="set-app-sec"><h2 class="set-app-h">⚡ 데이터 최적화</h2></div>
+  <div class="card set-card">
+    <h3><span class="dot"></span>한 번에 정리·최적화</h3>
+    <div class="cap">누적된 <b>중복 글/보증서</b>를 합치고, <b>빈 항목</b>을 정리하고, 내부 <b>캐시를 재계산</b>해 앱을 가볍게 만듭니다. 데이터는 삭제되지 않고 <b>중복만 합쳐지며</b>, 검증값은 보존됩니다. 결과는 클라우드에 반영됩니다.</div>
+    <div class="set-add" style="margin-top:10px"><button class="vc-save" id="optimizeBtn">⚡ 지금 최적화 실행</button></div>
+    <div id="optResult" class="cap" style="margin-top:10px"></div>
+  </div>`;
+}
 function renderSettingsApp(){
   const gate=document.getElementById('setGate');
+  const oH=document.getElementById('setOptHost');
   const aH=document.getElementById('setAccessHost'), cH=document.getElementById('setCafeHost'), wH=document.getElementById('setWarrHost');
   if(auth!=='admin'){
-    [aH,cH,wH].forEach(h=>{ if(h) h.style.display='none'; });
+    [oH,aH,cH,wH].forEach(h=>{ if(h) h.style.display='none'; });
     gate.style.display='block';
     gate.innerHTML=`<div class="card" style="text-align:center;padding:42px 20px">
       <div style="font-size:34px;margin-bottom:6px">🔐</div>
       <h3 style="justify-content:center">설정은 관리자만 변경할 수 있습니다</h3>
-      <div class="cap" style="margin:6px 0 16px">카페 모니터링과 레이노 데이터의 모든 설정을 여기에서 관리합니다.</div>
+      <div class="cap" style="margin:6px 0 16px">온라인 모니터링과 레이노 데이터의 모든 설정을 여기에서 관리합니다.</div>
       <button class="vc-save" id="setAdminLogin">🔐 관리자 로그인</button></div>`;
     return;
   }
-  gate.style.display='none'; [aH,cH,wH].forEach(h=>{ if(h) h.style.display='block'; });
+  gate.style.display='none'; [oH,aH,cH,wH].forEach(h=>{ if(h) h.style.display='block'; });
+  oH.innerHTML = optimizeHTML();
   aH.innerHTML = accessHTML();
   ensureCafeSettingsHost();
   renderSettings();
@@ -3562,6 +3598,15 @@ function renderSettingsApp(){
 }
 document.getElementById('settingsApp').addEventListener('click', async e=>{
   if(e.target.id==='setAdminLogin'){ showLock(); return; }
+  if(e.target.id==='optimizeBtn'){
+    if(!window.confirm('누적 중복/빈 항목을 정리하고 캐시를 재계산합니다. (검증값은 보존, 데이터 삭제 없음) 진행할까요?')) return;
+    e.target.disabled=true; e.target.textContent='최적화 중…';
+    const r=await optimizeAll();
+    const cafeMsg=`온라인 모니터링 ${r.cafeBefore.toLocaleString()} → ${r.cafeAfter.toLocaleString()}건 (정리 ${r.cafeRemoved.toLocaleString()})`;
+    const warrMsg=r.warrBefore?` · 품질보증서 ${r.warrBefore.toLocaleString()} → ${r.warrAfter.toLocaleString()}건 (정리 ${r.warrRemoved.toLocaleString()})`:'';
+    const el=document.getElementById('optResult'); if(el) el.innerHTML=`✅ <b>최적화 완료</b> — ${cafeMsg}${warrMsg} · 캐시 재계산 완료`;
+    e.target.disabled=false; e.target.textContent='⚡ 지금 최적화 실행';
+    toast('최적화를 완료했습니다'); return; }
   // 레이노 접근 설정
   if(e.target.id==='raynoPassSave'){ const v=(document.getElementById('raynoPassNew').value||'').trim();
     if(!v){ toast('비밀번호를 입력하세요.',true); return; }
