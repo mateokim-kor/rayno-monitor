@@ -2961,7 +2961,10 @@ function defaultWarrConfig(cols){
 }
 function ensureWarrCfg(){ const cfg=WARR.config=WARR.config||defaultWarrConfig(WARR.columns||[]);
   cfg.summaryCols=cfg.summaryCols||defaultWarrConfig(WARR.columns||[]).summaryCols;
-  cfg.labelMap=cfg.labelMap||{}; return cfg; }
+  cfg.labelMap=cfg.labelMap||{};
+  // 발급일 기준 정렬: 옛 기본값(시공일자)이고 관리자가 직접 고정한 적 없으면 등록날짜로 자동 전환
+  if(!cfg.dateColLocked && cfg.dateCol==='시공일자' && (WARR.columns||[]).includes('등록날짜')) cfg.dateCol='등록날짜';
+  return cfg; }
 function warrRecKey(rec){
   // 보증서 고유키: 시리얼번호(영구 고유) > No(파일 내 순번) > 내용 해시
   if(rec['시리얼번호']) return 'S:'+rec['시리얼번호'];
@@ -3277,7 +3280,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
     const arr=cfg[key]; const i=arr.indexOf(col);
     if(i>=0) arr.splice(i,1); else arr.push(col);
     chip.classList.toggle('on'); return; }
-  if(e.target.id==='warrCfgSave'){ const sel=document.getElementById('warrDateSel'); if(sel) WARR.config.dateCol=sel.value;
+  if(e.target.id==='warrCfgSave'){ const sel=document.getElementById('warrDateSel'); if(sel){ WARR.config.dateCol=sel.value; WARR.config.dateColLocked=true; }
     await cloudSaveJSON(SUPA.warrFile,WARR); warrCfgOpen=false; renderWarranty(); toast('표시 설정을 저장했습니다'); return; }
   if(e.target.id==='warrCfgClose'){ warrCfgOpen=false; renderWarranty(); return; }
   if(e.target.id==='warrCleanBtn'){ const n=warrDedupe(); await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty();
