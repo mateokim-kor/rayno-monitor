@@ -1933,7 +1933,7 @@ function renderSettings(){
    </div>
    <div class="card set-card">
      <h3><span class="dot"></span>브랜드 설정</h3>
-     <div class="cap">자사 브랜드명과 경쟁사 목록입니다. 리포트의 ‘경쟁사 언급 비교(점유율)’와 본문 언급 집계에 사용됩니다.</div>
+     <div class="cap">자사 브랜드명과 경쟁사 목록입니다. 리포트의 ‘경쟁사 동시 언급(비교 노출)’과 본문 언급 집계에 사용됩니다.</div>
      <label class="set-field" style="max-width:300px"><span>자사 브랜드명</span><input class="set-text" data-k="ownBrand" value="${escapeHtml(setDraft.ownBrand)}"></label>
      <div class="set-sub">경쟁사</div>
      <div class="set-list">${chipRow('comp',setDraft.competitors)}</div>
@@ -2131,16 +2131,17 @@ function pickerHTML(which){
 }
 // 자동 초안(관리자가 비워두면 표시)
 function autoInsightText(ctx){
-  const {M,P,RP,OWN,ownShare,bcEnt,asCnt,priceCnt,negR,posR,byNeg}=ctx;
+  const {M,P,RP,OWN,coEnt,coTotal,bcEnt,asCnt,priceCnt,negR,posR,byNeg}=ctx;
   const L=[];
   const stance = M.net>=20?'++매우 우호적++':M.net>=5?'++대체로 긍정적++':M.net<=-20?'~~부정 우위(위험)~~':M.net<=-5?'~~다소 부정적~~':'중립적';
   L.push(`📊 **여론 종합** — ${rpLabel(RP)} 동안 **${M.total.toLocaleString()}건**이 수집됐습니다. 순감성 ==${M.net>=0?'+':''}${M.net.toFixed(0)}%p== (긍정 ${M.posRate.toFixed(0)}% · 부정 ${M.negRate.toFixed(0)}%)로 여론은 ${stance}입니다.`);
   if(P){ const dv=P.total?Math.round((M.total/P.total-1)*100):0, dp=M.posRate-P.posRate;
     const tag=(dv>20&&dp>=0)?'++양·질 동반 개선 국면++ — 모멘텀을 키울 적기입니다.':(dv>20&&dp<0)?'~~노출↑·호감도↓~~ — 확산 전에 메시지 리스크를 잡아야 합니다.':(dp>=5)?'++호감도 뚜렷이 개선++.':(dp<=-5)?'~~호감도 하락~~ — 원인 점검이 필요합니다.':'큰 변동은 없습니다.';
     L.push(`📈 **모멘텀** — 직전 대비 언급량 ==${dv>=0?'+':''}${dv}%==, 긍정률 ==${dp>=0?'+':''}${dp.toFixed(0)}%p==. ${tag}`); }
-  if(bcEnt&&bcEnt.length){ const lead=bcEnt[0];
-    if(lead[0]===OWN) L.push(`🏆 **점유율** — 브랜드 언급 1위(자사 ==${ownShare.toFixed(0)}%==). 카테고리 기준을 선점하는 ‘레퍼런스 리더’ 포지셔닝이 유효합니다.`);
-    else L.push(`⚔ **점유율** — 경쟁사 ‘**${lead[0]}**’가 상위(자사 ==${ownShare.toFixed(0)}%==). ~~열위 구간~~이므로 시야·단열·내구 차별점 비교 메시지로 방어·역전이 필요합니다.`); }
+  // 검색 기반 데이터: 점유율 대신 '함께 언급된 경쟁사'를 신호로
+  if(coEnt&&coEnt.length){ const lead=coEnt[0]; const p=coTotal?Math.round(lead[1]/coTotal*100):0;
+    L.push(`🔍 **비교 노출** — 이 데이터는 ‘레이노’ 검색 결과라 자사 언급은 대부분입니다(점유율 해석은 부적절). 의미 있는 신호는 **함께 거론된 경쟁사**로, ‘**${lead[0]}**’가 ==${lead[1].toLocaleString()}건(${p}%)==에서 같이 언급돼 ++비교·대안 검토++가 가장 활발합니다. 차별점(시야·단열·내구) 비교 콘텐츠로 선점하세요.`); }
+  else L.push(`🔍 **비교 노출** — ‘레이노’ 글에 함께 거론된 경쟁사가 거의 없어 ++자사 단독 검토(지명 관심)++ 비중이 높습니다. 검색 유입을 전환으로 잇는 동선이 핵심입니다.`);
   if(asCnt>0||M.negRate>=25){ const topNeg=(negR&&negR.length)?negR[0][0]:'부정 이슈';
     L.push(`⚠ **리스크** — 부정률 ==${M.negRate.toFixed(0)}%==${asCnt?` · 불만/AS ~~${asCnt}건~~`:''}. 핵심 불만은 ‘~~${topNeg}~~’ — 표준 응대 스크립트와 공개 해명으로 ++확산 차단++이 우선입니다.`); }
   if(priceCnt>=3) L.push(`💰 **기회** — 가격·견적 문의 ==${priceCnt}건==으로 ++구매 의향++이 감지됩니다. 견적→상담→시공점 동선을 짧게 만들면 전환을 끌어올릴 수 있습니다.`);
@@ -2164,7 +2165,7 @@ function autoMarketingText(M,signals){
   if(M.posRate>=55) out.push('• 긍정 후기를 리뷰·콘텐츠 마케팅 소재로 활용');
   if(signals.price>=3) out.push('• 가격·견적 문의가 많음 → 프로모션/견적 이벤트 검토');
   if(signals.as>0) out.push('• 불만/AS 건 신속 대응으로 부정 여론 확산 방지');
-  if(signals.competitorLead) out.push('• 경쟁사 언급 우위 → 차별점(시야·단열·품질) 강조 캠페인');
+  if(signals.competitorLead) out.push('• 경쟁사가 레이노 글에 자주 함께 언급됨 → 비교 콘텐츠(차별점: 시야·단열·품질) 강화');
   out.push('• 활동량 많은 카페 중심으로 체험단·이벤트 집행 검토');
   return out.join('\n');
 }
@@ -2182,16 +2183,15 @@ function autoSalesText(c){
 }
 function autoBrandText(c){
   const L=[];
-  if(c.bcEnt&&c.bcEnt.length){
-    if(c.bcEnt[0][0]===c.OWN) L.push(`• 언급 점유율 ==1위(${c.ownShare.toFixed(0)}%)== — ++카테고리 리더십++ 메시지로 ‘기준이 되는 브랜드’ 포지션을 선점하세요.`);
-    else L.push(`• 자사 점유율 ==${c.ownShare.toFixed(0)}%==로 경쟁사 ‘**${c.bcEnt[0][0]}**’에 ~~열위~~ — 차별점(${c.posR&&c.posR.length?c.posR[0][0]:'시야·단열·내구'}) 중심 **비교 캠페인**으로 점유율을 끌어올리세요.`);
-  }
+  if(c.coEnt&&c.coEnt.length){ const lead=c.coEnt[0]; const p=c.coTotal?Math.round(lead[1]/c.coTotal*100):0;
+    L.push(`• ‘레이노’ 글에 가장 자주 함께 언급된 경쟁사는 ‘**${lead[0]}**’(==${lead[1].toLocaleString()}건·${p}%==) — **${lead[0]} vs 레이노** 비교 콘텐츠로 ++비교 프레임을 선점++하세요. <span style="color:var(--ink3)">(검색 기반 데이터라 ‘점유율’은 자사 편향 → 동시 언급을 신호로 사용)</span>`); }
+  else L.push(`• 함께 거론된 경쟁사가 적어 ++지명 관심(레이노 단독 검토)++ 위주입니다 — 브랜드 자산(후기·시그니처 메시지)을 강화해 검색 유입을 전환으로 연결하세요.`);
   if(c.posR&&c.posR.length) L.push(`• 긍정 키워드 ‘++${c.posR.slice(0,2).map(x=>x[0]).join(', ')}++’를 핵심 브랜드 메시지로 콘텐츠(리뷰·블로그·영상)에 일관 반영하세요.`);
   if(c.negR&&c.negR.length) L.push(`• 부정 인식 ‘~~${c.negR[0][0]}~~’에 대한 **해명·개선 커뮤니케이션**(FAQ·시공 가이드)으로 신뢰를 보완하세요.`);
   if(c.P){ const dp=c.M.posRate-c.P.posRate;
     if(dp<=-5) L.push(`• ~~긍정률 하락 국면~~ — 메시지 톤·캠페인을 점검하고 우호 여론 회복 콘텐츠가 필요합니다.`);
     else if(dp>=5) L.push(`• ++긍정률 상승 모멘텀++ — 신제품·프로모션 메시지를 키울 적기입니다.`); }
-  L.push(`💡 **반짝이는 아이디어** — 분기마다 ‘**브랜드 헬스 지수**(점유율·순감성·긍정키워드)’를 한 장으로 시각화해, 경쟁사 대비 우리 위치를 ++한눈에 보이는 추세 그래프++로 경영진에 공유하세요.`);
+  L.push(`💡 **반짝이는 아이디어** — 분기마다 ‘**브랜드 헬스 지수**(순감성·긍정키워드·경쟁사 동시언급)’를 한 장으로 시각화해, 검색 여론의 추세와 비교 압력을 ++한눈에 보이는 그래프++로 경영진에 공유하세요.`);
   return L.join('\n');
 }
 function autoQualityText(c){
@@ -2307,21 +2307,28 @@ function renderReport(){
      <div class="rep-trend">${trendRows||'<div class="empty">추이 데이터 부족</div>'}</div>
    </div>`;
 
-  // ── 3. 경쟁사 비교 (SOV) ──
+  // ── 3. 경쟁사 동시 언급 (검색 기반 데이터 보정) ──
+  // 업로드 데이터가 '레이노' 검색 결과라 자사 언급은 사실상 100% → 점유율 대신 '함께 등장한 경쟁사' 비율을 본다.
+  const OWN=effOwnBrand();
+  const coTotal=cur.length;
+  const comps=effCompetitors();
+  const coRows={}; comps.forEach(b=>{ if(b)coRows[b]=0; }); let ownRows=0;
+  cur.forEach(r=>{ const t=(r.title||'')+' '+(r.body||''); if(OWN&&t.includes(OWN))ownRows++; comps.forEach(b=>{ if(b&&t.includes(b))coRows[b]++; }); });
+  const coEnt=Object.entries(coRows).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
+  const ownPct=coTotal?Math.round(ownRows/coTotal*100):0;
+  // 하위호환: 일부 로직이 참조하는 bcEnt/own/ownShare 유지(언급 횟수 기준)
   const bc=rpBrandCounts(cur); const bcEnt=Object.entries(bc).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]);
-  const bcTotal=bcEnt.reduce((a,e)=>a+e[1],0);
-  const OWN=effOwnBrand(); const own=bc[OWN]||0; const ownShare=bcTotal?own/bcTotal*100:0;
-  let ownShareDelta='';
-  if(prev){ const pbc=rpBrandCounts(prev); const pt=Object.values(pbc).reduce((a,b)=>a+b,0); const ps=pt?(pbc[OWN]||0)/pt*100:0; ownShareDelta=dlt(ownShare,ps,true); }
-  const sovRows=bcEnt.map(([b,c])=>{const share=bcTotal?c/bcTotal*100:0; const mine=(b===OWN);
-    return `<div class="rep-trow"><div class="rt-l">${mine?'<b style="color:var(--amber)">'+escapeHtml(b)+' (자사)</b>':escapeHtml(b)}</div>
-      <div class="rt-bar"><i style="width:${share}%;background:${mine?'var(--amber)':'var(--ink3)'}"></i></div>
-      <div class="rt-n">${c}회</div><div class="rt-p">${share.toFixed(0)}%</div></div>`;}).join('');
+  const bcTotal=bcEnt.reduce((a,e)=>a+e[1],0); const own=bc[OWN]||0; const ownShare=bcTotal?own/bcTotal*100:0;
+  const coRowsHtml=coEnt.length?coEnt.map(([b,c])=>{const pct=coTotal?c/coTotal*100:0;
+    return `<div class="rep-trow"><div class="rt-l">${escapeHtml(b)}</div>
+      <div class="rt-bar"><i style="width:${Math.max(2,pct)}%;background:var(--ink3)"></i></div>
+      <div class="rt-n">${c.toLocaleString()}건</div><div class="rt-p">${pct.toFixed(0)}%</div></div>`;}).join('')
+    :'<div class="empty">‘레이노’ 글에 함께 언급된 경쟁사가 거의 없습니다 — 자사 단독 검토(지명 관심) 비중이 높습니다.</div>';
   const sov=`
    <div class="card rep-sec">
-     <h3><span class="dot"></span>경쟁사 언급 비교 (점유율)</h3>
-     <div class="cap">본문·제목에서 브랜드명이 언급된 횟수 기준 · 자사 점유율 <b style="color:var(--amber)">${ownShare.toFixed(0)}%</b> ${ownShareDelta}</div>
-     <div class="rep-trend">${sovRows||'<div class="empty">브랜드 언급이 감지되지 않았습니다.</div>'}</div>
+     <h3><span class="dot"></span>경쟁사 동시 언급 <span class="rep-sub2">레이노 글에 함께 등장한 비율</span></h3>
+     <div class="cap">이 데이터는 <b>‘레이노’ 검색 결과</b>라 자사 언급은 거의 전부(약 <b style="color:var(--amber)">${ownPct}%</b>)입니다. 그래서 ‘점유율’ 대신 <b>레이노 글에 함께 등장한 경쟁사</b> 비율을 봅니다 — <b>비교·대안 검토</b>가 일어나는 지점입니다.</div>
+     <div class="rep-trend">${coRowsHtml}</div>
    </div>`;
 
   // ── 4. 긍정/부정 요인 ──
@@ -2387,7 +2394,8 @@ function renderReport(){
   if(asCnt>0) ins.push(['warn',`<b>불만/AS</b> 유형 글이 <b>${asCnt}건</b> 있습니다. CS 대응이 필요할 수 있습니다.`,'as']);
   const priceCnt=cur.filter(r=>{const t=rtype(r);return t==='가격문의'||t==='시공/견적문의';}).length;
   if(priceCnt>=3) ins.push(['info',`가격·견적 문의가 <b>${priceCnt}건</b>으로 구매 관심이 감지됩니다. 가격/프로모션 메시지를 점검하세요.`]);
-  if(bcEnt.length){ const top=bcEnt[0]; if(top[0]!==OWN && top[1]>own) ins.push(['warn',`경쟁사 <b>${escapeHtml(top[0])}</b> 언급(${top[1]}회)이 자사(${own}회)보다 많습니다. 점유율 방어가 필요합니다.`]); }
+  if(coEnt.length){ const top=coEnt[0]; const p=coTotal?Math.round(top[1]/coTotal*100):0;
+    if(p>=15) ins.push(['warn',`경쟁사 <b>${escapeHtml(top[0])}</b>가 레이노 글의 <b>${p}%</b>(${top[1].toLocaleString()}건)에서 함께 언급됩니다. 비교·대안 검토가 활발하니 <b>비교 우위 콘텐츠</b> 대응을 권장합니다. <span style="color:var(--ink3)">(검색 기반 데이터라 점유율 대신 동시 언급으로 해석)</span>`]); }
   if(M.posRate>=60 && M.negRate<15) ins.push(['good',`전반적으로 우호적인 여론입니다. 긍정 후기를 콘텐츠·리뷰 마케팅에 활용해 보세요.`]);
   if(!ins.length) ins.push(['info','특이 신호는 없습니다. 안정적인 흐름입니다.']);
   const insHtml=ins.map(it=>`<div class="insight ${it[0]}">${it[1]}${it[2]==='as'?' <button class="viewbtn" data-rep="as" style="margin-left:6px;padding:3px 10px">글 보기</button>':''}</div>`).join('');
@@ -2403,7 +2411,7 @@ function renderReport(){
 
   // ── 핵심 인사이트(상단) · 부서별 추천 · 대표 게시물 · 마케팅 제안(하단) ──
   const recCnt=cur.filter(r=>rtype(r)==='추천요청').length;
-  const repCtx={M,P,RP,OWN,own,ownShare,bcEnt,asCnt,priceCnt,recCnt,negR,posR,byNeg,byVol,prod,car};
+  const repCtx={M,P,RP,OWN,own,ownShare,bcEnt,coEnt,coTotal,ownPct,asCnt,priceCnt,recCnt,negR,posR,byNeg,byVol,prod,car};
   const insightBlock = noteBlock('insight','💡 핵심 인사이트', autoInsightText(repCtx));
   const deptHead = `<div class="card rep-sec rep-dept-head"><h3 style="margin:0"><span class="dot"></span>🏢 부서별 실행 제안</h3>
      <div class="cap">이 기간 데이터를 바탕으로 부서 관점별 추천을 자동 작성했습니다. 각 항목은 관리자가 수정할 수 있습니다.</div></div>`;
@@ -2413,7 +2421,7 @@ function renderReport(){
      + noteBlock('quality','🔧 품질혁신팀 — CS·제품 품질 개선 관점', autoQualityText(repCtx));
   const repPos = repSection('pos',cur);
   const repNeg = repSection('neg',cur);
-  const signals = { price:priceCnt, as:asCnt, competitorLead:(bcEnt.length && bcEnt[0][0]!==OWN && bcEnt[0][1]>own) };
+  const signals = { price:priceCnt, as:asCnt, competitorLead:(coEnt.length>0 && coTotal>0 && coEnt[0][1]/coTotal>=0.15) };
   const marketingBlock = noteBlock('marketing','📣 마케팅 / 세일즈 제안', autoMarketingText(M,signals));
 
   box.innerHTML = head + insightBlock + deptBlock + summary + repPos + repNeg + trend + sov + reasons + types + cafes + extra + advice + marketingBlock;
