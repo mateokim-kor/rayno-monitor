@@ -825,8 +825,8 @@
   </div>
 
   <footer>
-    레이노 카페 모니터링 · 검증(verified) 데이터 우선 대시보드<br>
-    모든 분석은 브라우저 안에서만 처리되며 파일은 외부로 전송되지 않습니다.
+    <span id="footerLine1">레이노 온라인 모니터링 · 검증(verified) 데이터 우선 대시보드</span><br>
+    <span id="footerLine2">모든 분석은 브라우저 안에서만 처리되며 파일은 외부로 전송되지 않습니다.</span>
   </footer>
 </div>
 
@@ -886,6 +886,8 @@ const CONFIG = {
     docTitle:   'RAYNO 카페 모니터링 · 대시보드',
     headerTitle:'카페 모니터링 대시보드',
     headerSub:  '소셜 모니터링 · 검증 데이터 기반 자동 분석',
+    footer1:    '레이노 온라인 모니터링 · 검증(verified) 데이터 우선 대시보드',
+    footer2:    '모든 분석은 브라우저 안에서만 처리되며 파일은 외부로 전송되지 않습니다.',
     loginTitle:'관리자 로그인',
     loginSub:  '관리자 이메일과 비밀번호를 입력하세요',
     loginFoot: '일반 사용자는 로그인 없이 바로 볼 수 있습니다',
@@ -1894,13 +1896,16 @@ function normDate(s){
 let setDraft=null;
 function setDraftInit(){
   setDraft={ headerTitle:effText('headerTitle'), headerSub:effText('headerSub'),
+    docTitle:effText('docTitle'), footer1:effText('footer1'), footer2:effText('footer2'),
     ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice() };
 }
 function setDirty(){
   if(!setDraft) return false;
-  const norm=o=>JSON.stringify({h:(o.headerTitle||'').trim(),s:(o.headerSub||'').trim(),b:(o.ownBrand||'').trim(),
+  const norm=o=>JSON.stringify({h:(o.headerTitle||'').trim(),s:(o.headerSub||'').trim(),
+    d:(o.docTitle||'').trim(),f1:(o.footer1||'').trim(),f2:(o.footer2||'').trim(),b:(o.ownBrand||'').trim(),
     c:(o.competitors||[]).map(x=>x.trim()).filter(Boolean),t:(o.postTypes||[]).map(x=>x.trim()).filter(Boolean)});
   return norm(setDraft)!==norm({headerTitle:effText('headerTitle'),headerSub:effText('headerSub'),
+    docTitle:effText('docTitle'),footer1:effText('footer1'),footer2:effText('footer2'),
     ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes()});
 }
 function chipRow(grp,arr){
@@ -1925,11 +1930,14 @@ function renderSettings(){
   const dirty=setDirty();
   box.innerHTML = `
    <div class="card set-card">
-     <h3><span class="dot"></span>표시 정보</h3>
-     <div class="cap">상단 헤더에 표시되는 문구입니다.</div>
+     <h3><span class="dot"></span>표시 정보 (텍스트)</h3>
+     <div class="cap">화면에 표시되는 문구를 직접 바꿀 수 있습니다. 저장하면 모든 사용자에게 적용됩니다.</div>
      <div class="set-grid">
        <label class="set-field"><span>헤더 제목</span><input class="set-text" data-k="headerTitle" value="${escapeHtml(setDraft.headerTitle)}"></label>
        <label class="set-field"><span>헤더 부제목</span><input class="set-text" data-k="headerSub" value="${escapeHtml(setDraft.headerSub)}"></label>
+       <label class="set-field"><span>브라우저 탭 제목</span><input class="set-text" data-k="docTitle" value="${escapeHtml(setDraft.docTitle)}"></label>
+       <label class="set-field"><span>하단 문구 1줄</span><input class="set-text" data-k="footer1" value="${escapeHtml(setDraft.footer1)}"></label>
+       <label class="set-field"><span>하단 문구 2줄</span><input class="set-text" data-k="footer2" value="${escapeHtml(setDraft.footer2)}"></label>
      </div>
    </div>
    <div class="card set-card">
@@ -1967,10 +1975,16 @@ function saveAllSettings(){
   const types=[...new Set(setDraft.postTypes.map(s=>s.trim()).filter(Boolean))];
   if(!types.length){ toast('게시글 유형은 최소 1개가 필요합니다.',true); return; }
   STORE.config = {...(STORE.config||{}),
-    text:{...((STORE.config&&STORE.config.text)||{}), headerTitle:(setDraft.headerTitle.trim()||CONFIG.text.headerTitle), headerSub:(setDraft.headerSub.trim()||CONFIG.text.headerSub)},
+    text:{...((STORE.config&&STORE.config.text)||{}),
+      headerTitle:(setDraft.headerTitle.trim()||CONFIG.text.headerTitle),
+      headerSub:(setDraft.headerSub.trim()||CONFIG.text.headerSub),
+      docTitle:(setDraft.docTitle.trim()||CONFIG.text.docTitle),
+      footer1:(setDraft.footer1.trim()||CONFIG.text.footer1),
+      footer2:(setDraft.footer2.trim()||CONFIG.text.footer2)},
     ownBrand:(setDraft.ownBrand.trim()||CONFIG.ownBrand), competitors:comps, postTypes:types };
-  saveStore(STORE); _typeUnionCache=null; setDraft=null;
-  applyConfigAndSettings(); renderSettings(); toast('설정을 저장했습니다');
+  saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave();   // 설정은 즉시 반영(디바운스 대기 X)
+  _typeUnionCache=null; setDraft=null;
+  applyConfigAndSettings(); renderSettings(); toast('설정을 저장했습니다 · 모든 사용자에게 적용됩니다');
 }
 function removeUploadBatch(bid){
   const store=loadStore(); const before=store.rows.length;
@@ -3720,6 +3734,8 @@ function applyConfigAndSettings(){
   document.title = effText('docTitle');
   const ht=document.getElementById('headerTitle'); if(ht) ht.textContent=effText('headerTitle');
   const hs=document.getElementById('headerSub');   if(hs) hs.textContent=effText('headerSub');
+  const f1=document.getElementById('footerLine1');  if(f1) f1.textContent=effText('footer1');
+  const f2=document.getElementById('footerLine2');  if(f2) f2.textContent=effText('footer2');
   const kw=document.getElementById('kwExclude');    if(kw) kw.value=(state.excludeKeywords||[]).join(', ');
   document.querySelectorAll('#noneSeg button').forEach(b=>
     b.classList.toggle('on', (b.dataset.none==='exclude')===state.excludeNone));
