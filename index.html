@@ -2962,9 +2962,10 @@ function defaultWarrConfig(cols){
 function ensureWarrCfg(){ const cfg=WARR.config=WARR.config||defaultWarrConfig(WARR.columns||[]);
   cfg.summaryCols=cfg.summaryCols||defaultWarrConfig(WARR.columns||[]).summaryCols;
   cfg.labelMap=cfg.labelMap||{};
-  // 발급일 기준 정렬: 옛 기본값(시공일자)이고 관리자가 직접 고정한 적 없으면 등록날짜로 자동 전환
+  cfg.excluded=cfg.excluded||[];   // 집계에서 제외할 보증서 키 목록(관리자 지정)
   if(!cfg.dateColLocked && cfg.dateCol==='시공일자' && (WARR.columns||[]).includes('등록날짜')) cfg.dateCol='등록날짜';
   return cfg; }
+function warrExcludedSet(){ return new Set(((WARR.config&&WARR.config.excluded)||[])); }
 function warrRecKey(rec){
   // 보증서 고유키: 시리얼번호(영구 고유) > No(파일 내 순번) > 내용 해시
   if(rec['시리얼번호']) return 'S:'+rec['시리얼번호'];
@@ -3053,7 +3054,7 @@ function autoSuffix(raw){ const p=String(raw).split('-'); return p.length>1?p[p.
 function warrLabelOf(col,raw){ const lm=(WARR.config&&WARR.config.labelMap&&WARR.config.labelMap[col])||{}; return (lm[raw]!=null&&lm[raw]!=='')?lm[raw]:raw; }
 function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(a[0],a[1],0).getDate(); return {from:`${ym}-01`, to:`${ym}-${String(last).padStart(2,'0')}`}; }
 // 품질보증서 뷰 상태: 집계 단위 + 기간 + 지부 필터
-const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', front:'전체', _min:'', _max:'' };
+const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', front:'전체', showExcluded:false, _min:'', _max:'' };
 function weekKey(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d; const off=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-off);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
 function warrBranchCol(){ const c=WARR.columns||[]; return c.includes('담당지부')?'담당지부':(c.includes('대리점구분')?'대리점구분':null); }
@@ -3066,7 +3067,7 @@ function warrParseDate(v){
   const d=normDate(s); return /^\d{4}-\d{2}/.test(d)?d:'';
 }
 function warrDateStr(r){ const cfg=WARR.config||defaultWarrConfig(WARR.columns||[]); return warrParseDate(r[cfg.dateCol]); }
-function warrRangeRecs(){ let recs=(WARR.rows||[]);
+function warrRangeRecs(){ const ex=warrExcludedSet(); let recs=(WARR.rows||[]).filter(r=>!ex.has(warrRecKey(r)));
   if(WV.scope==='range' && (WV.from||WV.to)) recs=recs.filter(r=>{ const d=warrDateStr(r); if(!d)return false; if(WV.from&&d<WV.from)return false; if(WV.to&&d>WV.to)return false; return true; });
   return recs; }
 function warrApplyBranch(recs){ const bc=warrBranchCol(); return (bc&&WV.branch!=='전체')?recs.filter(r=>(r[bc]||'')===WV.branch):recs; }
@@ -3153,14 +3154,33 @@ function renderWarranty(){
     const bars=arr.length?arr.map(([v,c])=>`<div class="rep-trow ${isBranch?'rep-clk':''} ${isBranch&&WV.branch===v?'rep-on':''}" ${isBranch?`data-branch="${escapeHtml(v)}"`:''}><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${c/mx*100}%;background:${palette[i%palette.length]}"></i></div><div class="rt-n">${c}건</div><div class="rt-p">${(c/tot*100).toFixed(0)}%</div></div>`).join(''):'<div class="empty">데이터 없음</div>';
     return `<div class="card"><h3><span class="dot"></span>${escapeHtml(col)} 구성 ${isBranch?'<span class="rep-sub2">클릭=필터</span>':''}</h3><div class="rep-trend">${bars}</div></div>`; }).join('');
   const tcols=(cfg.tableCols&&cfg.tableCols.length?cfg.tableCols:(WARR.columns||[]).slice(0,8));
-  const thead=tcols.map(c=>`<th>${escapeHtml(c)}</th>`).join('');
+  const admin=(auth==='admin');
+  const thead=tcols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')+(admin?'<th></th>':'');
   const sorted=recs.slice().sort((a,b)=>String(warrDateStr(b)).localeCompare(String(warrDateStr(a))));
-  const tbody=sorted.slice(0,200).map(r=>`<tr>${tcols.map(c=>`<td>${escapeHtml(r[c]||'-')}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${tcols.length}"><div class="empty">데이터 없음</div></td></tr>`;
+  const rowSearch=r=>(WARR.columns||[]).map(c=>r[c]||'').join(' ').toLowerCase();
+  const tbody=sorted.slice(0,300).map(r=>{ const key=warrRecKey(r);
+    return `<tr data-search="${escapeHtml(rowSearch(r))}">${tcols.map(c=>`<td>${escapeHtml(r[c]||'-')}</td>`).join('')}${admin?`<td style="text-align:right"><button class="set-del-btn warr-exclude" data-key="${escapeHtml(key)}">제외</button></td>`:''}</tr>`;
+  }).join('')||`<tr><td colspan="${tcols.length+(admin?1:0)}"><div class="empty">데이터 없음</div></td></tr>`;
+  // 제외된 건 관리 패널(관리자)
+  const exSet=warrExcludedSet();
+  const exRows=(WARR.rows||[]).filter(r=>exSet.has(warrRecKey(r)));
+  const exPanel = (admin && WV.showExcluded) ? `<div class="card" style="border-top:3px solid var(--neg)">
+      <h3 style="margin:0"><span class="dot"></span>집계 제외된 보증서 (${exRows.length})</h3>
+      <div class="cap">아래 건들은 모든 집계·차트·표에서 빠집니다. 홈페이지와 수치를 맞출 때 사용하세요.</div>
+      ${exRows.length?`<div class="tbl-wrap"><table><thead><tr>${tcols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}<th></th></tr></thead><tbody>${exRows.slice(0,300).map(r=>`<tr>${tcols.map(c=>`<td>${escapeHtml(r[c]||'-')}</td>`).join('')}<td style="text-align:right"><button class="viewbtn warr-restore" data-key="${escapeHtml(warrRecKey(r))}">복원</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">제외된 건이 없습니다.</div>'}
+    </div>` : '';
   box.innerHTML = cfgCard + controls + kpis + trendCard +
     (breakdownCards?`<div class="biz-grid">${breakdownCards}</div>`:'') +
-    `<div class="card"><h3><span class="dot"></span>발급 내역 ${recs.length>200?'(최근 200건)':''}</h3>
-      <div class="cap">표 컬럼은 ⚙ 표시 설정에서 변경할 수 있습니다.</div>
-      <div class="tbl-wrap"><table><thead><tr>${thead}</tr></thead><tbody>${tbody}</tbody></table></div></div>`;
+    `<div class="card"><h3><span class="dot"></span>발급 내역 ${recs.length>300?'(최근 300건)':`(${recs.length.toLocaleString()}건)`}</h3>
+      <div class="rep-head-top" style="margin-bottom:8px">
+        <div class="cap">표 컬럼은 ⚙ 표시 설정에서 변경할 수 있습니다.${admin?' 행의 <b>제외</b>를 누르면 그 건이 집계에서 빠집니다.':''}</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="warrSearch" class="dt-input" placeholder="표 검색(시리얼·매장·이름 등)" style="width:200px">
+          ${admin?`<button class="acc-btn" id="warrExclToggle">제외 목록 (${exRows.length})</button>`:''}
+        </div>
+      </div>
+      <div class="tbl-wrap"><table><thead><tr>${thead}</tr></thead><tbody id="warrTbody">${tbody}</tbody></table></div></div>`
+    + exPanel;
 }
 
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
@@ -3263,6 +3283,13 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
   if(e.target.id==='wvClearBranch'){ WV.branch='전체'; renderWarranty(); return; }
   if(e.target.id==='wvClearFront'){ WV.front='전체'; renderWarranty(); return; }
+  const exb=e.target.closest('.warr-exclude');
+  if(exb){ const cfg=ensureWarrCfg(); const k=exb.dataset.key; if(!cfg.excluded.includes(k)) cfg.excluded.push(k);
+    await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty(); toast('1건을 집계에서 제외했습니다'); return; }
+  const rsb=e.target.closest('.warr-restore');
+  if(rsb){ const cfg=ensureWarrCfg(); cfg.excluded=cfg.excluded.filter(k=>k!==rsb.dataset.key);
+    await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty(); toast('제외를 해제했습니다'); return; }
+  if(e.target.id==='warrExclToggle'){ WV.showExcluded=!WV.showExcluded; renderWarranty(); return; }
   const mc=e.target.closest('.mchip'); if(mc){ const ym=mc.dataset.ym;
     if(ym==='__all'){ WV.scope='all'; } else { const r=monthRange(ym); WV.scope='range'; WV.from=r.from; WV.to=r.to; }
     renderWarranty(); return; }
@@ -3305,6 +3332,10 @@ document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='wvFront'){ WV.front=e.target.value; renderWarranty(); }
   if(e.target.id==='wvFrom'){ WV.from=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.to=WV.from; renderWarranty(); }
   if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; renderWarranty(); }
+});
+document.getElementById('raynoApp').addEventListener('input', e=>{
+  if(e.target.id==='warrSearch'){ const q=(e.target.value||'').trim().toLowerCase();
+    document.querySelectorAll('#warrTbody tr').forEach(tr=>{ tr.style.display=(!q||(tr.dataset.search||'').includes(q))?'':'none'; }); }
 });
 
 
