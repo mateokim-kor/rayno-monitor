@@ -606,14 +606,14 @@
 
   <!-- 내비게이션 + 누적 툴바 -->
   <div class="appsw" id="appSwitcher" style="display:none">
-    <button class="appsw-btn on" data-ws="cafe">📡 온라인 모니터링</button>
-    <button class="appsw-btn" data-ws="rayno">📊 레이노 데이터</button>
-    <button class="appsw-btn" data-ws="settings">⚙ 설정</button>
+    <button class="appsw-btn on" data-ws="cafe">📡 <span data-txt="tabCafe">온라인 모니터링</span></button>
+    <button class="appsw-btn" data-ws="rayno">📊 <span data-txt="tabRayno">레이노 데이터</span></button>
+    <button class="appsw-btn" data-ws="settings">⚙ <span data-txt="tabSettings">설정</span></button>
   </div>
   <div class="nav" id="nav">
-    <button class="nav-btn on" data-view="dash">📊 대시보드</button>
-    <button class="nav-btn" data-view="report">📑 리포트</button>
-    <button class="nav-btn admin-only" data-view="verify">✓ 데이터 검증 <span class="nav-badge" id="verifyBadge">0</span></button>
+    <button class="nav-btn on" data-view="dash">📊 <span data-txt="tabDash">대시보드</span></button>
+    <button class="nav-btn" data-view="report">📑 <span data-txt="tabReport">리포트</span></button>
+    <button class="nav-btn admin-only" data-view="verify">✓ <span data-txt="tabVerify">데이터 검증</span> <span class="nav-badge" id="verifyBadge">0</span></button>
     <div class="nav-tools">
       <span class="acc-stat" id="accStat"></span>
       <span class="admin-flag" id="adminFlag">🔓 관리자 모드</span>
@@ -738,8 +738,8 @@
 
   <!-- 데이터 없음 안내 (뷰어용) -->
   <div id="emptyState">
-    <div class="vf-empty"><span class="big">📭</span>아직 업로드된 데이터가 없습니다.<br>
-      <span style="font-size:12.5px">관리자가 엑셀을 업로드하면 이곳에 대시보드가 표시됩니다.</span></div>
+    <div class="vf-empty"><span class="big">📭</span><span data-txt="emptyTitle">아직 업로드된 데이터가 없습니다.</span><br>
+      <span style="font-size:12.5px" data-txt="emptySub">관리자가 엑셀을 업로드하면 이곳에 대시보드가 표시됩니다.</span></div>
   </div>
 
   <!-- 데이터 검증 페이지 -->
@@ -789,18 +789,18 @@
     <div id="raynoLock" class="rlock" style="display:none">
       <div class="rlock-card">
         <div class="rlock-ico">🔒</div>
-        <div class="rlock-t">레이노 데이터</div>
-        <div class="rlock-s">접근하려면 비밀번호를 입력하세요.</div>
+        <div class="rlock-t" data-txt="raynoLockTitle">레이노 데이터</div>
+        <div class="rlock-s" data-txt="raynoLockSub">접근하려면 비밀번호를 입력하세요.</div>
         <input type="password" id="raynoPw" class="lock-in" placeholder="비밀번호" inputmode="numeric" autocomplete="off">
         <button class="viewbtn" id="raynoPwGo" style="width:100%;justify-content:center;margin-top:10px">확인</button>
         <div class="rlock-err" id="raynoPwErr"></div>
       </div>
     </div>
     <div class="nav" id="raynoNav">
-      <button class="nav-btn on" data-rview="warranty">📜 품질보증서</button>
-      <button class="nav-btn" data-rview="warrReport">📈 보증서 리포트</button>
-      <button class="nav-btn" data-rview="search">🔎 검색량</button>
-      <button class="nav-btn" data-rview="revenue">💰 매출</button>
+      <button class="nav-btn on" data-rview="warranty">📜 <span data-txt="tabWarranty">품질보증서</span></button>
+      <button class="nav-btn" data-rview="warrReport">📈 <span data-txt="tabWarrReport">보증서 리포트</span></button>
+      <button class="nav-btn" data-rview="search">🔎 <span data-txt="tabSearch">검색량</span></button>
+      <button class="nav-btn" data-rview="revenue">💰 <span data-txt="tabRevenue">매출</span></button>
       <div class="nav-tools">
         <span class="admin-flag" id="raynoAdminFlag" style="display:none">🔓 관리자 모드</span>
         <button class="acc-btn" id="warrAddBtn">＋ 보증서 엑셀</button>
@@ -888,6 +888,12 @@ const CONFIG = {
     headerSub:  '소셜 모니터링 · 검증 데이터 기반 자동 분석',
     footer1:    '레이노 온라인 모니터링 · 검증(verified) 데이터 우선 대시보드',
     footer2:    '모든 분석은 브라우저 안에서만 처리되며 파일은 외부로 전송되지 않습니다.',
+    tabCafe:'온라인 모니터링', tabRayno:'레이노 데이터', tabSettings:'설정',
+    tabDash:'대시보드', tabReport:'리포트', tabVerify:'데이터 검증',
+    tabWarranty:'품질보증서', tabWarrReport:'보증서 리포트', tabSearch:'검색량', tabRevenue:'매출',
+    raynoLockTitle:'레이노 데이터', raynoLockSub:'접근하려면 비밀번호를 입력하세요.',
+    emptyTitle:'아직 업로드된 데이터가 없습니다.', emptySub:'관리자가 엑셀을 업로드하면 이곳에 대시보드가 표시됩니다.',
+    reportTitle:'📑 분석 리포트', reportSub:'누적 데이터 기반 · 감성은 검증값 우선(없으면 AI) 적용 · 기간을 바꾸면 리포트가 갱신됩니다',
     loginTitle:'관리자 로그인',
     loginSub:  '관리자 이메일과 비밀번호를 입력하세요',
     loginFoot: '일반 사용자는 로그인 없이 바로 볼 수 있습니다',
@@ -1894,19 +1900,26 @@ function normDate(s){
 //  ⚙ 설정 탭 — 게시글 유형 관리 (관리자)
 // ════════════════════════════════════════════════════
 let setDraft=null;
+const TEXT_KEYS=['headerTitle','headerSub','docTitle','footer1','footer2',
+  'tabCafe','tabRayno','tabSettings','tabDash','tabReport','tabVerify',
+  'tabWarranty','tabWarrReport','tabSearch','tabRevenue',
+  'raynoLockTitle','raynoLockSub','emptyTitle','emptySub','reportTitle','reportSub'];
 function setDraftInit(){
-  setDraft={ headerTitle:effText('headerTitle'), headerSub:effText('headerSub'),
-    docTitle:effText('docTitle'), footer1:effText('footer1'), footer2:effText('footer2'),
-    ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice() };
+  setDraft={ ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice() };
+  TEXT_KEYS.forEach(k=>setDraft[k]=effText(k));
 }
 function setDirty(){
   if(!setDraft) return false;
-  const norm=o=>JSON.stringify({h:(o.headerTitle||'').trim(),s:(o.headerSub||'').trim(),
-    d:(o.docTitle||'').trim(),f1:(o.footer1||'').trim(),f2:(o.footer2||'').trim(),b:(o.ownBrand||'').trim(),
+  const norm=o=>JSON.stringify({
+    txt:TEXT_KEYS.map(k=>String(o[k]==null?'':o[k]).trim()),
+    b:(o.ownBrand||'').trim(),
     c:(o.competitors||[]).map(x=>x.trim()).filter(Boolean),t:(o.postTypes||[]).map(x=>x.trim()).filter(Boolean)});
-  return norm(setDraft)!==norm({headerTitle:effText('headerTitle'),headerSub:effText('headerSub'),
-    docTitle:effText('docTitle'),footer1:effText('footer1'),footer2:effText('footer2'),
-    ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes()});
+  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes()};
+  TEXT_KEYS.forEach(k=>cur[k]=effText(k));
+  return norm(setDraft)!==norm(cur);
+}
+function txtField(k,label){
+  return `<label class="set-field"><span>${escapeHtml(label)}</span><input class="set-text" data-k="${k}" value="${escapeHtml(setDraft[k]||'')}"></label>`;
 }
 function chipRow(grp,arr){
   return arr.map((t,i)=>`<div class="set-chip"><input class="set-input" data-grp="${grp}" data-i="${i}" value="${escapeHtml(t)}"><button class="set-del" data-grp="${grp}" data-i="${i}" title="삭제">✕</button></div>`).join('');
@@ -1930,14 +1943,49 @@ function renderSettings(){
   const dirty=setDirty();
   box.innerHTML = `
    <div class="card set-card">
-     <h3><span class="dot"></span>표시 정보 (텍스트)</h3>
+     <h3><span class="dot"></span>표시 정보 (헤더 · 문서 · 푸터)</h3>
      <div class="cap">화면에 표시되는 문구를 직접 바꿀 수 있습니다. 저장하면 모든 사용자에게 적용됩니다.</div>
      <div class="set-grid">
-       <label class="set-field"><span>헤더 제목</span><input class="set-text" data-k="headerTitle" value="${escapeHtml(setDraft.headerTitle)}"></label>
-       <label class="set-field"><span>헤더 부제목</span><input class="set-text" data-k="headerSub" value="${escapeHtml(setDraft.headerSub)}"></label>
-       <label class="set-field"><span>브라우저 탭 제목</span><input class="set-text" data-k="docTitle" value="${escapeHtml(setDraft.docTitle)}"></label>
-       <label class="set-field"><span>하단 문구 1줄</span><input class="set-text" data-k="footer1" value="${escapeHtml(setDraft.footer1)}"></label>
-       <label class="set-field"><span>하단 문구 2줄</span><input class="set-text" data-k="footer2" value="${escapeHtml(setDraft.footer2)}"></label>
+       ${txtField('headerTitle','헤더 제목')}
+       ${txtField('headerSub','헤더 부제목')}
+       ${txtField('docTitle','브라우저 탭 제목')}
+       ${txtField('footer1','하단 문구 1줄')}
+       ${txtField('footer2','하단 문구 2줄')}
+     </div>
+   </div>
+   <div class="card set-card">
+     <h3><span class="dot"></span>탭(메뉴) 이름</h3>
+     <div class="cap">상단 메뉴와 각 화면 탭의 이름입니다. (앞의 아이콘은 그대로 유지됩니다)</div>
+     <div class="set-sub">상단 메뉴</div>
+     <div class="set-grid">
+       ${txtField('tabCafe','온라인 모니터링')}
+       ${txtField('tabRayno','레이노 데이터')}
+       ${txtField('tabSettings','설정')}
+     </div>
+     <div class="set-sub">온라인 모니터링 탭</div>
+     <div class="set-grid">
+       ${txtField('tabDash','대시보드')}
+       ${txtField('tabReport','리포트')}
+       ${txtField('tabVerify','데이터 검증')}
+     </div>
+     <div class="set-sub">레이노 데이터 탭</div>
+     <div class="set-grid">
+       ${txtField('tabWarranty','품질보증서')}
+       ${txtField('tabWarrReport','보증서 리포트')}
+       ${txtField('tabSearch','검색량')}
+       ${txtField('tabRevenue','매출')}
+     </div>
+   </div>
+   <div class="card set-card">
+     <h3><span class="dot"></span>화면 문구 (잠금 · 빈 화면 · 리포트)</h3>
+     <div class="cap">레이노 데이터 잠금 화면, 데이터가 없을 때의 안내, 리포트 머리말 문구입니다.</div>
+     <div class="set-grid">
+       ${txtField('raynoLockTitle','레이노 잠금 — 제목')}
+       ${txtField('raynoLockSub','레이노 잠금 — 설명')}
+       ${txtField('emptyTitle','빈 화면 — 제목')}
+       ${txtField('emptySub','빈 화면 — 설명')}
+       ${txtField('reportTitle','리포트 머리말 — 제목')}
+       ${txtField('reportSub','리포트 머리말 — 설명')}
      </div>
    </div>
    <div class="card set-card">
@@ -1974,13 +2022,10 @@ function saveAllSettings(){
   const comps=[...new Set(setDraft.competitors.map(s=>s.trim()).filter(Boolean))];
   const types=[...new Set(setDraft.postTypes.map(s=>s.trim()).filter(Boolean))];
   if(!types.length){ toast('게시글 유형은 최소 1개가 필요합니다.',true); return; }
+  const textObj={...((STORE.config&&STORE.config.text)||{})};
+  TEXT_KEYS.forEach(k=>{ const v=(setDraft[k]||'').trim(); textObj[k]= v || CONFIG.text[k]; });
   STORE.config = {...(STORE.config||{}),
-    text:{...((STORE.config&&STORE.config.text)||{}),
-      headerTitle:(setDraft.headerTitle.trim()||CONFIG.text.headerTitle),
-      headerSub:(setDraft.headerSub.trim()||CONFIG.text.headerSub),
-      docTitle:(setDraft.docTitle.trim()||CONFIG.text.docTitle),
-      footer1:(setDraft.footer1.trim()||CONFIG.text.footer1),
-      footer2:(setDraft.footer2.trim()||CONFIG.text.footer2)},
+    text:textObj,
     ownBrand:(setDraft.ownBrand.trim()||CONFIG.ownBrand), competitors:comps, postTypes:types };
   saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave();   // 설정은 즉시 반영(디바운스 대기 X)
   _typeUnionCache=null; setDraft=null;
@@ -2265,8 +2310,8 @@ function renderReport(){
   const head=`
    <div class="card rep-head">
      <div class="rep-head-top">
-       <div><h2 style="margin:0">📑 분석 리포트</h2>
-         <div class="cap" style="margin-top:4px">누적 데이터 기반 · 감성은 검증값 우선(없으면 AI) 적용 · 기간을 바꾸면 리포트가 갱신됩니다</div></div>
+       <div><h2 style="margin:0">${escapeHtml(effText('reportTitle'))}</h2>
+         <div class="cap" style="margin-top:4px">${escapeHtml(effText('reportSub'))}</div></div>
        <div class="rep-period">
          <div class="seg" id="rpSeg">
            <button data-rpm="all" class="${RP.mode==='all'?'on':''}">전체</button>
@@ -3730,12 +3775,16 @@ document.getElementById('raynoApp').addEventListener('input', e=>{
 });
 
 
+function applyTexts(){
+  document.querySelectorAll('[data-txt]').forEach(el=>{ const v=effText(el.dataset.txt); if(v!=null) el.textContent=v; });
+}
 function applyConfigAndSettings(){
   document.title = effText('docTitle');
   const ht=document.getElementById('headerTitle'); if(ht) ht.textContent=effText('headerTitle');
   const hs=document.getElementById('headerSub');   if(hs) hs.textContent=effText('headerSub');
   const f1=document.getElementById('footerLine1');  if(f1) f1.textContent=effText('footer1');
   const f2=document.getElementById('footerLine2');  if(f2) f2.textContent=effText('footer2');
+  applyTexts();
   const kw=document.getElementById('kwExclude');    if(kw) kw.value=(state.excludeKeywords||[]).join(', ');
   document.querySelectorAll('#noneSeg button').forEach(b=>
     b.classList.toggle('on', (b.dataset.none==='exclude')===state.excludeNone));
@@ -3750,6 +3799,7 @@ async function boot(){
   catch(e){ auth='viewer'; }
   // 2) 클라우드 데이터 로드 (모든 방문자)
   await cloudLoadData();
+  applyConfigAndSettings();   // 저장된 표시 문구/탭 이름을 로드 후 모든 방문자에게 적용
   // 3) (관리자 첫 사용) 클라우드가 비어있고 예전 localStorage 데이터가 있으면 한번 올려줌
   if(auth==='admin' && (!STORE.rows || !STORE.rows.length)){
     try{ const old=localStorage.getItem(SKEY); if(old){ const j=JSON.parse(old);
