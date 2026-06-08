@@ -3081,7 +3081,7 @@ function handleWarrFile(file){
     const p=parseWarrWB(wb);
     if(!p||!p.rows.length){ toast('보증서 데이터를 인식하지 못했습니다. 첫 행이 헤더인지 확인하세요.',true); return; }
     mergeWarr(p); warrLoaded=true; await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty();
-    toast(`${file.name} · ${p.rows.length}건 반영 → 누적 ${WARR.rows.length}건 · 컬럼 ${WARR.columns.length}개 인식`);
+    toast(`${file.name} · ${p.rows.length.toLocaleString()}건 반영 → 누적 ${WARR.rows.length.toLocaleString()}건 · 컬럼 ${WARR.columns.length}개 인식`);
   }catch(ex){ toast('파일 오류: '+ex.message,true); } };
   rd.readAsArrayBuffer(file);
 }
@@ -3186,12 +3186,12 @@ function renderWarranty(){
   const granBtn=(g,t)=>`<button data-g="${g}" class="${WV.gran===g?'on':''}">${t}</button>`;
   const branchOpts = bc ? (()=>{ const m={}; recsProd.forEach(r=>{const v=(r[bc]||'').trim(); if(v)m[v]=(m[v]||0)+1;});
       const ent=Object.entries(m).sort((a,b)=>b[1]-a[1]);
-      return `<option value="전체" ${WV.branch==='전체'?'selected':''}>전체 지부 (${recsProd.length})</option>`+
-        ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.branch===v?'selected':''}>${escapeHtml(v)} (${c})</option>`).join(''); })() : '';
+      return `<option value="전체" ${WV.branch==='전체'?'selected':''}>전체 지부 (${recsProd.length.toLocaleString()})</option>`+
+        ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.branch===v?'selected':''}>${escapeHtml(v)} (${c.toLocaleString()})</option>`).join(''); })() : '';
   const frontOpts = fc ? (()=>{ const m={}; recsRange.forEach(r=>{const raw=(r[fc]||'').trim(); if(!raw)return; const v=warrLabelOf(fc,raw); m[v]=(m[v]||0)+1;});
       const ent=Object.entries(m).sort((a,b)=>b[1]-a[1]);
-      return `<option value="전체" ${WV.front==='전체'?'selected':''}>전체 제품 (${recsRange.length})</option>`+
-        ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.front===v?'selected':''}>${escapeHtml(v)} (${c})</option>`).join(''); })() : '';
+      return `<option value="전체" ${WV.front==='전체'?'selected':''}>전체 제품 (${recsRange.length.toLocaleString()})</option>`+
+        ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.front===v?'selected':''}>${escapeHtml(v)} (${c.toLocaleString()})</option>`).join(''); })() : '';
   const allMonths=[...new Set(all.map(r=>warrDateStr(r).slice(0,7)).filter(s=>/^\d{4}-\d{2}$/.test(s)))].sort().reverse().slice(0,12);
   const monthChip=ym=>{ const r=monthRange(ym); const on=(WV.scope==='range'&&WV.from===r.from&&WV.to===r.to); const a=ym.split('-'); return `<span class="mchip ${on?'on':''}" data-ym="${ym}">${a[0]}년 ${+a[1]}월</span>`; };
   const monthChips=allMonths.length?`<div class="mchips"><span class="mchips-lbl">월 바로가기</span>${allMonths.map(monthChip).join('')}<span class="mchip ${WV.scope==='all'?'on':''}" data-ym="__all">전체</span></div>`:'';
@@ -3220,20 +3220,20 @@ function renderWarranty(){
   let bDelta=''; if(prevB&&prevB.n){const d=lastB.n-prevB.n,pct=Math.round(d/prevB.n*100); bDelta=`<span class="dlt ${d>0?'up':d<0?'down':'flat'}">${d>0?'▲':d<0?'▼':'–'} ${Math.abs(pct)}%</span>`;}
   const unitTxt=WV.gran==='day'?'일':WV.gran==='week'?'주':'월';
   const sumLabel=col=>({'매장명':'매장 수','대리점지역(도)':'지역 수','대리점지역(시군구)':'시군구 수','차종':'차종 수','제조사':'제조사 수','담당지부':'지부 수','모델명':'모델 수','신차/중고차':'신차/중고 구분'}[col]||`${col} 종류`);
-  const sumCards=(cfg.summaryCols||[]).filter(c=>(WARR.columns||[]).includes(c)).map(col=>`<div class="rk"><div class="rk-l">${escapeHtml(sumLabel(col))}</div><div class="rk-v">${distinct(recs,col)}</div><div class="rk-m">고유 값</div></div>`).join('');
+  const sumCards=(cfg.summaryCols||[]).filter(c=>(WARR.columns||[]).includes(c)).map(col=>`<div class="rk"><div class="rk-l">${escapeHtml(sumLabel(col))}</div><div class="rk-v">${distinct(recs,col).toLocaleString()}</div><div class="rk-m">고유 값</div></div>`).join('');
   const kpis=`<div class="card"><h3><span class="dot"></span>발급 요약 <span class="rep-sub2">기준: ${escapeHtml(cfg.dateCol||'-')}${auth==='admin'?' · ⚙에서 항목 변경':''}</span></h3>
       <div class="rep-kpis">
         <div class="rk"><div class="rk-l">총 발급</div><div class="rk-v">${recs.length.toLocaleString()}<span style="font-size:12px;color:var(--ink3)"> 건</span></div><div class="rk-m">${tr.rows.length}${unitTxt} 구간</div></div>
         <div class="rk"><div class="rk-l">최근 ${unitTxt} 발급</div><div class="rk-v">${lastB?lastB.n.toLocaleString():0} ${bDelta}</div><div class="rk-m">${lastB?lastB.label:'-'}</div></div>
         ${sumCards}
       </div></div>`;
-  const trendRows=tr.rows.length?tr.rows.map(b=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(b.label)}</div><div class="rt-bar"><i style="width:${b.n/maxT*100}%;background:var(--amber)"></i></div><div class="rt-n">${b.n}건</div><div class="rt-p"></div></div>`).join(''):'<div class="empty">선택한 조건에 데이터가 없습니다. (날짜 컬럼은 ⚙ 표시 설정에서 변경)</div>';
+  const trendRows=tr.rows.length?tr.rows.map(b=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(b.label)}</div><div class="rt-bar"><i style="width:${b.n/maxT*100}%;background:var(--amber)"></i></div><div class="rt-n">${b.n.toLocaleString()}건</div><div class="rt-p"></div></div>`).join(''):'<div class="empty">선택한 조건에 데이터가 없습니다. (날짜 컬럼은 ⚙ 표시 설정에서 변경)</div>';
   const trendCard=`<div class="card"><h3><span class="dot"></span>${WV.gran==='day'?'일별':WV.gran==='week'?'주별':'월별'} 발급 추이</h3>${tr.capped?'<div class="cap">최근 구간만 표시합니다.</div>':''}<div class="rep-trend">${trendRows}</div></div>`;
   const palette=['var(--neu)','var(--pos)','var(--amber)','var(--neg)'];
   const topOf=(set,col,n,useLabel)=>{ const m={}; set.forEach(r=>{let v=(r[col]||'').trim(); if(!v)return; if(useLabel)v=warrLabelOf(col,v); m[v]=(m[v]||0)+1;}); return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n); };
   const breakdownCards=(cfg.breakdownCols||[]).map((col,i)=>{
     const isBranch=(col===bc); const srcSet=isBranch?recsProd:recs; const arr=topOf(srcSet,col,TOPN,!isBranch); const mx=Math.max(1,...arr.map(e=>e[1])); const tot=srcSet.length||1;
-    const bars=arr.length?arr.map(([v,c])=>`<div class="rep-trow ${isBranch?'rep-clk':''} ${isBranch&&WV.branch===v?'rep-on':''}" ${isBranch?`data-branch="${escapeHtml(v)}"`:''}><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${c/mx*100}%;background:${palette[i%palette.length]}"></i></div><div class="rt-n">${c}건</div><div class="rt-p">${(c/tot*100).toFixed(0)}%</div></div>`).join(''):'<div class="empty">데이터 없음</div>';
+    const bars=arr.length?arr.map(([v,c])=>`<div class="rep-trow ${isBranch?'rep-clk':''} ${isBranch&&WV.branch===v?'rep-on':''}" ${isBranch?`data-branch="${escapeHtml(v)}"`:''}><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${c/mx*100}%;background:${palette[i%palette.length]}"></i></div><div class="rt-n">${c.toLocaleString()}건</div><div class="rt-p">${(c/tot*100).toFixed(0)}%</div></div>`).join(''):'<div class="empty">데이터 없음</div>';
     return `<div class="card"><h3><span class="dot"></span>${escapeHtml(col)} 구성 ${isBranch?'<span class="rep-sub2">클릭=필터</span>':''}</h3><div class="rep-trend">${bars}</div></div>`; }).join('');
   const tcols=(cfg.tableCols&&cfg.tableCols.length?cfg.tableCols:(WARR.columns||[]).slice(0,8));
   const admin=(auth==='admin');
@@ -3393,7 +3393,7 @@ function renderWarrReport(){
     const mv=ks.map(k=>({k,cur:ac[k]||0,prev:ap[k]||0,d:(ac[k]||0)-(ap[k]||0)})).filter(x=>x.d!==0);
     const us=mv.filter(x=>x.d>0).sort((a,b)=>b.d-a.d).slice(0,5);
     const ds=mv.filter(x=>x.d<0).sort((a,b)=>a.d-b.d).slice(0,5);
-    const row=x=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(x.k)}</div><div class="rt-bar"></div><div class="rt-n">${x.cur}건</div><div class="rt-p"><span class="dlt ${x.d>0?'up':'down'}">${x.d>0?'+':''}${x.d}</span></div></div>`;
+    const row=x=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(x.k)}</div><div class="rt-bar"></div><div class="rt-n">${x.cur.toLocaleString()}건</div><div class="rt-p"><span class="dlt ${x.d>0?'up':'down'}">${x.d>0?'+':''}${x.d.toLocaleString()}</span></div></div>`;
     moverCard=`<div class="card"><h3><span class="dot"></span>지부별 증감 <span class="rep-sub2">최근 ${N}일 vs 직전 ${N}일</span></h3>
       <div class="set-sub" style="margin-top:6px">📈 증가</div><div class="rep-trend">${us.length?us.map(row).join(''):'<div class="empty">증가한 지부 없음</div>'}</div>
       <div class="set-sub" style="margin-top:10px">📉 감소</div><div class="rep-trend">${ds.length?ds.map(row).join(''):'<div class="empty">감소한 지부 없음</div>'}</div></div>`;
@@ -3401,14 +3401,14 @@ function renderWarrReport(){
   // ── 5) 최근 7일 구성 (지부/전면제품/차종)
   const palette=['var(--neu)','var(--amber)','var(--pos)'];
   const compCard=(title,c,useLabel,ci)=>{ if(!c) return ''; const m=aggBy(curW,c,useLabel); const arr=topEntries(m,5); const mx=Math.max(1,...arr.map(e=>e[1])); const tot=curW.length||1;
-    const bars=arr.length?arr.map(([v,n])=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${n/mx*100}%;background:${palette[ci%palette.length]}"></i></div><div class="rt-n">${n}건</div><div class="rt-p">${(n/tot*100).toFixed(0)}%</div></div>`).join(''):'<div class="empty">데이터 없음</div>';
+    const bars=arr.length?arr.map(([v,n])=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${n/mx*100}%;background:${palette[ci%palette.length]}"></i></div><div class="rt-n">${n.toLocaleString()}건</div><div class="rt-p">${(n/tot*100).toFixed(0)}%</div></div>`).join(''):'<div class="empty">데이터 없음</div>';
     return `<div class="card"><h3><span class="dot"></span>${escapeHtml(title)} <span class="rep-sub2">최근 ${N}일</span></h3><div class="rep-trend">${bars}</div></div>`; };
   const compGrid=`<div class="biz-grid">${[bc?compCard('지부 구성',bc,false,0):'', fc?compCard('전면제품 구성',fc,true,1):'', carCol?compCard('차종 구성',carCol,false,2):''].filter(Boolean).join('')}</div>`;
   // ── 6) 일자별 추이(기준일 기준, 최근 max(N,21)일)
   const span=Math.max(N,21);
   const days=[]; for(let i=span-1;i>=0;i--) days.push(dShift(anchor,-i));
   const dmax=Math.max(1,...days.map(dd=>cnt(dd,dd)));
-  const dayRows=days.map(dd=>{ const n=cnt(dd,dd); return `<div class="rep-trow"><div class="rt-l">${dd.slice(5)}</div><div class="rt-bar"><i style="width:${n/dmax*100}%;background:var(--amber)"></i></div><div class="rt-n">${n}건</div><div class="rt-p"></div></div>`; }).join('');
+  const dayRows=days.map(dd=>{ const n=cnt(dd,dd); return `<div class="rep-trow"><div class="rt-l">${dd.slice(5)}</div><div class="rt-bar"><i style="width:${n/dmax*100}%;background:var(--amber)"></i></div><div class="rt-n">${n.toLocaleString()}건</div><div class="rt-p"></div></div>`; }).join('');
   const dailyCard=`<div class="card"><h3><span class="dot"></span>일자별 발급 추이 <span class="rep-sub2">기준일까지 최근 ${days.length}일</span></h3><div class="rep-trend">${dayRows}</div></div>`;
 
   box.innerHTML = headCard + kpiCard + insightCard + (moverCard?`<div class="biz-grid">${moverCard}${dailyCard}</div>`:dailyCard) + compGrid;
