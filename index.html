@@ -751,9 +751,13 @@
           <span class="ctl-label">표시</span>
           <div class="seg" id="vfFilterSeg">
             <button data-vf="todo" class="on">미검증만</button>
+            <button data-vf="auto">🤖 자동(검토)</button>
             <button data-vf="done">검증완료</button>
             <button data-vf="all">전체</button>
           </div>
+        </div>
+        <div class="ctl-group">
+          <button class="acc-btn admin-only" id="autoVerifyBtn">🤖 자동 검증 실행</button>
         </div>
         <div class="ctl-group">
           <span class="ctl-label">범위</span>
@@ -2465,7 +2469,8 @@ function verifyRows(){
   if(state.vfScope==='post')    rows = rows.filter(r=>r.isPost);
   if(state.vfScope==='comment') rows = rows.filter(r=>!r.isPost);
   if(state.vfFilter==='todo') rows = rows.filter(r=>!isVerified(r));
-  if(state.vfFilter==='done') rows = rows.filter(r=> isVerified(r));
+  if(state.vfFilter==='done') rows = rows.filter(r=> isVerified(r) && r.vsrc!=='auto');
+  if(state.vfFilter==='auto') rows = rows.filter(r=>r.vsrc==='auto').sort((a,b)=>(a.vconf||0)-(b.vconf||0));
   const q=state.vfSearch.trim().toLowerCase();
   if(q) rows = rows.filter(r=>(r.title+' '+r.body+' '+r.cafe).toLowerCase().includes(q));
   return rows;
@@ -2555,6 +2560,68 @@ function editorControls(r){
     </div>`;
 }
 
+// ── 자동 검증(학습형 분류기) ────────────────────────────────
+// 사용자가 직접 검증한 데이터(vsrc!=='auto')를 학습해 새 글의 감성·유형을 예측한다.
+function _atok(text){ const s=(text||'').toLowerCase(); const words=s.match(/[가-힣a-z0-9]+/g)||[]; const out=[];
+  for(const w of words){ out.push(w); if(/[가-힣]/.test(w) && w.length>=2){ for(let i=0;i<w.length-1;i++) out.push('§'+w.slice(i,i+2)); } }
+  return out; }
+function _rowText(r){ return (r.title||'')+' '+(r.body||''); }
+function _normText(r){ return _rowText(r).replace(/\s+/g,' ').trim().toLowerCase(); }
+function _trainNB(rows, labelFn){
+  const cls={}; let total=0; const vocab=new Set();
+  rows.forEach(r=>{ const lab=labelFn(r); if(!lab) return; const ts=_atok(_rowText(r));
+    const c=cls[lab]||(cls[lab]={count:0,tot:0,tf:Object.create(null)}); c.count++; total++;
+    ts.forEach(t=>{ c.tf[t]=(c.tf[t]||0)+1; c.tot++; vocab.add(t); }); });
+  return {cls,total,V:vocab.size||1};
+}
+function _predNB(model, text){
+  if(!model||!model.total) return null; const labels=Object.keys(model.cls); if(!labels.length) return null;
+  const ts=_atok(text); const sc=labels.map(lab=>{ const c=model.cls[lab]; let lp=Math.log(c.count/model.total);
+    for(const t of ts){ lp+=Math.log(((c.tf[t]||0)+1)/(c.tot+model.V)); } return lp; });
+  const mx=Math.max(...sc); const ex=sc.map(s=>Math.exp(s-mx)); const sum=ex.reduce((a,b)=>a+b,0)||1;
+  let bi=0; for(let i=1;i<labels.length;i++) if(ex[i]>ex[bi]) bi=i;
+  return {label:labels[bi], conf:ex[bi]/sum};
+}
+function buildAutoModel(){
+  const train=(RAW&&RAW.rows?RAW.rows:[]).filter(r=>isVerified(r) && r.vsrc!=='auto');
+  const exSent=Object.create(null), exType=Object.create(null);
+  train.forEach(r=>{ const k=_normText(r); if(!k)return; if(r.vSent) exSent[k]=r.vSent; if(r.vType) exType[k]=r.vType; });
+  return { n:train.length,
+    sentNB:_trainNB(train, r=>r.vSent),
+    typeNB:_trainNB(train.filter(r=>r.vType), r=>r.vType),
+    exSent, exType };
+}
+function autoPredict(r, M){
+  const txt=_rowText(r), nt=_normText(r);
+  let sent='', sconf=0, type='', tconf=0;
+  if(M.exSent[nt]!=null){ sent=M.exSent[nt]; sconf=0.98; }
+  else { const p=_predNB(M.sentNB, txt);
+    if(p && M.sentNB.total>=15 && p.conf>=0.6){ sent=p.label; sconf=p.conf; if(sent===r.aiSent) sconf=Math.min(0.99,sconf+0.08); }
+    else if(r.aiSent){ sent=r.aiSent; sconf=p?Math.max(0.4,Math.min(0.55,p.conf)):0.45; }
+    else if(p){ sent=p.label; sconf=Math.min(0.55,p.conf); } }
+  if(M.exType[nt]!=null){ type=M.exType[nt]; tconf=0.98; }
+  else { const p=_predNB(M.typeNB, txt);
+    if(p && M.typeNB.total>=15 && p.conf>=0.55){ type=p.label; tconf=p.conf; if(type===r.aiType) tconf=Math.min(0.99,tconf+0.08); }
+    else if(r.aiType){ type=r.aiType; tconf=p?Math.max(0.4,Math.min(0.55,p.conf)):0.45; }
+    else if(p){ type=p.label; tconf=Math.min(0.55,p.conf); } }
+  const overall=Math.min(sconf||0, type?(tconf||0):(sconf||0));
+  return { vSent:sent, vType:type, sconf, tconf, conf:overall };
+}
+function autoVerifyAll(){
+  if(auth!=='admin'){ toast('자동 검증은 관리자만 가능합니다.',true); return; }
+  if(!RAW||!RAW.rows||!RAW.rows.length){ toast('데이터가 없습니다.',true); return; }
+  const M=buildAutoModel();
+  if(M.n<5){ toast('학습할 검증 데이터가 부족합니다. 먼저 몇 건을 직접 검증해 주세요(최소 5건).',true); return; }
+  const store=loadStore(); let n=0;
+  store.rows.forEach(r=>{ if(isVerified(r) && r.vsrc!=='auto') return;   // 사람이 검증한 건은 절대 건드리지 않음
+    const p=autoPredict(r,M); if(!p.vSent) return;
+    r.vSent=p.vSent; if(p.vType) r.vType=p.vType; r.vsrc='auto'; r.vconf=Math.round((p.conf||0)*100); n++; });
+  saveStore(store); rebuildRAW();
+  if(state.view==='dash'){ buildTypeChips(); render(); } else dashStale=true;
+  state.vfFilter='auto'; document.querySelectorAll('#vfFilterSeg button').forEach(b=>b.classList.toggle('on', b.dataset.vf==='auto'));
+  state.vfLimit=60; refreshVerify(); updateVerifyHeader(); renderVerify();
+  toast(n>0?`${n.toLocaleString()}건을 자동 검증했습니다 · 학습 ${M.n.toLocaleString()}건 기반 · 신뢰도 낮은 항목부터 검토하세요`:'새로 자동 검증할 항목이 없습니다.');
+}
 function renderVerify(){
   if(!RAW){ return; }
   updateVerifyHeader();
@@ -2593,6 +2660,7 @@ function vCard(r){
       ${r.date?`<span class="tagm date">${escapeHtml(r.date)}</span>`:''}
       <span class="tagm kind ${r.isPost?'':'c'}">${kind}</span>
       <span class="vc-ai">${ai}</span>
+      ${r.vsrc==='auto'?`<span class="vc-auto" style="background:${(r.vconf||0)>=75?'#e8f5e9':(r.vconf||0)>=55?'#fff8e1':'#ffebee'};color:${(r.vconf||0)>=75?'var(--pos)':(r.vconf||0)>=55?'#b58100':'var(--neg)'};border:1px solid currentColor;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;margin-left:4px">🤖 자동${r.vconf!=null?` · ${r.vconf}%`:''}</span>`:''}
       ${linkBtn}
     </div>
     ${titleBlock}${parentBlock}
@@ -2636,6 +2704,7 @@ function stage(editorEl, changes){
 function commitEditor(editorEl){
   const id=editorEl.dataset.id, changes=pending[id];
   if(!changes){ return; }
+  changes.vsrc='manual'; changes.vconf=100;   // 사람이 확정한 검증 → 학습 정답
   if(!saveRow(id, changes)) return;
   delete pending[id];
   if(editorEl.closest('#verifyList')){
@@ -2735,6 +2804,7 @@ document.getElementById('verifyList').addEventListener('click', onEditorClick);
 document.getElementById('verifyList').addEventListener('change', onEditorChange);
 
 // 검증 페이지 컨트롤
+document.getElementById('autoVerifyBtn').addEventListener('click', autoVerifyAll);
 document.getElementById('vfFilterSeg').addEventListener('click', e=>{
   if(e.target.tagName!=='BUTTON')return;
   state.vfFilter=e.target.dataset.vf; state.vfLimit=60;
