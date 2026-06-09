@@ -106,6 +106,9 @@
   .crawl-msg{font-size:12px;color:var(--ink2);margin-top:8px}
   .crawl-spin{width:13px;height:13px;border:2px solid rgba(0,113,227,.3);border-top-color:var(--neu);border-radius:50%;display:inline-block;animation:crawlspin .8s linear infinite}
   @keyframes crawlspin{to{transform:rotate(360deg)}}
+  .crawl-btn{border:0;border-radius:980px;font-family:var(--font);font-size:12.5px;font-weight:800;padding:8px 18px;cursor:pointer;white-space:nowrap;transition:.15s}
+  .crawl-btn.start{background:var(--neu);color:#fff} .crawl-btn.start:hover{background:#0062c4}
+  .crawl-btn.auth{background:var(--pos);color:#fff} .crawl-btn.auth:hover{filter:brightness(.95)}
   .alertbox{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
   .alert-item{display:flex;align-items:flex-start;gap:10px;border-radius:14px;padding:13px 16px;font-size:13.5px;line-height:1.55;border:1px solid}
   .alert-item .ai-ic{font-size:17px;line-height:1.3;flex:none}
@@ -1020,6 +1023,7 @@ const SUPA = {
   bizFile:  'biz.json',
   warrFile: 'warranty.json',
   statusFile: 'crawl_status.json',
+  commandFile: 'crawl_command.json',
 };
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
@@ -4118,7 +4122,7 @@ function applyConfigAndSettings(){
 
 // ── 페이지 로드: 클라우드에서 데이터 불러오기 + 로그인 상태 확인 ──
 // ── 자동 수집 진행률: crawl_status.json 폴링 → % 바 표시 + 완료 시 자동 갱신 ──
-let _crawlPollTimer=null, _crawlInit=false, _crawlRefreshedAt='';
+let _crawlPollTimer=null, _crawlInit=false, _crawlRefreshedAt='', _crawlReqAt=0;
 async function fetchCrawlStatus(){
   if(typeof fetch!=='function') return null;
   try{
@@ -4128,27 +4132,61 @@ async function fetchCrawlStatus(){
 }
 function renderCrawlBar(s){
   const el=document.getElementById('crawlBar'); if(!el) return;
-  if(!s || !s.state || s.state==='idle'){ el.innerHTML=''; return; }
-  const pct=Math.max(0,Math.min(100,Math.round(s.pct||0)));
-  if(s.state==='running'){
+  const isAdmin=(auth==='admin');
+  const st=(s&&s.state)?s.state:'idle';
+  const pct=s?Math.max(0,Math.min(100,Math.round(s.pct||0))):0;
+  const startBtn=isAdmin?`<button class="crawl-btn start" id="crawlStartBtn">🔄 크롤링 시작</button>`:'';
+  if(st==='running'){
     el.innerHTML=`<div class="crawl run">
       <div class="crawl-top"><span class="crawl-t"><span class="crawl-spin"></span> 자동 수집 진행 중</span><span class="crawl-pct">${pct}%</span></div>
       <div class="crawl-track"><div class="crawl-fill" style="width:${pct}%"></div></div>
       <div class="crawl-msg">${escapeHtml(s.message||'')}</div></div>`;
-  }else if(s.state==='error'){
-    el.innerHTML=`<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 자동 수집 오류</span></div><div class="crawl-msg">${escapeHtml(s.message||'다시 시도해 주세요.')}</div></div>`;
-  }else if(s.state==='done'){
+  }else if(st==='await_auth'){
+    el.innerHTML=`<div class="crawl run">
+      <div class="crawl-top"><span class="crawl-t">🔐 네이버 인증 대기</span></div>
+      <div class="crawl-msg">${escapeHtml(s.message||'크롬 창에서 네이버 로그인/인증을 완료한 뒤 아래 버튼을 누르세요.')}</div>
+      ${isAdmin?`<div style="margin-top:11px"><button class="crawl-btn auth" id="crawlAuthBtn">✅ 인증 완료</button></div>`:''}</div>`;
+  }else if(st==='error'){
+    el.innerHTML=`<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 자동 수집 오류</span>${startBtn}</div><div class="crawl-msg">${escapeHtml(s.message||'다시 시도해 주세요.')}</div></div>`;
+  }else if(st==='done'){
     const t=s.at?new Date(s.at).toLocaleString('ko-KR'):'';
-    el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">✅ 자동 수집 완료</span><span class="crawl-pct" style="color:var(--pos)">100%</span></div>
+    el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">✅ 자동 수집 완료</span>${startBtn}</div>
       <div class="crawl-msg">${escapeHtml(t)} · 신규 ${(s.added||0).toLocaleString()}건 · 누적 ${(s.total||0).toLocaleString()}건</div></div>`;
+  }else{
+    if(isAdmin) el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">🛰 자동 수집</span>${startBtn}</div><div class="crawl-msg">버튼을 누르면 PC의 크롤러가 실행됩니다. 네이버 인증이 필요하면 여기에 [인증 완료] 버튼이 나타납니다.</div></div>`;
+    else el.innerHTML='';
   }
 }
+async function startCrawl(){
+  if(auth!=='admin'){ toast('관리자만 실행할 수 있습니다.',true); return; }
+  _crawlReqAt=Date.now();
+  renderCrawlBar({state:'running',pct:1,message:'크롤링 요청됨 — PC에서 시작 대기 중…'});
+  const ok=await cloudSaveJSON(SUPA.commandFile,{action:'start',nonce:Date.now(),at:new Date().toISOString()});
+  if(ok) toast('크롤링을 요청했습니다. PC 워처가 곧 시작합니다.'); else _crawlReqAt=0;
+}
+async function confirmAuthDone(){
+  if(auth!=='admin') return;
+  _crawlReqAt=Date.now();
+  renderCrawlBar({state:'running',pct:6,message:'인증 완료 — 수집을 시작합니다…'});
+  const ok=await cloudSaveJSON(SUPA.commandFile,{action:'auth_done',nonce:Date.now(),at:new Date().toISOString()});
+  if(ok) toast('인증 완료를 전달했습니다.'); else _crawlReqAt=0;
+}
+document.addEventListener('click', e=>{
+  if(e.target.closest('#crawlStartBtn')) startCrawl();
+  else if(e.target.closest('#crawlAuthBtn')) confirmAuthDone();
+});
 async function pollCrawlStatus(){
   const s=await fetchCrawlStatus();
+  const sAt=(s&&s.at)?new Date(s.at).getTime():0;
+  // 요청 직후, 아직 PC가 상태를 못 올린 구간엔 '대기' 표시 유지(깜빡임 방지, 최대 30초)
+  if(_crawlReqAt && (Date.now()-_crawlReqAt)<30000 && sAt < _crawlReqAt){
+    _crawlInit=true; clearTimeout(_crawlPollTimer); _crawlPollTimer=setTimeout(pollCrawlStatus,2500); return;
+  }
+  if(_crawlReqAt && sAt>=_crawlReqAt) _crawlReqAt=0;
   renderCrawlBar(s);
   if(s && s.state==='done' && s.at){
-    if(!_crawlInit){ _crawlRefreshedAt=s.at; }              // 부팅 시 이미 완료된 건 무시
-    else if(s.at!==_crawlRefreshedAt){ _crawlRefreshedAt=s.at;   // 새 완료 → 데이터 자동 갱신
+    if(!_crawlInit){ _crawlRefreshedAt=s.at; }
+    else if(s.at!==_crawlRefreshedAt){ _crawlRefreshedAt=s.at;
       await cloudLoadData(); rebuildRAW();
       if(state.view==='dash'){ buildTypeChips(); render(); } else dashStale=true;
       if(typeof refreshVerify==='function') refreshVerify();
@@ -4156,7 +4194,7 @@ async function pollCrawlStatus(){
     }
   }
   _crawlInit=true;
-  const next=(s && s.state==='running')?2500:8000;
+  const next=(s && (s.state==='running'||s.state==='await_auth'))?2500:8000;
   clearTimeout(_crawlPollTimer); _crawlPollTimer=setTimeout(pollCrawlStatus, next);
 }
 async function boot(){
