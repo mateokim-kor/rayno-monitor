@@ -1276,7 +1276,7 @@ async function downloadUpload(u){
 }
 
 // 행 고유키 = 카페·날짜·종류·제목·본문·링크 조합 → 같은 글은 다시 올려도 1건
-function rowKey(r){ return [r.cafe, r.date, r.isPost?'P':'C', r.title, r.body, r.link].join('\u0001'); }
+function rowKey(r){ return [r.cafe, r.isPost?'P':'C', r.title, r.body, r.link, r.parentLink||r.parentTitle||''].join('\u0001'); }
 function hashId(str){
   let h1=0x811c9dc5, h2=0xc2b2ae35;
   for(let i=0;i<str.length;i++){ const c=str.charCodeAt(i);
@@ -1337,9 +1337,42 @@ function rebuildRAW(fname){
           sheetName:'(누적)', total:rows.length, vSentN, vTypeN } };
 }
 
+// ── 중복 정리: 같은 내용(날짜만 다른) 글을 하나로 합치기 ──
+function _mergeRowInto(c, r){
+  if(r.date){ const rd=normDate(r.date), cd=normDate(c.date);
+    if(!c.date || (rd && cd && rd<cd)) c.date=r.date; }   // 가장 이른 날짜 유지
+  if(!c.vSent && r.vSent) c.vSent=r.vSent;
+  if(!c.vType && r.vType) c.vType=r.vType;
+  if(!c.vsrc  && r.vsrc)  c.vsrc =r.vsrc;
+  if(c.vconf==null && r.vconf!=null) c.vconf=r.vconf;
+  if(!c.aiSent && r.aiSent) c.aiSent=r.aiSent;
+  if(!c.aiType && r.aiType) c.aiType=r.aiType;
+  CLASS_FIELDS.forEach(f=>{ if(!c[f.key] && r[f.key]) c[f.key]=r[f.key]; });
+  if(Array.isArray(r.hls)&&r.hls.length){ c.hls=Array.isArray(c.hls)?c.hls:[]; r.hls.forEach(h=>{ if(!c.hls.some(x=>x.t===h.t)) c.hls.push(h); }); }
+  if(r.seq!=null && (c.seq==null || r.seq<c.seq)) c.seq=r.seq;
+  if(!c.link && r.link) c.link=r.link;
+  if(!c.parentLink && r.parentLink) c.parentLink=r.parentLink;
+  if(!c.parentTitle && r.parentTitle) c.parentTitle=r.parentTitle;
+}
+function canonicalize(rows){
+  const byKey=new Map(); const idMap={}; let merged=0;
+  rows.forEach(r=>{ const key=rowKey(r); let c=byKey.get(key);
+    if(!c){ c={...r}; c.__ids=[r.id]; byKey.set(key,c); }
+    else { _mergeRowInto(c,r); c.__ids.push(r.id); merged++; }
+  });
+  const out=[];
+  byKey.forEach((c,key)=>{ const newId=hashId(key);
+    (c.__ids||[]).forEach(oid=>{ if(oid!=null) idMap[oid]=newId; });
+    delete c.__ids; c.id=newId; out.push(c); });
+  return { rows:out, idMap, merged };
+}
+function remapRep(idMap){
+  STORE.config=STORE.config||{};
+  ['repPos','repNeg'].forEach(k=>{ if(Array.isArray(STORE.config[k]))
+    STORE.config[k]=[...new Set(STORE.config[k].map(id=>idMap[id]||id))].slice(0,3); });
+}
 function showDashboardUI(){
   document.getElementById('drop').style.display='none';
-  document.getElementById('emptyState').style.display='none';
   document.getElementById('nav').style.display='flex';
   document.getElementById('dash').style.display='block';
   if(state.view==='dash'){
@@ -2970,13 +3003,11 @@ async function optimizeAll(){
   // 1) 카페 데이터: 중복(같은 내용) 합치기 + 빈 항목 제거 (검증값 보존)
   const store=loadStore();
   res.cafeBefore=store.rows.length;
-  const map=new Map();
-  store.rows.forEach(r=>{ const k=r.id||rowKey(r);
-    if(map.has(k)){ const ex=map.get(k); if(!isVerified(ex)&&isVerified(r)) map.set(k,r); }   // 검증된 쪽 우선
-    else map.set(k,r); });
-  let rows=[...map.values()].filter(r=> (r.cafe||r.title||r.body) );   // 완전 빈 행 제거
+  const c=canonicalize(store.rows);                                   // 같은 내용(날짜만 다른) 글 합치기
+  let rows=c.rows.filter(r=> (r.cafe||r.title||r.body) );             // 완전 빈 행 제거
+  remapRep(c.idMap);                                                  // 대표글 ID 갱신
   res.cafeAfter=rows.length; res.cafeRemoved=res.cafeBefore-rows.length;
-  store.rows=rows;
+  store.rows=rows; store.config=store.config||{}; store.config.canon=2;
   // 2) 내부 캐시 재계산
   _typeUnionCache=null; if(_ndCache&&_ndCache.clear) _ndCache.clear();
   saveStore(store); rebuildRAW();
@@ -4084,6 +4115,13 @@ async function boot(){
   // 2) 클라우드 데이터 로드 (모든 방문자)
   await cloudLoadData();
   applyConfigAndSettings();   // 저장된 표시 문구/탭 이름을 로드 후 모든 방문자에게 적용
+  // 2.5) 중복 정리 마이그레이션 — 날짜만 다른 동일 글 합치기 (기존 데이터 1회 정리)
+  STORE.config = STORE.config || {};
+  if(STORE.config.canon!==2 && STORE.rows && STORE.rows.length){
+    const c=canonicalize(STORE.rows);
+    STORE.rows=c.rows; remapRep(c.idMap); STORE.config.canon=2;
+    if(auth==='admin'){ saveStore(STORE); if(c.merged>0) flushCloudSave(); }   // 관리자면 클라우드에 정리본 반영(전원 공유)
+  }
   // 3) (관리자 첫 사용) 클라우드가 비어있고 예전 localStorage 데이터가 있으면 한번 올려줌
   if(auth==='admin' && (!STORE.rows || !STORE.rows.length)){
     try{ const old=localStorage.getItem(SKEY); if(old){ const j=JSON.parse(old);
