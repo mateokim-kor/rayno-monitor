@@ -1315,8 +1315,14 @@ function showDashboardUI(){
     document.getElementById('typeBar').style.display='flex';
   }
   const m=RAW.meta;
+  // 최근 입력일(마지막 업로드일) · 없으면 수집 데이터 중 최신 날짜로 대체
+  const ups=(STORE.config&&STORE.config.uploads)||[];
+  let lastUp=''; ups.forEach(u=>{ if(u.at && u.at>lastUp) lastUp=u.at; });
+  let lastData=''; for(const r of RAW.rows){ const d=normDate(r.date); if(d && d>lastData) lastData=d; }
+  const recentLabel = lastUp ? '최근 입력일' : '최근 데이터';
+  const recentDate  = (lastUp ? lastUp.slice(0,10) : lastData) || '-';
   document.getElementById('fileMeta').innerHTML =
-    `최근: <b>${escapeHtml(m.fname)}</b><br>누적 ${m.total.toLocaleString()}행 · 검증 ${m.vSentN.toLocaleString()}건`;
+    `${recentLabel} · <b>${escapeHtml(recentDate)}</b><br>누적 ${m.total.toLocaleString()}건 · 검증 ${m.vSentN.toLocaleString()}건`;
   updateAccStat();
   applyAuthUI();
 }
