@@ -2946,9 +2946,8 @@ function editorControls(r){
     <button type="button" class="vc-clstoggle">${hasCls?'추가 분류 (입력됨) ▾':'＋ 추가 분류 입력'}</button>
     <div class="vc-class" hidden></div>
     <div class="vc-actions">
-      <button class="vc-save" ${dirty?'':'disabled'}>저장</button>
+      <button class="vc-confirm" title="선택한 감성(긍정/부정/중립)을 저장하고 검증 완료로 처리합니다">✓ 검증 완료</button>
       <button class="vc-revert" ${dirty?'':'disabled'}>되돌리기</button>
-      ${r.vsrc==='auto'?`<button class="vc-confirm" title="자동 검증 결과를 사람이 확정 → 검증 완료로 이동">✓ 검증 완료</button>`:''}
       <span class="vc-status ${dirty?'dirty':''}">${statusTxt}</span>
     </div>`;
 }
@@ -3135,9 +3134,14 @@ function confirmAuto(editorEl){
   if(!changes.vSent){ toast('감성을 먼저 선택해주세요.', true); return; }
   if(!saveRow(id, changes)) return;
   delete pending[id];
-  if(state.vfFilter==='auto' || state.vfFilter==='todo'){ dropCardFromList(editorEl.closest('.vcard')); }
-  else { renderVerify(); }
-  toast('검증 완료로 이동했습니다.');
+  if(editorEl.closest('#verifyList')){
+    const card=editorEl.closest('.vcard');
+    const verified=isVerifiedId(id);
+    const leaves=(state.vfFilter==='todo'&&verified)||(state.vfFilter==='auto')||(state.vfFilter==='done'&&!verified);
+    if(leaves){ dropCardFromList(card); }
+    else { const r2=RAW.rows.find(x=>x.id===id); const tmp=document.createElement('div'); tmp.innerHTML=vCard(r2); card.replaceWith(tmp.firstElementChild); }
+  }
+  toast('검증 완료되었습니다.');
 }
 function confirmAllAuto(){
   if(auth!=='admin'){ toast('관리자만 가능합니다.', true); return; }
