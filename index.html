@@ -180,8 +180,15 @@
   .tagm.typ{background:var(--bg);border:1px solid var(--line2);color:var(--ink)}
   .rec-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;letter-spacing:-.01em}
   .rec-parent{font-size:11.5px;color:var(--ink3);margin-bottom:7px;background:var(--bg2);border:1px solid var(--line);border-radius:7px;padding:4px 9px;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  mark.hl-pos{background:linear-gradient(180deg,transparent 6%,#fff04d 6%,#ffe14d 90%,transparent 90%);color:#3d3000;border-radius:3px;padding:0 2px;font-weight:700;box-decoration-break:clone;-webkit-box-decoration-break:clone}
-  mark.hl-neg{background:linear-gradient(180deg,transparent 6%,#ffb3b0 6%,#ff9a96 90%,transparent 90%);color:#5e1411;border-radius:3px;padding:0 2px;font-weight:700;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.hl-pos{background:rgba(31,158,99,.15);color:#15784a;border-radius:3px;padding:0 2px;font-weight:600}
+  mark.hl-neg{background:rgba(224,56,43,.14);color:#b3271e;border-radius:3px;padding:0 2px;font-weight:600}
+  mark.hl-user{border-radius:3px;padding:0 2px;cursor:pointer;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.hl-user.hl-y{background:linear-gradient(180deg,transparent 8%,#ffe14d 8%,#ffd60a 88%,transparent 88%);color:#3a2e00}
+  mark.hl-user.hl-r{background:linear-gradient(180deg,transparent 8%,#ffa09b 8%,#ff7b75 88%,transparent 88%);color:#5e1411}
+  mark.hl-user:hover{outline:1px dashed rgba(0,0,0,.3)}
+  #hlPop{position:absolute;z-index:9999;display:none;gap:5px;background:#1d1d1f;border-radius:11px;padding:6px;box-shadow:0 8px 26px rgba(0,0,0,.32)}
+  #hlPop button{border:0;border-radius:8px;padding:7px 11px;font-family:var(--font);font-size:12.5px;font-weight:800;cursor:pointer;line-height:1}
+  #hlPop .hp-y{background:#ffd60a;color:#3a2e00} #hlPop .hp-r{background:#ff7b75;color:#3a0d0a} #hlPop .hp-x{background:#3a3a3c;color:#fff}
   .modal-hl{background:var(--bg2);border:1px solid var(--line2);color:var(--ink3);font-family:var(--font);font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:980px;cursor:pointer;white-space:nowrap;transition:.15s}
   .modal-hl.on{background:rgba(31,158,99,.12);border-color:var(--pos);color:#15784a}
   .rec-body{font-size:13px;line-height:1.7;color:var(--ink2);white-space:pre-wrap;word-break:break-word}
@@ -865,7 +872,7 @@
           <button data-ms="중립">중립</button>
           <button data-ms="부정">부정</button>
         </div>
-        <button class="modal-hl on" id="modalHlBtn" title="본문에서 긍정/부정 표현을 색으로 표시">✨ 감성 하이라이트</button>
+        <button class="modal-hl on" id="modalHlBtn" title="긍정/부정 단어를 자동으로 색칠 (드래그로 직접 칠하는 것과 별개)">✨ 자동 색칠</button>
         <input class="modal-search" id="modalSearch" placeholder="목록 내 검색…">
         <button class="modal-x" id="modalClose" aria-label="닫기">✕</button>
       </div>
@@ -1860,6 +1867,24 @@ function highlightSentiment(escapedText){
   if(!_hlRe) return escapedText;
   return escapedText.replace(_hlRe, m=>`<mark class="hl-${_hlMap[m.toLowerCase()]||'pos'}">${m}</mark>`);
 }
+function renderRecBody(r){
+  const raw=(r.body||'');
+  if(!raw) return '<span style="color:var(--ink3)">(내용 없음)</span>';
+  const seg=(t)=> HL_ON ? highlightSentiment(escapeHtml(t)) : escapeHtml(t);
+  const hls=Array.isArray(r.hls)?r.hls:[];
+  if(!hls.length) return seg(raw);
+  // 사용자가 드래그로 칠한 구간(텍스트 매칭)을 위치로 변환
+  let ranges=[];
+  hls.forEach(h=>{ const t=h&&h.t; if(!t) return; let i=0; while((i=raw.indexOf(t,i))!==-1){ ranges.push({s:i,e:i+t.length,c:h.c==='r'?'r':'y'}); i+=t.length; } });
+  if(!ranges.length) return seg(raw);
+  ranges.sort((a,b)=>a.s-b.s||b.e-a.e);
+  const merged=[]; ranges.forEach(rg=>{ const last=merged[merged.length-1]; if(last && rg.s<=last.e){ last.e=Math.max(last.e,rg.e); } else merged.push({...rg}); });
+  let out='',pos=0;
+  merged.forEach(rg=>{ if(rg.s>pos) out+=seg(raw.slice(pos,rg.s));
+    out+=`<mark class="hl-user hl-${rg.c}" title="클릭하면 하이라이트 해제">${escapeHtml(raw.slice(rg.s,rg.e))}</mark>`; pos=rg.e; });
+  if(pos<raw.length) out+=seg(raw.slice(pos));
+  return out;
+}
 function recCard(r){
   const sent=sentOf(r), typ=typeOf(r);
   const sCls = sent==='긍정'?'pos':sent==='부정'?'neg':sent==='중립'?'neu':'';
@@ -1887,7 +1912,7 @@ function recCard(r){
       ${typ?`<span class="tagm typ">${escapeHtml(typ)}</span>`:''}
     </div>
     ${titleBlock}${parentBlock}
-    <div class="rec-body ${longish?'clamp':''}">${body?(HL_ON?highlightSentiment(body):body):'<span style="color:var(--ink3)">(내용 없음)</span>'}</div>
+    <div class="rec-body ${longish?'clamp':''}">${renderRecBody(r)}</div>
     ${longish?`<button class="rec-more">더 보기 ▾</button>`:''}
     ${clsBlock}
     ${linkBlock}
@@ -1912,6 +1937,50 @@ document.getElementById('modalSentSeg').addEventListener('click', e=>{ const b=e
 document.getElementById('modalHlBtn').addEventListener('click', e=>{ HL_ON=!HL_ON;
   e.currentTarget.classList.toggle('on', HL_ON);
   renderModalList(document.getElementById('modalSearch').value); });
+
+// ── 글마다 드래그 하이라이트(관리자) — 본문에서 원하는 부분을 끌어서 형광펜 표시 ──
+let hlPending=null;
+const hlPop=document.createElement('div'); hlPop.id='hlPop';
+hlPop.innerHTML='<button class="hp-y" data-hlc="y">🟡 형광</button><button class="hp-r" data-hlc="r">🔴 표시</button><button class="hp-x" data-hlx="1">취소</button>';
+document.body.appendChild(hlPop);
+function hideHlPop(){ hlPop.style.display='none'; hlPending=null; }
+document.addEventListener('mouseup', e=>{
+  if(e.target.closest && e.target.closest('#hlPop')) return;
+  if(auth!=='admin') return;
+  const mb=document.getElementById('modalBg'); if(!mb || !mb.classList.contains('open')) return;
+  const sel=window.getSelection(); if(!sel || sel.isCollapsed){ hideHlPop(); return; }
+  const chk=sel.toString().trim(); if(!chk || chk.length<2){ hideHlPop(); return; }
+  const an=sel.anchorNode, fn=sel.focusNode;
+  const ae=an&&(an.nodeType===3?an.parentElement:an), fe=fn&&(fn.nodeType===3?fn.parentElement:fn);
+  const body=ae&&ae.closest&&ae.closest('#modalBody .rec-body'); if(!body){ hideHlPop(); return; }
+  const card=body.closest('.rec[data-id]'); if(!card){ hideHlPop(); return; }
+  if(!(fe&&fe.closest&&fe.closest('.rec[data-id]')===card)){ hideHlPop(); return; }   // 한 글 안에서만
+  hlPending={ id:card.dataset.id, text:sel.toString() };
+  const rect=sel.getRangeAt(0).getBoundingClientRect();
+  hlPop.style.left=Math.max(8, window.scrollX+rect.left)+'px';
+  hlPop.style.top=(window.scrollY+rect.top-46)+'px';
+  hlPop.style.display='flex';
+});
+document.addEventListener('mousedown', e=>{ if(hlPop.style.display==='flex' && !(e.target.closest&&e.target.closest('#hlPop'))) hideHlPop(); });
+hlPop.addEventListener('click', e=>{
+  if(e.target.closest('[data-hlx]')){ hideHlPop(); const s=window.getSelection(); if(s)s.removeAllRanges(); return; }
+  const b=e.target.closest('[data-hlc]'); if(!b||!hlPending) return;
+  const {id,text}=hlPending; const r=RAW.rows.find(z=>z.id===id);
+  if(r){ const hls=Array.isArray(r.hls)?r.hls.slice():[];
+    if(!hls.some(h=>h.t===text)) hls.push({t:text,c:b.dataset.hlc});
+    else hls.forEach(h=>{ if(h.t===text) h.c=b.dataset.hlc; });
+    if(saveRow(id,{hls}) && typeof flushCloudSave==='function') flushCloudSave(); }
+  hideHlPop(); const s=window.getSelection(); if(s)s.removeAllRanges();
+  renderModalList(document.getElementById('modalSearch').value);
+});
+// 하이라이트 클릭 → 해제
+document.getElementById('modalBody').addEventListener('click', e=>{
+  const m=e.target.closest('mark.hl-user'); if(!m || auth!=='admin') return;
+  const card=m.closest('.rec[data-id]'); if(!card) return;
+  const id=card.dataset.id, t=m.textContent; const r=RAW.rows.find(z=>z.id===id); if(!r||!r.hls) return;
+  if(saveRow(id,{hls:r.hls.filter(h=>h.t!==t)}) && typeof flushCloudSave==='function') flushCloudSave();
+  renderModalList(document.getElementById('modalSearch').value); toast('하이라이트를 해제했습니다.');
+});
 
 // 상세 모달 인라인 편집 (관리자) — 편집기 컨트롤은 공용 핸들러 사용
 document.getElementById('modalBody').addEventListener('click', onEditorClick);
