@@ -94,6 +94,24 @@
   .kpis{grid-template-columns:repeat(5,1fr);margin-bottom:16px}
   @media(max-width:920px){.kpis{grid-template-columns:repeat(2,1fr)}}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 20px 18px;position:relative;overflow:hidden;box-shadow:var(--shadow-sm)}
+  /* 조기경보 배너 */
+  .alertbox{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .alert-item{display:flex;align-items:flex-start;gap:10px;border-radius:14px;padding:13px 16px;font-size:13.5px;line-height:1.55;border:1px solid}
+  .alert-item .ai-ic{font-size:17px;line-height:1.3;flex:none}
+  .alert-item.red{background:rgba(224,56,43,.07);border-color:rgba(224,56,43,.30);color:#a32a21}
+  .alert-item.amber{background:rgba(224,125,44,.08);border-color:rgba(224,125,44,.32);color:#9a5316}
+  .alert-item.ok{background:rgba(31,158,99,.07);border-color:rgba(31,158,99,.26);color:#15784a}
+  .alert-item b{font-weight:800}
+  /* 한 줄 브리핑 */
+  .brief{background:linear-gradient(180deg,#fafafa,#f5f5f7);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow-sm)}
+  .brief-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .brief-head .bh-t{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+  .brief-lines{display:flex;flex-direction:column;gap:7px}
+  .brief-line{font-size:13.5px;line-height:1.5;color:var(--ink2)}
+  .brief-line b{color:var(--ink);font-weight:800}
+  .brief-line .pos{color:var(--pos);font-weight:800} .brief-line .neg{color:var(--neg);font-weight:800} .brief-line .amber{color:var(--amber);font-weight:800}
+  .brief-copy{background:var(--card);border:1px solid var(--line2);color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:7px 14px;border-radius:980px;cursor:pointer;white-space:nowrap;transition:.15s}
+  .brief-copy:hover{border-color:var(--amber);color:var(--amber)}
   .kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--amber)}
   .kpi.k-pos::after{background:var(--pos)} .kpi.k-neg::after{background:var(--neg)} .kpi.k-neu::after{background:var(--neu)}
   .kpi .lab{font-size:11.5px;color:var(--ink2);font-weight:600;letter-spacing:.01em}
@@ -708,6 +726,8 @@
 
   <!-- 대시보드 -->
   <div id="dash">
+    <div id="dashAlert"></div>
+    <div id="dashBrief"></div>
     <div class="grid kpis" id="kpis"></div>
 
     <div class="grid cols">
@@ -1397,6 +1417,65 @@ function buildTypeChips(){
 
 // ── 렌더 ──
 let VIEW = { typeFiltered:[], drill:[] };
+// ── 상단: 한 줄 브리핑 + 조기경보 ──
+let _briefPlain='';
+function _activePeriodLabel(){
+  if(state.dateMode==='month' && state.month){ const [y,mo]=state.month.split('-'); return `${y}년 ${+mo}월`; }
+  if(state.dateMode==='range' && (state.from||state.to)) return `${state.from||'처음'} ~ ${state.to||'최근'}`;
+  return '전체 기간';
+}
+function _dayShift(ymd,n){ const d=new Date(ymd+'T00:00:00'); d.setDate(d.getDate()+n);
+  const z=x=>String(x).padStart(2,'0'); return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`; }
+function briefStats(rows){
+  let pos=0,neg=0,neu=0,posts=0,cmts=0;
+  rows.forEach(r=>{ r.isPost?posts++:cmts++; const s=sentOf(r); if(s==='긍정')pos++; else if(s==='부정')neg++; else if(s==='중립')neu++; });
+  const cl=pos+neg+neu; const pr=cl?pos/cl*100:0, nr=cl?neg/cl*100:0;
+  return {total:rows.length,posts,cmts,pos,neg,neu,posRate:pr,negRate:nr,net:pr-nr};
+}
+function renderBrief(rows){
+  const el=document.getElementById('dashBrief'); if(!el) return;
+  const m=briefStats(rows);
+  if(!m.total){ el.innerHTML=''; return; }
+  const stance = m.net>=20?'<span class="pos">매우 우호적</span>':m.net>=5?'<span class="pos">대체로 긍정적</span>':m.net<=-20?'<span class="neg">부정 우위</span>':m.net<=-5?'<span class="neg">다소 부정적</span>':'중립적';
+  const stanceTxt = m.net>=20?'매우 우호적':m.net>=5?'대체로 긍정적':m.net<=-20?'부정 우위':m.net<=-5?'다소 부정적':'중립적';
+  const negByCafe={}; let priceN=0;
+  rows.forEach(r=>{ if(sentOf(r)==='부정') negByCafe[r.cafe]=(negByCafe[r.cafe]||0)+1;
+    const t=(r.title||'')+(r.body||''); if(/가격|견적|얼마|비용|할인|프로모/.test(t)) priceN++; });
+  const negTop=Object.entries(negByCafe).sort((a,b)=>b[1]-a[1])[0];
+  let signal, signalTxt;
+  if(negTop && negTop[1]>=3){ signal=`부정 언급이 ‘<b>${escapeHtml(negTop[0])}</b>’에 집중(<span class="neg">${negTop[1]}건</span>)`; signalTxt=`부정 언급 집중: ${negTop[0]} (${negTop[1]}건)`; }
+  else if(priceN>=3){ signal=`가격·견적 관심 <span class="amber">${priceN}건</span> 감지 — 구매 의향 신호`; signalTxt=`가격·견적 관심 ${priceN}건`; }
+  else { signal='특별히 두드러지는 신호는 없습니다'; signalTxt='특이 신호 없음'; }
+  const period=_activePeriodLabel();
+  const l1=`📌 <b>${escapeHtml(period)}</b> · 누적 <b>${m.total.toLocaleString()}건</b> (게시글 ${m.posts.toLocaleString()} · 댓글 ${m.cmts.toLocaleString()})`;
+  const l2=`🗣 여론 ${stance} — 순감성 <b>${m.net>=0?'+':''}${m.net.toFixed(0)}%p</b> (긍정 ${m.posRate.toFixed(0)}% · 부정 ${m.negRate.toFixed(0)}%)`;
+  const l3=`🔎 ${signal}`;
+  _briefPlain=`[RAYNO 온라인 모니터링 요약]\n· ${period} · 누적 ${m.total.toLocaleString()}건 (게시글 ${m.posts}·댓글 ${m.cmts})\n· 여론 ${stanceTxt} — 순감성 ${m.net>=0?'+':''}${m.net.toFixed(0)}%p (긍정 ${m.posRate.toFixed(0)}% / 부정 ${m.negRate.toFixed(0)}%)\n· ${signalTxt}`;
+  el.innerHTML=`<div class="brief">
+    <div class="brief-head"><span class="bh-t">📋 한 줄 브리핑</span><button class="brief-copy" id="briefCopyBtn">📋 복사</button></div>
+    <div class="brief-lines"><div class="brief-line">${l1}</div><div class="brief-line">${l2}</div><div class="brief-line">${l3}</div></div>
+  </div>`;
+}
+function renderAlerts(){
+  const el=document.getElementById('dashAlert'); if(!el) return;
+  const dated=(RAW.rows||[]).map(r=>({r,d:normDate(r.date)})).filter(x=>x.d);
+  if(dated.length<10){ el.innerHTML=''; return; }
+  let maxD=''; dated.forEach(x=>{ if(x.d>maxD)maxD=x.d; });
+  const recStart=_dayShift(maxD,-6), prevStart=_dayShift(maxD,-13), prevEnd=_dayShift(maxD,-7);
+  const es=r=>r.vSent||r.aiSent;
+  const win=(a,b)=>{ let tot=0,neg=0,byCafe={}; dated.forEach(x=>{ if(x.d>=a&&x.d<=b){ tot++; if(es(x.r)==='부정'){ neg++; byCafe[x.r.cafe]=(byCafe[x.r.cafe]||0)+1; } } }); return {tot,neg,negRate:tot?neg/tot*100:0,byCafe}; };
+  const rec=win(recStart,maxD), prev=win(prevStart,prevEnd);
+  const A=[];
+  if(rec.neg>=3 && (rec.negRate-prev.negRate)>=10)
+    A.push(['red','⚠',`최근 7일 <b>부정률 ${rec.negRate.toFixed(0)}%</b> — 직전 7일 대비 <b>+${(rec.negRate-prev.negRate).toFixed(0)}%p</b> 상승. 부정 글을 확인하고 원인을 점검하세요.`]);
+  if(prev.tot>=5 && rec.tot>=prev.tot*1.5 && (rec.tot-prev.tot)>=10)
+    A.push(['amber','📈',`최근 7일 언급량 <b>${rec.tot.toLocaleString()}건</b> — 직전 대비 <b>+${Math.round((rec.tot/prev.tot-1)*100)}%</b> 급증. 이슈 확산 여부를 확인하세요.`]);
+  const negTop=Object.entries(rec.byCafe).sort((a,b)=>b[1]-a[1])[0];
+  if(negTop && negTop[1]>=3 && rec.neg>0 && (negTop[1]/rec.neg)>=0.4)
+    A.push(['red','📍',`최근 부정 언급이 ‘<b>${escapeHtml(negTop[0])}</b>’에 집중(<b>${negTop[1]}건</b>). 해당 카페를 우선 대응하세요.`]);
+  if(!A.length){ el.innerHTML=`<div class="alertbox"><div class="alert-item ok"><span class="ai-ic">✅</span><div>최근 7일간 특이 징후가 없습니다. <span style="opacity:.7">(기준일 ${maxD})</span></div></div></div>`; return; }
+  el.innerHTML=`<div class="alertbox">`+A.map(a=>`<div class="alert-item ${a[0]}"><span class="ai-ic">${a[1]}</span><div>${a[2]}</div></div>`).join('')+`</div>`;
+}
 function render(){
   if(!RAW) return;
   // 1) 범위(게시글/댓글) 필터
@@ -1431,6 +1510,8 @@ function render(){
   VIEW = { typeFiltered, drill };
 
   renderVeriNote();
+  renderAlerts();
+  renderBrief(typeFiltered);
   renderFilterStatus(typeFiltered.length, drill.length);
   renderKPIs(typeFiltered);            // 카드 = 유형필터 적용된 전체 감성 분포 (클릭 토글)
   renderSentiment(typeFiltered);       // 도넛 = 전체 감성 분포 유지
@@ -1927,6 +2008,12 @@ function refreshModalAfterEdit(){
   renderModalList(document.getElementById('modalSearch').value);
 }
 
+document.addEventListener('click', e=>{ if(!e.target.closest('#briefCopyBtn')) return;
+  const txt=_briefPlain||'';
+  const done=()=>toast('요약을 복사했습니다.');
+  const fb=()=>{ try{ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }catch(_){ toast('복사에 실패했습니다.',true); } };
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done, fb); } else fb();
+});
 document.getElementById('modalClose').addEventListener('click', closeDetail);
 document.getElementById('modalBg').addEventListener('click', e=>{ if(e.target.id==='modalBg') closeDetail(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDetail(); });
