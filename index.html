@@ -94,7 +94,18 @@
   .kpis{grid-template-columns:repeat(5,1fr);margin-bottom:16px}
   @media(max-width:920px){.kpis{grid-template-columns:repeat(2,1fr)}}
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 20px 18px;position:relative;overflow:hidden;box-shadow:var(--shadow-sm)}
-  /* 조기경보 배너 */
+  /* 자동 수집 진행률 배너 */
+  .crawl{border:1px solid var(--line);border-radius:var(--r);padding:15px 18px;margin-bottom:16px;background:linear-gradient(180deg,#fafafa,#f5f5f7);box-shadow:var(--shadow-sm)}
+  .crawl.run{border-color:rgba(0,113,227,.35);background:rgba(0,113,227,.05)}
+  .crawl.err{border-color:rgba(224,56,43,.35);background:rgba(224,56,43,.05)}
+  .crawl-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+  .crawl-t{font-size:13px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:8px}
+  .crawl-pct{font-size:13px;font-weight:800;color:var(--neu);font-variant-numeric:tabular-nums}
+  .crawl-track{height:9px;border-radius:980px;background:var(--line);overflow:hidden}
+  .crawl-fill{height:100%;border-radius:980px;background:linear-gradient(90deg,#0071e3,#42a5ff);width:0%;transition:width .6s ease}
+  .crawl-msg{font-size:12px;color:var(--ink2);margin-top:8px}
+  .crawl-spin{width:13px;height:13px;border:2px solid rgba(0,113,227,.3);border-top-color:var(--neu);border-radius:50%;display:inline-block;animation:crawlspin .8s linear infinite}
+  @keyframes crawlspin{to{transform:rotate(360deg)}}
   .alertbox{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
   .alert-item{display:flex;align-items:flex-start;gap:10px;border-radius:14px;padding:13px 16px;font-size:13.5px;line-height:1.55;border:1px solid}
   .alert-item .ai-ic{font-size:17px;line-height:1.3;flex:none}
@@ -726,6 +737,7 @@
 
   <!-- 대시보드 -->
   <div id="dash">
+    <div id="crawlBar"></div>
     <div id="dashAlert"></div>
     <div id="dashBrief"></div>
     <div class="grid kpis" id="kpis"></div>
@@ -1007,6 +1019,7 @@ const SUPA = {
   dataFile: 'data.json',
   bizFile:  'biz.json',
   warrFile: 'warranty.json',
+  statusFile: 'crawl_status.json',
 };
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
@@ -4104,6 +4117,48 @@ function applyConfigAndSettings(){
 }
 
 // ── 페이지 로드: 클라우드에서 데이터 불러오기 + 로그인 상태 확인 ──
+// ── 자동 수집 진행률: crawl_status.json 폴링 → % 바 표시 + 완료 시 자동 갱신 ──
+let _crawlPollTimer=null, _crawlInit=false, _crawlRefreshedAt='';
+async function fetchCrawlStatus(){
+  if(typeof fetch!=='function') return null;
+  try{
+    const url=`${SUPA.url}/storage/v1/object/public/${SUPA.bucket}/${SUPA.statusFile}?cb=${Date.now()}`;
+    const r=await fetch(url); if(!r.ok) return null; return await r.json();
+  }catch(e){ return null; }
+}
+function renderCrawlBar(s){
+  const el=document.getElementById('crawlBar'); if(!el) return;
+  if(!s || !s.state || s.state==='idle'){ el.innerHTML=''; return; }
+  const pct=Math.max(0,Math.min(100,Math.round(s.pct||0)));
+  if(s.state==='running'){
+    el.innerHTML=`<div class="crawl run">
+      <div class="crawl-top"><span class="crawl-t"><span class="crawl-spin"></span> 자동 수집 진행 중</span><span class="crawl-pct">${pct}%</span></div>
+      <div class="crawl-track"><div class="crawl-fill" style="width:${pct}%"></div></div>
+      <div class="crawl-msg">${escapeHtml(s.message||'')}</div></div>`;
+  }else if(s.state==='error'){
+    el.innerHTML=`<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 자동 수집 오류</span></div><div class="crawl-msg">${escapeHtml(s.message||'다시 시도해 주세요.')}</div></div>`;
+  }else if(s.state==='done'){
+    const t=s.at?new Date(s.at).toLocaleString('ko-KR'):'';
+    el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">✅ 자동 수집 완료</span><span class="crawl-pct" style="color:var(--pos)">100%</span></div>
+      <div class="crawl-msg">${escapeHtml(t)} · 신규 ${(s.added||0).toLocaleString()}건 · 누적 ${(s.total||0).toLocaleString()}건</div></div>`;
+  }
+}
+async function pollCrawlStatus(){
+  const s=await fetchCrawlStatus();
+  renderCrawlBar(s);
+  if(s && s.state==='done' && s.at){
+    if(!_crawlInit){ _crawlRefreshedAt=s.at; }              // 부팅 시 이미 완료된 건 무시
+    else if(s.at!==_crawlRefreshedAt){ _crawlRefreshedAt=s.at;   // 새 완료 → 데이터 자동 갱신
+      await cloudLoadData(); rebuildRAW();
+      if(state.view==='dash'){ buildTypeChips(); render(); } else dashStale=true;
+      if(typeof refreshVerify==='function') refreshVerify();
+      toast('자동 수집 완료 — 최신 데이터로 갱신했습니다.');
+    }
+  }
+  _crawlInit=true;
+  const next=(s && s.state==='running')?2500:8000;
+  clearTimeout(_crawlPollTimer); _crawlPollTimer=setTimeout(pollCrawlStatus, next);
+}
 async function boot(){
   applyConfigAndSettings();
   // 보안: 이전에 브라우저에 저장돼 자동 로그인되던 세션 토큰을 정리 → 새 접속 시 항상 재로그인
@@ -4129,6 +4184,7 @@ async function boot(){
   }
   // 4) 화면 구성
   enterApp();
+  pollCrawlStatus();   // 자동 수집 진행률 폴링 시작
   const n = (STORE.rows||[]).length;
   if(n) setTimeout(()=>toast(`데이터 ${n.toLocaleString()}건 불러옴${auth==='admin'?' · 관리자 모드':''}`), 400);
 
