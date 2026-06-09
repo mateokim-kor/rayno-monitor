@@ -109,6 +109,9 @@
   .crawl-btn{border:0;border-radius:980px;font-family:var(--font);font-size:12.5px;font-weight:800;padding:8px 18px;cursor:pointer;white-space:nowrap;transition:.15s}
   .crawl-btn.start{background:var(--neu);color:#fff} .crawl-btn.start:hover{background:#0062c4}
   .crawl-btn.auth{background:var(--pos);color:#fff} .crawl-btn.auth:hover{filter:brightness(.95)}
+  .crawl-ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .crawl-days,.crawl-date{background:var(--card);border:1px solid var(--line2);color:var(--ink);font-family:var(--font);font-size:12.5px;font-weight:700;padding:7px 11px;border-radius:980px;outline:none;cursor:pointer}
+  .crawl-date{font-weight:600;cursor:auto}
   .alertbox{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
   .alert-item{display:flex;align-items:flex-start;gap:10px;border-radius:14px;padding:13px 16px;font-size:13.5px;line-height:1.55;border:1px solid}
   .alert-item .ai-ic{font-size:17px;line-height:1.3;flex:none}
@@ -1381,7 +1384,11 @@ function canonicalize(rows){
   byKey.forEach((c,key)=>{ const newId=hashId(key);
     (c.__ids||[]).forEach(oid=>{ if(oid!=null) idMap[oid]=newId; });
     delete c.__ids; c.id=newId; out.push(c); });
-  return { rows:out, idMap, merged };
+  // (A) 같은 게시글(같은 링크)에 내용이 채워진 행이 있으면, 빈 본문 행 제거 (검증된 건 보존)
+  const filledLink=new Set();
+  out.forEach(r=>{ if(r.isPost && r.link && (r.body||'').trim()) filledLink.add(r.link); });
+  const cleaned=out.filter(r=> !(r.isPost && r.link && !(r.body||'').trim() && filledLink.has(r.link) && !isVerified(r)) );
+  return { rows:cleaned, idMap, merged, removedEmpty: out.length-cleaned.length };
 }
 function remapRep(idMap){
   STORE.config=STORE.config||{};
@@ -3023,7 +3030,7 @@ async function optimizeAll(){
   let rows=c.rows.filter(r=> (r.cafe||r.title||r.body) );             // 완전 빈 행 제거
   remapRep(c.idMap);                                                  // 대표글 ID 갱신
   res.cafeAfter=rows.length; res.cafeRemoved=res.cafeBefore-rows.length;
-  store.rows=rows; store.config=store.config||{}; store.config.canon=2;
+  store.rows=rows; store.config=store.config||{}; store.config.canon=3;
   // 2) 내부 캐시 재계산
   _typeUnionCache=null; if(_ndCache&&_ndCache.clear) _ndCache.clear();
   saveStore(store); rebuildRAW();
@@ -4127,6 +4134,7 @@ function applyConfigAndSettings(){
 // ── 페이지 로드: 클라우드에서 데이터 불러오기 + 로그인 상태 확인 ──
 // ── 자동 수집 진행률: crawl_status.json 폴링 → % 바 표시 + 완료 시 자동 갱신 ──
 let _crawlPollTimer=null, _crawlInit=false, _crawlRefreshedAt='', _crawlReqAt=0;
+let _lastCrawlStatus=null, _crawlPeriodSel='3', _crawlFrom='', _crawlTo='';
 async function fetchCrawlStatus(){
   if(typeof fetch!=='function') return null;
   try{
@@ -4136,10 +4144,11 @@ async function fetchCrawlStatus(){
 }
 function renderCrawlBar(s){
   const el=document.getElementById('crawlBar'); if(!el) return;
+  _lastCrawlStatus=s||null;
   const isAdmin=(auth==='admin');
   const st=(s&&s.state)?s.state:'idle';
   const pct=s?Math.max(0,Math.min(100,Math.round(s.pct||0))):0;
-  const startBtn=isAdmin?`<button class="crawl-btn start" id="crawlStartBtn">🔄 크롤링 시작</button>`:'';
+  const ctl=crawlControls();
   if(st==='running'){
     el.innerHTML=`<div class="crawl run">
       <div class="crawl-top"><span class="crawl-t"><span class="crawl-spin"></span> 자동 수집 진행 중</span><span class="crawl-pct">${pct}%</span></div>
@@ -4151,22 +4160,43 @@ function renderCrawlBar(s){
       <div class="crawl-msg">${escapeHtml(s.message||'크롬 창에서 네이버 로그인/인증을 완료한 뒤 아래 버튼을 누르세요.')}</div>
       ${isAdmin?`<div style="margin-top:11px"><button class="crawl-btn auth" id="crawlAuthBtn">✅ 인증 완료</button></div>`:''}</div>`;
   }else if(st==='error'){
-    el.innerHTML=`<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 자동 수집 오류</span>${startBtn}</div><div class="crawl-msg">${escapeHtml(s.message||'다시 시도해 주세요.')}</div></div>`;
+    el.innerHTML=`<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 자동 수집 오류</span>${ctl}</div><div class="crawl-msg">${escapeHtml(s.message||'다시 시도해 주세요.')}</div></div>`;
   }else if(st==='done'){
     const t=s.at?new Date(s.at).toLocaleString('ko-KR'):'';
-    el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">✅ 자동 수집 완료</span>${startBtn}</div>
+    el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">✅ 자동 수집 완료</span>${ctl}</div>
       <div class="crawl-msg">${escapeHtml(t)} · 신규 ${(s.added||0).toLocaleString()}건 · 누적 ${(s.total||0).toLocaleString()}건</div></div>`;
   }else{
-    if(isAdmin) el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">🛰 자동 수집</span>${startBtn}</div><div class="crawl-msg">버튼을 누르면 PC의 크롤러가 실행됩니다. 네이버 인증이 필요하면 여기에 [인증 완료] 버튼이 나타납니다.</div></div>`;
+    if(isAdmin) el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">🛰 자동 수집</span>${ctl}</div><div class="crawl-msg">기간을 고른 뒤 [크롤링 시작]을 누르면 PC의 크롤러가 실행됩니다. 네이버 인증이 필요하면 [인증 완료] 버튼이 나타납니다.</div></div>`;
     else el.innerHTML='';
   }
 }
+function crawlControls(){
+  if(auth!=='admin') return '';
+  const opt=(v,l)=>`<option value="${v}" ${_crawlPeriodSel===v?'selected':''}>${l}</option>`;
+  const custom=(_crawlPeriodSel==='custom')
+    ? `<input type="date" class="crawl-date" id="crawlFrom" value="${_crawlFrom}"><span style="color:var(--ink3)">~</span><input type="date" class="crawl-date" id="crawlTo" value="${_crawlTo}">`
+    : '';
+  return `<div class="crawl-ctl">
+    <select id="crawlDays" class="crawl-days">${opt('1','최근 1일')}${opt('3','최근 3일')}${opt('7','최근 7일')}${opt('14','최근 14일')}${opt('30','최근 30일')}${opt('custom','직접 지정')}</select>
+    ${custom}
+    <button class="crawl-btn start" id="crawlStartBtn">🔄 크롤링 시작</button>
+  </div>`;
+}
 async function startCrawl(){
   if(auth!=='admin'){ toast('관리자만 실행할 수 있습니다.',true); return; }
+  const cmd={action:'start', nonce:Date.now(), at:new Date().toISOString()};
+  let label='';
+  if(_crawlPeriodSel==='custom'){
+    const f=(document.getElementById('crawlFrom')||{}).value||_crawlFrom;
+    const t=(document.getElementById('crawlTo')||{}).value||_crawlTo;
+    _crawlFrom=f; _crawlTo=t;
+    if(f) cmd.from=f; if(t) cmd.to=t; if(!f&&!t) cmd.days=3;
+    label=`${f||'처음'} ~ ${t||'최근'}`;
+  }else{ cmd.days=parseInt(_crawlPeriodSel,10)||3; label=`최근 ${cmd.days}일`; }
   _crawlReqAt=Date.now();
-  renderCrawlBar({state:'running',pct:1,message:'크롤링 요청됨 — PC에서 시작 대기 중…'});
-  const ok=await cloudSaveJSON(SUPA.commandFile,{action:'start',nonce:Date.now(),at:new Date().toISOString()});
-  if(ok) toast('크롤링을 요청했습니다. PC 워처가 곧 시작합니다.'); else _crawlReqAt=0;
+  renderCrawlBar({state:'running',pct:1,message:`크롤링 요청됨 (${label}) — PC에서 시작 대기 중…`});
+  const ok=await cloudSaveJSON(SUPA.commandFile, cmd);
+  if(ok) toast(`크롤링을 요청했습니다 (${label}).`); else _crawlReqAt=0;
 }
 async function confirmAuthDone(){
   if(auth!=='admin') return;
@@ -4178,6 +4208,11 @@ async function confirmAuthDone(){
 document.addEventListener('click', e=>{
   if(e.target.closest('#crawlStartBtn')) startCrawl();
   else if(e.target.closest('#crawlAuthBtn')) confirmAuthDone();
+});
+document.addEventListener('change', e=>{
+  if(e.target.id==='crawlDays'){ _crawlPeriodSel=e.target.value; renderCrawlBar(_lastCrawlStatus); }
+  else if(e.target.id==='crawlFrom'){ _crawlFrom=e.target.value; }
+  else if(e.target.id==='crawlTo'){ _crawlTo=e.target.value; }
 });
 async function pollCrawlStatus(){
   const s=await fetchCrawlStatus();
@@ -4214,9 +4249,9 @@ async function boot(){
   applyConfigAndSettings();   // 저장된 표시 문구/탭 이름을 로드 후 모든 방문자에게 적용
   // 2.5) 중복 정리 마이그레이션 — 날짜만 다른 동일 글 합치기 (기존 데이터 1회 정리)
   STORE.config = STORE.config || {};
-  if(STORE.config.canon!==2 && STORE.rows && STORE.rows.length){
+  if(STORE.config.canon!==3 && STORE.rows && STORE.rows.length){
     const c=canonicalize(STORE.rows);
-    STORE.rows=c.rows; remapRep(c.idMap); STORE.config.canon=2;
+    STORE.rows=c.rows; remapRep(c.idMap); STORE.config.canon=3;
     if(auth==='admin'){ saveStore(STORE); if(c.merged>0) flushCloudSave(); }   // 관리자면 클라우드에 정리본 반영(전원 공유)
   }
   // 3) (관리자 첫 사용) 클라우드가 비어있고 예전 localStorage 데이터가 있으면 한번 올려줌
