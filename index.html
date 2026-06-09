@@ -180,8 +180,8 @@
   .tagm.typ{background:var(--bg);border:1px solid var(--line2);color:var(--ink)}
   .rec-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;letter-spacing:-.01em}
   .rec-parent{font-size:11.5px;color:var(--ink3);margin-bottom:7px;background:var(--bg2);border:1px solid var(--line);border-radius:7px;padding:4px 9px;display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  mark.hl-pos{background:rgba(31,158,99,.16);color:#15784a;border-radius:4px;padding:0 2px;font-weight:600}
-  mark.hl-neg{background:rgba(224,56,43,.15);color:#b3271e;border-radius:4px;padding:0 2px;font-weight:600}
+  mark.hl-pos{background:linear-gradient(180deg,transparent 6%,#fff04d 6%,#ffe14d 90%,transparent 90%);color:#3d3000;border-radius:3px;padding:0 2px;font-weight:700;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.hl-neg{background:linear-gradient(180deg,transparent 6%,#ffb3b0 6%,#ff9a96 90%,transparent 90%);color:#5e1411;border-radius:3px;padding:0 2px;font-weight:700;box-decoration-break:clone;-webkit-box-decoration-break:clone}
   .modal-hl{background:var(--bg2);border:1px solid var(--line2);color:var(--ink3);font-family:var(--font);font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:980px;cursor:pointer;white-space:nowrap;transition:.15s}
   .modal-hl.on{background:rgba(31,158,99,.12);border-color:var(--pos);color:#15784a}
   .rec-body{font-size:13px;line-height:1.7;color:var(--ink2);white-space:pre-wrap;word-break:break-word}
@@ -1845,16 +1845,19 @@ function renderModalList(q){
 const POS_LEX=['만족','좋아요','좋아','좋은','좋네','좋고','추천','선명','시원','단열','잘 됐','잘됐','깔끔','최고','대만족','마음에','후회 없','효과','가성비','친절','빠르','꼼꼼','튼튼','예쁘','이쁘','편하','시야 ','확실','강추','굿','감사','잘 보','잘보'];
 const NEG_LEX=['불만','별로','하자','기포','들뜸','들뜬','박리','벗겨','변색','버블','환불','실망','비싸','어둡','후회','짜증','불친절','늦','지연','거품','벗겨짐','떨어','갈라','문제','클레임','as','AS','재시공','반품','과하','과한','심하','최악','엉망','불량'];
 let _hlRe=null,_hlMap=null;
+function effHlPos(){ const c=STORE&&STORE.config&&STORE.config.hlPos; return (Array.isArray(c)&&c.length)?c:POS_LEX; }
+function effHlNeg(){ const c=STORE&&STORE.config&&STORE.config.hlNeg; return (Array.isArray(c)&&c.length)?c:NEG_LEX; }
 function _hlInit(){ _hlMap={}; const all=[];
-  POS_LEX.forEach(w=>{const k=w.trim(); if(k){all.push(k); _hlMap[k.toLowerCase()]='pos';}});
-  NEG_LEX.forEach(w=>{const k=w.trim(); if(k){all.push(k); _hlMap[k.toLowerCase()]='neg';}});
+  effHlPos().forEach(w=>{const k=String(w).trim(); if(k){all.push(k); _hlMap[k.toLowerCase()]='pos';}});
+  effHlNeg().forEach(w=>{const k=String(w).trim(); if(k){all.push(k); _hlMap[k.toLowerCase()]='neg';}});
   all.sort((a,b)=>b.length-a.length);
   const esc=all.map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'));
-  _hlRe=new RegExp(esc.join('|'),'gi');
+  _hlRe= all.length ? new RegExp(esc.join('|'),'gi') : null;
 }
 function highlightSentiment(escapedText){
   if(!escapedText) return escapedText;
   if(!_hlRe) _hlInit();
+  if(!_hlRe) return escapedText;
   return escapedText.replace(_hlRe, m=>`<mark class="hl-${_hlMap[m.toLowerCase()]||'pos'}">${m}</mark>`);
 }
 function recCard(r){
@@ -1953,7 +1956,8 @@ const TEXT_KEYS=['headerTitle','headerSub','docTitle','footer1','footer2',
   'tabWarranty','tabWarrReport','tabSearch','tabRevenue',
   'raynoLockTitle','raynoLockSub','emptyTitle','emptySub','reportTitle','reportSub'];
 function setDraftInit(){
-  setDraft={ ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice() };
+  setDraft={ ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice(),
+    hlPos:effHlPos().slice(), hlNeg:effHlNeg().slice() };
   TEXT_KEYS.forEach(k=>setDraft[k]=effText(k));
 }
 function setDirty(){
@@ -1961,8 +1965,9 @@ function setDirty(){
   const norm=o=>JSON.stringify({
     txt:TEXT_KEYS.map(k=>String(o[k]==null?'':o[k]).trim()),
     b:(o.ownBrand||'').trim(),
-    c:(o.competitors||[]).map(x=>x.trim()).filter(Boolean),t:(o.postTypes||[]).map(x=>x.trim()).filter(Boolean)});
-  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes()};
+    c:(o.competitors||[]).map(x=>x.trim()).filter(Boolean),t:(o.postTypes||[]).map(x=>x.trim()).filter(Boolean),
+    hp:(o.hlPos||[]).map(x=>x.trim()).filter(Boolean),hn:(o.hlNeg||[]).map(x=>x.trim()).filter(Boolean)});
+  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes(),hlPos:effHlPos(),hlNeg:effHlNeg()};
   TEXT_KEYS.forEach(k=>cur[k]=effText(k));
   return norm(setDraft)!==norm(cur);
 }
@@ -2050,6 +2055,16 @@ function renderSettings(){
      <div class="set-list">${chipRow('type',setDraft.postTypes)}</div>
      <div class="set-add"><input id="typeNew" placeholder="유형 추가 (예: 배송문의)"><button class="viewbtn" data-add="type">＋ 추가</button></div>
    </div>
+   <div class="card set-card">
+     <h3><span class="dot"></span>감성 하이라이트 단어</h3>
+     <div class="cap">상세 보기에서 본문에 색칠되는 표현입니다. <b>긍정</b>은 노란 형광펜, <b>부정</b>은 빨간 형광펜으로 표시됩니다. 도메인에 맞는 표현을 자유롭게 추가/삭제하세요.</div>
+     <div class="set-sub">긍정 표현</div>
+     <div class="set-list">${chipRow('hlpos',setDraft.hlPos)}</div>
+     <div class="set-add"><input id="hlPosNew" placeholder="긍정 표현 추가 (예: 만족, 선명)"><button class="viewbtn" data-add="hlpos">＋ 추가</button></div>
+     <div class="set-sub">부정 표현</div>
+     <div class="set-list">${chipRow('hlneg',setDraft.hlNeg)}</div>
+     <div class="set-add"><input id="hlNegNew" placeholder="부정 표현 추가 (예: 기포, 변색)"><button class="viewbtn" data-add="hlneg">＋ 추가</button></div>
+   </div>
    <div class="set-savebar">
      <button id="setSaveAll" class="vc-save" ${dirty?'':'disabled'}>설정 저장</button>
      <button id="setResetAll" class="vc-revert">되돌리기</button>
@@ -2069,14 +2084,16 @@ function saveAllSettings(){
   if(auth!=='admin'){ toast('관리자만 저장할 수 있습니다.',true); return; }
   const comps=[...new Set(setDraft.competitors.map(s=>s.trim()).filter(Boolean))];
   const types=[...new Set(setDraft.postTypes.map(s=>s.trim()).filter(Boolean))];
+  const hlPos=[...new Set(setDraft.hlPos.map(s=>s.trim()).filter(Boolean))];
+  const hlNeg=[...new Set(setDraft.hlNeg.map(s=>s.trim()).filter(Boolean))];
   if(!types.length){ toast('게시글 유형은 최소 1개가 필요합니다.',true); return; }
   const textObj={...((STORE.config&&STORE.config.text)||{})};
   TEXT_KEYS.forEach(k=>{ const v=(setDraft[k]||'').trim(); textObj[k]= v || CONFIG.text[k]; });
   STORE.config = {...(STORE.config||{}),
-    text:textObj,
+    text:textObj, hlPos, hlNeg,
     ownBrand:(setDraft.ownBrand.trim()||CONFIG.ownBrand), competitors:comps, postTypes:types };
   saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave();   // 설정은 즉시 반영(디바운스 대기 X)
-  _typeUnionCache=null; setDraft=null;
+  _typeUnionCache=null; _hlRe=null; setDraft=null;
   applyConfigAndSettings(); renderSettings(); toast('설정을 저장했습니다 · 모든 사용자에게 적용됩니다');
 }
 function removeUploadBatch(bid){
@@ -2087,17 +2104,19 @@ function removeUploadBatch(bid){
   return before-store.rows.length;
 }
 let _replaceBatch=null;
+const GRP_MAP={comp:'competitors',type:'postTypes',hlpos:'hlPos',hlneg:'hlNeg'};
+const ADD_INPUT={comp:'compNew',type:'typeNew',hlpos:'hlPosNew',hlneg:'hlNegNew'};
 document.getElementById('settings').addEventListener('input', e=>{
   const t=e.target;
   if(t.classList.contains('set-text')){ setDraft[t.dataset.k]=t.value; updateSaveBar(); }
-  else if(t.classList.contains('set-input')){ const grp=t.dataset.grp==='comp'?'competitors':'postTypes'; setDraft[grp][+t.dataset.i]=t.value; updateSaveBar(); }
+  else if(t.classList.contains('set-input')){ const grp=GRP_MAP[t.dataset.grp]; if(grp){ setDraft[grp][+t.dataset.i]=t.value; updateSaveBar(); } }
 });
 document.getElementById('settings').addEventListener('click', e=>{
   const del=e.target.closest('.set-del');
-  if(del){ const grp=del.dataset.grp==='comp'?'competitors':'postTypes'; setDraft[grp].splice(+del.dataset.i,1); renderSettings(); return; }
+  if(del){ const grp=GRP_MAP[del.dataset.grp]; if(grp){ setDraft[grp].splice(+del.dataset.i,1); renderSettings(); } return; }
   const add=e.target.closest('[data-add]');
-  if(add){ const which=add.dataset.add; const inp=document.getElementById(which==='comp'?'compNew':'typeNew'); const v=(inp.value||'').trim();
-    const grp=which==='comp'?'competitors':'postTypes'; if(v && !setDraft[grp].includes(v)) setDraft[grp].push(v); renderSettings(); return; }
+  if(add){ const which=add.dataset.add; const grp=GRP_MAP[which]; const inp=document.getElementById(ADD_INPUT[which]);
+    if(grp&&inp){ const v=(inp.value||'').trim(); if(v && !setDraft[grp].includes(v)) setDraft[grp].push(v); renderSettings(); } return; }
   if(e.target.id==='setSaveAll'){ saveAllSettings(); return; }
   if(e.target.id==='setResetAll'){ setDraft=null; renderSettings(); return; }
   const dlb=e.target.closest('.up-dl');
@@ -2111,6 +2130,8 @@ document.getElementById('settings').addEventListener('click', e=>{
 document.getElementById('settings').addEventListener('keydown', e=>{
   if(e.target.id==='compNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="comp"]').click(); }
   if(e.target.id==='typeNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="type"]').click(); }
+  if(e.target.id==='hlPosNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="hlpos"]').click(); }
+  if(e.target.id==='hlNegNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="hlneg"]').click(); }
 });
 
 // ════════════════════════════════════════════════════
