@@ -1112,12 +1112,18 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-10 · 범례흰색';   // 배포 버전 확인용
+const BUILD = '2026-06-10 · 관리자계정';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
 
 let auth = 'viewer';               // 'viewer'(비로그인) | 'admin'(로그인)
+let _adminEmail = '';              // 현재 로그인한 관리자 이메일 (계정 관리용)
+function _isMaster(){
+  const me=(_adminEmail||'').toLowerCase();
+  const mm=((STORE.config&&STORE.config.masterEmail)||'').toLowerCase();
+  return auth==='admin' && (!mm || me===mm);   // 마스터 미지정 시 현재 관리자가 마스터
+}
 let lockMode = 'login';
 let RAW = null;          // {rows:[...], meta:{}}
 let charts = {};
@@ -2379,6 +2385,20 @@ function renderSettings(){
      <div class="set-add"><input id="autoKwNew" placeholder="예: 카스페이스 본사 [구로점]입니다"><button class="viewbtn" data-add="autokw">＋ 추가</button></div>
      <div class="set-add" style="margin-top:6px"><button id="setApplyKw" class="viewbtn" style="background:var(--neu);color:#fff">🧹 지금 적용 (미검증 글에서 정리)</button></div>
    </div>
+   <div class="card set-card">
+     <h3><span class="dot"></span>관리자 계정</h3>
+     ${ _isMaster() ? `
+     <div class="cap">관리자 계정은 모두 <b>동일한 권한</b>입니다(업로드·검증·설정 변경). 현재 로그인: <b>${escapeHtml(_adminEmail||'-')}</b> <span style="color:var(--amber);font-weight:800">· 마스터</span><br>아래에 이메일·비밀번호를 넣으면 <b>나와 동일한 관리자 계정</b>이 만들어집니다. 만든 사람은 같은 로그인 화면에서 그 이메일/비밀번호로 로그인하면 관리자로 동작해요.</div>
+     <div class="set-grid">
+       <label class="set-field"><span>새 관리자 이메일</span><input class="set-input" id="newAdminEmail" type="email" placeholder="coworker@example.com" autocomplete="off"></label>
+       <label class="set-field"><span>비밀번호 (6자 이상)</span><input class="set-input" id="newAdminPw" type="password" placeholder="비밀번호" autocomplete="new-password"></label>
+     </div>
+     <div class="set-add" style="margin-top:10px"><button class="viewbtn" id="addAdminBtn">＋ 관리자 계정 만들기</button> <span id="addAdminMsg" style="font-size:12px;margin-left:10px"></span></div>
+     <div class="cap" style="margin-top:12px;color:var(--ink3)">※ 보안 안내 — 기존 계정 <b>목록 조회·삭제</b>는 이 화면에서 불가합니다(Supabase 관리 콘솔에서 관리). 또 Supabase에서 <b>이메일 확인</b>이 켜져 있으면, 새 계정은 받은 메일의 확인 링크를 눌러야 로그인됩니다.</div>
+     ` : `
+     <div class="cap">관리자 계정 추가는 <b>마스터 계정</b>에서만 할 수 있습니다. (현재 로그인: ${escapeHtml(_adminEmail||'-')})</div>
+     ` }
+   </div>
    <div class="set-savebar">
      <button id="setSaveAll" class="vc-save" ${dirty?'':'disabled'}>설정 저장</button>
      <button id="setResetAll" class="vc-revert">되돌리기</button>
@@ -2435,6 +2455,7 @@ document.getElementById('settings').addEventListener('click', e=>{
     if(grp&&inp){ const v=(inp.value||'').trim(); if(v && !setDraft[grp].includes(v)) setDraft[grp].push(v); renderSettings(); } return; }
   if(e.target.id==='setSaveAll'){ saveAllSettings(); return; }
   if(e.target.id==='setApplyKw'){ runAutoKeywords(); return; }
+  if(e.target.id==='addAdminBtn'){ addAdminAccount(); return; }
   if(e.target.id==='setResetAll'){ setDraft=null; renderSettings(); return; }
   const dlb=e.target.closest('.up-dl');
   if(dlb){ const u=((STORE.config&&STORE.config.uploads)||[]).find(x=>x.id===dlb.dataset.bid); downloadUpload(u); return; }
@@ -3460,6 +3481,33 @@ function showLock(){
 }
 function hideLock(){ document.getElementById('lockScreen').classList.remove('open'); }
 
+async function addAdminAccount(){
+  const msg=document.getElementById('addAdminMsg');
+  const setMsg=(t,ok)=>{ if(msg){ msg.style.color= ok?'var(--pos)':'var(--neg)'; msg.textContent=t; } };
+  if(!_isMaster()){ setMsg('마스터 계정만 추가할 수 있습니다.',false); return; }
+  if(!SB){ setMsg('서버 연결이 준비되지 않았습니다.',false); return; }
+  const em=(document.getElementById('newAdminEmail').value||'').trim();
+  const pw=(document.getElementById('newAdminPw').value||'');
+  if(!em || !pw){ setMsg('이메일과 비밀번호를 모두 입력하세요.',false); return; }
+  if(pw.length<6){ setMsg('비밀번호는 6자 이상이어야 합니다.',false); return; }
+  const btn=document.getElementById('addAdminBtn'); if(btn){ btn.disabled=true; btn.textContent='생성 중…'; }
+  setMsg('생성 중…',true);
+  // 현재(마스터) 세션 백업 — signUp이 새 계정으로 세션을 바꾸므로 끝나고 복구
+  let sess=null; try{ const s=await SB.auth.getSession(); sess=s.data&&s.data.session; }catch(e){}
+  let err=null;
+  try{ const r=await SB.auth.signUp({ email:em, password:pw }); err=r.error; }
+  catch(e){ err=e; }
+  // 마스터 세션 복구
+  if(sess){ try{ await SB.auth.setSession({ access_token:sess.access_token, refresh_token:sess.refresh_token }); }catch(e){} }
+  if(btn){ btn.disabled=false; btn.textContent='＋ 관리자 계정 만들기'; }
+  if(err){ setMsg('실패: '+(err.message||err),false); return; }
+  // 마스터 이메일 확정·저장 (최초 1회)
+  if(STORE.config && !STORE.config.masterEmail){ STORE.config.masterEmail=_adminEmail; try{ saveStore(); }catch(e){} }
+  setMsg('✅ 생성됨: '+em+' · 이메일 확인이 필요할 수 있어요',true);
+  const e1=document.getElementById('newAdminEmail'), e2=document.getElementById('newAdminPw');
+  if(e1) e1.value=''; if(e2) e2.value='';
+  toast('관리자 계정을 만들었습니다: '+em);
+}
 async function submitLock(){
   if(!SB){ lockErr('서버 연결이 준비되지 않았습니다. 새로고침 후 다시 시도하세요.'); return; }
   const email=document.getElementById('lockEmail').value.trim();
@@ -3471,7 +3519,7 @@ async function submitLock(){
   catch(e){ error=e; }
   go.disabled=false; go.textContent='로그인';
   if(error){ lockErr('로그인 실패 · 이메일 또는 비밀번호를 확인하세요.'); return; }
-  auth='admin'; hideLock();
+  auth='admin'; _adminEmail=email; hideLock();
   applyAuthUI(); refreshVerify();
   if(workspace==='settings') renderSettingsApp();
   toast('관리자로 로그인했습니다 · 업로드/검증/관리 가능');
@@ -3483,7 +3531,7 @@ function lockErr(msg){
 async function logout(){
   flushCloudSave();
   try{ if(SB) await SB.auth.signOut(); }catch(e){}
-  auth='viewer';
+  auth='viewer'; _adminEmail='';
   applyAuthUI(); setView('dash');
   if(workspace==='settings') renderSettingsApp();
   toast('로그아웃되었습니다 (보기 전용)');
@@ -4380,7 +4428,7 @@ async function boot(){
   try{ Object.keys(localStorage).forEach(k=>{ if(/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); }); }catch(e){}
   if(!SB){ toast('⚠ 서버 연결에 실패했습니다. 인터넷 연결을 확인하고 새로고침하세요.', true); }
   // 1) 로그인 세션 확인 (세션은 메모리에만 유지되므로, 새로고침/새 접속이면 비어 있음 → 열람자)
-  try{ const { data } = await SB.auth.getSession(); auth = (data && data.session) ? 'admin' : 'viewer'; }
+  try{ const { data } = await SB.auth.getSession(); auth = (data && data.session) ? 'admin' : 'viewer'; if(data&&data.session&&data.session.user) _adminEmail=data.session.user.email||''; }
   catch(e){ auth='viewer'; }
   // 2) 클라우드 데이터 로드 (모든 방문자)
   await cloudLoadData();
