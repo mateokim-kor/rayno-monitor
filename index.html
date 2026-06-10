@@ -127,6 +127,13 @@
   .brief-line{font-size:13.5px;line-height:1.5;color:var(--ink2)}
   .brief-line b{color:var(--ink);font-weight:800}
   .brief-line .pos{color:var(--pos);font-weight:800} .brief-line .neg{color:var(--neg);font-weight:800} .brief-line .amber{color:var(--amber);font-weight:800}
+  .brief-alerts{margin-top:13px;padding-top:13px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:9px}
+  .ba-row{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.5;color:var(--ink2)}
+  .ba-row .ba-ic{font-size:14px;flex:none;line-height:1.45}
+  .ba-row b{font-weight:800;color:var(--ink)}
+  .ba-row.red{color:#a32a21} .ba-row.red b{color:#a32a21}
+  .ba-row.amber{color:#9a5316} .ba-row.amber b{color:#9a5316}
+  .ba-row.ok{color:var(--ink3)}
   .brief-copy{background:var(--card);border:1px solid var(--line2);color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:7px 14px;border-radius:980px;cursor:pointer;white-space:nowrap;transition:.15s}
   .brief-copy:hover{border-color:var(--amber);color:var(--amber)}
   .kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--amber)}
@@ -1052,7 +1059,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-10 · hl가독성';   // 배포 버전 확인용
+const BUILD = '2026-06-10 · 알림정리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -1535,15 +1542,21 @@ function renderBrief(rows){
   const l2=`🗣 여론 ${stance} — 순감성 <b>${m.net>=0?'+':''}${m.net.toFixed(0)}%p</b> (긍정 ${m.posRate.toFixed(0)}% · 부정 ${m.negRate.toFixed(0)}%)`;
   const l3=`🔎 ${signal}`;
   _briefPlain=`[RAYNO 온라인 모니터링 요약]\n· ${period} · 누적 ${m.total.toLocaleString()}건 (게시글 ${m.posts}·댓글 ${m.cmts})\n· 여론 ${stanceTxt} — 순감성 ${m.net>=0?'+':''}${m.net.toFixed(0)}%p (긍정 ${m.posRate.toFixed(0)}% / 부정 ${m.negRate.toFixed(0)}%)\n· ${signalTxt}`;
+  const al=computeAlerts();
+  let alertHtml='';
+  if(al.enough){
+    const rows2 = al.A.length ? al.A : [['ok','✅',`최근 7일간 특이 징후가 없습니다. <span style="opacity:.6">(기준일 ${al.maxD})</span>`]];
+    alertHtml=`<div class="brief-alerts">`+rows2.map(a=>`<div class="ba-row ${a[0]}"><span class="ba-ic">${a[1]}</span><div>${a[2]}</div></div>`).join('')+`</div>`;
+  }
   el.innerHTML=`<div class="brief">
     <div class="brief-head"><span class="bh-t">📋 한 줄 브리핑</span><button class="brief-copy" id="briefCopyBtn">📋 복사</button></div>
     <div class="brief-lines"><div class="brief-line">${l1}</div><div class="brief-line">${l2}</div><div class="brief-line">${l3}</div></div>
+    ${alertHtml}
   </div>`;
 }
-function renderAlerts(){
-  const el=document.getElementById('dashAlert'); if(!el) return;
+function computeAlerts(){
   const dated=(RAW.rows||[]).map(r=>({r,d:normDate(r.date)})).filter(x=>x.d);
-  if(dated.length<10){ el.innerHTML=''; return; }
+  if(dated.length<10) return {enough:false,A:[],maxD:''};
   let maxD=''; dated.forEach(x=>{ if(x.d>maxD)maxD=x.d; });
   const recStart=_dayShift(maxD,-6), prevStart=_dayShift(maxD,-13), prevEnd=_dayShift(maxD,-7);
   const es=r=>r.vSent||r.aiSent;
@@ -1551,15 +1564,15 @@ function renderAlerts(){
   const rec=win(recStart,maxD), prev=win(prevStart,prevEnd);
   const A=[];
   if(rec.neg>=3 && (rec.negRate-prev.negRate)>=10)
-    A.push(['red','⚠',`최근 7일 <b>부정률 ${rec.negRate.toFixed(0)}%</b> — 직전 7일 대비 <b>+${(rec.negRate-prev.negRate).toFixed(0)}%p</b> 상승. 부정 글을 확인하고 원인을 점검하세요.`]);
+    A.push(['red','⚠',`최근 7일 <b>부정률 ${rec.negRate.toFixed(0)}%</b> — 직전 7일 대비 <b>+${(rec.negRate-prev.negRate).toFixed(0)}%p</b> 상승. 부정 글을 확인해 원인을 점검하세요.`]);
   if(prev.tot>=5 && rec.tot>=prev.tot*1.5 && (rec.tot-prev.tot)>=10)
     A.push(['amber','📈',`최근 7일 언급량 <b>${rec.tot.toLocaleString()}건</b> — 직전 대비 <b>+${Math.round((rec.tot/prev.tot-1)*100)}%</b> 급증. 이슈 확산 여부를 확인하세요.`]);
   const negTop=Object.entries(rec.byCafe).sort((a,b)=>b[1]-a[1])[0];
   if(negTop && negTop[1]>=3 && rec.neg>0 && (negTop[1]/rec.neg)>=0.4)
     A.push(['red','📍',`최근 부정 언급이 ‘<b>${escapeHtml(negTop[0])}</b>’에 집중(<b>${negTop[1]}건</b>). 해당 카페를 우선 대응하세요.`]);
-  if(!A.length){ el.innerHTML=`<div class="alertbox"><div class="alert-item ok"><span class="ai-ic">✅</span><div>최근 7일간 특이 징후가 없습니다. <span style="opacity:.7">(기준일 ${maxD})</span></div></div></div>`; return; }
-  el.innerHTML=`<div class="alertbox">`+A.map(a=>`<div class="alert-item ${a[0]}"><span class="ai-ic">${a[1]}</span><div>${a[2]}</div></div>`).join('')+`</div>`;
+  return {enough:true,A,maxD};
 }
+function renderAlerts(){ const el=document.getElementById('dashAlert'); if(el) el.innerHTML=''; }  // 알림은 한 줄 브리핑 카드로 통합
 function render(){
   if(!RAW) return;
   // 1) 범위(게시글/댓글) 필터
