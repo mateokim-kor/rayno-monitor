@@ -160,11 +160,20 @@
   .ba-row.ok{color:var(--ink3)}
   .tooltgl{display:inline-flex;align-items:center;gap:6px;margin:2px 0 14px;background:var(--bg2);border:1px solid var(--line2);color:var(--ink2);font-family:var(--font);font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:980px;cursor:pointer;transition:.14s}
   .tooltgl:hover{border-color:var(--amber);color:var(--amber)}
-  #themeToggle{position:fixed;top:14px;right:16px;z-index:300;width:40px;height:40px;border-radius:50%;
-    border:1px solid var(--line2);background:var(--card);color:var(--ink);cursor:pointer;
-    box-shadow:var(--shadow-sm);font-size:17px;line-height:1;display:flex;align-items:center;justify-content:center;transition:.15s}
-  #themeToggle:hover{border-color:var(--amber);transform:scale(1.06)}
-  @media(max-width:520px){#themeToggle{top:10px;right:10px;width:36px;height:36px;font-size:15px}}
+  /* 다크모드 토글 스위치 (워크스페이스 줄 우측) */
+  .theme-switch{display:inline-flex;align-items:center;gap:9px;margin-left:auto;background:var(--card);
+    border:1px solid var(--line2);border-radius:980px;padding:8px 14px;cursor:pointer;
+    font-family:var(--font);font-size:12.5px;font-weight:700;color:var(--ink2);transition:.15s}
+  .theme-switch:hover{border-color:var(--amber);color:var(--ink)}
+  .theme-switch .ts-ico{font-size:14px;line-height:1}
+  .theme-switch .ts-track{position:relative;width:38px;height:20px;border-radius:980px;background:var(--line2);transition:.18s;flex:none}
+  .theme-switch .ts-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.35);transition:.18s}
+  html[data-theme="dark"] .theme-switch{color:var(--ink)}
+  html[data-theme="dark"] .theme-switch .ts-track{background:var(--amber)}
+  html[data-theme="dark"] .theme-switch .ts-knob{left:20px}
+  @media(max-width:640px){.theme-switch{margin-left:0}.theme-switch .ts-label{display:none}}
+  /* 다크모드: 활성 워크스페이스 버튼 = 흰색 대신 오렌지 포인트 */
+  html[data-theme="dark"] .appsw-btn.on{background:rgba(244,145,28,.16);border-color:var(--amber);color:var(--amber)}
   .brief-copy{background:var(--card);border:1px solid var(--line2);color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:7px 14px;border-radius:980px;cursor:pointer;white-space:nowrap;transition:.15s}
   .brief-copy:hover{border-color:var(--amber);color:var(--amber)}
   .kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--amber)}
@@ -701,6 +710,10 @@
     <button class="appsw-btn on" data-ws="cafe">📡 <span data-txt="tabCafe">온라인 모니터링</span></button>
     <button class="appsw-btn" data-ws="rayno">📊 <span data-txt="tabRayno">레이노 데이터</span></button>
     <button class="appsw-btn" data-ws="settings">⚙ <span data-txt="tabSettings">설정</span></button>
+    <button id="themeToggle" class="theme-switch" type="button" role="switch" aria-checked="false" aria-label="다크모드 전환" title="라이트/다크 전환">
+      <span class="ts-ico">🌙</span><span class="ts-label">다크모드</span>
+      <span class="ts-track"><span class="ts-knob"></span></span>
+    </button>
   </div>
   <div class="nav" id="nav">
     <button class="nav-btn on" data-view="dash">📊 <span data-txt="tabDash">대시보드</span></button>
@@ -1099,7 +1112,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-10 · 다크보완';   // 배포 버전 확인용
+const BUILD = '2026-06-10 · 토글스위치';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4330,8 +4343,13 @@ async function pollCrawlStatus(){
 }
 // ── 라이트/다크 테마 (기본 라이트, 선택 시 localStorage 기억) ──
 function _applyThemeAttr(t){
-  document.documentElement.setAttribute('data-theme', t==='dark'?'dark':'light');
-  const b=document.getElementById('themeToggle'); if(b) b.textContent = (t==='dark'?'☀️':'🌙');
+  const dark = (t==='dark');
+  document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+  const b=document.getElementById('themeToggle');
+  if(b){
+    b.setAttribute('aria-checked', dark?'true':'false');
+    const ico=b.querySelector('.ts-ico'); if(ico) ico.textContent = dark?'☀️':'🌙';
+  }
   if(window.Chart) Chart.defaults.color = _ck().text;
 }
 function toggleTheme(){
