@@ -1011,9 +1011,9 @@ function applyAutoKeywords(rows){
   if(!kws.length || !arr) return 0;
   let n=0;
   arr.forEach(r=>{
-    if(r.vsrc==='manual' || r.vsrc==='kw') return;   // 사람이 검증했거나 이미 키워드 처리한 건만 보호 (자동검토·미검증은 처리)
+    if(r.vSent==='없음') return;   // 이미 '없음' 처리됨 → 유지(반복 방지)
     const hay=_normTxt((r.title||'')+' '+(r.body||''));
-    if(kws.some(k=>hay && hay.includes(k))){ r.vSent='중립'; r.vsrc='kw'; r.vconf=100; r.kw=1; n++; }
+    if(kws.some(k=>hay && hay.includes(k))){ r.vSent='없음'; r.vsrc='kw'; r.vconf=100; r.kw=1; n++; }
   });
   if(n>0 && !rows){ saveStore(STORE); rebuildRAW(); }   // 외부 배열을 받으면 저장은 호출측 담당
   return n;
@@ -2307,7 +2307,7 @@ function renderSettings(){
    </div>
    <div class="card set-card">
      <h3><span class="dot"></span>자동 처리 키워드/문장</h3>
-     <div class="cap">여기에 등록한 <b>키워드나 문장</b>이 글의 제목·본문에 들어 있으면, 해당 글을 자동으로 <b>중립 + 검증 완료</b>로 처리합니다. (대리점 광고문구 등 반복되는 글을 한 번에 정리할 때 유용합니다. 띄어쓰기·줄바꿈은 자동으로 무시하고 비교합니다. 이미 검증한 글은 건드리지 않습니다.)</div>
+     <div class="cap">여기에 등록한 <b>키워드나 문장</b>이 글의 제목·본문에 들어 있으면, 해당 글을 자동으로 <b>없음(감성 분석 제외) + 검증 완료</b>로 처리합니다. (대리점 광고문구 등 반복 글 정리에 유용. 띄어쓰기·줄바꿈은 무시하고 비교하며, <b>이미 검증한 글이라도 문장이 들어 있으면 '없음'으로 바뀝니다.</b>)</div>
      <div class="set-list">${chipRow('autokw',setDraft.autoKw)}</div>
      <div class="set-add"><input id="autoKwNew" placeholder="예: 카스페이스 본사 [구로점]입니다"><button class="viewbtn" data-add="autokw">＋ 추가</button></div>
      <div class="set-add" style="margin-top:6px"><button id="setApplyKw" class="viewbtn" style="background:var(--neu);color:#fff">🧹 지금 적용 (미검증 글에서 정리)</button></div>
@@ -3018,7 +3018,7 @@ function _predNB(model, text){
   return {label:labels[bi], conf:ex[bi]/sum};
 }
 function buildAutoModel(){
-  const train=(RAW&&RAW.rows?RAW.rows:[]).filter(r=>isVerified(r) && r.vsrc!=='auto' && r.vsrc!=='kw');
+  const train=(RAW&&RAW.rows?RAW.rows:[]).filter(r=>isVerified(r) && r.vsrc!=='auto' && r.vsrc!=='kw' && r.vSent!=='없음');
   const exSent=Object.create(null), exType=Object.create(null);
   train.forEach(r=>{ const k=_normText(r); if(!k)return; if(r.vSent) exSent[k]=r.vSent; if(r.vType) exType[k]=r.vType; });
   return { n:train.length,
