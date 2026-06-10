@@ -995,7 +995,7 @@
 Chart.defaults.font.family = '"Pretendard Variable",Pretendard,sans-serif';
 // 테마별 차트 색상 (라이트 기본 / 다크)
 function _ck(){ return document.documentElement.getAttribute('data-theme')==='dark'
-  ? {text:'#aeb4bf', grid:'#2a2f38', donut:'#1a1e24'}
+  ? {text:'#f4f6f8', grid:'#2a2f38', donut:'#1a1e24'}
   : {text:'#56616f', grid:'#e3e7ee', donut:'#ffffff'}; }
 Chart.defaults.color = _ck().text;
 Chart.defaults.font.size = 12;
@@ -1112,7 +1112,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-10 · 간격통일';   // 배포 버전 확인용
+const BUILD = '2026-06-10 · 범례흰색';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
