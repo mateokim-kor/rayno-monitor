@@ -134,6 +134,8 @@
   .ba-row.red{color:#a32a21} .ba-row.red b{color:#a32a21}
   .ba-row.amber{color:#9a5316} .ba-row.amber b{color:#9a5316}
   .ba-row.ok{color:var(--ink3)}
+  .tooltgl{display:inline-flex;align-items:center;gap:6px;margin:2px 0 14px;background:var(--bg2);border:1px solid var(--line2);color:var(--ink2);font-family:var(--font);font-size:12.5px;font-weight:700;padding:8px 16px;border-radius:980px;cursor:pointer;transition:.14s}
+  .tooltgl:hover{border-color:var(--amber);color:var(--amber)}
   .brief-copy{background:var(--card);border:1px solid var(--line2);color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:7px 14px;border-radius:980px;cursor:pointer;white-space:nowrap;transition:.15s}
   .brief-copy:hover{border-color:var(--amber);color:var(--amber)}
   .kpi::after{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--amber)}
@@ -686,6 +688,9 @@
     </div>
   </div>
 
+  <!-- 도구·필터 접기 토글 -->
+  <button id="dashToolToggle" class="tooltgl" type="button">⚙ 도구·필터 펼치기 ▾</button>
+
   <!-- 컨트롤 -->
   <div class="controls" id="controls">
     <div class="ctl-group">
@@ -1059,7 +1064,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-10 · 알림정리';   // 배포 버전 확인용
+const BUILD = '2026-06-10 · 상단접기';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4288,6 +4293,17 @@ async function pollCrawlStatus(){
   const next=(s && (s.state==='running'||s.state==='await_auth'))?2500:8000;
   clearTimeout(_crawlPollTimer); _crawlPollTimer=setTimeout(pollCrawlStatus, next);
 }
+// ── 상단 도구·필터 접기 (기본 접힘, 한 줄 브리핑은 항상 표시) ──
+let _dashToolsOpen=false;
+function applyDashTools(){
+  ['controls','veriNote','typeBar','filterStatus','crawlBar'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display=_dashToolsOpen?'':'none';
+  });
+  const b=document.getElementById('dashToolToggle');
+  if(b) b.textContent=_dashToolsOpen?'⚙ 도구·필터 접기 ▴':'⚙ 도구·필터 펼치기 ▾';
+}
+(function(){ const b=document.getElementById('dashToolToggle');
+  if(b) b.addEventListener('click', ()=>{ _dashToolsOpen=!_dashToolsOpen; applyDashTools(); }); })();
 async function boot(){
   applyConfigAndSettings();
   // 보안: 이전에 브라우저에 저장돼 자동 로그인되던 세션 토큰을 정리 → 새 접속 시 항상 재로그인
@@ -4314,6 +4330,7 @@ async function boot(){
   // 4) 화면 구성
   applyAutoKeywords();   // 등록된 키워드/문장에 걸리는 미검증 글 자동 정리
   enterApp();
+  applyDashTools();    // 상단 도구·필터 기본 접힘
   pollCrawlStatus();   // 자동 수집 진행률 폴링 시작
   const n = (STORE.rows||[]).length;
   if(n) setTimeout(()=>toast(`데이터 ${n.toLocaleString()}건 불러옴${auth==='admin'?' · 관리자 모드':''}`), 400);
