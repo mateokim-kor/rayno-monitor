@@ -1052,6 +1052,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
+const BUILD = '2026-06-10 · kw-없음';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -2316,6 +2317,7 @@ function renderSettings(){
      <button id="setSaveAll" class="vc-save" ${dirty?'':'disabled'}>설정 저장</button>
      <button id="setResetAll" class="vc-revert">되돌리기</button>
      <span class="vc-status ${dirty?'dirty':''}">${dirty?'● 미저장 변경 있음 — 저장하면 모든 사용자에게 적용됩니다':'저장됨'}</span>
+     <span style="margin-left:auto;font-size:11px;color:var(--ink3)">빌드 ${BUILD}</span>
    </div>
    <div class="card set-card">
      <h3><span class="dot"></span>업로드 파일 이력</h3>
