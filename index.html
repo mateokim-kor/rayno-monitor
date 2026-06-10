@@ -1005,16 +1005,17 @@ function effOwnBrand(){ return (STORE.config&&STORE.config.ownBrand)||CONFIG.own
 function effCompetitors(){ const c=STORE.config&&STORE.config.competitors; return (Array.isArray(c)&&c.length)?c:CONFIG.competitors; }
 function effAutoKw(){ const c=STORE.config&&STORE.config.autoKeywords; return Array.isArray(c)?c:[]; }
 // 지정 키워드/문장이 들어간 '미검증' 글을 → 중립 + 검증완료(vsrc='kw')로 자동 처리
-function applyAutoKeywords(){
+function applyAutoKeywords(rows){
   const kws=effAutoKw().map(_normTxt).filter(Boolean);
-  if(!kws.length || !STORE.rows) return 0;
+  const arr = rows || (STORE&&STORE.rows);
+  if(!kws.length || !arr) return 0;
   let n=0;
-  STORE.rows.forEach(r=>{
-    if(isVerified(r)) return;                 // 이미 검증/처리된 건은 건드리지 않음
+  arr.forEach(r=>{
+    if(r.vsrc==='manual' || r.vsrc==='kw') return;   // 사람이 검증했거나 이미 키워드 처리한 건만 보호 (자동검토·미검증은 처리)
     const hay=_normTxt((r.title||'')+' '+(r.body||''));
     if(kws.some(k=>hay && hay.includes(k))){ r.vSent='중립'; r.vsrc='kw'; r.vconf=100; r.kw=1; n++; }
   });
-  if(n>0){ saveStore(STORE); rebuildRAW(); }
+  if(n>0 && !rows){ saveStore(STORE); rebuildRAW(); }   // 외부 배열을 받으면 저장은 호출측 담당
   return n;
 }
 function runAutoKeywords(){
@@ -3050,6 +3051,7 @@ function autoVerifyAll(){
   store.rows.forEach(r=>{ if(isVerified(r) && r.vsrc!=='auto') return;   // 사람이 검증한 건은 절대 건드리지 않음
     const p=autoPredict(r,M); if(!p.vSent) return;
     r.vSent=p.vSent; if(p.vType) r.vType=p.vType; r.vsrc='auto'; r.vconf=Math.round((p.conf||0)*100); n++; });
+  applyAutoKeywords(store.rows);   // 키워드/문장 걸리는 건 자동검토 대신 바로 중립·검증완료
   saveStore(store); rebuildRAW();
   if(state.view==='dash'){ buildTypeChips(); render(); } else dashStale=true;
   state.vfFilter='auto'; document.querySelectorAll('#vfFilterSeg button').forEach(b=>b.classList.toggle('on', b.dataset.vf==='auto'));
