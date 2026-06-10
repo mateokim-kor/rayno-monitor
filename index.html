@@ -1296,7 +1296,9 @@ async function downloadUpload(u){
 }
 
 // 행 고유키 = 카페·날짜·종류·제목·본문·링크 조합 → 같은 글은 다시 올려도 1건
-function rowKey(r){ return [r.cafe, r.isPost?'P':'C', r.title, r.body, r.link, r.parentLink||r.parentTitle||''].join('\u0001'); }
+function _normTxt(s){ return (s||'').replace(/\s+/g,' ').trim(); }
+function _normLink(s){ return (s||'').split('#')[0].split('?')[0].replace(/\/+$/,''); }
+function rowKey(r){ return [_normTxt(r.cafe), r.isPost?'P':'C', _normTxt(r.title), _normTxt(r.body), _normLink(r.link), _normTxt(r.parentLink||r.parentTitle||'')].join('\u0001'); }
 function hashId(str){
   let h1=0x811c9dc5, h2=0xc2b2ae35;
   for(let i=0;i<str.length;i++){ const c=str.charCodeAt(i);
@@ -3030,7 +3032,7 @@ async function optimizeAll(){
   let rows=c.rows.filter(r=> (r.cafe||r.title||r.body) );             // 완전 빈 행 제거
   remapRep(c.idMap);                                                  // 대표글 ID 갱신
   res.cafeAfter=rows.length; res.cafeRemoved=res.cafeBefore-rows.length;
-  store.rows=rows; store.config=store.config||{}; store.config.canon=3;
+  store.rows=rows; store.config=store.config||{}; store.config.canon=4;
   // 2) 내부 캐시 재계산
   _typeUnionCache=null; if(_ndCache&&_ndCache.clear) _ndCache.clear();
   saveStore(store); rebuildRAW();
@@ -4249,9 +4251,9 @@ async function boot(){
   applyConfigAndSettings();   // 저장된 표시 문구/탭 이름을 로드 후 모든 방문자에게 적용
   // 2.5) 중복 정리 마이그레이션 — 날짜만 다른 동일 글 합치기 (기존 데이터 1회 정리)
   STORE.config = STORE.config || {};
-  if(STORE.config.canon!==3 && STORE.rows && STORE.rows.length){
+  if(STORE.config.canon!==4 && STORE.rows && STORE.rows.length){
     const c=canonicalize(STORE.rows);
-    STORE.rows=c.rows; remapRep(c.idMap); STORE.config.canon=3;
+    STORE.rows=c.rows; remapRep(c.idMap); STORE.config.canon=4;
     if(auth==='admin'){ saveStore(STORE); if(c.merged>0) flushCloudSave(); }   // 관리자면 클라우드에 정리본 반영(전원 공유)
   }
   // 3) (관리자 첫 사용) 클라우드가 비어있고 예전 localStorage 데이터가 있으면 한번 올려줌
