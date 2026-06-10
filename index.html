@@ -1003,6 +1003,29 @@ const POST_TYPES  = CONFIG.postTypes;
 function effText(k){ const c=STORE.config&&STORE.config.text; return (c&&c[k])||CONFIG.text[k]; }
 function effOwnBrand(){ return (STORE.config&&STORE.config.ownBrand)||CONFIG.ownBrand; }
 function effCompetitors(){ const c=STORE.config&&STORE.config.competitors; return (Array.isArray(c)&&c.length)?c:CONFIG.competitors; }
+function effAutoKw(){ const c=STORE.config&&STORE.config.autoKeywords; return Array.isArray(c)?c:[]; }
+// 지정 키워드/문장이 들어간 '미검증' 글을 → 중립 + 검증완료(vsrc='kw')로 자동 처리
+function applyAutoKeywords(){
+  const kws=effAutoKw().map(_normTxt).filter(Boolean);
+  if(!kws.length || !STORE.rows) return 0;
+  let n=0;
+  STORE.rows.forEach(r=>{
+    if(isVerified(r)) return;                 // 이미 검증/처리된 건은 건드리지 않음
+    const hay=_normTxt((r.title||'')+' '+(r.body||''));
+    if(kws.some(k=>hay && hay.includes(k))){ r.vSent='중립'; r.vsrc='kw'; r.vconf=100; r.kw=1; n++; }
+  });
+  if(n>0){ saveStore(STORE); rebuildRAW(); }
+  return n;
+}
+function runAutoKeywords(){
+  if(auth!=='admin'){ toast('관리자만 실행할 수 있습니다.',true); return; }
+  if(typeof setDirty==='function' && setDirty()) saveAllSettings();   // 편집 중인 키워드 먼저 저장
+  const n=applyAutoKeywords();
+  if(typeof flushCloudSave==='function') flushCloudSave();
+  if(typeof buildTypeChips==='function') buildTypeChips();
+  render(); if(typeof refreshVerify==='function') refreshVerify();
+  toast(n>0?`${n.toLocaleString()}건을 키워드로 '중립·검증 완료' 처리했습니다.`:'해당 키워드가 들어간 미검증 글이 없습니다.');
+}
 const CLASS_FIELDS = [
   {key:'posReason',  col:'긍정이유', label:'긍정 이유', kind:'text',  ph:'예) 시야 선명, 단열 만족'},
   {key:'negReason',  col:'부정이유', label:'부정 이유', kind:'text',  ph:'예) 가격 부담, 기포'},
@@ -2172,7 +2195,7 @@ const TEXT_KEYS=['headerTitle','headerSub','docTitle','footer1','footer2',
   'raynoLockTitle','raynoLockSub','emptyTitle','emptySub','reportTitle','reportSub'];
 function setDraftInit(){
   setDraft={ ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice(),
-    hlPos:effHlPos().slice(), hlNeg:effHlNeg().slice() };
+    hlPos:effHlPos().slice(), hlNeg:effHlNeg().slice(), autoKw:effAutoKw().slice() };
   TEXT_KEYS.forEach(k=>setDraft[k]=effText(k));
 }
 function setDirty(){
@@ -2181,8 +2204,9 @@ function setDirty(){
     txt:TEXT_KEYS.map(k=>String(o[k]==null?'':o[k]).trim()),
     b:(o.ownBrand||'').trim(),
     c:(o.competitors||[]).map(x=>x.trim()).filter(Boolean),t:(o.postTypes||[]).map(x=>x.trim()).filter(Boolean),
-    hp:(o.hlPos||[]).map(x=>x.trim()).filter(Boolean),hn:(o.hlNeg||[]).map(x=>x.trim()).filter(Boolean)});
-  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes(),hlPos:effHlPos(),hlNeg:effHlNeg()};
+    hp:(o.hlPos||[]).map(x=>x.trim()).filter(Boolean),hn:(o.hlNeg||[]).map(x=>x.trim()).filter(Boolean),
+    ak:(o.autoKw||[]).map(x=>x.trim()).filter(Boolean)});
+  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes(),hlPos:effHlPos(),hlNeg:effHlNeg(),autoKw:effAutoKw()};
   TEXT_KEYS.forEach(k=>cur[k]=effText(k));
   return norm(setDraft)!==norm(cur);
 }
@@ -2280,6 +2304,13 @@ function renderSettings(){
      <div class="set-list">${chipRow('hlneg',setDraft.hlNeg)}</div>
      <div class="set-add"><input id="hlNegNew" placeholder="부정 표현 추가 (예: 기포, 변색)"><button class="viewbtn" data-add="hlneg">＋ 추가</button></div>
    </div>
+   <div class="card set-card">
+     <h3><span class="dot"></span>자동 처리 키워드/문장</h3>
+     <div class="cap">여기에 등록한 <b>키워드나 문장</b>이 글의 제목·본문에 들어 있으면, 해당 글을 자동으로 <b>중립 + 검증 완료</b>로 처리합니다. (대리점 광고문구 등 반복되는 글을 한 번에 정리할 때 유용합니다. 띄어쓰기·줄바꿈은 자동으로 무시하고 비교합니다. 이미 검증한 글은 건드리지 않습니다.)</div>
+     <div class="set-list">${chipRow('autokw',setDraft.autoKw)}</div>
+     <div class="set-add"><input id="autoKwNew" placeholder="예: 카스페이스 본사 [구로점]입니다"><button class="viewbtn" data-add="autokw">＋ 추가</button></div>
+     <div class="set-add" style="margin-top:6px"><button id="setApplyKw" class="viewbtn" style="background:var(--neu);color:#fff">🧹 지금 적용 (미검증 글에서 정리)</button></div>
+   </div>
    <div class="set-savebar">
      <button id="setSaveAll" class="vc-save" ${dirty?'':'disabled'}>설정 저장</button>
      <button id="setResetAll" class="vc-revert">되돌리기</button>
@@ -2301,11 +2332,12 @@ function saveAllSettings(){
   const types=[...new Set(setDraft.postTypes.map(s=>s.trim()).filter(Boolean))];
   const hlPos=[...new Set(setDraft.hlPos.map(s=>s.trim()).filter(Boolean))];
   const hlNeg=[...new Set(setDraft.hlNeg.map(s=>s.trim()).filter(Boolean))];
+  const autoKeywords=[...new Set(setDraft.autoKw.map(s=>s.trim()).filter(Boolean))];
   if(!types.length){ toast('게시글 유형은 최소 1개가 필요합니다.',true); return; }
   const textObj={...((STORE.config&&STORE.config.text)||{})};
   TEXT_KEYS.forEach(k=>{ const v=(setDraft[k]||'').trim(); textObj[k]= v || CONFIG.text[k]; });
   STORE.config = {...(STORE.config||{}),
-    text:textObj, hlPos, hlNeg,
+    text:textObj, hlPos, hlNeg, autoKeywords,
     ownBrand:(setDraft.ownBrand.trim()||CONFIG.ownBrand), competitors:comps, postTypes:types };
   saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave();   // 설정은 즉시 반영(디바운스 대기 X)
   _typeUnionCache=null; _hlRe=null; setDraft=null;
@@ -2319,8 +2351,8 @@ function removeUploadBatch(bid){
   return before-store.rows.length;
 }
 let _replaceBatch=null;
-const GRP_MAP={comp:'competitors',type:'postTypes',hlpos:'hlPos',hlneg:'hlNeg'};
-const ADD_INPUT={comp:'compNew',type:'typeNew',hlpos:'hlPosNew',hlneg:'hlNegNew'};
+const GRP_MAP={comp:'competitors',type:'postTypes',hlpos:'hlPos',hlneg:'hlNeg',autokw:'autoKw'};
+const ADD_INPUT={comp:'compNew',type:'typeNew',hlpos:'hlPosNew',hlneg:'hlNegNew',autokw:'autoKwNew'};
 document.getElementById('settings').addEventListener('input', e=>{
   const t=e.target;
   if(t.classList.contains('set-text')){ setDraft[t.dataset.k]=t.value; updateSaveBar(); }
@@ -2333,6 +2365,7 @@ document.getElementById('settings').addEventListener('click', e=>{
   if(add){ const which=add.dataset.add; const grp=GRP_MAP[which]; const inp=document.getElementById(ADD_INPUT[which]);
     if(grp&&inp){ const v=(inp.value||'').trim(); if(v && !setDraft[grp].includes(v)) setDraft[grp].push(v); renderSettings(); } return; }
   if(e.target.id==='setSaveAll'){ saveAllSettings(); return; }
+  if(e.target.id==='setApplyKw'){ runAutoKeywords(); return; }
   if(e.target.id==='setResetAll'){ setDraft=null; renderSettings(); return; }
   const dlb=e.target.closest('.up-dl');
   if(dlb){ const u=((STORE.config&&STORE.config.uploads)||[]).find(x=>x.id===dlb.dataset.bid); downloadUpload(u); return; }
@@ -2984,7 +3017,7 @@ function _predNB(model, text){
   return {label:labels[bi], conf:ex[bi]/sum};
 }
 function buildAutoModel(){
-  const train=(RAW&&RAW.rows?RAW.rows:[]).filter(r=>isVerified(r) && r.vsrc!=='auto');
+  const train=(RAW&&RAW.rows?RAW.rows:[]).filter(r=>isVerified(r) && r.vsrc!=='auto' && r.vsrc!=='kw');
   const exSent=Object.create(null), exType=Object.create(null);
   train.forEach(r=>{ const k=_normText(r); if(!k)return; if(r.vSent) exSent[k]=r.vSent; if(r.vType) exType[k]=r.vType; });
   return { n:train.length,
@@ -4228,7 +4261,7 @@ async function pollCrawlStatus(){
   if(s && s.state==='done' && s.at){
     if(!_crawlInit){ _crawlRefreshedAt=s.at; }
     else if(s.at!==_crawlRefreshedAt){ _crawlRefreshedAt=s.at;
-      await cloudLoadData(); rebuildRAW();
+      await cloudLoadData(); rebuildRAW(); applyAutoKeywords();
       if(state.view==='dash'){ buildTypeChips(); render(); } else dashStale=true;
       if(typeof refreshVerify==='function') refreshVerify();
       toast('자동 수집 완료 — 최신 데이터로 갱신했습니다.');
@@ -4262,6 +4295,7 @@ async function boot(){
       if(j && j.rows && j.rows.length){ STORE=j; await cloudSaveData(); toast('기존 로컬 데이터를 클라우드로 옮겼습니다.'); } } }catch(e){}
   }
   // 4) 화면 구성
+  applyAutoKeywords();   // 등록된 키워드/문장에 걸리는 미검증 글 자동 정리
   enterApp();
   pollCrawlStatus();   // 자동 수집 진행률 폴링 시작
   const n = (STORE.rows||[]).length;
