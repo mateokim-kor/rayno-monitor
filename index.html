@@ -325,6 +325,45 @@
   .iv-sticky td.l{background:var(--card)}
   .iv-sticky tr:nth-of-type(even) td.l{background:var(--bg2)}
   .iv-sticky th.l{background:var(--amber)}
+  /* 개요(홈) 대시보드 */
+  .hm{max-width:1200px;margin:0 auto}
+  .hm-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin:2px 0 20px}
+  .hm-head h1{margin:0;font-size:26px;font-weight:800;letter-spacing:-.4px}
+  .hm-head p{margin:6px 0 0;color:var(--ink2);font-size:13px}
+  .hm-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+  .hm-kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px 18px;box-shadow:var(--shadow)}
+  .hm-kpi .t{display:flex;justify-content:space-between;align-items:center}
+  .hm-kpi .l{color:var(--ink2);font-size:12px;font-weight:600}
+  .hm-kpi .ic{width:30px;height:30px;border-radius:9px;background:var(--bg2);display:grid;place-items:center;font-size:15px}
+  .hm-kpi .v{font-size:27px;font-weight:800;letter-spacing:-.5px;margin:11px 0 7px;font-variant-numeric:tabular-nums}
+  .hm-dlt{font-size:12px;font-weight:700;display:inline-flex;gap:5px;align-items:center}
+  .hm-dlt.up{color:var(--pos)} .hm-dlt.down{color:var(--neg)}
+  .hm-dlt .vs{color:var(--ink3);font-weight:500;margin-left:2px}
+  .hm-row2{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;margin-bottom:16px}
+  .hm-row2b{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+  .hm-card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow)}
+  .hm-card h3{margin:0 0 2px;font-size:15px;font-weight:700}
+  .hm-card .sub{color:var(--ink3);font-size:11.5px;margin:0 0 12px}
+  .hm-chart{position:relative;height:220px}
+  .hm-donut{position:relative;width:148px;height:148px;flex:0 0 148px}
+  .hm-donut .c{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+  .hm-donut .c b{font-size:20px;font-weight:800;display:block;font-variant-numeric:tabular-nums}.hm-donut .c span{font-size:10.5px;color:var(--ink2)}
+  .hm-rank{display:flex;flex-direction:column;gap:12px}
+  .hm-rank .it{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center}
+  .hm-rank .nm{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+  .hm-rank .nm i{width:9px;height:9px;border-radius:50%;display:inline-block;flex:0 0 9px}
+  .hm-rank .vv{font-size:13.5px;font-weight:800;font-variant-numeric:tabular-nums}
+  .hm-rank .bar{grid-column:1/3;height:7px;border-radius:5px;background:var(--bg2);overflow:hidden}
+  .hm-rank .bar i{display:block;height:100%;border-radius:5px}
+  .hm-tbl{width:100%;border-collapse:collapse}
+  .hm-tbl thead th{text-align:left;color:var(--ink3);font-size:11px;font-weight:700;letter-spacing:.3px;padding:0 10px 11px}
+  .hm-tbl tbody td{padding:12px 10px;border-top:1px solid var(--line);font-size:13px;vertical-align:middle}
+  .hm-tbl .av{width:32px;height:32px;border-radius:9px;background:var(--bg2);display:grid;place-items:center;font-size:14px;flex:0 0 32px}
+  .hm-pill{font-weight:800;padding:4px 9px;border-radius:8px;font-size:12px}
+  .hm-pill.neg{background:rgba(229,72,77,.16);color:var(--neg)}
+  .hm-pill.neu{background:rgba(201,138,23,.18);color:#c98a17}
+  .hm-emp{padding:26px;text-align:center;color:var(--ink2);font-size:13px}
+  @media(max-width:860px){ .hm-kpis{grid-template-columns:1fr 1fr} .hm-row2,.hm-row2b{grid-template-columns:1fr} .hm-head h1{font-size:22px} }
   .card h3{font-size:13.5px;font-weight:700;letter-spacing:-.01em;margin-bottom:2px;display:flex;align-items:center;gap:8px}
   .card .cap{font-size:11px;color:var(--ink3);margin-bottom:14px;line-height:1.65}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);flex:none}
@@ -747,7 +786,8 @@
 
   <!-- 내비게이션 + 누적 툴바 -->
   <div class="appsw" id="appSwitcher" style="display:none">
-    <button class="appsw-btn on" data-ws="cafe">📡 <span data-txt="tabCafe">온라인 모니터링</span></button>
+    <button class="appsw-btn on" data-ws="home">🏠 <span data-txt="tabHome">개요</span></button>
+    <button class="appsw-btn" data-ws="cafe">📡 <span data-txt="tabCafe">온라인 모니터링</span></button>
     <button class="appsw-btn" data-ws="rayno">📊 <span data-txt="tabRayno">레이노 데이터</span></button>
     <button class="appsw-btn" data-ws="settings">⚙ <span data-txt="tabSettings">설정</span></button>
     <button id="themeToggle" class="theme-switch" type="button" role="switch" aria-checked="false" aria-label="다크모드 전환" title="라이트/다크 전환">
@@ -987,6 +1027,8 @@
     <div id="setSalesHost"></div>
   </div>
 
+  <div id="homeApp" style="display:none"></div>
+
   <footer>
     <span id="footerLine1">레이노 온라인 모니터링 · 검증(verified) 데이터 우선 대시보드</span><br>
     <span id="footerLine2">모든 분석은 브라우저 안에서만 처리되며 파일은 외부로 전송되지 않습니다.</span>
@@ -1162,7 +1204,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 최적화백업';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 개요홈';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -3641,7 +3683,7 @@ document.getElementById('logoutBtn').addEventListener('click', logout);
 
 // 좌상단 RAYNO 로고 클릭 → 대시보드 최초 화면·기본 설정으로 복귀
 function resetToHome(){
-  if(workspace!=='cafe') setWorkspace('cafe');
+  setWorkspace('home');
   state.mode='strict'; state.scope='all'; state.sentFilter=null; state.hiddenTypes.clear();
   state.dateMode='all'; state.month=''; state.from=''; state.to='';
   state.excludeNone = CONFIG.excludeNoneByDefault;
@@ -3664,7 +3706,7 @@ const brandEl=document.querySelector('.brand'); if(brandEl) brandEl.addEventList
 let BIZ={rows:[],version:1};                 // 검색량/매출 (수기): {ym, search, revenue}
 let WARR={rows:[],columns:[],config:null,version:1};   // 품질보증서 (엑셀, 원본 컬럼 보존)
 let bizLoaded=false, warrLoaded=false;
-let workspace='cafe', rview='warranty', raynoUnlocked=false, warrCfgOpen=false;
+let workspace='home', rview='warranty', raynoUnlocked=false, warrCfgOpen=false;
 const WARR_PII=['고객 이름','고객 연락처','차량(차대)번호','시리얼번호','정보숨김URL','할인쿠폰코드'];
 
 async function cloudLoadJSON(file){ if(!SB)return null; try{ const {data,error}=await SB.storage.from(SUPA.bucket).download(file+'?cb='+Date.now()); if(error||!data)return null; return JSON.parse(await data.text()); }catch(e){ return null; } }
@@ -4638,13 +4680,120 @@ async function openRayno(){
   lock.style.display='none'; nav.style.display='flex';
   await ensureBiz(); await ensureWarr(); await ensureSales(); setRView(rview);
 }
+// ── 개요(홈) 대시보드 — 실데이터(브랜드 모니터링 + 매출) ──
+function _homeFmtNum(n){ return Math.round(n||0).toLocaleString(); }
+async function renderHome(){
+  const host=document.getElementById('homeApp'); if(!host) return;
+  try{ await ensureSales(); }catch(e){}
+  const all=(typeof rpRows==='function' && RAW && RAW.rows)? rpRows({mode:'all'}) : [];
+  const has=all.length>0;
+  const m=has?rpMetrics(all):{total:0,posRate:0,negRate:0,pos:0,neg:0,neu:0};
+  const negPosts=all.filter(r=>r.isPost && rsent(r)==='부정').length;
+  const tr=has?rpTrend(all,{mode:'all'}):[];
+  const lastT=tr[tr.length-1]||{}, prevT=tr[tr.length-2]||null;
+  const dP=(c,p)=>(p!=null&&p>0)?((c-p)/p*100):null;
+  const dPp=(c,p)=>(p!=null)?(c-p):null;
+  // 감성/SOV/카페
+  const bc=has?rpBrandCounts(all):{}; const own=(typeof effOwnBrand==='function'?effOwnBrand():'레이노');
+  const sovArr=Object.entries(bc).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const sovTot=sovArr.reduce((s,x)=>s+x[1],0)||1;
+  const sovTop=sovArr.slice(0,4);
+  const cafeCnt={}; all.forEach(r=>{ const c=r.cafe||'(미상)'; cafeCnt[c]=(cafeCnt[c]||0)+1; });
+  const cafeTop=Object.entries(cafeCnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const cafeMax=cafeTop.length?cafeTop[0][1]:1;
+  // 매출
+  const S=(SALES&&SALES.channels)?SALES:null; let revTot=0, revMonths=(S&&S.months)||[];
+  if(S) revMonths.forEach(mo=>revTot+=((S.channels.B2C.ma[mo]||0)+(S.channels.B2B.ma[mo]||0)+(S.channels['별도채널'].ma[mo]||0)));
+  let revDelta=null;
+  if(S&&revMonths.length>=2){ const a=revMonths[revMonths.length-2],b=revMonths[revMonths.length-1];
+    const va=(S.channels.B2C.ma[a]||0)+(S.channels.B2B.ma[a]||0)+(S.channels['별도채널'].ma[a]||0);
+    const vb=(S.channels.B2C.ma[b]||0)+(S.channels.B2B.ma[b]||0)+(S.channels['별도채널'].ma[b]||0);
+    revDelta=dP(vb,va); }
+  // 주목 게시글
+  const maxD=all.reduce((mx,r)=>{const d=normDate(r.date);return d&&d>mx?d:mx;},'');
+  const rel=d=>{ if(!d||!maxD)return ''; const diff=Math.round((new Date(maxD)-new Date(d))/86400000); return diff<=0?'오늘':diff+'일 전'; };
+  const watch=all.filter(r=>r.isPost && rsent(r)==='부정').map(r=>({r,d:normDate(r.date)})).filter(x=>x.d).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,5);
+
+  const dlt=(v,pp,invert)=>{ if(v==null) return `<span class="hm-dlt" style="color:var(--ink3)">— <span class="vs">데이터 부족</span></span>`;
+    const good = invert? v<0 : v>=0; const arrow = v>=0?'▲':'▼';
+    return `<span class="hm-dlt ${good?'up':'down'}">${arrow} ${Math.abs(v).toFixed(1)}${pp?'pp':'%'}<span class="vs">vs 직전 월</span></span>`; };
+  const F=_homeFmtNum;
+
+  if(!has && !S){ host.innerHTML=`<div class="hm"><div class="hm-head"><div><h1>브랜드 &amp; 매출 개요</h1><p>수집 데이터와 매출 ERP를 올리면 핵심 지표가 여기에 모입니다.</p></div></div><div class="hm-card"><div class="hm-emp">아직 데이터가 없습니다. <b>온라인 모니터링</b>에서 수집 데이터를, <b>설정 → 매출</b>에서 ERP를 올려주세요.</div></div></div>`; return; }
+
+  // KPI
+  const kpis=`<div class="hm-kpis">
+    <div class="hm-kpi"><div class="t"><span class="l">총 언급 수</span><span class="ic">💬</span></div><div class="v">${F(m.total)}</div>${dlt(dP(lastT.total,prevT&&prevT.total))}</div>
+    <div class="hm-kpi"><div class="t"><span class="l">긍정 비율</span><span class="ic">🙂</span></div><div class="v">${m.posRate.toFixed(1)}%</div>${dlt(dPp(lastT.posRate,prevT&&prevT.posRate),true)}</div>
+    <div class="hm-kpi"><div class="t"><span class="l">부정 게시글</span><span class="ic">⚠️</span></div><div class="v">${F(negPosts)}</div>${dlt(dP(lastT.neg,prevT&&prevT.neg),false,true)}</div>
+    <div class="hm-kpi"><div class="t"><span class="l">전사 매출${revMonths.length?` (${revMonths[0]}~${revMonths[revMonths.length-1]}월)`:''}</span><span class="ic">📈</span></div><div class="v">${S?(revTot/1e8).toFixed(1)+'억':'—'}</div>${S?dlt(revDelta):`<span class="hm-dlt" style="color:var(--ink3)">매출 ERP 업로드 시 표시</span>`}</div>
+  </div>`;
+
+  // 감성 도넛 + SOV
+  const sovRows=sovTop.map(([b,v])=>{ const pct=v/sovTot*100, mine=(b===own);
+    return `<div class="it"><span class="nm"><i style="background:${mine?'var(--amber)':'#6b7280'}"></i>${escapeHtml(b)}${mine?' <span style="color:var(--amber);font-size:11px">· 자사</span>':''}</span><span class="vv">${pct.toFixed(1)}%</span><div class="bar"><i style="width:${pct.toFixed(0)}%;background:${mine?'var(--amber)':'#6b7280'}"></i></div></div>`; }).join('') || `<div class="hm-emp">브랜드 언급이 아직 없습니다.</div>`;
+  const sentTotal=m.pos+m.neu+m.neg||1;
+  const row2=`<div class="hm-row2">
+    <div class="hm-card"><h3>감성 구성</h3><div class="sub">검증·AI 감성 분류 (없음 제외)</div>
+      <div style="display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-top:4px">
+        <div class="hm-donut"><canvas id="hmSenti"></canvas><div class="c"><b>${F(m.total)}</b><span>분류 언급</span></div></div>
+        <div class="hm-rank" style="flex:1;min-width:200px">
+          <div class="it"><span class="nm"><i style="background:var(--pos)"></i>긍정</span><span class="vv">${(m.pos/sentTotal*100).toFixed(1)}%</span><div class="bar"><i style="width:${(m.pos/sentTotal*100).toFixed(0)}%;background:var(--pos)"></i></div></div>
+          <div class="it"><span class="nm"><i style="background:#6b7280"></i>중립</span><span class="vv">${(m.neu/sentTotal*100).toFixed(1)}%</span><div class="bar"><i style="width:${(m.neu/sentTotal*100).toFixed(0)}%;background:#6b7280"></i></div></div>
+          <div class="it"><span class="nm"><i style="background:var(--neg)"></i>부정</span><span class="vv">${(m.neg/sentTotal*100).toFixed(1)}%</span><div class="bar"><i style="width:${(m.neg/sentTotal*100).toFixed(0)}%;background:var(--neg)"></i></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="hm-card"><h3>경쟁사 점유율 (SOV)</h3><div class="sub">언급량 기준 점유율</div><div class="hm-rank" style="margin-top:8px">${sovRows}</div></div>
+  </div>`;
+
+  // 채널 매출 + 카페 TOP
+  const cafeRows=cafeTop.map(([c,v])=>`<div class="it"><span class="nm">${escapeHtml(c)}</span><span class="vv">${F(v)}</span><div class="bar"><i style="width:${(v/cafeMax*100).toFixed(0)}%;background:var(--amber)"></i></div></div>`).join('')||`<div class="hm-emp">데이터 없음</div>`;
+  const row2b=`<div class="hm-row2b">
+    <div class="hm-card"><h3>채널별 매출 비중</h3><div class="sub">B2C / B2B · 월별 (단위: 억)</div>${S?'<div class="hm-chart" style="height:210px;margin-top:6px"><canvas id="hmRev"></canvas></div>':'<div class="hm-emp">매출 ERP를 올리면 표시됩니다.</div>'}</div>
+    <div class="hm-card"><h3>언급 많은 카페 TOP 5</h3><div class="sub">레이노 언급이 많은 커뮤니티</div><div class="hm-rank" style="margin-top:8px">${cafeRows}</div></div>
+  </div>`;
+
+  // 주목 게시글
+  const wrows=watch.map(x=>{ const r=x.r, t=(r.title||'(제목 없음)').slice(0,46), pill=rsent(r)==='부정'?'neg':'neu';
+    const link=r.link?`<a class="lk" href="${escapeHtml(r.link)}" target="_blank" rel="noopener" style="color:var(--amber);text-decoration:none;font-weight:700">원문 →</a>`:'';
+    return `<tr><td><div style="display:flex;gap:10px;align-items:center"><div class="av">📝</div><div><div style="font-weight:700">${escapeHtml(t)}</div><div style="font-size:11.5px;color:var(--ink3)">${escapeHtml(r.cafe||'')}</div></div></div></td><td><span class="hm-pill ${pill}">${rsent(r)}</span></td><td style="color:var(--ink2);font-size:12px">${x.d.replace(/-/g,'.')} · ${rel(x.d)}</td><td style="text-align:right">${link}</td></tr>`; }).join('');
+  const table=`<div class="hm-card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div><h3>주목 게시글 (부정 · 최신)</h3><div class="sub">우선 확인이 필요한 최근 부정 게시글</div></div></div>
+    ${watch.length?`<table class="hm-tbl"><thead><tr><th>제목 / 카페</th><th>감성</th><th>작성일</th><th></th></tr></thead><tbody>${wrows}</tbody></table>`:'<div class="hm-emp">최근 부정 게시글이 없습니다. 👍</div>'}</div>`;
+
+  host.innerHTML=`<div class="hm"><div class="hm-head"><div><h1>브랜드 &amp; 매출 개요</h1><p>레이노 브랜드 언급·감성과 매출 핵심 지표를 한 화면에서 봅니다.${maxD?` · 최신 데이터 ${maxD.replace(/-/g,'.')}`:''}</p></div></div>
+    ${kpis}
+    <div class="hm-card" style="margin-bottom:16px"><h3>언급 추이</h3><div class="sub">월별 언급 수</div><div class="hm-chart"><canvas id="hmTrend"></canvas></div></div>
+    ${row2}${row2b}${table}</div>`;
+
+  // 차트
+  const ck=_ck(), amber='#f4911c';
+  if(tr.length && document.getElementById('hmTrend')){
+    makeChart('hmTrend',{type:'line',data:{labels:tr.map(t=>t.label),datasets:[{data:tr.map(t=>t.total),borderColor:amber,borderWidth:2.5,tension:.4,pointRadius:tr.length>14?0:3,pointBackgroundColor:amber,fill:true,
+      backgroundColor:c=>{const{ctx,chartArea}=c.chart;if(!chartArea)return 'transparent';const g=ctx.createLinearGradient(0,chartArea.top,0,chartArea.bottom);g.addColorStop(0,'rgba(244,145,28,.35)');g.addColorStop(1,'rgba(244,145,28,0)');return g;}}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y.toLocaleString()+' 건'}}},scales:{x:{grid:{display:false},ticks:{color:ck.text,maxTicksLimit:10}},y:{grid:{color:ck.grid},ticks:{color:ck.text}}}}});
+  }
+  if(document.getElementById('hmSenti')){
+    makeChart('hmSenti',{type:'doughnut',data:{labels:['긍정','중립','부정'],datasets:[{data:[m.pos,m.neu,m.neg],backgroundColor:['#34b27b','#6b7280','#e5484d'],borderColor:ck.donut,borderWidth:3}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed.toLocaleString()}}}}});
+  }
+  if(S && document.getElementById('hmRev')){
+    makeChart('hmRev',{type:'bar',data:{labels:revMonths.map(mo=>mo+'월'),datasets:[
+      {label:'B2C',data:revMonths.map(mo=>(S.channels.B2C.ma[mo]||0)/1e8),backgroundColor:amber,borderRadius:5,stack:'s'},
+      {label:'B2B',data:revMonths.map(mo=>(S.channels.B2B.ma[mo]||0)/1e8),backgroundColor:'#3f78c7',borderRadius:5,stack:'s'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:ck.text,boxWidth:11,font:{size:11}}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toFixed(1)+'억'}}},scales:{x:{grid:{display:false},ticks:{color:ck.text},stacked:true},y:{grid:{color:ck.grid},ticks:{color:ck.text,callback:v=>v+'억'},stacked:true}}}});
+  }
+}
+
 async function setWorkspace(ws){
   workspace=ws;
   document.querySelectorAll('.appsw-btn').forEach(b=>b.classList.toggle('on', b.dataset.ws===ws));
-  const rayno=(ws==='rayno'), settings=(ws==='settings');
+  const home=(ws==='home'), rayno=(ws==='rayno'), settings=(ws==='settings');
+  const hmEl=document.getElementById('homeApp'); if(hmEl) hmEl.style.display = home?'block':'none';
   document.getElementById('raynoApp').style.display = rayno?'block':'none';
   document.getElementById('settingsApp').style.display = settings?'block':'none';
-  if(rayno){ hideCafe(); await openRayno(); }
+  if(home){ hideCafe(); document.getElementById('nav').style.display='none'; await renderHome(); }
+  else if(rayno){ hideCafe(); await openRayno(); }
   else if(settings){ hideCafe(); await openSettingsWs(); }
   else { showCafe(); }
   window.scrollTo({top:0,behavior:'smooth'});
@@ -5072,6 +5221,7 @@ async function boot(){
   applyAutoKeywords();   // 등록된 키워드/문장에 걸리는 미검증 글 자동 정리
   enterApp();
   applyDashTools();    // 상단 도구·필터 기본 접힘
+  setWorkspace('home');   // 랜딩: 개요(홈)
   pollCrawlStatus();   // 자동 수집 진행률 폴링 시작
   const n = (STORE.rows||[]).length;
   if(n) setTimeout(()=>toast(`데이터 ${n.toLocaleString()}건 불러옴${auth==='admin'?' · 관리자 모드':''}`), 400);
