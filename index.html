@@ -167,6 +167,8 @@
   body.tools-collapsed #typeBar,
   body.tools-collapsed #filterStatus,
   body.tools-collapsed #crawlBar:not(.crawl-active){display:none !important}
+  @keyframes crawlFlash{0%{box-shadow:0 0 0 0 rgba(244,145,28,.55)}100%{box-shadow:0 0 0 9px rgba(244,145,28,0)}}
+  .crawl-flash{animation:crawlFlash 1.3s ease-out}
   /* 다크모드 토글 스위치 (워크스페이스 줄 우측) */
   .theme-switch{display:inline-flex;align-items:center;gap:9px;margin-left:auto;background:var(--card);
     border:1px solid var(--line2);border-radius:980px;padding:8px 14px;cursor:pointer;
@@ -726,6 +728,7 @@
     <button class="nav-btn on" data-view="dash">📊 <span data-txt="tabDash">대시보드</span></button>
     <button class="nav-btn" data-view="report">📑 <span data-txt="tabReport">리포트</span></button>
     <button class="nav-btn admin-only" data-view="verify">✓ <span data-txt="tabVerify">데이터 검증</span> <span class="nav-badge" id="verifyBadge">0</span></button>
+    <button class="nav-btn admin-only" id="navCrawlBtn" type="button" title="자동 수집(크롤링) 열기">🛰 <span>자동 수집</span></button>
     <div class="nav-tools">
       <span class="acc-stat" id="accStat"></span>
       <span class="admin-flag" id="adminFlag">🔓 관리자 모드</span>
@@ -1117,7 +1120,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 잔버그수정';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 크롤버튼';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -3423,7 +3426,9 @@ document.getElementById('vfSearch').addEventListener('input', e=>{
 
 // 내비게이션
 document.getElementById('nav').addEventListener('click', e=>{
-  const b=e.target.closest('.nav-btn'); if(!b)return; setView(b.dataset.view);
+  const b=e.target.closest('.nav-btn'); if(!b)return;
+  if(b.id==='navCrawlBtn'){ openCrawlPanel(); return; }
+  setView(b.dataset.view);
 });
 document.getElementById('addBtn').addEventListener('click', ()=>fileInput.click());
 document.getElementById('exportBtn').addEventListener('click', exportData);
@@ -4436,6 +4441,17 @@ function applyDashTools(){
   document.body.classList.toggle('tools-collapsed', !_dashToolsOpen);
   const b=document.getElementById('dashToolToggle');
   if(b) b.textContent=_dashToolsOpen?'⚙ 도구·필터 접기 ▴':'⚙ 도구·필터 펼치기 ▾';
+}
+// 상단 [🛰 자동 수집] 버튼 → 대시보드로 이동 + 도구 펼침 + 자동수집 박스로 스크롤·강조
+function openCrawlPanel(){
+  if(auth!=='admin'){ toast('관리자만 사용할 수 있습니다.',true); return; }
+  if(state.view!=='dash'){ setView('dash'); }
+  _dashToolsOpen=true; applyDashTools();
+  setTimeout(()=>{
+    const el=document.getElementById('crawlBar');
+    if(el){ el.scrollIntoView({behavior:'smooth', block:'center'});
+      el.classList.add('crawl-flash'); setTimeout(()=>el.classList.remove('crawl-flash'),1500); }
+  },70);
 }
 (function(){ const b=document.getElementById('dashToolToggle');
   if(b) b.addEventListener('click', ()=>{ _dashToolsOpen=!_dashToolsOpen; applyDashTools(); }); })();
