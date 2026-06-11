@@ -1120,7 +1120,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 멈춤복구3';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 크롤박스복구';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -3557,6 +3557,8 @@ function applyAuthUI(){
   document.getElementById('logoutBtn').style.display = admin ? '' : 'none';  // 로그아웃: 관리자
   document.getElementById('adminFlag').style.display = admin ? 'inline-flex' : 'none';
   if(!admin && (state.view==='verify'||state.view==='settings')) setView('dash');
+  // 권한이 바뀌면 자동수집 박스도 다시 그림(부팅 땐 viewer라 비어 있던 것 → 로그인 후 시작 컨트롤 표시)
+  if(typeof renderCrawlBar==='function'){ try{ renderCrawlBar(_lastCrawlStatus); }catch(e){} }
   const hasData = !!(RAW && RAW.meta && RAW.meta.total>0);
   if(!hasData){
     document.getElementById('drop').style.display = admin ? 'block' : 'none';
