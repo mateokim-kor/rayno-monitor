@@ -1120,7 +1120,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 멈춤복구2';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 멈춤복구3';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4311,8 +4311,9 @@ function renderCrawlBar(s){
   const isAdmin=(auth==='admin');
   const st0=(s&&s.state)?s.state:'idle';
   const sAt=(s&&s.at)?new Date(s.at).getTime():0;
-  // 진행 중인데 시각 정보가 없거나 90초 넘게 갱신이 없으면 = 멈춘 것 → 시작 컨트롤 노출
-  const stale=(st0==='running') && (sAt===0 || Date.now()-sAt>90000);
+  // 유효하고 최근(±90초)인 시각이 있을 때만 '진행 중'으로 인정. 그 외(시각없음/깨짐/오래됨/미래)는 멈춤 처리
+  const fresh=sAt>0 && Math.abs(Date.now()-sAt)<=90000;
+  const stale=(st0==='running') && !fresh;
   const st=stale?'stalled':st0;
   el.classList.toggle('crawl-active', st==='running'||st==='await_auth');
   const pct=s?Math.max(0,Math.min(100,Math.round(s.pct||0))):0;
