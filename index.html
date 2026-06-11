@@ -1120,7 +1120,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 멈춤복구';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 멈춤복구2';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4311,8 +4311,8 @@ function renderCrawlBar(s){
   const isAdmin=(auth==='admin');
   const st0=(s&&s.state)?s.state:'idle';
   const sAt=(s&&s.at)?new Date(s.at).getTime():0;
-  // 진행 중인데 90초 넘게 갱신이 없으면 = 프로그램이 멈춘 것 → 시작 컨트롤 노출
-  const stale=(st0==='running') && sAt>0 && (Date.now()-sAt>90000);
+  // 진행 중인데 시각 정보가 없거나 90초 넘게 갱신이 없으면 = 멈춘 것 → 시작 컨트롤 노출
+  const stale=(st0==='running') && (sAt===0 || Date.now()-sAt>90000);
   const st=stale?'stalled':st0;
   el.classList.toggle('crawl-active', st==='running'||st==='await_auth');
   const pct=s?Math.max(0,Math.min(100,Math.round(s.pct||0))):0;
@@ -4366,14 +4366,14 @@ async function startCrawl(){
     label=`${f||'처음'} ~ ${t||'최근'}`;
   }else{ cmd.days=parseInt(_crawlPeriodSel,10)||3; label=`최근 ${cmd.days}일`; }
   _crawlReqAt=Date.now();
-  renderCrawlBar({state:'running',pct:1,message:`크롤링 요청됨 (${label}) — PC에서 시작 대기 중…`});
+  renderCrawlBar({state:'running',pct:1,at:new Date().toISOString(),message:`크롤링 요청됨 (${label}) — PC에서 시작 대기 중…`});
   const ok=await cloudSaveJSON(SUPA.commandFile, cmd);
   if(ok) toast(`크롤링을 요청했습니다 (${label}).`); else _crawlReqAt=0;
 }
 async function confirmAuthDone(){
   if(auth!=='admin') return;
   _crawlReqAt=Date.now();
-  renderCrawlBar({state:'running',pct:6,message:'인증 완료 — 수집을 시작합니다…'});
+  renderCrawlBar({state:'running',pct:6,at:new Date().toISOString(),message:'인증 완료 — 수집을 시작합니다…'});
   const ok=await cloudSaveJSON(SUPA.commandFile,{action:'auth_done',nonce:Date.now(),at:new Date().toISOString()});
   if(ok) toast('인증 완료를 전달했습니다.'); else _crawlReqAt=0;
 }
