@@ -1165,7 +1165,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 점유율6차트';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 전사메일';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2752,6 +2752,94 @@ function noteBlock(kind,title,autoText){
 }
 function printReport(){ if(typeof window!=='undefined' && window.print) window.print(); }
 
+// ── 전사 메일: 브랜드 모니터링 리포트 기반 자동 작성 ──
+function buildBrandEmail(){
+  const cur=rpRows(RP), M=rpMetrics(cur);
+  const prevP=rpPrev(RP), P=prevP?rpMetrics(rpRows(prevP)):null;
+  const lab=rpLabel(RP), comps=effCompetitors();
+  const coTotal=cur.length, coRows={}; comps.forEach(b=>{ if(b)coRows[b]=0; });
+  cur.forEach(r=>{ const t=(r.title||'')+' '+(r.body||''); comps.forEach(b=>{ if(b&&t.includes(b))coRows[b]++; }); });
+  const coEnt=Object.entries(coRows).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const posR=rpTopValues(cur,'posReason',5), negR=rpTopValues(cur,'negReason',5);
+  const neg=cur.filter(r=>r.isPost && rsent(r)==='부정').map(r=>({r,d:normDate(r.date)})).filter(x=>x.d).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,5);
+  const gn=k=>((typeof getNote==='function'?getNote(k):'')||(repDrafts&&repDrafts[k])||'').trim();
+  const _strip=s=>String(s||'').replace(/\*\*|==|\+\+|~~/g,'').replace(/`/g,'');
+  const insight=_strip(gn('insight')), marketing=_strip(gn('marketing'));
+  const dl=(c,p)=> p==null||!p?'':(c>=p?` (▲ ${(((c-p)/p)*100).toFixed(0)}%)`:` (▼ ${(((p-c)/p)*100).toFixed(0)}%)`);
+  const subject=`[레이노 브랜드 모니터링] ${lab} 온라인 언급·감성 리포트`;
+  const L=[];
+  L.push('수신: 전사');
+  L.push('');
+  L.push('안녕하세요. 마케팅팀입니다.');
+  L.push(`${lab} 기준 레이노 온라인 브랜드 모니터링 결과를 공유드립니다.`);
+  L.push('');
+  L.push('■ 핵심 요약');
+  L.push(`· 총 언급량: ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''} (게시글 ${M.posts} · 댓글 ${M.cmts})`);
+  L.push(`· 긍정률 ${M.posRate.toFixed(1)}% / 부정률 ${M.negRate.toFixed(1)}% / 순감성 ${M.net>=0?'+':''}${M.net.toFixed(1)}%p`);
+  L.push(`· 활동 카페: ${M.cafes}곳`);
+  L.push('');
+  if(coEnt.length){
+    L.push('■ 경쟁사 동시 언급 (레이노 글에 함께 등장)');
+    coEnt.forEach(([b,c])=>L.push(`· ${b}: ${c.toLocaleString()}건 (${coTotal?(c/coTotal*100).toFixed(0):0}%)`));
+    L.push('');
+  }
+  if(posR.length||negR.length){
+    L.push('■ 주요 감성 요인');
+    if(posR.length) L.push(`· 긍정: ${posR.map(x=>x[0]).join(', ')}`);
+    if(negR.length) L.push(`· 부정: ${negR.map(x=>x[0]).join(', ')}`);
+    L.push('');
+  }
+  if(neg.length){
+    L.push('■ 주목 게시글 (부정·최근)');
+    neg.forEach(x=>L.push(`· [${x.r.cafe||''}] ${(x.r.title||'(제목 없음)').slice(0,50)} (${x.d.replace(/-/g,'.')})`));
+    L.push('');
+  }
+  L.push('■ 인사이트 / 제언');
+  if(insight) L.push(insight);
+  if(marketing){ if(insight)L.push(''); L.push(marketing); }
+  if(!insight && !marketing) L.push('· (리포트의 ‘핵심 인사이트/마케팅 제안’을 작성하면 이 영역에 자동 반영됩니다.)');
+  L.push('');
+  L.push('자세한 내용은 브랜드 모니터링 대시보드를 참고해 주세요.');
+  L.push('감사합니다.');
+  L.push('마케팅팀 드림');
+  return { subject, body:L.join('\n') };
+}
+function openMailModal(){
+  if(auth!=='admin') return;
+  const m=buildBrandEmail();
+  const old=document.getElementById('mailModal'); if(old) old.remove();
+  const ov=document.createElement('div'); ov.id='mailModal'; ov.className='cmodal';
+  ov.innerHTML=`<div class="cmodal-card" style="width:min(680px,94vw)">
+    <div class="cmodal-head"><span class="cmodal-title">✉ 전사 메일 작성 <span style="font-size:12px;color:var(--ink2);font-weight:600">· 브랜드 모니터링 ${escapeHtml(rpLabel(RP))}</span></span><button class="cmodal-x" id="mailClose" type="button">✕</button></div>
+    <label style="font-size:12px;color:var(--ink2);font-weight:700">제목</label>
+    <input id="mailSubject" class="lock-in" style="width:100%;margin:4px 0 12px" value="${escapeHtml(m.subject)}">
+    <label style="font-size:12px;color:var(--ink2);font-weight:700">본문 <span style="color:var(--ink3);font-weight:500">· 자유롭게 수정 가능</span></label>
+    <textarea id="mailBody" style="width:100%;height:300px;margin-top:4px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font-size:13px;line-height:1.6;font-family:inherit;resize:vertical">${escapeHtml(m.body)}</textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap">
+      <button class="viewbtn" id="mailCopy" type="button">📋 복사</button>
+      <button class="viewbtn" id="mailPdf" type="button">📄 PDF로 저장</button>
+      <button class="viewbtn" id="mailMailto" type="button" style="background:var(--amber);color:#1a1205;border-color:var(--amber)">✉ 메일 앱으로</button>
+    </div></div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  ov.addEventListener('click', ev=>{ if(ev.target===ov) close(); });
+  ov.querySelector('#mailClose').onclick=close;
+  ov.querySelector('#mailCopy').onclick=()=>{ const t=ov.querySelector('#mailSubject').value+'\n\n'+ov.querySelector('#mailBody').value;
+    try{ navigator.clipboard.writeText(t); }catch(e){} toast('메일 내용을 복사했습니다'); };
+  ov.querySelector('#mailPdf').onclick=()=>printMail(ov.querySelector('#mailSubject').value, ov.querySelector('#mailBody').value);
+  ov.querySelector('#mailMailto').onclick=()=>{ const s=encodeURIComponent(ov.querySelector('#mailSubject').value), b=encodeURIComponent(ov.querySelector('#mailBody').value);
+    window.location.href=`mailto:?subject=${s}&body=${b}`; };
+}
+function printMail(subject, body){
+  const w=window.open('','_blank','width=720,height=900');
+  if(!w){ toast('팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.',true); return; }
+  const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  w.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>${esc(subject)}</title>
+<style>@page{margin:18mm} body{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:#111;line-height:1.7;font-size:13.5px;max-width:760px;margin:0 auto;padding:10px} h1{font-size:18px;border-bottom:2px solid #f4911c;padding-bottom:10px;margin:0 0 18px;color:#111} pre{white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:13.5px;margin:0} .ft{margin-top:26px;border-top:1px solid #ddd;padding-top:10px;color:#888;font-size:11px}</style>
+</head><body><h1>${esc(subject)}</h1><pre>${esc(body)}</pre><div class="ft">RAYNO 브랜드 모니터링 · 생성일 ${new Date().toLocaleDateString('ko-KR')}</div></body></html>`);
+  w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(e){} }, 350);
+}
+
 function renderReport(){
   const box=document.getElementById('report');
   if(!RAW || !RAW.rows.length){ box.innerHTML='<div class="card"><div class="empty">아직 데이터가 없습니다. 데이터가 쌓이면 리포트가 자동 생성됩니다.</div></div>'; return; }
@@ -2785,6 +2873,7 @@ function renderReport(){
            <span class="dt-tilde">~</span>
            <input type="date" class="dt-input" id="rpTo" value="${RP.to}" min="${dates[0]||''}" max="${dates[dates.length-1]||''}">
          </span>
+         ${auth==='admin'?`<button class="viewbtn" id="rpMail" title="브랜드 모니터링 리포트로 전사 메일 작성">✉ 전사 메일</button>`:''}
          <button class="viewbtn" id="rpPdf" title="인쇄 창에서 ‘PDF로 저장’을 선택하세요">📄 PDF 저장</button>
        </div>
      </div>
@@ -2956,6 +3045,8 @@ function bindReport(){
 document.getElementById('report').addEventListener('click', e=>{
   // PDF 저장
   if(e.target.closest('#rpPdf')){ printReport(); return; }
+  // 전사 메일 작성(관리자)
+  if(e.target.closest('#rpMail')){ if(auth==='admin') openMailModal(); return; }
   // 기간 세그먼트
   const sb=e.target.closest('#rpSeg button');
   if(sb){ RP.mode=sb.dataset.rpm; renderReport(); return; }
