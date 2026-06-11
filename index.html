@@ -1137,7 +1137,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 매출월별';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 품목분류';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -3931,6 +3931,8 @@ function _salesRows(buf){
   if(b.length>=2&&b[0]===0xFE&&b[1]===0xFF) return new TextDecoder('utf-16be').decode(b).split(/\r\n|\n/).map(l=>l.split('\t'));
   try{ const wb=XLSX.read(b,{type:'array'}); const sh=wb.SheetNames[0]; return XLSX.utils.sheet_to_json(wb.Sheets[sh],{header:1,defval:''}); }catch(e){ return null; }
 }
+function _sGuessType(mat,mid){ const GD=/스티커|타월|TOWEL|TAPE|테이프|PAPER|인증패|세트|SQZ|습지|커버|charge|불스원|냅킨|장갑|칼|블레이드/i; const RS=/UNI-|-PH-|-UL-|롤|ROLL/i;
+  if(GD.test(mat)&&!RS.test(mat)) return 'goods'; if(mid==='기타품목'&&!RS.test(mat)) return 'goods'; return 'roll'; }
 function aggregateSales(rows){
   if(!rows||rows.length<2) return null;
   const H=rows[0].map(c=>String(c||'').trim());
@@ -3948,21 +3950,21 @@ function aggregateSales(rows){
     const dept=String((iDept>=0?r[iDept]:'')||'').trim(), g=grp(dept);
     const cust=String((iCust>=0?r[iCust]:'')||'').trim();
     const mid=String((iMid>=0?r[iMid]:'')||'').trim()||'기타';
-    if(!prodAll[mid]) prodAll[mid]={mq:_sMz(),ma:_sMz()};
+    if(!prodAll[mat]) prodAll[mat]={mid,mq:_sMz(),ma:_sMz()};
     const isB2C=(g==='B2C'), jb=isB2C?(_sToJibu(cust)||'본사'):null;
-    if(isB2C){ if(!jibuProd[jb][mid]) jibuProd[jb][mid]=_sMz(); if(cust&&!dealers[cust]) dealers[cust]={mq:_sMz(),ma:_sMz(),jibu:!!_sToJibu(cust)}; }
+    if(isB2C){ if(!jibuProd[jb][mat]) jibuProd[jb][mat]=_sMz(); if(cust&&!dealers[cust]) dealers[cust]={mq:_sMz(),ma:_sMz(),jibu:!!_sToJibu(cust)}; }
     const dep=dept||'(미지정)'; if(g==='별도채널'&&!extra[dep]) extra[dep]={mq:_sMz(),ma:_sMz()};
     for(let m=1;m<=12;m++){
       const q=qc[m]>=0?_sNum(r[qc[m]]):0, a=ac[m]>=0?_sNum(r[ac[m]]):0; if(!q&&!a) continue; act.add(m);
-      ch[g].mq[m]+=q; ch[g].ma[m]+=a; prodAll[mid].mq[m]+=q; prodAll[mid].ma[m]+=a;
+      ch[g].mq[m]+=q; ch[g].ma[m]+=a; prodAll[mat].mq[m]+=q; prodAll[mat].ma[m]+=a;
       if(g==='별도채널'){ extra[dep].mq[m]+=q; extra[dep].ma[m]+=a; }
-      if(isB2C){ jibu[jb].mq[m]+=q; jibu[jb].ma[m]+=a; jibuProd[jb][mid][m]+=q; if(cust){ dealers[cust].mq[m]+=q; dealers[cust].ma[m]+=a; } }
+      if(isB2C){ jibu[jb].mq[m]+=q; jibu[jb].ma[m]+=a; jibuProd[jb][mat][m]+=q; if(cust){ dealers[cust].mq[m]+=q; dealers[cust].ma[m]+=a; } }
     }
   }
   const months=[]; for(let m=1;m<=12;m++) if(act.has(m)) months.push(m);
   const prodList=Object.keys(prodAll).sort((a,b)=>_sSum(prodAll[b].mq)-_sSum(prodAll[a].mq));
-  const itemType={}; prodList.forEach(p=> itemType[p]= /기타품목|스티커|타월|TOWEL|TAPE|테이프|PAPER|인증패|세트|charge|SQZ|습지|커버링/i.test(p)?'goods':'roll');
-  return {ver:2,updatedAt:new Date().toISOString(),months,channels:ch,extra,jibu,dealers,prodAll,jibuProd,prodList,inputs:{carSales:{},cap:{},itemType}};
+  const itemType={}; prodList.forEach(mat=> itemType[mat]=_sGuessType(mat,prodAll[mat].mid));
+  return {ver:3,updatedAt:new Date().toISOString(),months,channels:ch,extra,jibu,dealers,prodAll,jibuProd,prodList,inputs:{carSales:{},cap:{},itemType}};
 }
 function handleSalesFile(file){
   if(auth!=='admin'){ toast('관리자만 업로드할 수 있습니다.',true); return; }
@@ -3974,13 +3976,14 @@ function handleSalesFile(file){
       Object.keys(SALES.inputs.itemType||{}).forEach(p=>{ if(agg.inputs.itemType[p]!==undefined) agg.inputs.itemType[p]=SALES.inputs.itemType[p]; }); }
     SALES=agg; salesLoaded=true; await cloudSaveJSON(SUPA.salesFile,SALES); renderRevenue();
     const tot=_sSum(SALES.channels.B2C.ma)+_sSum(SALES.channels.B2B.ma)+_sSum(SALES.channels['별도채널'].ma);
-    toast(`${file.name} · 매출 ${(tot/1e8).toFixed(1)}억 · ${SALES.months.length}개월 반영`);
+    toast(`${file.name} · 매출 ${(tot/1e8).toFixed(1)}억 · 품목 ${SALES.prodList.length}종 · ${SALES.months.length}개월 반영`);
   }catch(ex){ toast('파일 오류: '+ex.message,true); } };
   rd.readAsArrayBuffer(file);
 }
 function _warrByJibu(month){ const by={}; let total=0; SALES_JIBU.concat(['본사']).forEach(j=>by[j]=0);
   ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{ if(month){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(mm!==month)return; } total++; const j=String(r['담당지부']||'').trim(); if(by[j]!=null)by[j]++; }); return {by,total}; }
-function _isRoll(p){ const it=(SALES&&SALES.inputs&&SALES.inputs.itemType)||{}; return it[p]!=='goods'; }
+function _isRoll(mat){ const it=(SALES&&SALES.inputs&&SALES.inputs.itemType)||{}; return it[mat]!=='goods'; }
+function _midOf(mat){ return (SALES&&SALES.prodAll[mat]&&SALES.prodAll[mat].mid)||'기타'; }
 
 function renderRevenue(){
   const box=document.getElementById('rRevenue'); if(!box) return;
@@ -4006,14 +4009,14 @@ function renderRevenue(){
   const lab=m0?`${m0}월`:'전체(누적)';
   let sel=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><span style="font-weight:800">기간</span><select id="salesMonthSel" style="padding:7px 12px;border:1px solid var(--amber);border-radius:8px;background:var(--card);color:var(--ink);font-weight:700"><option value="0"${m0===0?' selected':''}>전체(누적)</option>${M.map(m=>`<option value="${m}"${m0===m?' selected':''}>${m}월</option>`).join('')}</select><span style="color:var(--ink2);font-size:12px">· 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b></span></div>`;
 
-  let s1=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>수량</th><th ${th}>매출액(원)</th><th ${th}>구성비</th></tr>`;
+  let s1=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>구성비</th></tr>`;
   ['B2C','B2B','별도채널'].forEach(g=>{ s1+=`<tr><td ${tdl}><b>${g}</b></td><td ${td}>${roll(chQty(g))}</td><td ${td}>${won(chAmt(g))}</td><td ${td}>${pct(chAmt(g),tAmt).toFixed(1)}%</td></tr>`; });
   s1+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">합계</td><td ${td} style="font-weight:800;background:var(--line)">${roll(chQty('B2C')+chQty('B2B')+chQty('별도채널'))}</td><td ${td} style="font-weight:800;background:var(--line)">${won(tAmt)}</td><td ${td} style="font-weight:800;background:var(--line)">100.0%</td></tr></table>`;
 
-  let s2=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>구분</th><th ${th}>수량</th><th ${th}>금액(원)</th></tr>`
+  let s2=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>구분</th><th ${th}>판매수량</th><th ${th}>금액(원)</th></tr>`
     +`<tr><td ${tdl}><b>롤 품목</b></td><td ${td}><b>${roll(rollQ)}</b> 롤</td><td ${td}>${won(rollA)}</td></tr>`
     +`<tr><td ${tdl}>일반 물품</td><td ${td}>${roll(goodsQ)}</td><td ${td}>${won(goodsA)}</td></tr></table>`
-    +`<div style="font-size:11px;color:var(--ink2);margin-top:6px">분류는 아래 ⑤제품별에서 바꿀 수 있어요.</div>`;
+    +`<div style="font-size:11px;color:var(--ink2);margin-top:6px">품목(MatName) 단위 분류 · 아래 ⑤에서 변경</div>`;
 
   let s3=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
   ['B2C','B2B','별도채널'].forEach(g=>{ s3+=`<tr><td ${tdl}>${g}</td>${M.map(m=>`<td ${td}>${won(C[g].ma[m])}</td>`).join('')}<td ${td}><b>${won(_sSum(C[g].ma))}</b></td></tr>`; });
@@ -4022,26 +4025,39 @@ function renderRevenue(){
   const JG=SALES_JIBU.concat(['본사']);
   const jr=JG.map(j=>({j,q:_sPick(SALES.jibu[j].mq),a:_sPick(SALES.jibu[j].ma)})).sort((x,y)=>y.q-x.q);
   const jR=jr.reduce((s,x)=>s+x.q,0), jA=jr.reduce((s,x)=>s+x.a,0);
-  let s4=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>수량</th><th ${th}>매출액(원)</th><th ${th}>수량 구성비</th></tr>`;
+  let s4=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>수량 구성비</th></tr>`;
   jr.forEach(x=>{ s4+=`<tr><td ${tdl}>${x.j==='본사'?'<b>본사</b>':x.j}</td><td ${td}>${roll(x.q)}</td><td ${td}>${won(x.a)}</td><td ${td}>${pct(x.q,jR).toFixed(1)}%</td></tr>`; });
   s4+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">합계(B2C)</td><td ${td} style="font-weight:800;background:var(--line)">${roll(jR)}</td><td ${td} style="font-weight:800;background:var(--line)">${won(jA)}</td><td ${td} style="background:var(--line)"></td></tr></table>`;
 
-  let capTotCars=0;
-  let s5=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>품목(중분류)</th><th ${th}>수량</th><th ${th}>분류</th><th ${th}>롤당 대수</th><th ${th}>시공가능대수</th></tr>`;
-  SALES.prodList.forEach(p=>{ const q=_sPick(SALES.prodAll[p].mq); const rt=_isRoll(p); const cp=_sNum(inp.cap[p]||0); const cars=rt?q*cp:0; if(rt)capTotCars+=cars;
-    const ep=encodeURIComponent(p);
-    const typeCell= admin? `<select class="sales-type" data-prod="${ep}" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)"><option value="roll"${rt?' selected':''}>롤</option><option value="goods"${!rt?' selected':''}>일반</option></select>` : (rt?'롤':'일반');
-    const capCell= rt? (admin? `<input class="sales-cap" data-prod="${ep}" type="number" min="0" step="0.1" value="${cp||''}" style="width:72px;text-align:right;padding:3px 6px;border:1px solid var(--amber);border-radius:6px;background:var(--card);color:var(--ink)">` : (cp||0)) : '<span style="color:var(--ink2)">—</span>';
-    s5+=`<tr><td ${tdl}>${p}</td><td ${td}>${roll(q)}</td><td ${td}>${typeCell}</td><td ${td}>${capCell}</td><td ${td}>${rt?roll(cars):'—'}</td></tr>`; });
-  s5+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">롤 시공가능대수 합</td><td colspan="3" ${td} style="background:var(--line)"></td><td ${td} style="font-weight:800;background:var(--line)">${roll(capTotCars)}</td></tr></table>`;
+  // ⑤ 품목(MatName) 분류 — 중분류로 묶기
+  const groups={}; SALES.prodList.forEach(mat=>{ const mid=_midOf(mat); (groups[mid]=groups[mid]||[]).push(mat); });
+  const midList=Object.keys(groups).sort((a,b)=> groups[b].reduce((s,m)=>s+_sPick(SALES.prodAll[m].mq),0) - groups[a].reduce((s,m)=>s+_sPick(SALES.prodAll[m].mq),0));
+  let s5=`<div style="font-size:12px;color:var(--ink2);margin-bottom:9px">품목(MatName)별 롤/일반 분류. 중분류 그룹을 펼쳐 개별 조정하거나, 그룹 헤더의 <b>일괄</b> 버튼으로 한 번에 바꿀 수 있어요.</div>`;
+  midList.forEach(mid=>{ const items=groups[mid].slice().sort((a,b)=>_sPick(SALES.prodAll[b].mq)-_sPick(SALES.prodAll[a].mq));
+    const gq=items.reduce((s,m)=>s+_sPick(SALES.prodAll[m].mq),0);
+    const nRoll=items.filter(_isRoll).length, nGoods=items.length-nRoll;
+    let rowsH='';
+    items.forEach(mat=>{ const q=_sPick(SALES.prodAll[mat].mq); const rt=_isRoll(mat); const em=encodeURIComponent(mat);
+      const tg= admin? `<select class="sales-type" data-mat="${em}" style="padding:2px 5px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)"><option value="roll"${rt?' selected':''}>롤</option><option value="goods"${!rt?' selected':''}>일반</option></select>` : (rt?'롤':'일반');
+      rowsH+=`<tr><td ${tdl} style="padding-left:18px">${mat}</td><td ${td}>${roll(q)}</td><td ${td}>${tg}</td></tr>`; });
+    const bulk= admin? `<span style="float:right;font-weight:400"><button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="roll" style="padding:1px 8px;font-size:11px">전체 롤</button> <button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="goods" style="padding:1px 8px;font-size:11px">전체 일반</button></span>` : '';
+    s5+=`<details style="border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;font-size:13px;list-style:none">${mid} <span style="color:var(--ink2);font-weight:400">· ${items.length}품목 · 수량 ${roll(gq)} · 롤 ${nRoll}/일반 ${nGoods}</span>${bulk}</summary><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>품목(MatName)</th><th ${th}>판매수량</th><th ${th}>분류</th></tr>${rowsH}</table></details>`; });
 
-  const capf=p=>_sNum(inp.cap[p]||0);
+  // ⑥ 시장 점유율 — 롤당 대수(중분류) + 자동차 판매량
+  const capf=mid=>_sNum(inp.cap[mid]||0);
+  // 롤 중분류 목록(롤 품목 1개 이상)
+  const rollMids={}; SALES.prodList.forEach(mat=>{ if(_isRoll(mat)) rollMids[_midOf(mat)]=true; });
   let carsDealer=0, carsJibu=0;
-  JG.forEach(j=>{ const pm=SALES.jibuProd[j]||{}; Object.keys(pm).forEach(p=>{ if(!_isRoll(p))return; const r=_sPick(pm[p]); carsDealer+=r*capf(p); if(j!=='본사')carsJibu+=r*capf(p); }); });
+  JG.forEach(j=>{ const pm=SALES.jibuProd[j]||{}; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const r=_sPick(pm[mat]); const cp=capf(_midOf(mat)); carsDealer+=r*cp; if(j!=='본사')carsJibu+=r*cp; }); });
   const wj=_warrByJibu(m0);
   const carSales = m0? _sNum((inp.carSales||{})[m0]||0) : Object.keys(inp.carSales||{}).reduce((s,k)=>s+_sNum(inp.carSales[k]),0);
   const shr=c=> carSales>0? (c/carSales*100).toFixed(2)+'%' : '<span style="color:var(--ink2)">판매량 입력</span>';
-  let s6=`<div style="margin-bottom:11px"><span style="font-weight:700">자동차 판매량 (${lab}, 대): </span>`;
+  let s6=`<div style="font-size:12px;color:var(--ink2);margin-bottom:8px">롤 중분류별 <b>롤당 시공가능대수</b>를 입력하면 시장점유율이 계산됩니다.</div>`;
+  s6+=`<table style="width:100%;border-collapse:collapse;margin-bottom:12px"><tr><th ${thl}>롤 중분류</th><th ${th}>롤당 시공가능대수</th></tr>`;
+  Object.keys(rollMids).sort().forEach(mid=>{ const em=encodeURIComponent(mid);
+    s6+=`<tr><td ${tdl}>${mid}</td><td ${td}>${admin?`<input class="sales-cap" data-mid="${em}" type="number" min="0" step="0.1" value="${capf(mid)||''}" style="width:80px;text-align:right;padding:3px 6px;border:1px solid var(--amber);border-radius:6px;background:var(--card);color:var(--ink)">`:(capf(mid)||0)}</td></tr>`; });
+  s6+=`</table>`;
+  s6+=`<div style="margin-bottom:11px"><span style="font-weight:700">자동차 판매량 (${lab}, 대): </span>`;
   s6+= (admin && m0)? `<input id="salesCarInput" data-month="${m0}" type="number" min="0" value="${carSales||''}" style="width:130px;text-align:right;padding:5px 8px;border:1px solid var(--amber);border-radius:7px;background:var(--card);color:var(--ink)">` : `<b>${carSales?won(carSales):'(미입력)'}</b>${(!m0&&admin)?' <span style="font-size:11px;color:var(--ink2)">· 월을 선택해 월별로 입력</span>':''}`;
   s6+=`</div>`;
   s6+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>기준</th><th ${th}>차량대수</th><th ${th}>점유율</th></tr>`
@@ -4053,20 +4069,20 @@ function renderRevenue(){
   s6+=`</table>`;
 
   const dl=Object.keys(SALES.dealers).map(k=>({name:k,q:_sPick(SALES.dealers[k].mq),a:_sPick(SALES.dealers[k].ma),jibu:SALES.dealers[k].jibu})).filter(d=>d.q>0||d.a>0).sort((a,b)=>b.q-a.q);
-  let s7=`<table style="width:100%;border-collapse:collapse"><tr><th ${th}>#</th><th ${thl}>거래처</th><th ${th}>수량</th><th ${th}>매출액(원)</th></tr>`;
+  let s7=`<table style="width:100%;border-collapse:collapse"><tr><th ${th}>#</th><th ${thl}>거래처</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th></tr>`;
   dl.forEach((d,i)=>{ s7+=`<tr${d.jibu?' style="background:rgba(244,145,28,.07)"':''}><td ${td}>${i+1}</td><td ${tdl}>${d.name}${d.jibu?' <span style="color:var(--amber);font-size:11px">·지부</span>':''}</td><td ${td}>${roll(d.q)}</td><td ${td}>${won(d.a)}</td></tr>`; });
   s7+=`</table>`;
 
   const rep=salesReportText();
   let s8=`<button id="salesRepCopy" class="acc-btn" style="margin-bottom:8px">📋 리포트 복사</button><pre id="salesRepText" style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:inherit;font-size:13px;color:var(--ink);margin:0">${rep.replace(/</g,'&lt;')}</pre>`;
 
-  box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'}</div>`
+  box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
     + sel
     + card(hh('① 채널 요약 · '+lab)+s1)
     + card(hh('② 롤 / 일반물품 구분 · '+lab)+s2)
     + card(hh('③ 월별 매출 추이')+s3)
     + card(hh('④ 지부별 판매현황 · '+lab)+s4)
-    + card(hh('⑤ 제품별 · 분류(롤/일반) · 시공가능대수 · '+lab)+s5)
+    + card(hh('⑤ 품목(MatName) 분류 · 롤/일반 · '+lab)+s5)
     + card(hh('⑥ 시장 점유율 · '+lab)+s6)
     + card(hh('⑦ 대리점별 판매현황 · '+lab)+s7)
     + card(hh('⑧ 월별 매출 리포트')+s8);
@@ -4093,18 +4109,24 @@ function salesReportText(){
   if(_salesMonth) return block(_salesMonth);
   return M.map(m=>block(m)).join('\n\n') + '\n\n' + block(0);
 }
-document.getElementById('rRevenue').addEventListener('change', async e=>{
+async function _salesSave(){ if(auth==='admin') cloudSaveJSON(SUPA.salesFile,SALES); }
+document.getElementById('rRevenue').addEventListener('change', e=>{
   if(!SALES) return; SALES.inputs=SALES.inputs||{cap:{},carSales:{},itemType:{}};
   const t=e.target;
   if(t.id==='salesMonthSel'){ _salesMonth=parseInt(t.value,10)||0; renderRevenue(); return; }
-  if(t.classList.contains('sales-cap')){ SALES.inputs.cap[decodeURIComponent(t.dataset.prod)]=_sNum(t.value); }
-  else if(t.classList.contains('sales-type')){ SALES.inputs.itemType=SALES.inputs.itemType||{}; SALES.inputs.itemType[decodeURIComponent(t.dataset.prod)]=t.value; }
+  if(t.classList.contains('sales-cap')){ SALES.inputs.cap[decodeURIComponent(t.dataset.mid)]=_sNum(t.value); }
+  else if(t.classList.contains('sales-type')){ SALES.inputs.itemType=SALES.inputs.itemType||{}; SALES.inputs.itemType[decodeURIComponent(t.dataset.mat)]=t.value; }
   else if(t.id==='salesCarInput'){ SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.carSales[parseInt(t.dataset.month,10)]=_sNum(t.value); }
   else return;
-  renderRevenue(); if(auth==='admin') cloudSaveJSON(SUPA.salesFile,SALES);
+  renderRevenue(); _salesSave();
 });
 document.getElementById('rRevenue').addEventListener('click', e=>{
-  if(e.target.id==='salesRepCopy'){ const el=document.getElementById('salesRepText'); const txt=el?el.textContent:'';
+  const t=e.target;
+  if(t.classList&&t.classList.contains('sales-bulk')){ const mid=decodeURIComponent(t.dataset.mid), val=t.dataset.val;
+    SALES.inputs.itemType=SALES.inputs.itemType||{};
+    SALES.prodList.forEach(mat=>{ if(_midOf(mat)===mid) SALES.inputs.itemType[mat]=val; });
+    renderRevenue(); _salesSave(); return; }
+  if(t.id==='salesRepCopy'){ const el=document.getElementById('salesRepText'); const txt=el?el.textContent:'';
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(()=>toast('리포트를 복사했습니다')).catch(()=>toast('복사 실패 — 길게 눌러 복사하세요',true)); }
     else toast('복사를 지원하지 않는 환경입니다',true); }
 });
