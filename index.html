@@ -1138,7 +1138,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 매출대시보드';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 매출차트';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -3924,7 +3924,10 @@ function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
 function _sMz(){ return Array(13).fill(0); }
 function _sSum(a){ let s=0; for(let m=1;m<=12;m++)s+=(a&&a[m])||0; return s; }
-function _sPick(a){ if(_salesMonth) return (a&&a[_salesMonth])||0; return _sSum(a); }
+function _salesCut(){ return _sNum((typeof salesCfg==='function'?salesCfg().cutoff:0)||0); }
+function _salesMonths(){ const cut=_salesCut(); const ms=(SALES&&SALES.months)||[]; return cut? ms.filter(m=>m<=cut) : ms.slice(); }
+function _sTot(a){ let s=0; _salesMonths().forEach(m=>s+=(a&&a[m])||0); return s; }
+function _sPick(a){ if(_salesMonth) return (a&&a[_salesMonth])||0; return _sTot(a); }
 async function ensureSales(){ if(salesLoaded)return; const j=await cloudLoadJSON(SUPA.salesFile); if(j&&j.prodAll){ SALES=j; SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; } salesLoaded=true; }
 function _salesRows(buf){
   const b=new Uint8Array(buf);
@@ -3993,7 +3996,9 @@ function renderRevenue(){
     box.innerHTML=`<div class="empty" style="padding:46px 18px;text-align:center;color:var(--ink2)">아직 매출 데이터가 없습니다.<br>${admin?'우측 상단 <b>＋ 매출 ERP</b> 버튼으로 ERP 원본 파일(.XLS)을 올려주세요.':'관리자가 ERP 파일을 올리면 표시됩니다.'}</div>`;
     return;
   }
-  const inp=SALES.inputs, M=SALES.months, m0=_salesMonth;
+  const inp=SALES.inputs, M=_salesMonths(), cut=_salesCut();
+  if(_salesMonth && M.indexOf(_salesMonth)<0) _salesMonth=0;
+  const m0=_salesMonth;
   const won=n=>Math.round(n||0).toLocaleString(), eok=n=>(n/1e8).toFixed(1), roll=n=>Math.round(n||0).toLocaleString();
   const C=SALES.channels;
   const chAmt=g=>_sPick(C[g].ma), chQty=g=>_sPick(C[g].mq);
@@ -4005,10 +4010,19 @@ function renderRevenue(){
   const th=`style="background:var(--ink);color:var(--bg);padding:8px 10px;font-size:12px;font-weight:800;text-align:right;white-space:nowrap"`;
   const tdl=`style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px"`;
   const td=`style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px"`;
-  const card=s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 17px;margin-bottom:13px">${s}</div>`;
-  const hh=t=>`<div style="font-size:14.5px;font-weight:800;color:var(--ink);margin-bottom:10px">${t}</div>`;
-  const lab=m0?`${m0}월`:'전체(누적)';
-  let sel=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><span style="font-weight:800">기간</span><select id="salesMonthSel" style="padding:7px 12px;border:1px solid var(--amber);border-radius:8px;background:var(--card);color:var(--ink);font-weight:700"><option value="0"${m0===0?' selected':''}>전체(누적)</option>${M.map(m=>`<option value="${m}"${m0===m?' selected':''}>${m}월</option>`).join('')}</select><span style="color:var(--ink2);font-size:12px">· 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b></span></div>`;
+  const card=s=>`<div class="card" style="margin-bottom:13px">${s}</div>`;
+  const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
+  const lab=m0?`${m0}월`:(cut?`1~${cut}월`:'전체(누적)');
+  let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${m0===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${m0===m?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b>${cut?` · <span style="color:var(--amber)">관리자 설정: ${cut}월까지</span>`:''}</span></div>`;
+
+  // ── 차트 대시보드 ──
+  const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
+  let charts=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:13px;margin-bottom:13px">`
+    + chartCard('cRevTrend','월별 매출 추이','채널별 매출(원)')
+    + chartCard('cChannel','채널 구성 · '+lab,'매출 비중')
+    + chartCard('cShare','시장점유율 추이','품질보증서 ÷ 신차등록')
+    + chartCard('cProdTop','제품 TOP · '+lab,'롤 중분류별 판매수량')
+    + `</div>`;
 
   let s1=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>구성비</th></tr>`;
   ['B2C','B2B','별도채널'].forEach(g=>{ s1+=`<tr><td ${tdl}><b>${g}</b></td><td ${td}>${roll(chQty(g))}</td><td ${td}>${won(chAmt(g))}</td><td ${td}>${pct(chAmt(g),tAmt).toFixed(1)}%</td></tr>`; });
@@ -4020,7 +4034,7 @@ function renderRevenue(){
     +`<div style="font-size:11px;color:var(--ink2);margin-top:6px">품목(MatName) 단위 분류 · 아래 ⑤에서 변경</div>`;
 
   let s3=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
-  ['B2C','B2B','별도채널'].forEach(g=>{ s3+=`<tr><td ${tdl}>${g}</td>${M.map(m=>`<td ${td}>${won(C[g].ma[m])}</td>`).join('')}<td ${td}><b>${won(_sSum(C[g].ma))}</b></td></tr>`; });
+  ['B2C','B2B','별도채널'].forEach(g=>{ s3+=`<tr><td ${tdl}>${g}</td>${M.map(m=>`<td ${td}>${won(C[g].ma[m])}</td>`).join('')}<td ${td}><b>${won(_sTot(C[g].ma))}</b></td></tr>`; });
   s3+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">합계</td>${M.map(m=>`<td ${td} style="background:var(--line);font-weight:700">${won(C.B2C.ma[m]+C.B2B.ma[m]+C['별도채널'].ma[m])}</td>`).join('')}<td ${td} style="background:var(--line)"></td></tr></table><div style="font-size:11px;color:var(--ink2);margin-top:5px">단위: 원</div>`;
 
   const JG=SALES_JIBU.concat(['본사']);
@@ -4071,9 +4085,10 @@ function renderRevenue(){
   let s8=`<button id="salesRepCopy" class="acc-btn" style="margin-bottom:8px">📋 리포트 복사</button><pre id="salesRepText" style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:inherit;font-size:13px;color:var(--ink);margin:0">${rep.replace(/</g,'&lt;')}</pre>`;
 
   box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
-    + salesKPI()
-    + card(hh('📊 세일즈 데이터 · 월별 종합 (단위: 원, VAT 별도)')+salesSummaryTable())
     + sel
+    + salesKPI()
+    + charts
+    + card(hh('📊 세일즈 데이터 · 월별 종합 (단위: 원, VAT 별도)')+salesSummaryTable())
     + card(hh('① 채널 요약 · '+lab)+s1)
     + card(hh('② 롤 / 일반물품 구분 · '+lab)+s2)
     + card(hh('③ 월별 매출 추이')+s3)
@@ -4082,6 +4097,43 @@ function renderRevenue(){
     + card(hh('⑥ 시장 점유율 · '+lab)+s6)
     + card(hh('⑦ 대리점별 판매현황 · '+lab)+s7)
     + card(hh('⑧ 월별 매출 리포트')+s8);
+  drawSalesCharts();
+}
+function drawSalesCharts(){
+  if(typeof Chart==='undefined'||!SALES||!SALES.channels) return;
+  const C=SALES.channels, M=_salesMonths(), sc=salesCfg(), ck=_ck();
+  const AM='#f4911c', BL='#3f78c7', GR='#34b27b', GY='#9aa3af';
+  const moneyTick=v=> v>=1e8?(v/1e8).toLocaleString()+'억': v>=1e4?(v/1e4).toLocaleString()+'만': v.toLocaleString();
+  // 월별 매출 추이 (누적 막대)
+  if(document.getElementById('cRevTrend')) makeChart('cRevTrend',{ type:'bar',
+    data:{ labels:M.map(m=>m+'월'), datasets:[
+      {label:'B2C', data:M.map(m=>C.B2C.ma[m]), backgroundColor:AM, stack:'s'},
+      {label:'B2B', data:M.map(m=>C.B2B.ma[m]), backgroundColor:BL, stack:'s'},
+      {label:'별도채널', data:M.map(m=>C['별도채널'].ma[m]), backgroundColor:GY, stack:'s'} ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{labels:{color:ck.text,boxWidth:12,font:{size:11}}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+c.parsed.y.toLocaleString()+'원'}} },
+      scales:{ x:{stacked:true,grid:{display:false},ticks:{color:ck.text}}, y:{stacked:true,grid:{color:ck.grid},ticks:{color:ck.text,callback:moneyTick}} } } });
+  // 채널 구성 도넛 (선택 기간)
+  if(document.getElementById('cChannel')){ const d=['B2C','B2B','별도채널'].map(g=>_sPick(C[g].ma));
+    makeChart('cChannel',{ type:'doughnut',
+      data:{ labels:['B2C','B2B','별도채널'], datasets:[{data:d, backgroundColor:[AM,BL,GY], borderColor:ck.donut, borderWidth:2}] },
+      options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+        plugins:{ legend:{position:'bottom',labels:{color:ck.text,boxWidth:12,font:{size:11}}}, tooltip:{callbacks:{label:c=>c.label+': '+c.parsed.toLocaleString()+'원'}} } } }); }
+  // 시장점유율 추이 (품질보증서/신차등록)
+  if(document.getElementById('cShare')){ const sh=M.map(m=>{ const cr=_sNum((sc.carReg||{})[m]||0), w=_sNum((sc.warranty||{})[m]||0); return cr>0? +(w/cr*100).toFixed(2):null; });
+    makeChart('cShare',{ type:'line',
+      data:{ labels:M.map(m=>m+'월'), datasets:[{label:'점유율(%)', data:sh, borderColor:GR, backgroundColor:GR+'22', borderWidth:2, pointRadius:3, tension:.3, spanGaps:true, fill:true}] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>'점유율: '+(c.parsed.y!=null?c.parsed.y+'%':'-')}} },
+        scales:{ x:{grid:{display:false},ticks:{color:ck.text}}, y:{grid:{color:ck.grid},ticks:{color:ck.text,callback:v=>v+'%'}} } } }); }
+  // 제품 TOP (롤 중분류, 선택 기간)
+  if(document.getElementById('cProdTop')){ const mids={}; SALES.prodList.forEach(mat=>{ if(_isRoll(mat)){ const mid=_midOf(mat); mids[mid]=(mids[mid]||0)+_sPick(SALES.prodAll[mat].mq); } });
+    const top=Object.keys(mids).map(k=>[k,mids[k]]).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    makeChart('cProdTop',{ type:'bar',
+      data:{ labels:top.map(x=>x[0]), datasets:[{label:'판매수량', data:top.map(x=>x[1]), backgroundColor:AM}] },
+      options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>c.parsed.x.toLocaleString()+'롤'}} },
+        scales:{ x:{grid:{color:ck.grid},ticks:{color:ck.text}}, y:{grid:{display:false},ticks:{color:ck.text,font:{size:11}}} } } }); }
 }
 function salesReportText(){
   if(!SALES||!SALES.prodAll) return '';
@@ -4118,6 +4170,8 @@ document.getElementById('rRevenue').addEventListener('change', e=>{
 });
 document.getElementById('rRevenue').addEventListener('click', e=>{
   const t=e.target;
+  const segB=t.closest&&t.closest('#salesMonthSeg button[data-m]');
+  if(segB){ _salesMonth=parseInt(segB.dataset.m,10)||0; renderRevenue(); return; }
   if(t.classList&&t.classList.contains('sales-bulk')){ const mid=decodeURIComponent(t.dataset.mid), val=t.dataset.val;
     SALES.inputs.itemType=SALES.inputs.itemType||{};
     SALES.prodList.forEach(mat=>{ if(_midOf(mat)===mid) SALES.inputs.itemType[mat]=val; });
@@ -4132,15 +4186,16 @@ document.getElementById('salesFileInput').addEventListener('change', e=>{ const 
 // ── 매출 수기설정(STORE.config.salesCfg) ──
 function salesCfg(){ STORE.config=STORE.config||{}; const s=STORE.config.salesCfg=STORE.config.salesCfg||{}; s.marketing=s.marketing||{}; s.warranty=s.warranty||{}; s.carReg=s.carReg||{}; return s; }
 function _scSum(o){ let s=0; for(let m=1;m<=12;m++) s+=_sNum((o&&o[m])||0); return s; }
-function _scPick(o){ if(_salesMonth) return _sNum((o&&o[_salesMonth])||0); return _scSum(o); }
+function _scTot(o){ let s=0; _salesMonths().forEach(m=>s+=_sNum((o&&o[m])||0)); return s; }
+function _scPick(o){ if(_salesMonth) return _sNum((o&&o[_salesMonth])||0); return _scTot(o); }
 
 function salesKPI(){
   if(!SALES||!SALES.channels) return '';
   const C=SALES.channels, sc=salesCfg();
   const eok=n=>(n/1e8).toFixed(1), won=n=>Math.round(n||0).toLocaleString();
-  const entT=_sSum(C.B2C.ma)+_sSum(C.B2B.ma)+_sSum(C['별도채널'].ma);
-  const bbT=_sSum(C.B2C.ma)+_sSum(C.B2B.ma);
-  const mkT=_scSum(sc.marketing), wT=_scSum(sc.warranty), crT=_scSum(sc.carReg);
+  const entT=_sTot(C.B2C.ma)+_sTot(C.B2B.ma)+_sTot(C['별도채널'].ma);
+  const bbT=_sTot(C.B2C.ma)+_sTot(C.B2B.ma);
+  const mkT=_scTot(sc.marketing), wT=_scTot(sc.warranty), crT=_scTot(sc.carReg);
   const share= crT>0? (wT/crT*100).toFixed(2)+'%':'—';
   const kpi=(t,v,s)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px"><div style="font-size:12px;color:var(--ink2);margin-bottom:5px">${t}</div><div style="font-size:21px;font-weight:800;color:var(--ink)">${v}</div><div style="font-size:11px;color:var(--ink2);margin-top:3px">${s||''}</div></div>`;
   return `<div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:14px">`
@@ -4152,7 +4207,7 @@ function salesKPI(){
 }
 function salesSummaryTable(){
   if(!SALES||!SALES.channels) return '<div style="color:var(--ink2);font-size:13px">매출 ERP 업로드 후 표시됩니다.</div>';
-  const C=SALES.channels, sc=salesCfg(), MM=[1,2,3,4,5,6,7,8,9,10,11,12];
+  const C=SALES.channels, sc=salesCfg(), MM=_salesMonths();
   const won=n=>n?Math.round(n).toLocaleString():'';
   const ent=m=>C.B2C.ma[m]+C.B2B.ma[m]+C['별도채널'].ma[m], b2c=m=>C.B2C.ma[m], b2b=m=>C.B2B.ma[m], bb=m=>b2c(m)+b2b(m);
   const sum=f=>{let s=0;MM.forEach(m=>s+=f(m));return s;};
@@ -4168,9 +4223,9 @@ function salesSummaryTable(){
     {n:'B2C', f:b2c, t:b2cT, note:pc(b2cT,bbT)},
     {n:'B2B', f:b2b, t:b2bT, note:pc(b2bT,bbT)},
     {n:'B2C + B2B 합계', f:bb, t:bbT, note:pc(bbT,entT), hi:1},
-    {n:'마케팅 지출', f:m=>_sNum(sc.marketing[m]||0), t:_scSum(sc.marketing), note:pc(_scSum(sc.marketing),bbT)},
-    {n:'품질보증서', f:m=>_sNum(sc.warranty[m]||0), t:_scSum(sc.warranty), note:''},
-    {n:'신차등록', f:m=>_sNum(sc.carReg[m]||0), t:_scSum(sc.carReg), note:''},
+    {n:'마케팅 지출', f:m=>_sNum(sc.marketing[m]||0), t:_scTot(sc.marketing), note:pc(_scTot(sc.marketing),bbT)},
+    {n:'품질보증서', f:m=>_sNum(sc.warranty[m]||0), t:_scTot(sc.warranty), note:''},
+    {n:'신차등록', f:m=>_sNum(sc.carReg[m]||0), t:_scTot(sc.carReg), note:''},
   ];
   let h=`<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:100%"><tr><th ${thl}>구분</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th><th ${th}>비고</th></tr>`;
   rows.forEach(r=>{ h+=`<tr${r.hi?' style="background:rgba(244,145,28,.04)"':''}><td ${tdl}>${r.n}</td>${MM.map(m=>`<td ${td}>${won(r.f(m))}</td>`).join('')}<td ${tdt}>${won(r.t)}</td><td ${td}>${r.note}</td></tr>`; });
@@ -4197,6 +4252,11 @@ function salesSettingsSectionHTML(){
       + `</table></div>`;
   } else capHTML=`<div class="empty" style="padding:18px;color:var(--ink2);font-size:13px">매출 ERP 파일을 먼저 올리면(레이노 데이터 → 매출) 롤 중분류 목록이 여기에 나타납니다.</div>`;
   return `<div class="set-app-sec"><h2 class="set-app-h">💰 매출 설정</h2></div>
+   <div class="card set-card"><h3><span class="dot"></span>표시 기간 (마감 월)</h3>
+     <div class="cap">매출이 확정되지 않은 달을 가립니다. 예: <b>5월</b>로 설정하면 매출 대시보드·차트·종합표·점유율이 <b>1~5월</b>만 보이고 6월 이후는 숨겨집니다. (입력은 설정에서 계속 가능)</div>
+     <label class="set-field" style="flex-direction:row;align-items:center;gap:10px;max-width:none;margin-top:4px"><span style="font-weight:700">마감 월</span>
+       <select id="salesCutoff" class="set-text" style="max-width:160px">${[0,1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}"${_salesCut()===m?' selected':''}>${m===0?'전체 표시(제한 없음)':m+'월까지'}</option>`).join('')}</select>
+     </label></div>
    <div class="card set-card"><h3><span class="dot"></span>월별 수기 입력 (ERP에 없는 항목)</h3>
      <div class="cap"><b>마케팅 지출·품질보증서·신차등록</b>을 월별로 입력하면 매출 대시보드 종합표·KPI·시장점유율에 반영됩니다. 입력칸을 벗어나면 자동 저장됩니다.</div>
      ${grid}</div>
@@ -4207,6 +4267,7 @@ function salesSettingsSectionHTML(){
 // 매출 설정 입력 자동 저장(위임)
 (function(){ const host=document.getElementById('setSalesHost'); if(!host) return;
   host.addEventListener('change', e=>{ const t=e.target;
+    if(t.id==='salesCutoff'){ salesCfg().cutoff=parseInt(t.value,10)||0; saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave(); toast('표시 기간을 저장했습니다'); return; }
     if(t.classList&&t.classList.contains('sc-in')){ const sc=salesCfg(); sc[t.dataset.metric][parseInt(t.dataset.month,10)]=_sNum(t.value); saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave(); const sh=document.getElementById('setSalesHost'); if(sh) sh.innerHTML=salesSettingsSectionHTML(); toast('저장됨'); }
     else if(t.classList&&t.classList.contains('sc-cap')){ if(SALES){ SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.cap[decodeURIComponent(t.dataset.mid)]=_sNum(t.value); cloudSaveJSON(SUPA.salesFile,SALES); toast('저장됨'); } }
   });
