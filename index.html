@@ -940,6 +940,7 @@
       <div class="nav-tools">
         <span class="admin-flag" id="raynoAdminFlag" style="display:none">🔓 관리자 모드</span>
         <button class="acc-btn" id="warrAddBtn">＋ 보증서 엑셀</button>
+        <button class="acc-btn" id="salesAddBtn" style="display:none">＋ 매출 ERP</button>
         <button class="acc-btn" id="warrCfgBtn">⚙ 표시 설정</button>
         <button class="acc-btn" id="raynoLoginBtn">🔐 관리자 로그인</button>
         <button class="acc-btn" id="raynoLogoutBtn">로그아웃</button>
@@ -950,6 +951,7 @@
     <div id="rSearch" style="display:none"></div>
     <div id="rRevenue" style="display:none"></div>
     <input type="file" id="warrFileInput" accept=".xlsx,.xls" hidden>
+    <input type="file" id="salesFileInput" accept=".xls,.xlsx,.csv,.txt" hidden>
   </div>
 
   <div id="settingsApp" style="display:none">
@@ -1131,10 +1133,11 @@ const SUPA = {
   dataFile: 'data.json',
   bizFile:  'biz.json',
   warrFile: 'warranty.json',
+  salesFile: 'sales.json',
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 자동수집팝업';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 매출분석';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -3566,7 +3569,7 @@ function applyAuthUI(){
   const admin=(auth==='admin');
   document.querySelectorAll('.admin-only').forEach(el=>{ el.style.display = admin ? '' : 'none'; });
   const sw=document.getElementById('appSwitcher'); if(sw) sw.style.display='flex';
-  if(workspace==='rayno' && raynoUnlocked){ renderWarranty(); renderMetric('search'); renderMetric('revenue'); applyRaynoAuth(); }   // 권한 바뀌면 모든 레이노 화면 갱신
+  if(workspace==='rayno' && raynoUnlocked){ renderWarranty(); renderMetric('search'); renderRevenue(); applyRaynoAuth(); }   // 권한 바뀌면 모든 레이노 화면 갱신
   document.getElementById('adminBtn').style.display  = admin ? 'none' : '';  // 로그인 버튼: 비로그인 방문자
   document.getElementById('logoutBtn').style.display = admin ? '' : 'none';  // 로그아웃: 관리자
   document.getElementById('adminFlag').style.display = admin ? 'inline-flex' : 'none';
@@ -3912,6 +3915,159 @@ function renderWarranty(){
 }
 
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
+// ════════════════ 매출(ERP) 분석 ════════════════
+const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
+let SALES=null, salesLoaded=false;
+function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
+function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
+function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
+async function ensureSales(){ if(salesLoaded)return; const j=await cloudLoadJSON(SUPA.salesFile); if(j&&j.channels){ SALES=j; SALES.inputs=SALES.inputs||{carSales:0,cap:{}}; SALES.inputs.cap=SALES.inputs.cap||{}; } salesLoaded=true; }
+
+function _salesRows(buf){
+  const b=new Uint8Array(buf);
+  if(b.length>=2 && b[0]===0xFF && b[1]===0xFE) return new TextDecoder('utf-16le').decode(b).split(/\r\n|\n/).map(l=>l.split('\t'));
+  if(b.length>=2 && b[0]===0xFE && b[1]===0xFF) return new TextDecoder('utf-16be').decode(b).split(/\r\n|\n/).map(l=>l.split('\t'));
+  try{ const wb=XLSX.read(b,{type:'array'}); const sh=wb.SheetNames[0]; return XLSX.utils.sheet_to_json(wb.Sheets[sh],{header:1,defval:''}); }catch(e){ return null; }
+}
+function aggregateSales(rows){
+  function blank(){ return {rolls:0,amt:0,mq:Array(13).fill(0),ma:Array(13).fill(0)}; }
+  if(!rows||rows.length<2) return null;
+  const H=rows[0].map(c=>String(c||'').trim());
+  const iDept=H.indexOf('부서'),iCust=H.indexOf('거래처'),iMid=H.indexOf('중분류'),iMat=H.indexOf('MatName');
+  if(iMat<0) return null;
+  const qc=[],ac=[]; for(let m=1;m<=12;m++){ const qi=H.indexOf(m+'월'); qc[m]=qi; ac[m]=qi>=0?qi+1:-1; }
+  const grp=d=>d==='B2C'?'B2C':(d==='B2B'?'B2B':'별도채널');
+  const channels={B2C:blank(),B2B:blank(),'별도채널':blank()};
+  const extra={},jibu={},dealers={},products={},matrix={};
+  SALES_JIBU.concat(['본사']).forEach(j=>{ jibu[j]=blank(); matrix[j]={}; });
+  const act=new Set();
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i]; if(!r) continue;
+    const mat=String(r[iMat]==null?'':r[iMat]).trim(); if(!mat) continue;
+    const dept=String((iDept>=0?r[iDept]:'')||'').trim(), g=grp(dept), ch=channels[g];
+    const cust=String((iCust>=0?r[iCust]:'')||'').trim();
+    const mid=String((iMid>=0?r[iMid]:'')||'').trim()||'기타';
+    let rolls=0,amt=0;
+    for(let m=1;m<=12;m++){ const q=qc[m]>=0?_sNum(r[qc[m]]):0, a=ac[m]>=0?_sNum(r[ac[m]]):0;
+      rolls+=q; amt+=a; ch.mq[m]+=q; ch.ma[m]+=a; if(q||a)act.add(m); }
+    ch.rolls+=rolls; ch.amt+=amt;
+    if(g==='별도채널'){ const dep=dept||'(미지정)'; (extra[dep]=extra[dep]||{rolls:0,amt:0}); extra[dep].rolls+=rolls; extra[dep].amt+=amt; }
+    else if(g==='B2C'){
+      const jb=_sToJibu(cust)||'본사'; jibu[jb].rolls+=rolls; jibu[jb].amt+=amt;
+      for(let m=1;m<=12;m++){ jibu[jb].mq[m]+=qc[m]>=0?_sNum(r[qc[m]]):0; jibu[jb].ma[m]+=ac[m]>=0?_sNum(r[ac[m]]):0; }
+      if(cust){ (dealers[cust]=dealers[cust]||{rolls:0,amt:0,jibu:!!_sToJibu(cust)}); dealers[cust].rolls+=rolls; dealers[cust].amt+=amt; }
+      products[mid]=(products[mid]||0)+rolls; matrix[jb][mid]=(matrix[jb][mid]||0)+rolls;
+    }
+  }
+  const months=[]; for(let m=1;m<=12;m++) if(act.has(m)) months.push(m);
+  const prodList=Object.keys(products).sort((a,b)=>products[b]-products[a]);
+  return {ver:1,updatedAt:new Date().toISOString(),months,channels,extra,jibu,dealers,products,prodList,matrix,inputs:{carSales:0,cap:{}}};
+}
+function handleSalesFile(file){
+  if(auth!=='admin'){ toast('관리자만 업로드할 수 있습니다.',true); return; }
+  const rd=new FileReader();
+  rd.onload=async e=>{ try{
+    const agg=aggregateSales(_salesRows(e.target.result));
+    if(!agg){ toast('매출 데이터를 인식하지 못했습니다. ERP 원본 파일인지 확인하세요.',true); return; }
+    agg.inputs=(SALES&&SALES.inputs)?SALES.inputs:{carSales:0,cap:{}};
+    SALES=agg; salesLoaded=true; await cloudSaveJSON(SUPA.salesFile,SALES); renderRevenue();
+    const tot=SALES.channels.B2C.amt+SALES.channels.B2B.amt+SALES.channels['별도채널'].amt;
+    toast(`${file.name} · 매출 ${(tot/1e8).toFixed(1)}억 · ${SALES.months.length}개월 반영`);
+  }catch(ex){ toast('파일 오류: '+ex.message,true); } };
+  rd.readAsArrayBuffer(file);
+}
+function _warrByJibu(){ const by={}; let total=0; SALES_JIBU.concat(['본사']).forEach(j=>by[j]=0);
+  ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{ total++; const j=String(r['담당지부']||'').trim(); if(by[j]!=null)by[j]++; }); return {by,total}; }
+
+const MN_KR=m=>m+'월';
+function renderRevenue(){
+  const box=document.getElementById('rRevenue'); if(!box) return;
+  const admin=(auth==='admin');
+  if(!SALES||!SALES.channels){
+    box.innerHTML=`<div class="empty" style="padding:46px 18px;text-align:center;color:var(--ink2)">아직 매출 데이터가 없습니다.<br>${admin?'우측 상단 <b>＋ 매출 ERP</b> 버튼으로 ERP 원본 파일(.XLS)을 올려주세요.':'관리자가 ERP 파일을 올리면 표시됩니다.'}</div>`;
+    return;
+  }
+  const won=n=>Math.round(n||0).toLocaleString(), eok=n=>(n/1e8).toFixed(1), roll=n=>Math.round(n||0).toLocaleString();
+  const C=SALES.channels, M=SALES.months, inp=SALES.inputs||{carSales:0,cap:{}};
+  const tAmt=C.B2C.amt+C.B2B.amt+C['별도채널'].amt, tRoll=C.B2C.rolls+C.B2B.rolls+C['별도채널'].rolls;
+  const pct=(a,b)=>b?(a/b*100):0;
+  const th=`style="background:var(--ink);color:var(--bg);padding:9px 10px;font-size:12px;font-weight:800;text-align:right;white-space:nowrap"`;
+  const thl=`style="background:var(--ink);color:var(--bg);padding:9px 10px;font-size:12px;font-weight:800;text-align:left;white-space:nowrap"`;
+  const td=`style="padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px"`;
+  const tdl=`style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px"`;
+  const card=s=>`<div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px">${s}</div>`;
+  const h=t=>`<div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:11px">${t}</div>`;
+
+  // ① 채널 요약
+  let s1=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>판매 롤수</th><th ${th}>매출액(원)</th><th ${th}>매출 구성비</th></tr>`;
+  ['B2C','B2B','별도채널'].forEach(g=>{ s1+=`<tr><td ${tdl}><b>${g}</b></td><td ${td}>${roll(C[g].rolls)}</td><td ${td}>${won(C[g].amt)}</td><td ${td}>${pct(C[g].amt,tAmt).toFixed(1)}%</td></tr>`; });
+  s1+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">합계</td><td ${td} style="font-weight:800;background:var(--line)">${roll(tRoll)}</td><td ${td} style="font-weight:800;background:var(--line)">${won(tAmt)}</td><td ${td} style="font-weight:800;background:var(--line)">100.0%</td></tr></table>`;
+
+  // ② 월별 추이(매출)
+  let s2=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th>${M.map(m=>`<th ${th}>${MN_KR(m)}</th>`).join('')}<th ${th}>합계</th></tr>`;
+  ['B2C','B2B','별도채널'].forEach(g=>{ s2+=`<tr><td ${tdl}>${g}</td>${M.map(m=>`<td ${td}>${won(C[g].ma[m])}</td>`).join('')}<td ${td}><b>${won(C[g].amt)}</b></td></tr>`; });
+  s2+=`</table><div style="font-size:11px;color:var(--ink2);margin-top:6px">단위: 원</div>`;
+
+  // ③ 지부별
+  const JG=SALES_JIBU.concat(['본사']);
+  const jrows=JG.map(j=>({j,...SALES.jibu[j]})).sort((a,b)=>b.rolls-a.rolls);
+  let s3=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>롤수</th><th ${th}>매출액(원)</th><th ${th}>롤 구성비</th><th ${th}>매출 구성비</th></tr>`;
+  const jR=JG.reduce((s,j)=>s+SALES.jibu[j].rolls,0), jA=JG.reduce((s,j)=>s+SALES.jibu[j].amt,0);
+  jrows.forEach(x=>{ s3+=`<tr><td ${tdl}>${x.j==='본사'?'<b>본사</b>':x.j}</td><td ${td}>${roll(x.rolls)}</td><td ${td}>${won(x.amt)}</td><td ${td}>${pct(x.rolls,jR).toFixed(1)}%</td><td ${td}>${pct(x.amt,jA).toFixed(1)}%</td></tr>`; });
+  s3+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">합계(B2C)</td><td ${td} style="font-weight:800;background:var(--line)">${roll(jR)}</td><td ${td} style="font-weight:800;background:var(--line)">${won(jA)}</td><td ${td} colspan="2" style="background:var(--line)"></td></tr></table>`;
+
+  // ④ 대리점별
+  const dl=Object.keys(SALES.dealers).map(k=>({name:k,...SALES.dealers[k]})).filter(d=>d.rolls>0).sort((a,b)=>b.rolls-a.rolls);
+  let s4=`<table style="width:100%;border-collapse:collapse"><tr><th ${th}>#</th><th ${thl}>거래처</th><th ${th}>롤수</th><th ${th}>매출액(원)</th></tr>`;
+  dl.forEach((d,i)=>{ s4+=`<tr${d.jibu?' style="background:rgba(244,145,28,.07)"':''}><td ${td}>${i+1}</td><td ${tdl}>${d.name}${d.jibu?' <span style="color:var(--amber);font-size:11px">·지부</span>':''}</td><td ${td}>${roll(d.rolls)}</td><td ${td}>${won(d.amt)}</td></tr>`; });
+  s4+=`</table>`;
+
+  // ⑤ 제품(롤)별 + 롤당 대수 입력
+  let capTot=0;
+  let s5=`<div style="font-size:12px;color:var(--ink2);margin-bottom:8px">롤종류별 <b>롤당 시공가능대수</b>를 입력하면 시공가능대수가 계산됩니다(필름 아닌 항목은 0).</div>`;
+  s5+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>롤종류(중분류)</th><th ${th}>판매 롤수</th><th ${th}>롤당 시공가능대수</th><th ${th}>시공가능대수</th></tr>`;
+  SALES.prodList.forEach(p=>{ const cap=_sNum(inp.cap[p]||0); const cars=SALES.products[p]*cap; capTot+=cars;
+    s5+=`<tr><td ${tdl}>${p}</td><td ${td}>${roll(SALES.products[p])}</td><td ${td}>${admin?`<input class="sales-cap" data-prod="${encodeURIComponent(p)}" type="number" min="0" step="0.1" value="${cap||''}" style="width:80px;text-align:right;padding:4px 6px;border:1px solid var(--amber);border-radius:6px;background:var(--card);color:var(--ink)">`:(cap||0)}</td><td ${td}>${roll(cars)}</td></tr>`; });
+  s5+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">합계</td><td ${td} style="background:var(--line)"></td><td ${td} style="background:var(--line)"></td><td ${td} style="font-weight:800;background:var(--line)">${roll(capTot)}</td></tr></table>`;
+
+  // ⑥ 시장점유율
+  const carSales=_sNum(inp.carSales||0);
+  const carsDealer=capTot;
+  let carsJibu=0; SALES_JIBU.forEach(j=>{ const mm=SALES.matrix[j]||{}; Object.keys(mm).forEach(p=>{ carsJibu+=mm[p]*_sNum(inp.cap[p]||0); }); });
+  const wj=_warrByJibu();
+  const shr=c=>carSales>0?(c/carSales*100).toFixed(2)+'%':'<span style="color:var(--ink2)">자동차 판매량 입력</span>';
+  let s6=`<div style="margin-bottom:12px"><span style="font-weight:700">자동차 판매량 (${M.length?M[0]+'~'+M[M.length-1]+'월':''} 누적, 대): </span>`;
+  s6+= admin?`<input id="salesCarInput" type="number" min="0" value="${carSales||''}" style="width:130px;text-align:right;padding:5px 8px;border:1px solid var(--amber);border-radius:7px;background:var(--card);color:var(--ink)">`:`<b>${carSales?won(carSales):'(미입력)'}</b>`;
+  s6+=`</div>`;
+  s6+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>기준</th><th ${th}>차량대수</th><th ${th}>시장 점유율</th></tr>`;
+  s6+=`<tr><td ${tdl}>① 대리점 판매 기준</td><td ${td}>${roll(carsDealer)}</td><td ${td}><b>${shr(carsDealer)}</b></td></tr>`;
+  s6+=`<tr><td ${tdl}>② 지부 판매 기준</td><td ${td}>${roll(carsJibu)}</td><td ${td}><b>${shr(carsJibu)}</b></td></tr>`;
+  s6+=`<tr><td ${tdl}>③ 품질보증서 기준</td><td ${td}>${roll(wj.total)}</td><td ${td}><b>${shr(wj.total)}</b></td></tr>`;
+  s6+=`</table>`;
+  s6+=`<div style="font-weight:700;margin:14px 0 8px">지부별 점유율 (품질보증서 실시공 기준)</div>`;
+  s6+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>품질보증서(대)</th><th ${th}>점유율</th></tr>`;
+  JG.forEach(j=>{ s6+=`<tr><td ${tdl}>${j}</td><td ${td}>${wj.by[j]||0}</td><td ${td}>${carSales>0?((wj.by[j]||0)/carSales*100).toFixed(2)+'%':'—'}</td></tr>`; });
+  s6+=`</table>`;
+
+  const up=new Date(SALES.updatedAt).toLocaleString('ko-KR');
+  box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:12px">최종 업데이트: ${up} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b></div>`
+    + card(h('① 채널 요약 (B2C / B2B / 별도채널)')+s1)
+    + card(h('② 월별 매출 추이')+s2)
+    + card(h('③ 지부별 판매현황')+s3)
+    + card(h('⑤ 제품(롤종류)별 · 시공가능대수')+s5)
+    + card(h('⑥ 시장 점유율 (자동차 판매량 기준)')+s6)
+    + card(h('④ 대리점별 판매현황')+s4);
+}
+document.getElementById('rRevenue').addEventListener('change', async e=>{
+  if(!SALES) return; SALES.inputs=SALES.inputs||{carSales:0,cap:{}}; SALES.inputs.cap=SALES.inputs.cap||{};
+  if(e.target.classList.contains('sales-cap')){ SALES.inputs.cap[decodeURIComponent(e.target.dataset.prod)]=_sNum(e.target.value); }
+  else if(e.target.id==='salesCarInput'){ SALES.inputs.carSales=_sNum(e.target.value); }
+  else return;
+  renderRevenue(); if(auth==='admin') cloudSaveJSON(SUPA.salesFile,SALES);
+});
+document.getElementById('salesAddBtn').addEventListener('click', ()=>document.getElementById('salesFileInput').click());
+document.getElementById('salesFileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleSalesFile(f); e.target.value=''; });
+
 function renderMetric(view){
   const field=view, label=(view==='search')?'브랜드 검색량':'매출액';
   const box=document.getElementById(view==='search'?'rSearch':'rRevenue');
@@ -4069,7 +4225,7 @@ function setRView(v){
   if(v==='warranty') renderWarranty();
   else if(v==='warrReport') renderWarrReport();
   else if(v==='search') renderMetric('search');
-  else renderMetric('revenue');
+  else renderRevenue();
 }
 function applyRaynoAuth(){
   const admin=(auth==='admin');
@@ -4079,6 +4235,7 @@ function applyRaynoAuth(){
   set('raynoLogoutBtn', admin);
   set('warrAddBtn', admin && rview==='warranty');
   set('warrCfgBtn', admin && rview==='warranty');
+  set('salesAddBtn', admin && rview==='revenue');
 }
 function raynoLockOn(){ const c=STORE&&STORE.config&&STORE.config.raynoLock; return c? c.on!==false : true; }
 function raynoPass(){ const c=STORE&&STORE.config&&STORE.config.raynoLock; return (c&&c.pass)?String(c.pass):CONFIG.raynoPassword; }
@@ -4092,7 +4249,7 @@ async function openRayno(){
     return;
   }
   lock.style.display='none'; nav.style.display='flex';
-  await ensureBiz(); await ensureWarr(); setRView(rview);
+  await ensureBiz(); await ensureWarr(); await ensureSales(); setRView(rview);
 }
 async function setWorkspace(ws){
   workspace=ws;
