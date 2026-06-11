@@ -1162,7 +1162,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 인보이스표';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 최적화백업';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4140,7 +4140,7 @@ function renderRevenue(){
 function drawSalesCharts(){
   if(typeof Chart==='undefined'||!SALES||!SALES.channels) return;
   const C=SALES.channels, M=_salesMonths(), sc=salesCfg(), ck=_ck();
-  const AM='#f4911c', BL='#3f78c7', GR='#34b27b', GY='#9aa3af';
+  const AM='#f4911c', BL='#3f78c7';
   const moneyTick=v=> v>=1e8?(v/1e8).toLocaleString()+'억': v>=1e4?(v/1e4).toLocaleString()+'만': v.toLocaleString();
   // 월별 매출 추이 (누적 막대)
   if(document.getElementById('cRevTrend')) makeChart('cRevTrend',{ type:'bar',
@@ -4204,7 +4204,6 @@ async function _salesSave(){ if(auth==='admin') cloudSaveJSON(SUPA.salesFile,SAL
 document.getElementById('rRevenue').addEventListener('change', e=>{
   if(!SALES) return; SALES.inputs=SALES.inputs||{cap:{},carSales:{},itemType:{}};
   const t=e.target;
-  if(t.id==='salesMonthSel'){ const v=parseInt(t.value,10)||0; _salesSel=v?[v]:[]; renderRevenue(); return; }
   if(t.id==='salesCmpA'){ _salesCmpA=parseInt(t.value,10)||0; renderRevenue(); return; }
   if(t.id==='salesCmpB'){ _salesCmpB=parseInt(t.value,10)||0; renderRevenue(); return; }
   if(t.classList.contains('sales-cap')){ SALES.inputs.cap[decodeURIComponent(t.dataset.mid)]=_sNum(t.value); }
@@ -4297,7 +4296,6 @@ function salesSummaryTable(){
 // 품질보증서 월별 건수: 프로그램의 품질보증서(WARR) 데이터에서 시공일자 기준 자동 집계 (없으면 수기값)
 function _qc(m){ if(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length){ return _warrByJibu(m).total; } return _sNum(((salesCfg().warranty)||{})[m]||0); }
 function _qcTot(){ let s=0; _salesMonths().forEach(m=>s+=_qc(m)); return s; }
-function _qcAuto(){ return (typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length>0); }
 
 // ── 롤당 시공대수 + 시장점유율(판매/대리점 기준) ──
 function _capDef(mid){ return (/카본|모노|MONO|TBTECH/i.test(mid))?17:10; }  // 기본: 모노카본 17대, 그 외 10대
