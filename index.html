@@ -169,6 +169,13 @@
   body.tools-collapsed #crawlBar:not(.crawl-active){display:none !important}
   @keyframes crawlFlash{0%{box-shadow:0 0 0 0 rgba(244,145,28,.55)}100%{box-shadow:0 0 0 9px rgba(244,145,28,0)}}
   .crawl-flash{animation:crawlFlash 1.3s ease-out}
+  .cmodal{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px}
+  .cmodal-card{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.35);width:min(560px,94vw);max-height:88vh;overflow:auto;padding:18px 20px}
+  .cmodal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px}
+  .cmodal-title{font-size:16px;font-weight:800;color:var(--ink)}
+  .cmodal-x{border:0;background:var(--line);color:var(--ink);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px;font-weight:700;flex:0 0 auto}
+  .cmodal-x:hover{background:var(--neg);color:#fff}
+  .cmodal-card .crawl{margin-bottom:0}
   /* 다크모드 토글 스위치 (워크스페이스 줄 우측) */
   .theme-switch{display:inline-flex;align-items:center;gap:9px;margin-left:auto;background:var(--card);
     border:1px solid var(--line2);border-radius:980px;padding:8px 14px;cursor:pointer;
@@ -998,6 +1005,13 @@
   </div>
 </div>
 
+<div id="crawlModal" class="cmodal" style="display:none">
+  <div class="cmodal-card">
+    <div class="cmodal-head"><span class="cmodal-title">🛰 자동 수집 (크롤링)</span><button id="crawlModalClose" class="cmodal-x" type="button" aria-label="닫기">✕</button></div>
+    <div id="crawlModalBody"></div>
+  </div>
+</div>
+
 <script>
 "use strict";
 Chart.defaults.font.family = '"Pretendard Variable",Pretendard,sans-serif';
@@ -1120,7 +1134,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 크롤박스복구';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 자동수집팝업';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4298,7 +4312,7 @@ function applyConfigAndSettings(){
 
 // ── 페이지 로드: 클라우드에서 데이터 불러오기 + 로그인 상태 확인 ──
 // ── 자동 수집 진행률: crawl_status.json 폴링 → % 바 표시 + 완료 시 자동 갱신 ──
-let _crawlPollTimer=null, _crawlInit=false, _crawlRefreshedAt='', _crawlReqAt=0;
+let _crawlPollTimer=null, _crawlInit=false, _crawlRefreshedAt='', _crawlReqAt=0, _crawlModalOpen=false;
 let _lastCrawlStatus=null, _crawlPeriodSel='3', _crawlFrom='', _crawlTo='';
 async function fetchCrawlStatus(){
   if(typeof fetch!=='function') return null;
@@ -4307,42 +4321,56 @@ async function fetchCrawlStatus(){
     const r=await fetch(url); if(!r.ok) return null; return await r.json();
   }catch(e){ return null; }
 }
-function renderCrawlBar(s){
-  const el=document.getElementById('crawlBar'); if(!el) return;
-  _lastCrawlStatus=s||null;
-  const isAdmin=(auth==='admin');
+function crawlInnerHTML(s, isAdmin){
   const st0=(s&&s.state)?s.state:'idle';
   const sAt=(s&&s.at)?new Date(s.at).getTime():0;
-  // 유효하고 최근(±90초)인 시각이 있을 때만 '진행 중'으로 인정. 그 외(시각없음/깨짐/오래됨/미래)는 멈춤 처리
   const fresh=sAt>0 && Math.abs(Date.now()-sAt)<=90000;
   const stale=(st0==='running') && !fresh;
   const st=stale?'stalled':st0;
-  el.classList.toggle('crawl-active', st==='running'||st==='await_auth');
   const pct=s?Math.max(0,Math.min(100,Math.round(s.pct||0))):0;
-  const ctl=crawlControls();
+  const ctl=isAdmin?crawlControls():'';
   if(st==='running'){
-    el.innerHTML=`<div class="crawl run">
+    return `<div class="crawl run">
       <div class="crawl-top"><span class="crawl-t"><span class="crawl-spin"></span> 자동 수집 진행 중</span><span class="crawl-pct">${pct}%</span></div>
       <div class="crawl-track"><div class="crawl-fill" style="width:${pct}%"></div></div>
       <div class="crawl-msg">${escapeHtml(s.message||'')}</div>
       ${isAdmin?`<div style="margin-top:11px"><button class="crawl-btn stop" id="crawlStopBtn">■ 크롤링 중지</button></div>`:''}</div>`;
   }else if(st==='await_auth'){
-    el.innerHTML=`<div class="crawl run">
+    return `<div class="crawl run">
       <div class="crawl-top"><span class="crawl-t">🔐 네이버 인증 대기</span></div>
       <div class="crawl-msg">${escapeHtml(s.message||'크롬 창에서 네이버 로그인/인증을 완료한 뒤 아래 버튼을 누르세요.')}</div>
       ${isAdmin?`<div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap"><button class="crawl-btn auth" id="crawlAuthBtn">✅ 인증 완료</button><button class="crawl-btn stop" id="crawlStopBtn">■ 크롤링 중지</button></div>`:''}</div>`;
   }else if(st==='error'){
-    el.innerHTML=`<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 자동 수집 오류</span>${ctl}</div><div class="crawl-msg">${escapeHtml(s.message||'다시 시도해 주세요.')}</div></div>`;
+    return `<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 자동 수집 오류</span>${ctl}</div><div class="crawl-msg">${escapeHtml(s.message||'다시 시도해 주세요.')}</div></div>`;
   }else if(st==='stalled'){
-    el.innerHTML=`<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 이전 자동 수집이 멈춘 것 같아요</span>${ctl}</div>
+    return `<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 이전 자동 수집이 멈춘 것 같아요</span>${ctl}</div>
       <div class="crawl-msg">크롤러 프로그램 응답이 한동안 없었습니다. PC에서 프로그램(START)이 켜져 있는지 확인하거나, 위에서 기간을 고른 뒤 다시 시작하세요.${isAdmin?` · <a id="crawlResetBtn" style="color:var(--neu);cursor:pointer;font-weight:700">진행 표시 지우기</a>`:''}</div></div>`;
   }else if(st==='done'){
     const t=s.at?new Date(s.at).toLocaleString('ko-KR'):'';
-    el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">✅ 자동 수집 완료</span>${ctl}</div>
+    return `<div class="crawl"><div class="crawl-top"><span class="crawl-t">✅ 자동 수집 완료</span>${ctl}</div>
       <div class="crawl-msg">${escapeHtml(t)} · 신규 ${(s.added||0).toLocaleString()}건 · 누적 ${(s.total||0).toLocaleString()}건</div></div>`;
   }else{
-    if(isAdmin) el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">🛰 자동 수집</span>${ctl}</div><div class="crawl-msg">기간을 고른 뒤 [크롤링 시작]을 누르면 PC의 크롤러가 실행됩니다. 네이버 인증이 필요하면 [인증 완료] 버튼이 나타납니다.</div></div>`;
-    else el.innerHTML='';
+    if(isAdmin) return `<div class="crawl"><div class="crawl-top"><span class="crawl-t">🛰 자동 수집</span>${ctl}</div><div class="crawl-msg">기간을 고른 뒤 [크롤링 시작]을 누르면 PC의 크롤러가 실행됩니다. 네이버 인증이 필요하면 [인증 완료] 버튼이 나타납니다.</div></div>`;
+    return '';
+  }
+}
+function _crawlIsActive(s){
+  const st0=(s&&s.state)?s.state:'idle';
+  const sAt=(s&&s.at)?new Date(s.at).getTime():0;
+  const fresh=sAt>0 && Math.abs(Date.now()-sAt)<=90000;
+  return (st0==='running'&&fresh) || st0==='await_auth';
+}
+// 모달이 열려 있으면 컨트롤은 모달에만(중복 id 방지), 아니면 인라인 박스에 렌더
+function renderCrawlBar(s){
+  _lastCrawlStatus=s||null;
+  const isAdmin=(auth==='admin');
+  const inline=document.getElementById('crawlBar');
+  if(_crawlModalOpen){
+    const mb=document.getElementById('crawlModalBody');
+    if(mb) mb.innerHTML=crawlInnerHTML(s, true);
+    if(inline){ inline.classList.remove('crawl-active'); inline.innerHTML=''; }
+  }else{
+    if(inline){ inline.classList.toggle('crawl-active', _crawlIsActive(s)); inline.innerHTML=crawlInnerHTML(s, isAdmin); }
   }
 }
 function crawlControls(){
@@ -4396,6 +4424,8 @@ document.addEventListener('click', e=>{
   else if(e.target.closest('#crawlAuthBtn')) confirmAuthDone();
   else if(e.target.closest('#crawlStopBtn')) stopCrawl();
   else if(e.target.closest('#crawlResetBtn')) stopCrawl();
+  else if(e.target.closest('#crawlModalClose')) closeCrawlModal();
+  else if(e.target.id==='crawlModal') closeCrawlModal();   // 바깥(오버레이) 클릭 시 닫기
 });
 document.addEventListener('change', e=>{
   if(e.target.id==='crawlDays'){ _crawlPeriodSel=e.target.value; renderCrawlBar(_lastCrawlStatus); }
@@ -4453,19 +4483,20 @@ function applyDashTools(){
   const b=document.getElementById('dashToolToggle');
   if(b) b.textContent=_dashToolsOpen?'⚙ 도구·필터 접기 ▴':'⚙ 도구·필터 펼치기 ▾';
 }
-// 상단 [🛰 자동 수집] 버튼 → 대시보드로 이동 + 도구 펼침 + 자동수집 박스로 스크롤·강조
+// 상단 [🛰 자동 수집] 버튼 → 독립 팝업(모달)로 자동 수집 패널 열기 (접힘/스크롤/렌더타이밍과 무관)
 function openCrawlPanel(){
-  if(auth!=='admin'){ toast('관리자만 사용할 수 있습니다.',true); return; }
-  if(state.view!=='dash'){ setView('dash'); }
-  _dashToolsOpen=true; applyDashTools();
-  renderCrawlBar(_lastCrawlStatus);                         // 현재 권한으로 박스 즉시 렌더(빈 박스 방지)
-  try{ clearTimeout(_crawlPollTimer); pollCrawlStatus(); }catch(e){}   // 최신 상태로 새로고침
-  setTimeout(()=>{
-    const el=document.getElementById('crawlBar');
-    if(el){ el.scrollIntoView({behavior:'smooth', block:'center'});
-      el.classList.add('crawl-flash'); setTimeout(()=>el.classList.remove('crawl-flash'),1500); }
-  },70);
+  if(auth!=='admin'){ toast('관리자만 사용할 수 있습니다. 먼저 [관리자 로그인] 해주세요.',true); return; }
+  _crawlModalOpen=true;
+  const m=document.getElementById('crawlModal'); if(m) m.style.display='flex';
+  renderCrawlBar(_lastCrawlStatus);                          // 모달 본문을 현재 권한·상태로 즉시 채움
+  try{ clearTimeout(_crawlPollTimer); pollCrawlStatus(); }catch(e){}   // 최신 상태 새로고침
 }
+function closeCrawlModal(){
+  _crawlModalOpen=false;
+  const m=document.getElementById('crawlModal'); if(m) m.style.display='none';
+  renderCrawlBar(_lastCrawlStatus);                          // 인라인 박스 복구
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && _crawlModalOpen) closeCrawlModal(); });
 (function(){ const b=document.getElementById('dashToolToggle');
   if(b) b.addEventListener('click', ()=>{ _dashToolsOpen=!_dashToolsOpen; applyDashTools(); }); })();
 async function boot(){
