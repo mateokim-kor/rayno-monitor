@@ -1143,7 +1143,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 분류규칙비교';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 점유율3기준';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4041,7 +4041,7 @@ function renderRevenue(){
   let charts=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:13px;margin-bottom:13px">`
     + chartCard('cRevTrend','월별 매출 추이','채널별 매출(원)')
     + chartCard('cChannel','채널 구성 · '+lab,'매출 비중')
-    + chartCard('cShare','시장점유율 추이','품질보증서 ÷ 신차등록')
+    + chartCard('cShare','시장점유율 추이','월 출고대수 대비 · 3가지 기준')
     + chartCard('cProdTop','제품 TOP · '+lab,'롤 중분류별 판매수량')
     + `</div>`;
 
@@ -4067,34 +4067,23 @@ function renderRevenue(){
   jr.forEach(x=>{ s4+=`<tr><td ${tdl}>${x.j==='본사'?'<b>본사</b>':x.j}</td><td ${td}>${roll(x.q)}</td><td ${td}>${won(x.a)}</td><td ${td}>${pct(x.q,jR).toFixed(1)}%</td></tr>`; });
   s4+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">합계(B2C)</td><td ${td} style="font-weight:800;background:var(--line)">${roll(jR)}</td><td ${td} style="font-weight:800;background:var(--line)">${won(jA)}</td><td ${td} style="background:var(--line)"></td></tr></table>`;
 
-  // ⑤ 품목(MatName) 분류 — 중분류로 묶기
-  const groups={}; SALES.prodList.forEach(mat=>{ const mid=_midOf(mat); (groups[mid]=groups[mid]||[]).push(mat); });
-  const midList=Object.keys(groups).sort((a,b)=> groups[b].reduce((s,m)=>s+_sPick(SALES.prodAll[m].mq),0) - groups[a].reduce((s,m)=>s+_sPick(SALES.prodAll[m].mq),0));
-  let s5=`<div style="font-size:12px;color:var(--ink2);margin-bottom:9px">품목(MatName)별 <b>롤 / 일반 / 제외</b> 분류. <b>제외</b>로 두면 모든 집계·차트·점유율에서 빠집니다(전사 매출액 제외). 그룹 헤더의 <b>일괄</b> 버튼으로 한 번에 바꿀 수 있어요. (B2C+B2B 품목만 표시)</div>`;
-  midList.forEach(mid=>{ const items=groups[mid].slice().sort((a,b)=>_sPick(SALES.prodAll[b].mq)-_sPick(SALES.prodAll[a].mq));
-    const gq=items.reduce((s,m)=> _isExcl(m)?s:s+_sPick(SALES.prodAll[m].mq),0);
-    const nRoll=items.filter(m=>!_isExcl(m)&&_isRoll(m)).length, nGoods=items.filter(m=>!_isExcl(m)&&!_isRoll(m)).length, nExcl=items.filter(_isExcl).length;
-    let rowsH='';
-    items.forEach(mat=>{ const q=_sPick(SALES.prodAll[mat].mq); const ex=_isExcl(mat), rt=_isRoll(mat); const em=encodeURIComponent(mat); const cur=ex?'excl':(rt?'roll':'goods');
-      const tg= admin? `<select class="sales-type" data-mat="${em}" style="padding:2px 5px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)"><option value="roll"${cur==='roll'?' selected':''}>롤</option><option value="goods"${cur==='goods'?' selected':''}>일반</option><option value="excl"${cur==='excl'?' selected':''}>제외</option></select>` : (ex?'제외':(rt?'롤':'일반'));
-      rowsH+=`<tr${ex?' style="opacity:.5"':''}><td ${tdl} style="padding-left:18px">${mat}</td><td ${td}>${roll(q)}</td><td ${td}>${tg}</td></tr>`; });
-    const bulk= admin? `<span style="float:right;font-weight:400"><button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="roll" style="padding:1px 8px;font-size:11px">전체 롤</button> <button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="goods" style="padding:1px 8px;font-size:11px">전체 일반</button> <button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="excl" style="padding:1px 8px;font-size:11px">전체 제외</button></span>` : '';
-    s5+=`<details style="border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;font-size:13px;list-style:none">${mid} <span style="color:var(--ink2);font-weight:400">· ${items.length}품목 · 수량 ${roll(gq)} · 롤 ${nRoll}/일반 ${nGoods}${nExcl?`/<span style="color:var(--neg)">제외 ${nExcl}</span>`:''}</span>${bulk}</summary><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>품목(MatName)</th><th ${th}>판매수량</th><th ${th}>분류</th></tr>${rowsH}</table></details>`; });
 
-  // ⑥ 시장 점유율 — 신차등록(설정) 기준
-  const capf=mid=>_sNum(inp.cap[mid]||0);
-  let carsDealer=0, carsJibu=0;
-  JG.forEach(j=>{ const pm=SALES.jibuProd[j]||{}; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const r=_sPick(pm[mat].q||pm[mat]); const cp=capf(_midOf(mat)); carsDealer+=r*cp; if(j!=='본사')carsJibu+=r*cp; }); });
+  // ⑥ 시장 점유율 — 월 차량 출고 대수(신차등록) 분모, 3가지 기준
   const sc=salesCfg();
-  const carReg=_scPick(sc.carReg), warrManual=(_salesMonth?_qc(_salesMonth):_qcTot());
+  const carReg=_carRegPick();
+  const carB2C=_rollCarsPick('B2C'), carB2B=_rollCarsPick('B2B'), carSales=carB2C+carB2B;
+  const carDealer=_dealerPick();
+  const warrCnt=(_salesMonth?_qc(_salesMonth):_qcTot());
   const wj=_warrByJibu(m0);
   const shr=c=> carReg>0? (c/carReg*100).toFixed(2)+'%' : '<span style="color:var(--ink2)">신차등록 입력 필요</span>';
-  let s6=`<div style="font-size:12px;color:var(--ink2);margin-bottom:9px">분모 <b>신차등록 수</b>와 <b>롤당 시공가능대수</b>는 ⚙ <b>설정 → 매출 설정</b>에서 입력합니다.</div>`;
-  s6+=`<div style="margin-bottom:11px">신차등록 (${lab}): <b>${carReg?roll(carReg)+'대':'(미입력)'}</b></div>`;
+  let s6=`<div style="font-size:12px;color:var(--ink2);margin-bottom:9px">분모 = <b>월 차량 출고 대수(신차등록)</b> · ⚙ <b>설정 → 매출 설정</b>에서 신차등록·대리점 판매·롤당 시공대수를 입력합니다. (롤당 기본 10대, 모노카본 17대)</div>`;
+  s6+=`<div style="margin-bottom:11px">월 차량 출고 대수 (${lab}): <b>${carReg?roll(carReg)+'대':'(미입력)'}</b></div>`;
   s6+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>기준</th><th ${th}>차량대수</th><th ${th}>점유율</th></tr>`
-    +`<tr><td ${tdl}>① 대리점 판매 기준 (롤×대수)</td><td ${td}>${roll(carsDealer)}</td><td ${td}><b>${shr(carsDealer)}</b></td></tr>`
-    +`<tr><td ${tdl}>② 지부 판매 기준 (롤×대수)</td><td ${td}>${roll(carsJibu)}</td><td ${td}><b>${shr(carsJibu)}</b></td></tr>`
-    +`<tr><td ${tdl}>③ 품질보증서 기준 (수기)</td><td ${td}>${roll(warrManual)}</td><td ${td}><b>${shr(warrManual)}</b></td></tr></table>`;
+    +`<tr><td ${tdl}>품질보증서 기준 <span style="color:var(--ink2);font-weight:400">(1장=1대·자동)</span></td><td ${td}>${roll(warrCnt)}</td><td ${td}><b>${shr(warrCnt)}</b></td></tr>`
+    +`<tr><td ${tdl}>대리점 판매 기준 <span style="color:var(--ink2);font-weight:400">(수기)</span></td><td ${td}>${carDealer?roll(carDealer):'<span style=\"color:var(--ink2)\">(미입력)</span>'}</td><td ${td}><b>${carDealer?shr(carDealer):'—'}</b></td></tr>`
+    +`<tr><td ${tdl}>판매 기준 · B2C <span style="color:var(--ink2);font-weight:400">(롤×시공대수)</span></td><td ${td}>${roll(carB2C)}</td><td ${td}><b>${shr(carB2C)}</b></td></tr>`
+    +`<tr><td ${tdl}>판매 기준 · B2B <span style="color:var(--ink2);font-weight:400">(롤×시공대수)</span></td><td ${td}>${roll(carB2B)}</td><td ${td}><b>${shr(carB2B)}</b></td></tr>`
+    +`<tr><td ${tdl} style="font-weight:800;background:rgba(244,145,28,.1)">판매 기준 · 합계 (B2C+B2B)</td><td ${td} style="font-weight:800;background:rgba(244,145,28,.1)">${roll(carSales)}</td><td ${td} style="font-weight:800;background:rgba(244,145,28,.1)">${shr(carSales)}</td></tr></table>`;
   s6+=`<div style="font-weight:700;margin:13px 0 7px">지부별 점유율 (업로드 보증서 실시공 · ${lab})</div><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>실시공(건)</th><th ${th}>점유율</th></tr>`;
   JG.forEach(j=>{ s6+=`<tr><td ${tdl}>${j}</td><td ${td}>${wj.by[j]||0}</td><td ${td}>${carReg>0?((wj.by[j]||0)/carReg*100).toFixed(2)+'%':'—'}</td></tr>`; });
   s6+=`</table>`;
@@ -4119,7 +4108,6 @@ function renderRevenue(){
     + card(hh('② 롤 / 일반물품 구분 · '+lab)+s2)
     + card(hh('③ 월별 매출 추이')+s3)
     + card(hh('④ 지부별 판매현황 · '+lab)+s4)
-    + card(hh('⑤ 품목(MatName) 분류 · 롤/일반 · '+lab)+s5)
     + card(hh('⑥ 시장 점유율 · '+lab)+s6)
     + card(hh('⑦ 대리점별 판매현황 · '+lab)+s7)
     + card(hh('⑧ 월별 매출 리포트')+s8);
@@ -4144,12 +4132,18 @@ function drawSalesCharts(){
       data:{ labels:['B2C','B2B'], datasets:[{data:d, backgroundColor:[AM,BL], borderColor:ck.donut, borderWidth:2}] },
       options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
         plugins:{ legend:{position:'bottom',labels:{color:ck.text,boxWidth:12,font:{size:11}}}, tooltip:{callbacks:{label:c=>c.label+': '+c.parsed.toLocaleString()+'원'}} } } }); }
-  // 시장점유율 추이 (품질보증서/신차등록)
-  if(document.getElementById('cShare')){ const sh=M.map(m=>{ const cr=_sNum((sc.carReg||{})[m]||0), w=_sNum((sc.warranty||{})[m]||0); return cr>0? +(w/cr*100).toFixed(2):null; });
+  // 시장점유율 추이 — 3가지 기준 (월 차량 출고 대수 대비)
+  if(document.getElementById('cShare')){ const scc=salesCfg();
+    const mk=f=>M.map(m=>{ const cr=_sNum((scc.carReg||{})[m]||0); return cr>0? +(f(m)/cr*100).toFixed(2):null; });
+    const dW=mk(m=>_qc(m)), dD=mk(m=>_dealerCars(m)), dS=mk(m=>_rollCars('B2C',m)+_rollCars('B2B',m));
+    const hasD=dD.some(v=>v); 
+    const ds=[{label:'품질보증서', data:dW, borderColor:'#16a34a', backgroundColor:'#16a34a22', borderWidth:2, pointRadius:3, tension:.3, spanGaps:true},
+              {label:'판매(합계)', data:dS, borderColor:'#3b82f6', backgroundColor:'#3b82f622', borderWidth:2, pointRadius:3, tension:.3, spanGaps:true}];
+    if(hasD) ds.splice(1,0,{label:'대리점 판매', data:dD, borderColor:'#f4911c', backgroundColor:'#f4911c22', borderWidth:2, pointRadius:3, tension:.3, spanGaps:true});
     makeChart('cShare',{ type:'line',
-      data:{ labels:M.map(m=>m+'월'), datasets:[{label:'점유율(%)', data:sh, borderColor:GR, backgroundColor:GR+'22', borderWidth:2, pointRadius:3, tension:.3, spanGaps:true, fill:true}] },
+      data:{ labels:M.map(m=>m+'월'), datasets:ds },
       options:{ responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>'점유율: '+(c.parsed.y!=null?c.parsed.y+'%':'-')}} },
+        plugins:{ legend:{position:'bottom',labels:{color:ck.text,boxWidth:11,font:{size:10}}}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y!=null?c.parsed.y+'%':'-')}} },
         scales:{ x:{grid:{display:false},ticks:{color:ck.text}}, y:{grid:{color:ck.grid},ticks:{color:ck.text,callback:v=>v+'%'}} } } }); }
   // 제품 TOP (롤 중분류, 선택 기간)
   if(document.getElementById('cProdTop')){ const mids={}; SALES.prodList.forEach(mat=>{ if(_isRoll(mat)){ const mid=_midOf(mat); mids[mid]=(mids[mid]||0)+_sPick(SALES.prodAll[mat].mq); } });
@@ -4213,7 +4207,7 @@ document.getElementById('salesAddBtn').addEventListener('click', ()=>document.ge
 document.getElementById('salesFileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleSalesFile(f); e.target.value=''; });
 
 // ── 매출 수기설정(STORE.config.salesCfg) ──
-function salesCfg(){ STORE.config=STORE.config||{}; const s=STORE.config.salesCfg=STORE.config.salesCfg||{}; s.marketing=s.marketing||{}; s.warranty=s.warranty||{}; s.carReg=s.carReg||{}; s.midType=s.midType||{}; s.exclKw=Array.isArray(s.exclKw)?s.exclKw:[]; return s; }
+function salesCfg(){ STORE.config=STORE.config||{}; const s=STORE.config.salesCfg=STORE.config.salesCfg||{}; s.marketing=s.marketing||{}; s.warranty=s.warranty||{}; s.carReg=s.carReg||{}; s.midType=s.midType||{}; s.exclKw=Array.isArray(s.exclKw)?s.exclKw:[]; s.dealerSales=s.dealerSales||{}; return s; }
 function _scSum(o){ let s=0; for(let m=1;m<=12;m++) s+=_sNum((o&&o[m])||0); return s; }
 function _scTot(o){ let s=0; _salesMonths().forEach(m=>s+=_sNum((o&&o[m])||0)); return s; }
 function _scPick(o){ if(_salesMonth) return _sNum((o&&o[_salesMonth])||0); return _scTot(o); }
@@ -4288,6 +4282,16 @@ function _qc(m){ if(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length
 function _qcTot(){ let s=0; _salesMonths().forEach(m=>s+=_qc(m)); return s; }
 function _qcAuto(){ return (typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length>0); }
 
+// ── 롤당 시공대수 + 시장점유율(판매/대리점 기준) ──
+function _capDef(mid){ return (/카본|모노|MONO|TBTECH/i.test(mid))?17:10; }  // 기본: 모노카본 17대, 그 외 10대
+function _capOf(mid){ const c=_sNum((((SALES&&SALES.inputs&&SALES.inputs.cap)||{})[mid])||0); return c>0?c:_capDef(mid); }
+function _rollCars(ch,m){ const cm=(SALES&&SALES.chMat&&SALES.chMat[ch])||{}; let s=0; Object.keys(cm).forEach(mat=>{ if(!_isRoll(mat))return; s+=(cm[mat][m]||0)*_capOf(_midOf(mat)); }); return s; }  // 롤 판매수 × 롤당대수 = 시공가능 차량수
+function _rollCarsPick(ch){ if(_salesMonth) return _rollCars(ch,_salesMonth); let s=0; _salesMonths().forEach(m=>s+=_rollCars(ch,m)); return s; }
+function _dealerCars(m){ return _sNum(((salesCfg().dealerSales)||{})[m]||0); }
+function _dealerPick(){ if(_salesMonth) return _dealerCars(_salesMonth); let s=0; _salesMonths().forEach(m=>s+=_dealerCars(m)); return s; }
+function _carRegPick(){ return _scPick(salesCfg().carReg); }
+
+
 // Table A — 중분류별 롤 판매 수 (B2C / B2B / 합계, 월별)
 function salesRollTable(){
   if(!SALES||!SALES.chMat) return '<div style="color:var(--ink2);font-size:13px">ERP 재업로드 후 표시됩니다.</div>';
@@ -4339,6 +4343,27 @@ function salesJibuRollTable(){
 }
 
 
+function salesItemClassHTML(){
+  if(!SALES||!SALES.prodAll) return '<div class="cap">매출 ERP 업로드 후 표시됩니다.</div>';
+  const admin=(auth==='admin'), roll=n=>Math.round(n||0).toLocaleString();
+  const thl=`style="background:var(--ink);color:var(--bg);padding:6px 9px;font-size:11px;font-weight:800;text-align:left;white-space:nowrap"`;
+  const th=`style="background:var(--ink);color:var(--bg);padding:6px 9px;font-size:11px;font-weight:800;text-align:right;white-space:nowrap"`;
+  const tdl=`style="padding:5px 9px;text-align:left;border-bottom:1px solid var(--line);font-size:12px"`;
+  const td=`style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);font-size:12px"`;
+  const groups={}; SALES.prodList.forEach(mat=>{ const mid=_midOf(mat); (groups[mid]=groups[mid]||[]).push(mat); });
+  const midList=Object.keys(groups).sort((a,b)=> groups[b].reduce((s,m)=>s+_sTot(SALES.prodAll[m].mq),0) - groups[a].reduce((s,m)=>s+_sTot(SALES.prodAll[m].mq),0));
+  let s5=`<div class="cap" style="margin-bottom:9px">품목(MatName)별 <b>롤/일반/제외</b> 분류. 그룹 헤더의 <b>일괄</b> 버튼은 중분류 <b>영구 규칙</b>으로 저장됩니다(매 업로드 자동 적용). 개별 선택은 그 품목만 예외 지정(규칙보다 우선).</div>`;
+  midList.forEach(mid=>{ const items=groups[mid].slice().sort((a,b)=>_sTot(SALES.prodAll[b].mq)-_sTot(SALES.prodAll[a].mq));
+    const gq=items.reduce((s,m)=> _isExcl(m)?s:s+_sTot(SALES.prodAll[m].mq),0);
+    const nRoll=items.filter(m=>!_isExcl(m)&&_isRoll(m)).length, nGoods=items.filter(m=>!_isExcl(m)&&!_isRoll(m)).length, nExcl=items.filter(_isExcl).length;
+    let rowsH='';
+    items.forEach(mat=>{ const q=_sTot(SALES.prodAll[mat].mq); const ex=_isExcl(mat), rt=_isRoll(mat); const em=encodeURIComponent(mat); const cur=ex?'excl':(rt?'roll':'goods');
+      const tg= admin? `<select class="sales-type" data-mat="${em}" style="padding:2px 5px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)"><option value="roll"${cur==='roll'?' selected':''}>롤</option><option value="goods"${cur==='goods'?' selected':''}>일반</option><option value="excl"${cur==='excl'?' selected':''}>제외</option></select>` : (ex?'제외':(rt?'롤':'일반'));
+      rowsH+=`<tr${ex?' style="opacity:.5"':''}><td ${tdl} style="padding-left:16px">${mat}</td><td ${td}>${roll(q)}</td><td ${td}>${tg}</td></tr>`; });
+    const bulk= admin? `<span style="float:right;font-weight:400"><button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="roll" style="padding:1px 8px;font-size:11px">전체 롤</button> <button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="goods" style="padding:1px 8px;font-size:11px">전체 일반</button> <button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="excl" style="padding:1px 8px;font-size:11px">전체 제외</button></span>` : '';
+    s5+=`<details style="border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;font-size:13px;list-style:none">${mid} <span style="color:var(--ink2);font-weight:400">· ${items.length}품목 · 수량 ${roll(gq)} · 롤 ${nRoll}/일반 ${nGoods}${nExcl?`/<span style="color:var(--neg)">제외 ${nExcl}</span>`:''}</span>${bulk}</summary><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>품목(MatName)</th><th ${th}>판매수량</th><th ${th}>분류</th></tr>${rowsH}</table></details>`; });
+  return s5;
+}
 function salesSettingsSectionHTML(){
   const sc=salesCfg(), MM=[1,2,3,4,5,6,7,8,9,10,11,12], won=n=>n?Math.round(n).toLocaleString():'0';
   const thl=`style="background:var(--ink);color:var(--bg);padding:7px 8px;font-size:11px;font-weight:800;text-align:left;white-space:nowrap;position:sticky;left:0"`;
@@ -4347,12 +4372,13 @@ function salesSettingsSectionHTML(){
   const mfields=(metric)=> MM.map(m=>`<td style="padding:2px"><input class="sc-in" data-metric="${metric}" data-month="${m}" type="number" min="0" value="${sc[metric][m]||''}" placeholder="0" style="width:88px;text-align:right;padding:4px 5px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:12px"></td>`).join('');
   let grid=`<div style="overflow-x:auto"><table style="border-collapse:collapse"><tr><th ${thl}>항목</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`
         +`<tr><td ${tdl}>신차등록(대)</td>${mfields('carReg')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.carReg))}</td></tr>`
+    +`<tr><td ${tdl}>대리점 판매(대)</td>${mfields('dealerSales')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.dealerSales))}</td></tr>`
     +`</table></div>`;
   let capHTML;
   if(SALES&&SALES.prodAll){ const rm={}; SALES.prodList.forEach(mat=>{ if(_isRoll(mat)) rm[_midOf(mat)]=true; });
     const cap=(SALES.inputs&&SALES.inputs.cap)||{};
     capHTML=`<div style="overflow-x:auto"><table style="border-collapse:collapse"><tr><th ${thl}>롤 중분류</th><th ${th}>롤당 시공가능대수</th></tr>`
-      + Object.keys(rm).sort().map(mid=>`<tr><td ${tdl}>${mid}</td><td style="padding:4px 8px;text-align:right"><input class="sc-cap" data-mid="${encodeURIComponent(mid)}" type="number" min="0" step="0.1" value="${_sNum(cap[mid]||0)||''}" placeholder="0" style="width:90px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:12px"></td></tr>`).join('')
+      + Object.keys(rm).sort().map(mid=>`<tr><td ${tdl}>${mid}</td><td style="padding:4px 8px;text-align:right"><input class="sc-cap" data-mid="${encodeURIComponent(mid)}" type="number" min="0" step="0.1" value="${_sNum(cap[mid]||0)||''}" placeholder="${_capDef(mid)}" style="width:90px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:12px"></td></tr>`).join('')
       + `</table></div>`;
   } else capHTML=`<div class="empty" style="padding:18px;color:var(--ink2);font-size:13px">매출 ERP 파일을 먼저 올리면(레이노 데이터 → 매출) 롤 중분류 목록이 여기에 나타납니다.</div>`;
   const _mids=(SALES&&SALES.prodList)?[...new Set(SALES.prodList.map(_midOf))].sort():[];
@@ -4374,11 +4400,12 @@ function salesSettingsSectionHTML(){
        <select id="salesCutoff" class="set-text" style="max-width:160px">${[0,1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}"${_salesCut()===m?' selected':''}>${m===0?'전체 표시(제한 없음)':m+'월까지'}</option>`).join('')}</select>
      </label></div>
    <div class="card set-card"><h3><span class="dot"></span>월별 수기 입력 (ERP에 없는 항목)</h3>
-     <div class="cap"><b>신차등록</b>을 월별로 입력하면(품질보증서는 품질보증서 탭에서 자동 집계) 매출 종합표·KPI·시장점유율에 반영됩니다. 입력칸을 벗어나면 자동 저장됩니다.</div>
+     <div class="cap"><b>월 차량 출고 대수(신차등록)</b>와 <b>대리점 판매 대수</b>를 월별로 입력하면(품질보증서는 품질보증서 탭에서 자동 집계) 매출 종합표·KPI·시장점유율에 반영됩니다. 입력칸을 벗어나면 자동 저장됩니다.</div>
      ${grid}</div>
    <div class="card set-card"><h3><span class="dot"></span>롤당 시공가능대수 (시장점유율 계산용)</h3>
-     <div class="cap">롤 중분류별로 한 롤이 시공 가능한 차량 대수입니다. 시장점유율(대리점·지부 기준)의 분자 계산에 쓰입니다.</div>
-     ${capHTML}</div>`;
+     <div class="cap">롤 중분류별 한 롤이 시공 가능한 차량 대수. <b>기본 10대, 모노카본(TBTECH·MONO) 17대</b> — 비워두면 기본값 적용. 판매 기준 시장점유율 계산에 쓰입니다.</div>
+     ${capHTML}</div>
+   <div class="card set-card"><h3><span class="dot"></span>⑤ 품목(MatName) 분류 · 롤 / 일반 / 제외</h3>${salesItemClassHTML()}</div>`;
 }
 // 매출 설정 입력 자동 저장(위임)
 (function(){ const host=document.getElementById('setSalesHost'); if(!host) return;
@@ -4387,10 +4414,12 @@ function salesSettingsSectionHTML(){
     if(t.classList&&t.classList.contains('sc-in')){ const sc=salesCfg(); sc[t.dataset.metric][parseInt(t.dataset.month,10)]=_sNum(t.value); saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave(); const sh=document.getElementById('setSalesHost'); if(sh) sh.innerHTML=salesSettingsSectionHTML(); toast('저장됨'); }
     else if(t.classList&&t.classList.contains('sc-cap')){ if(SALES){ SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.cap[decodeURIComponent(t.dataset.mid)]=_sNum(t.value); cloudSaveJSON(SUPA.salesFile,SALES); toast('저장됨'); } }
     else if(t.classList&&t.classList.contains('sc-mid')){ const mid=decodeURIComponent(t.dataset.mid), sc=salesCfg(); if(t.value) sc.midType[mid]=t.value; else delete sc.midType[mid]; saveStore(STORE); if(typeof flushCloudSave==='function')flushCloudSave(); toast('중분류 ‘'+mid+'’ 규칙 저장'); }
+    else if(t.classList&&t.classList.contains('sales-type')){ if(SALES){ SALES.inputs=SALES.inputs||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; SALES.inputs.itemType[decodeURIComponent(t.dataset.mat)]=t.value; cloudSaveJSON(SUPA.salesFile,SALES); toast('분류 저장'); } }
   });
   host.addEventListener('click', e=>{ const t=e.target;
     if(t.id==='kwAdd'){ const inp=document.getElementById('kwInput'); const v=((inp&&inp.value)||'').trim(); if(!v)return; const sc=salesCfg(); if(sc.exclKw.indexOf(v)<0) sc.exclKw.push(v); saveStore(STORE); if(typeof flushCloudSave==='function')flushCloudSave(); host.innerHTML=salesSettingsSectionHTML(); toast('제외 키워드 추가: '+v); }
     else if(t.classList&&t.classList.contains('kw-del')){ const i=parseInt(t.dataset.i,10); const sc=salesCfg(); if(i>=0&&i<sc.exclKw.length){ const k=sc.exclKw.splice(i,1); saveStore(STORE); if(typeof flushCloudSave==='function')flushCloudSave(); host.innerHTML=salesSettingsSectionHTML(); toast('키워드 삭제: '+k); } }
+    else if(t.classList&&t.classList.contains('sales-bulk')){ const mid=decodeURIComponent(t.dataset.mid), val=t.dataset.val; salesCfg().midType[mid]=val; if(SALES){ SALES.inputs=SALES.inputs||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; (SALES.prodList||[]).forEach(mat=>{ if(_midOf(mat)===mid) delete SALES.inputs.itemType[mat]; }); cloudSaveJSON(SUPA.salesFile,SALES); } saveStore(STORE); if(typeof flushCloudSave==='function')flushCloudSave(); host.innerHTML=salesSettingsSectionHTML(); toast('중분류 ‘'+mid+'’ 규칙: '+(val==='roll'?'롤':val==='goods'?'일반':'제외')); }
   });
 })();
 
