@@ -960,6 +960,7 @@
     <div id="setAccessHost"></div>
     <div id="setCafeHost"></div>
     <div id="setWarrHost"></div>
+    <div id="setSalesHost"></div>
   </div>
 
   <footer>
@@ -1137,7 +1138,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 품목분류';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 매출대시보드';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4043,29 +4044,22 @@ function renderRevenue(){
     const bulk= admin? `<span style="float:right;font-weight:400"><button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="roll" style="padding:1px 8px;font-size:11px">전체 롤</button> <button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="goods" style="padding:1px 8px;font-size:11px">전체 일반</button></span>` : '';
     s5+=`<details style="border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;font-size:13px;list-style:none">${mid} <span style="color:var(--ink2);font-weight:400">· ${items.length}품목 · 수량 ${roll(gq)} · 롤 ${nRoll}/일반 ${nGoods}</span>${bulk}</summary><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>품목(MatName)</th><th ${th}>판매수량</th><th ${th}>분류</th></tr>${rowsH}</table></details>`; });
 
-  // ⑥ 시장 점유율 — 롤당 대수(중분류) + 자동차 판매량
+  // ⑥ 시장 점유율 — 신차등록(설정) 기준
   const capf=mid=>_sNum(inp.cap[mid]||0);
-  // 롤 중분류 목록(롤 품목 1개 이상)
-  const rollMids={}; SALES.prodList.forEach(mat=>{ if(_isRoll(mat)) rollMids[_midOf(mat)]=true; });
   let carsDealer=0, carsJibu=0;
   JG.forEach(j=>{ const pm=SALES.jibuProd[j]||{}; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const r=_sPick(pm[mat]); const cp=capf(_midOf(mat)); carsDealer+=r*cp; if(j!=='본사')carsJibu+=r*cp; }); });
+  const sc=salesCfg();
+  const carReg=_scPick(sc.carReg), warrManual=_scPick(sc.warranty);
   const wj=_warrByJibu(m0);
-  const carSales = m0? _sNum((inp.carSales||{})[m0]||0) : Object.keys(inp.carSales||{}).reduce((s,k)=>s+_sNum(inp.carSales[k]),0);
-  const shr=c=> carSales>0? (c/carSales*100).toFixed(2)+'%' : '<span style="color:var(--ink2)">판매량 입력</span>';
-  let s6=`<div style="font-size:12px;color:var(--ink2);margin-bottom:8px">롤 중분류별 <b>롤당 시공가능대수</b>를 입력하면 시장점유율이 계산됩니다.</div>`;
-  s6+=`<table style="width:100%;border-collapse:collapse;margin-bottom:12px"><tr><th ${thl}>롤 중분류</th><th ${th}>롤당 시공가능대수</th></tr>`;
-  Object.keys(rollMids).sort().forEach(mid=>{ const em=encodeURIComponent(mid);
-    s6+=`<tr><td ${tdl}>${mid}</td><td ${td}>${admin?`<input class="sales-cap" data-mid="${em}" type="number" min="0" step="0.1" value="${capf(mid)||''}" style="width:80px;text-align:right;padding:3px 6px;border:1px solid var(--amber);border-radius:6px;background:var(--card);color:var(--ink)">`:(capf(mid)||0)}</td></tr>`; });
-  s6+=`</table>`;
-  s6+=`<div style="margin-bottom:11px"><span style="font-weight:700">자동차 판매량 (${lab}, 대): </span>`;
-  s6+= (admin && m0)? `<input id="salesCarInput" data-month="${m0}" type="number" min="0" value="${carSales||''}" style="width:130px;text-align:right;padding:5px 8px;border:1px solid var(--amber);border-radius:7px;background:var(--card);color:var(--ink)">` : `<b>${carSales?won(carSales):'(미입력)'}</b>${(!m0&&admin)?' <span style="font-size:11px;color:var(--ink2)">· 월을 선택해 월별로 입력</span>':''}`;
-  s6+=`</div>`;
+  const shr=c=> carReg>0? (c/carReg*100).toFixed(2)+'%' : '<span style="color:var(--ink2)">신차등록 입력 필요</span>';
+  let s6=`<div style="font-size:12px;color:var(--ink2);margin-bottom:9px">분모 <b>신차등록 수</b>와 <b>롤당 시공가능대수</b>는 ⚙ <b>설정 → 매출 설정</b>에서 입력합니다.</div>`;
+  s6+=`<div style="margin-bottom:11px">신차등록 (${lab}): <b>${carReg?roll(carReg)+'대':'(미입력)'}</b></div>`;
   s6+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>기준</th><th ${th}>차량대수</th><th ${th}>점유율</th></tr>`
-    +`<tr><td ${tdl}>① 대리점 판매 기준</td><td ${td}>${roll(carsDealer)}</td><td ${td}><b>${shr(carsDealer)}</b></td></tr>`
-    +`<tr><td ${tdl}>② 지부 판매 기준</td><td ${td}>${roll(carsJibu)}</td><td ${td}><b>${shr(carsJibu)}</b></td></tr>`
-    +`<tr><td ${tdl}>③ 품질보증서 기준</td><td ${td}>${roll(wj.total)}</td><td ${td}><b>${shr(wj.total)}</b></td></tr></table>`;
-  s6+=`<div style="font-weight:700;margin:13px 0 7px">지부별 점유율 (품질보증서 · ${lab})</div><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>품질보증서(대)</th><th ${th}>점유율</th></tr>`;
-  JG.forEach(j=>{ s6+=`<tr><td ${tdl}>${j}</td><td ${td}>${wj.by[j]||0}</td><td ${td}>${carSales>0?((wj.by[j]||0)/carSales*100).toFixed(2)+'%':'—'}</td></tr>`; });
+    +`<tr><td ${tdl}>① 대리점 판매 기준 (롤×대수)</td><td ${td}>${roll(carsDealer)}</td><td ${td}><b>${shr(carsDealer)}</b></td></tr>`
+    +`<tr><td ${tdl}>② 지부 판매 기준 (롤×대수)</td><td ${td}>${roll(carsJibu)}</td><td ${td}><b>${shr(carsJibu)}</b></td></tr>`
+    +`<tr><td ${tdl}>③ 품질보증서 기준 (수기)</td><td ${td}>${roll(warrManual)}</td><td ${td}><b>${shr(warrManual)}</b></td></tr></table>`;
+  s6+=`<div style="font-weight:700;margin:13px 0 7px">지부별 점유율 (업로드 보증서 실시공 · ${lab})</div><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>실시공(건)</th><th ${th}>점유율</th></tr>`;
+  JG.forEach(j=>{ s6+=`<tr><td ${tdl}>${j}</td><td ${td}>${wj.by[j]||0}</td><td ${td}>${carReg>0?((wj.by[j]||0)/carReg*100).toFixed(2)+'%':'—'}</td></tr>`; });
   s6+=`</table>`;
 
   const dl=Object.keys(SALES.dealers).map(k=>({name:k,q:_sPick(SALES.dealers[k].mq),a:_sPick(SALES.dealers[k].ma),jibu:SALES.dealers[k].jibu})).filter(d=>d.q>0||d.a>0).sort((a,b)=>b.q-a.q);
@@ -4077,6 +4071,8 @@ function renderRevenue(){
   let s8=`<button id="salesRepCopy" class="acc-btn" style="margin-bottom:8px">📋 리포트 복사</button><pre id="salesRepText" style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:inherit;font-size:13px;color:var(--ink);margin:0">${rep.replace(/</g,'&lt;')}</pre>`;
 
   box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
+    + salesKPI()
+    + card(hh('📊 세일즈 데이터 · 월별 종합 (단위: 원, VAT 별도)')+salesSummaryTable())
     + sel
     + card(hh('① 채널 요약 · '+lab)+s1)
     + card(hh('② 롤 / 일반물품 구분 · '+lab)+s2)
@@ -4132,6 +4128,90 @@ document.getElementById('rRevenue').addEventListener('click', e=>{
 });
 document.getElementById('salesAddBtn').addEventListener('click', ()=>document.getElementById('salesFileInput').click());
 document.getElementById('salesFileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleSalesFile(f); e.target.value=''; });
+
+// ── 매출 수기설정(STORE.config.salesCfg) ──
+function salesCfg(){ STORE.config=STORE.config||{}; const s=STORE.config.salesCfg=STORE.config.salesCfg||{}; s.marketing=s.marketing||{}; s.warranty=s.warranty||{}; s.carReg=s.carReg||{}; return s; }
+function _scSum(o){ let s=0; for(let m=1;m<=12;m++) s+=_sNum((o&&o[m])||0); return s; }
+function _scPick(o){ if(_salesMonth) return _sNum((o&&o[_salesMonth])||0); return _scSum(o); }
+
+function salesKPI(){
+  if(!SALES||!SALES.channels) return '';
+  const C=SALES.channels, sc=salesCfg();
+  const eok=n=>(n/1e8).toFixed(1), won=n=>Math.round(n||0).toLocaleString();
+  const entT=_sSum(C.B2C.ma)+_sSum(C.B2B.ma)+_sSum(C['별도채널'].ma);
+  const bbT=_sSum(C.B2C.ma)+_sSum(C.B2B.ma);
+  const mkT=_scSum(sc.marketing), wT=_scSum(sc.warranty), crT=_scSum(sc.carReg);
+  const share= crT>0? (wT/crT*100).toFixed(2)+'%':'—';
+  const kpi=(t,v,s)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px"><div style="font-size:12px;color:var(--ink2);margin-bottom:5px">${t}</div><div style="font-size:21px;font-weight:800;color:var(--ink)">${v}</div><div style="font-size:11px;color:var(--ink2);margin-top:3px">${s||''}</div></div>`;
+  return `<div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:14px">`
+    + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도')
+    + kpi('B2C+B2B 합계', eok(bbT)+'억', entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'')
+    + kpi('마케팅 지출', mkT?eok(mkT)+'억':'(미입력)', bbT&&mkT?'B2C+B2B 대비 '+(mkT/bbT*100).toFixed(2)+'%':'설정에서 입력')
+    + kpi('시장점유율(품질보증서)', share, crT?`보증서 ${won(wT)} / 신차 ${won(crT)}`:'설정에서 입력')
+    + `</div>`;
+}
+function salesSummaryTable(){
+  if(!SALES||!SALES.channels) return '<div style="color:var(--ink2);font-size:13px">매출 ERP 업로드 후 표시됩니다.</div>';
+  const C=SALES.channels, sc=salesCfg(), MM=[1,2,3,4,5,6,7,8,9,10,11,12];
+  const won=n=>n?Math.round(n).toLocaleString():'';
+  const ent=m=>C.B2C.ma[m]+C.B2B.ma[m]+C['별도채널'].ma[m], b2c=m=>C.B2C.ma[m], b2b=m=>C.B2B.ma[m], bb=m=>b2c(m)+b2b(m);
+  const sum=f=>{let s=0;MM.forEach(m=>s+=f(m));return s;};
+  const entT=sum(ent), b2cT=sum(b2c), b2bT=sum(b2b), bbT=b2cT+b2bT;
+  const pc=(a,b)=>b?(a/b*100).toFixed(2)+'%':'';
+  const thl=`style="background:var(--ink);color:var(--bg);padding:8px 9px;font-size:11.5px;font-weight:800;text-align:left;white-space:nowrap;position:sticky;left:0;z-index:1"`;
+  const th=`style="background:var(--ink);color:var(--bg);padding:8px 9px;font-size:11.5px;font-weight:800;text-align:right;white-space:nowrap"`;
+  const tdl=`style="padding:7px 9px;text-align:left;border-bottom:1px solid var(--line);font-size:12.5px;font-weight:700;white-space:nowrap;background:var(--card);position:sticky;left:0"`;
+  const td=`style="padding:7px 9px;text-align:right;border-bottom:1px solid var(--line);font-size:12px;white-space:nowrap"`;
+  const tdt=`style="padding:7px 9px;text-align:right;border-bottom:1px solid var(--line);font-size:12.5px;font-weight:800;background:rgba(244,145,28,.08);white-space:nowrap"`;
+  const rows=[
+    {n:'전사 매출액', f:ent, t:entT, note:'', hi:1},
+    {n:'B2C', f:b2c, t:b2cT, note:pc(b2cT,bbT)},
+    {n:'B2B', f:b2b, t:b2bT, note:pc(b2bT,bbT)},
+    {n:'B2C + B2B 합계', f:bb, t:bbT, note:pc(bbT,entT), hi:1},
+    {n:'마케팅 지출', f:m=>_sNum(sc.marketing[m]||0), t:_scSum(sc.marketing), note:pc(_scSum(sc.marketing),bbT)},
+    {n:'품질보증서', f:m=>_sNum(sc.warranty[m]||0), t:_scSum(sc.warranty), note:''},
+    {n:'신차등록', f:m=>_sNum(sc.carReg[m]||0), t:_scSum(sc.carReg), note:''},
+  ];
+  let h=`<div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:100%"><tr><th ${thl}>구분</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th><th ${th}>비고</th></tr>`;
+  rows.forEach(r=>{ h+=`<tr${r.hi?' style="background:rgba(244,145,28,.04)"':''}><td ${tdl}>${r.n}</td>${MM.map(m=>`<td ${td}>${won(r.f(m))}</td>`).join('')}<td ${tdt}>${won(r.t)}</td><td ${td}>${r.note}</td></tr>`; });
+  h+=`</table></div><div style="font-size:11px;color:var(--ink2);margin-top:6px">매출=원 · 품질보증서/신차등록=건·대 · 마케팅지출·품질보증서·신차등록은 ⚙설정에서 입력</div>`;
+  return h;
+}
+// ── 설정 워크스페이스: 매출 설정 ──
+function salesSettingsSectionHTML(){
+  const sc=salesCfg(), MM=[1,2,3,4,5,6,7,8,9,10,11,12], won=n=>n?Math.round(n).toLocaleString():'0';
+  const thl=`style="background:var(--ink);color:var(--bg);padding:7px 8px;font-size:11px;font-weight:800;text-align:left;white-space:nowrap;position:sticky;left:0"`;
+  const th=`style="background:var(--ink);color:var(--bg);padding:7px 8px;font-size:11px;font-weight:800;text-align:center;white-space:nowrap"`;
+  const tdl=`style="padding:5px 8px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap;background:var(--card);position:sticky;left:0"`;
+  const mfields=(metric)=> MM.map(m=>`<td style="padding:2px"><input class="sc-in" data-metric="${metric}" data-month="${m}" type="number" min="0" value="${sc[metric][m]||''}" placeholder="0" style="width:88px;text-align:right;padding:4px 5px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:12px"></td>`).join('');
+  let grid=`<div style="overflow-x:auto"><table style="border-collapse:collapse"><tr><th ${thl}>항목</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`
+    +`<tr><td ${tdl}>마케팅 지출(원)</td>${mfields('marketing')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.marketing))}</td></tr>`
+    +`<tr><td ${tdl}>품질보증서(건)</td>${mfields('warranty')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.warranty))}</td></tr>`
+    +`<tr><td ${tdl}>신차등록(대)</td>${mfields('carReg')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.carReg))}</td></tr>`
+    +`</table></div>`;
+  let capHTML;
+  if(SALES&&SALES.prodAll){ const rm={}; SALES.prodList.forEach(mat=>{ if(_isRoll(mat)) rm[_midOf(mat)]=true; });
+    const cap=(SALES.inputs&&SALES.inputs.cap)||{};
+    capHTML=`<div style="overflow-x:auto"><table style="border-collapse:collapse"><tr><th ${thl}>롤 중분류</th><th ${th}>롤당 시공가능대수</th></tr>`
+      + Object.keys(rm).sort().map(mid=>`<tr><td ${tdl}>${mid}</td><td style="padding:4px 8px;text-align:right"><input class="sc-cap" data-mid="${encodeURIComponent(mid)}" type="number" min="0" step="0.1" value="${_sNum(cap[mid]||0)||''}" placeholder="0" style="width:90px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:12px"></td></tr>`).join('')
+      + `</table></div>`;
+  } else capHTML=`<div class="empty" style="padding:18px;color:var(--ink2);font-size:13px">매출 ERP 파일을 먼저 올리면(레이노 데이터 → 매출) 롤 중분류 목록이 여기에 나타납니다.</div>`;
+  return `<div class="set-app-sec"><h2 class="set-app-h">💰 매출 설정</h2></div>
+   <div class="card set-card"><h3><span class="dot"></span>월별 수기 입력 (ERP에 없는 항목)</h3>
+     <div class="cap"><b>마케팅 지출·품질보증서·신차등록</b>을 월별로 입력하면 매출 대시보드 종합표·KPI·시장점유율에 반영됩니다. 입력칸을 벗어나면 자동 저장됩니다.</div>
+     ${grid}</div>
+   <div class="card set-card"><h3><span class="dot"></span>롤당 시공가능대수 (시장점유율 계산용)</h3>
+     <div class="cap">롤 중분류별로 한 롤이 시공 가능한 차량 대수입니다. 시장점유율(대리점·지부 기준)의 분자 계산에 쓰입니다.</div>
+     ${capHTML}</div>`;
+}
+// 매출 설정 입력 자동 저장(위임)
+(function(){ const host=document.getElementById('setSalesHost'); if(!host) return;
+  host.addEventListener('change', e=>{ const t=e.target;
+    if(t.classList&&t.classList.contains('sc-in')){ const sc=salesCfg(); sc[t.dataset.metric][parseInt(t.dataset.month,10)]=_sNum(t.value); saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave(); const sh=document.getElementById('setSalesHost'); if(sh) sh.innerHTML=salesSettingsSectionHTML(); toast('저장됨'); }
+    else if(t.classList&&t.classList.contains('sc-cap')){ if(SALES){ SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.cap[decodeURIComponent(t.dataset.mid)]=_sNum(t.value); cloudSaveJSON(SUPA.salesFile,SALES); toast('저장됨'); } }
+  });
+})();
+
 
 function renderMetric(view){
   const field=view, label=(view==='search')?'브랜드 검색량':'매출액';
@@ -4329,6 +4409,7 @@ async function setWorkspace(ws){
 }
 async function openSettingsWs(){
   if(auth==='admin'){ try{ await ensureWarr(); }catch(e){} }
+  try{ await ensureSales(); }catch(e){}
   renderSettingsApp();
 }
 function raynoTryUnlock(){
@@ -4379,9 +4460,9 @@ function optimizeHTML(){
 function renderSettingsApp(){
   const gate=document.getElementById('setGate');
   const oH=document.getElementById('setOptHost');
-  const aH=document.getElementById('setAccessHost'), cH=document.getElementById('setCafeHost'), wH=document.getElementById('setWarrHost');
+  const aH=document.getElementById('setAccessHost'), cH=document.getElementById('setCafeHost'), wH=document.getElementById('setWarrHost'), sH=document.getElementById('setSalesHost');
   if(auth!=='admin'){
-    [oH,aH,cH,wH].forEach(h=>{ if(h) h.style.display='none'; });
+    [oH,aH,cH,wH,sH].forEach(h=>{ if(h) h.style.display='none'; });
     gate.style.display='block';
     gate.innerHTML=`<div class="card" style="text-align:center;padding:42px 20px">
       <div style="font-size:34px;margin-bottom:6px">🔐</div>
@@ -4390,12 +4471,13 @@ function renderSettingsApp(){
       <button class="vc-save" id="setAdminLogin">🔐 관리자 로그인</button></div>`;
     return;
   }
-  gate.style.display='none'; [oH,aH,cH,wH].forEach(h=>{ if(h) h.style.display='block'; });
+  gate.style.display='none'; [oH,aH,cH,wH,sH].forEach(h=>{ if(h) h.style.display='block'; });
   oH.innerHTML = optimizeHTML();
   aH.innerHTML = accessHTML();
   ensureCafeSettingsHost();
   renderSettings();
   wH.innerHTML = warrSettingsSectionHTML();
+  if(sH) sH.innerHTML = salesSettingsSectionHTML();
 }
 document.getElementById('settingsApp').addEventListener('click', async e=>{
   if(e.target.id==='setAdminLogin'){ showLock(); return; }
