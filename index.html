@@ -1138,7 +1138,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 매출필터';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 집계수정';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -3928,7 +3928,7 @@ function _salesCut(){ return _sNum((typeof salesCfg==='function'?salesCfg().cuto
 function _salesMonths(){ const cut=_salesCut(); const ms=(SALES&&SALES.months)||[]; return cut? ms.filter(m=>m<=cut) : ms.slice(); }
 function _sTot(a){ let s=0; _salesMonths().forEach(m=>s+=(a&&a[m])||0); return s; }
 function _sPick(a){ if(_salesMonth) return (a&&a[_salesMonth])||0; return _sTot(a); }
-async function ensureSales(){ if(salesLoaded)return; const j=await cloudLoadJSON(SUPA.salesFile); if(j&&j.prodAll){ SALES=j; SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; } salesLoaded=true; }
+async function ensureSales(){ if(salesLoaded)return; const j=await cloudLoadJSON(SUPA.salesFile); if(j&&j.prodAll&&j.ver>=5){ SALES=j; SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; } salesLoaded=true; }
 function _salesRows(buf){
   const b=new Uint8Array(buf);
   if(b.length>=2&&b[0]===0xFF&&b[1]===0xFE) return new TextDecoder('utf-16le').decode(b).split(/\r\n|\n/).map(l=>l.split('\t'));
@@ -3940,7 +3940,7 @@ function _sGuessType(mat,mid){ const GD=/스티커|타월|TOWEL|TAPE|테이프|P
 function aggregateSales(rows){
   if(!rows||rows.length<2) return null;
   const H=rows[0].map(c=>String(c||'').trim());
-  const iDept=H.indexOf('부서'),iCust=H.indexOf('거래처'),iMid=H.indexOf('중분류'),iMat=H.indexOf('MatName');
+  const iDept=H.indexOf('부서'),iCust=H.indexOf('거래처'),iMid=H.indexOf('중분류'),iMat=H.indexOf('MatName'),iOrd=H.indexOf('오더담당자');
   if(iMat<0) return null;
   const qc=[],ac=[]; for(let m=1;m<=12;m++){const qi=H.indexOf(m+'월'); qc[m]=qi; ac[m]=qi>=0?qi+1:-1;}
   const grp=d=>d==='B2C'?'B2C':(d==='B2B'?'B2B':'별도채널');
@@ -3951,6 +3951,7 @@ function aggregateSales(rows){
   for(let i=1;i<rows.length;i++){
     const r=rows[i]; if(!r) continue;
     const mat=String(r[iMat]==null?'':r[iMat]).trim(); if(!mat) continue;
+    if(iOrd>=0 && !String(r[iOrd]==null?'':r[iOrd]).trim()) continue;   // ERP 계층 소계 행 제외 — 오더담당자가 채워진 최하위 잎(leaf) 행만 집계
     const dept=String((iDept>=0?r[iDept]:'')||'').trim(), g=grp(dept);
     const cust=String((iCust>=0?r[iCust]:'')||'').trim();
     const mid=String((iMid>=0?r[iMid]:'')||'').trim()||'기타';
@@ -3968,7 +3969,7 @@ function aggregateSales(rows){
   const months=[]; for(let m=1;m<=12;m++) if(act.has(m)) months.push(m);
   const prodList=Object.keys(prodAll).sort((a,b)=>_sSum(prodAll[b].mq)-_sSum(prodAll[a].mq));
   const itemType={}; prodList.forEach(mat=> itemType[mat]=_sGuessType(mat,prodAll[mat].mid));
-  return {ver:4,updatedAt:new Date().toISOString(),months,channels:ch,extra,jibu,dealers,prodAll,jibuProd,prodList,inputs:{carSales:{},cap:{},itemType}};
+  return {ver:5,updatedAt:new Date().toISOString(),months,channels:ch,extra,jibu,dealers,prodAll,jibuProd,prodList,inputs:{carSales:{},cap:{},itemType}};
 }
 function handleSalesFile(file){
   if(auth!=='admin'){ toast('관리자만 업로드할 수 있습니다.',true); return; }
