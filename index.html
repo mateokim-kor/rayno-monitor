@@ -1120,7 +1120,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 크롤버튼2';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 멈춤복구';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4309,7 +4309,11 @@ function renderCrawlBar(s){
   const el=document.getElementById('crawlBar'); if(!el) return;
   _lastCrawlStatus=s||null;
   const isAdmin=(auth==='admin');
-  const st=(s&&s.state)?s.state:'idle';
+  const st0=(s&&s.state)?s.state:'idle';
+  const sAt=(s&&s.at)?new Date(s.at).getTime():0;
+  // 진행 중인데 90초 넘게 갱신이 없으면 = 프로그램이 멈춘 것 → 시작 컨트롤 노출
+  const stale=(st0==='running') && sAt>0 && (Date.now()-sAt>90000);
+  const st=stale?'stalled':st0;
   el.classList.toggle('crawl-active', st==='running'||st==='await_auth');
   const pct=s?Math.max(0,Math.min(100,Math.round(s.pct||0))):0;
   const ctl=crawlControls();
@@ -4326,6 +4330,9 @@ function renderCrawlBar(s){
       ${isAdmin?`<div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap"><button class="crawl-btn auth" id="crawlAuthBtn">✅ 인증 완료</button><button class="crawl-btn stop" id="crawlStopBtn">■ 크롤링 중지</button></div>`:''}</div>`;
   }else if(st==='error'){
     el.innerHTML=`<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 자동 수집 오류</span>${ctl}</div><div class="crawl-msg">${escapeHtml(s.message||'다시 시도해 주세요.')}</div></div>`;
+  }else if(st==='stalled'){
+    el.innerHTML=`<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 이전 자동 수집이 멈춘 것 같아요</span>${ctl}</div>
+      <div class="crawl-msg">크롤러 프로그램 응답이 한동안 없었습니다. PC에서 프로그램(START)이 켜져 있는지 확인하거나, 위에서 기간을 고른 뒤 다시 시작하세요.${isAdmin?` · <a id="crawlResetBtn" style="color:var(--neu);cursor:pointer;font-weight:700">진행 표시 지우기</a>`:''}</div></div>`;
   }else if(st==='done'){
     const t=s.at?new Date(s.at).toLocaleString('ko-KR'):'';
     el.innerHTML=`<div class="crawl"><div class="crawl-top"><span class="crawl-t">✅ 자동 수집 완료</span>${ctl}</div>
@@ -4385,6 +4392,7 @@ document.addEventListener('click', e=>{
   if(e.target.closest('#crawlStartBtn')) startCrawl();
   else if(e.target.closest('#crawlAuthBtn')) confirmAuthDone();
   else if(e.target.closest('#crawlStopBtn')) stopCrawl();
+  else if(e.target.closest('#crawlResetBtn')) stopCrawl();
 });
 document.addEventListener('change', e=>{
   if(e.target.id==='crawlDays'){ _crawlPeriodSel=e.target.value; renderCrawlBar(_lastCrawlStatus); }
