@@ -1138,7 +1138,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 집계수정';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 전사정확';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -3928,7 +3928,7 @@ function _salesCut(){ return _sNum((typeof salesCfg==='function'?salesCfg().cuto
 function _salesMonths(){ const cut=_salesCut(); const ms=(SALES&&SALES.months)||[]; return cut? ms.filter(m=>m<=cut) : ms.slice(); }
 function _sTot(a){ let s=0; _salesMonths().forEach(m=>s+=(a&&a[m])||0); return s; }
 function _sPick(a){ if(_salesMonth) return (a&&a[_salesMonth])||0; return _sTot(a); }
-async function ensureSales(){ if(salesLoaded)return; const j=await cloudLoadJSON(SUPA.salesFile); if(j&&j.prodAll&&j.ver>=5){ SALES=j; SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; } salesLoaded=true; }
+async function ensureSales(){ if(salesLoaded)return; const j=await cloudLoadJSON(SUPA.salesFile); if(j&&j.prodAll&&j.ver>=6){ SALES=j; SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; } salesLoaded=true; }
 function _salesRows(buf){
   const b=new Uint8Array(buf);
   if(b.length>=2&&b[0]===0xFF&&b[1]===0xFE) return new TextDecoder('utf-16le').decode(b).split(/\r\n|\n/).map(l=>l.split('\t'));
@@ -3940,36 +3940,40 @@ function _sGuessType(mat,mid){ const GD=/스티커|타월|TOWEL|TAPE|테이프|P
 function aggregateSales(rows){
   if(!rows||rows.length<2) return null;
   const H=rows[0].map(c=>String(c||'').trim());
-  const iDept=H.indexOf('부서'),iCust=H.indexOf('거래처'),iMid=H.indexOf('중분류'),iMat=H.indexOf('MatName'),iOrd=H.indexOf('오더담당자');
-  if(iMat<0) return null;
+  const iDept=H.indexOf('부서'),iCust=H.indexOf('거래처'),iMid=H.indexOf('중분류'),iSub=H.indexOf('소분류'),iMat=H.indexOf('MatName'),iOrd=H.indexOf('오더담당자');
+  if(iMat<0||iDept<0) return null;
   const qc=[],ac=[]; for(let m=1;m<=12;m++){const qi=H.indexOf(m+'월'); qc[m]=qi; ac[m]=qi>=0?qi+1:-1;}
   const grp=d=>d==='B2C'?'B2C':(d==='B2B'?'B2B':'별도채널');
   const ch={B2C:{mq:_sMz(),ma:_sMz()},B2B:{mq:_sMz(),ma:_sMz()},'별도채널':{mq:_sMz(),ma:_sMz()}};
   const extra={},jibu={},dealers={},prodAll={},jibuProd={};
   SALES_JIBU.concat(['본사']).forEach(j=>{ jibu[j]={mq:_sMz(),ma:_sMz()}; jibuProd[j]={}; });
   const act=new Set();
+  const V=(r,i)=> i>=0? String(r[i]==null?'':r[i]).trim() : '';
+  // ERP는 전사>부서>거래처>(중분류>소분류>품목)>매출구분>대분류>고객사구분>오더담당자 계층의 '소계 행'을 모두 포함한다.
+  // 값이 계층마다 반복되므로, 합산 대신 각 계층의 정규 합계 행만 사용한다:
+  //  · 채널/전사  = 부서 합계 행 (부서✓ 거래처✗ 품목✗)
+  //  · 지부/대리점 = 거래처 합계 행 (부서✓ 거래처✓ 중분류✗ 소분류✗ 품목✗) — B2C
+  //  · 제품/롤    = 최하위 잎 행 (품목✓ 오더담당자✓) — B2C+B2B
   for(let i=1;i<rows.length;i++){
     const r=rows[i]; if(!r) continue;
-    const mat=String(r[iMat]==null?'':r[iMat]).trim(); if(!mat) continue;
-    if(iOrd>=0 && !String(r[iOrd]==null?'':r[iOrd]).trim()) continue;   // ERP 계층 소계 행 제외 — 오더담당자가 채워진 최하위 잎(leaf) 행만 집계
-    const dept=String((iDept>=0?r[iDept]:'')||'').trim(), g=grp(dept);
-    const cust=String((iCust>=0?r[iCust]:'')||'').trim();
-    const mid=String((iMid>=0?r[iMid]:'')||'').trim()||'기타';
-    const isB2C=(g==='B2C'), inBB=(g==='B2C'||g==='B2B'), jb=isB2C?(_sToJibu(cust)||'본사'):null;
-    if(inBB && !prodAll[mat]) prodAll[mat]={mid,mq:_sMz(),ma:_sMz()};
-    if(isB2C){ if(!jibuProd[jb][mat]) jibuProd[jb][mat]=_sMz(); if(cust&&!dealers[cust]) dealers[cust]={mq:_sMz(),ma:_sMz(),jibu:!!_sToJibu(cust)}; }
-    const dep=dept||'(미지정)'; if(g==='별도채널'&&!extra[dep]) extra[dep]={mq:_sMz(),ma:_sMz()};
+    const dept=V(r,iDept); if(!dept) continue;
+    const cust=V(r,iCust), mid0=V(r,iMid), sub=V(r,iSub), mat=V(r,iMat), ord=V(r,iOrd), g=grp(dept);
+    const isDeptTot=(!cust && !mat);
+    const isCustTot=(cust && !mid0 && !sub && !mat);
+    const isLeaf=(mat && (iOrd<0 || ord));
+    if(!isDeptTot && !isCustTot && !isLeaf) continue;
     for(let m=1;m<=12;m++){
       const q=qc[m]>=0?_sNum(r[qc[m]]):0, a=ac[m]>=0?_sNum(r[ac[m]]):0; if(!q&&!a) continue; act.add(m);
-      ch[g].mq[m]+=q; ch[g].ma[m]+=a; if(inBB){ prodAll[mat].mq[m]+=q; prodAll[mat].ma[m]+=a; }
-      if(g==='별도채널'){ extra[dep].mq[m]+=q; extra[dep].ma[m]+=a; }
-      if(isB2C){ jibu[jb].mq[m]+=q; jibu[jb].ma[m]+=a; jibuProd[jb][mat][m]+=q; if(cust){ dealers[cust].mq[m]+=q; dealers[cust].ma[m]+=a; } }
+      if(isDeptTot){ ch[g].mq[m]+=q; ch[g].ma[m]+=a; if(g==='별도채널'){ const dep=dept; (extra[dep]=extra[dep]||{mq:_sMz(),ma:_sMz()}); extra[dep].mq[m]+=q; extra[dep].ma[m]+=a; } }
+      else if(isCustTot){ if(g==='B2C'){ const jb=_sToJibu(cust)||'본사'; jibu[jb].mq[m]+=q; jibu[jb].ma[m]+=a; if(!dealers[cust]) dealers[cust]={mq:_sMz(),ma:_sMz(),jibu:!!_sToJibu(cust)}; dealers[cust].mq[m]+=q; dealers[cust].ma[m]+=a; } }
+      else if(isLeaf){ if(g==='B2C'||g==='B2B'){ const mid=mid0||'기타'; if(!prodAll[mat]) prodAll[mat]={mid,mq:_sMz(),ma:_sMz()}; prodAll[mat].mq[m]+=q; prodAll[mat].ma[m]+=a;
+          if(g==='B2C'){ const jb=_sToJibu(cust)||'본사'; if(!jibuProd[jb][mat]) jibuProd[jb][mat]=_sMz(); jibuProd[jb][mat][m]+=q; } } }
     }
   }
   const months=[]; for(let m=1;m<=12;m++) if(act.has(m)) months.push(m);
   const prodList=Object.keys(prodAll).sort((a,b)=>_sSum(prodAll[b].mq)-_sSum(prodAll[a].mq));
   const itemType={}; prodList.forEach(mat=> itemType[mat]=_sGuessType(mat,prodAll[mat].mid));
-  return {ver:5,updatedAt:new Date().toISOString(),months,channels:ch,extra,jibu,dealers,prodAll,jibuProd,prodList,inputs:{carSales:{},cap:{},itemType}};
+  return {ver:6,updatedAt:new Date().toISOString(),months,channels:ch,extra,jibu,dealers,prodAll,jibuProd,prodList,inputs:{carSales:{},cap:{},itemType}};
 }
 function handleSalesFile(file){
   if(auth!=='admin'){ toast('관리자만 업로드할 수 있습니다.',true); return; }
