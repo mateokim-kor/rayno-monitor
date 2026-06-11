@@ -1143,7 +1143,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 점유율3기준';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 복수선택점유율';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -3923,7 +3923,7 @@ function renderWarranty(){
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
 // ════════════════ 매출(ERP) 분석 ════════════════
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
-let SALES=null, salesLoaded=false, _salesMonth=0, _salesCmpA=0, _salesCmpB=0;   // _salesMonth: 0=전체(누적)
+let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0;   // _salesSel: 선택 월 배열(빈 배열=누적)
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -3931,9 +3931,13 @@ function _sMz(){ return Array(13).fill(0); }
 function _sSum(a){ let s=0; for(let m=1;m<=12;m++)s+=(a&&a[m])||0; return s; }
 function _salesCut(){ return _sNum((typeof salesCfg==='function'?salesCfg().cutoff:0)||0); }
 function _salesMonths(){ const cut=_salesCut(); const ms=(SALES&&SALES.months)||[]; return cut? ms.filter(m=>m<=cut) : ms.slice(); }
-function _salesDispMonths(){ const sm=_salesMonth||0; if(sm){ return [sm]; } return _salesMonths(); }  // 단일 월 선택 시 그 달만
+function _salesActive(){ const av=_salesMonths(); if(!_salesSel.length) return av.slice(); const s=_salesSel.filter(m=>av.indexOf(m)>=0).sort((a,b)=>a-b); return s.length?s:av.slice(); }  // 선택 월(없으면 전체)
+function _salesDispMonths(){ return _salesActive(); }
+function _salesLabel(){ const av=_salesMonths(); if(!_salesSel.length) return (_salesCut()?`1~${_salesCut()}월`:'전체(누적)'); const s=_salesSel.filter(m=>av.indexOf(m)>=0).sort((a,b)=>a-b); if(!s.length) return '전체'; if(s.length===1) return s[0]+'월'; const cg=s.every((m,i)=>i===0||m===s[i-1]+1); return cg?`${s[0]}~${s[s.length-1]}월`:s.join('·')+'월'; }
+function _qcPick(){ let s=0; _salesActive().forEach(m=>s+=_qc(m)); return s; }
+function _sTotDisp(a){ let s=0; _salesDispMonths().forEach(m=>s+=(a&&a[m])||0); return s; }
 function _sTot(a){ let s=0; _salesMonths().forEach(m=>s+=(a&&a[m])||0); return s; }
-function _sPick(a){ if(_salesMonth) return (a&&a[_salesMonth])||0; return _sTot(a); }
+function _sPick(a){ let s=0; _salesActive().forEach(m=>s+=(a&&a[m])||0); return s; }
 async function ensureSales(){ if(salesLoaded)return; const j=await cloudLoadJSON(SUPA.salesFile); if(j&&j.prodAll&&j.ver>=7){ SALES=j; SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; } salesLoaded=true; }
 function _salesRows(buf){
   const b=new Uint8Array(buf);
@@ -4018,8 +4022,8 @@ function renderRevenue(){
     return;
   }
   const inp=SALES.inputs, M=_salesMonths(), cut=_salesCut();
-  if(_salesMonth && M.indexOf(_salesMonth)<0) _salesMonth=0;
-  const m0=_salesMonth;
+  _salesSel=_salesSel.filter(m=>M.indexOf(m)>=0);
+  const m0=(_salesSel.length===1?_salesSel[0]:0);
   const won=n=>Math.round(n||0).toLocaleString(), eok=n=>(n/1e8).toFixed(1), roll=n=>Math.round(n||0).toLocaleString();
   const C=SALES.channels;
   const chAmt=g=>_sPick(C[g].ma), chQty=g=>_sPick(C[g].mq);
@@ -4033,8 +4037,8 @@ function renderRevenue(){
   const td=`style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px"`;
   const card=s=>`<div class="card" style="margin-bottom:13px">${s}</div>`;
   const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
-  const lab=m0?`${m0}월`:(cut?`1~${cut}월`:'전체(누적)');
-  let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${m0===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${m0===m?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b>${cut?` · <span style="color:var(--amber)">관리자 설정: ${cut}월까지</span>`:''}</span></div>`;
+  const lab=_salesLabel();
+  let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
 
   // ── 차트 대시보드 ──
   const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
@@ -4073,7 +4077,7 @@ function renderRevenue(){
   const carReg=_carRegPick();
   const carB2C=_rollCarsPick('B2C'), carB2B=_rollCarsPick('B2B'), carSales=carB2C+carB2B;
   const carDealer=_dealerPick();
-  const warrCnt=(_salesMonth?_qc(_salesMonth):_qcTot());
+  const warrCnt=_qcPick();
   const wj=_warrByJibu(m0);
   const shr=c=> carReg>0? (c/carReg*100).toFixed(2)+'%' : '<span style="color:var(--ink2)">신차등록 입력 필요</span>';
   let s6=`<div style="font-size:12px;color:var(--ink2);margin-bottom:9px">분모 = <b>월 차량 출고 대수(신차등록)</b> · ⚙ <b>설정 → 매출 설정</b>에서 신차등록·대리점 판매·롤당 시공대수를 입력합니다. (롤당 기본 10대, 모노카본 17대)</div>`;
@@ -4104,6 +4108,7 @@ function renderRevenue(){
     + card(hh('📊 세일즈 데이터 · 월별 종합 (단위: 원, VAT 별도)')+salesSummaryTable())
     + card(hh('🎞 롤 판매 수 · 중분류별 (B2C / B2B)')+salesRollTable())
     + card(hh('🏢 지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
+    + card(hh('📈 시장 점유율 · '+lab)+salesShareTable())
     + card(hh('① 채널 요약 · '+lab)+s1)
     + card(hh('② 롤 / 일반물품 구분 · '+lab)+s2)
     + card(hh('③ 월별 매출 추이')+s3)
@@ -4173,14 +4178,14 @@ function salesReportText(){
       +`· 지부 TOP3(수량): ${jr.map(x=>x.j+' '+won(x.q)).join(' / ')}\n`
       +`· 시장점유율(품질보증서): ${wShr} (실시공 ${wj.total}대${cs?' / 판매 '+won(cs)+'대':''})`;
   };
-  if(_salesMonth) return block(_salesMonth);
+  if(_salesSel.length===1) return block(_salesSel[0]);
   return M.map(m=>block(m)).join('\n\n') + '\n\n' + block(0);
 }
 async function _salesSave(){ if(auth==='admin') cloudSaveJSON(SUPA.salesFile,SALES); }
 document.getElementById('rRevenue').addEventListener('change', e=>{
   if(!SALES) return; SALES.inputs=SALES.inputs||{cap:{},carSales:{},itemType:{}};
   const t=e.target;
-  if(t.id==='salesMonthSel'){ _salesMonth=parseInt(t.value,10)||0; renderRevenue(); return; }
+  if(t.id==='salesMonthSel'){ const v=parseInt(t.value,10)||0; _salesSel=v?[v]:[]; renderRevenue(); return; }
   if(t.id==='salesCmpA'){ _salesCmpA=parseInt(t.value,10)||0; renderRevenue(); return; }
   if(t.id==='salesCmpB'){ _salesCmpB=parseInt(t.value,10)||0; renderRevenue(); return; }
   if(t.classList.contains('sales-cap')){ SALES.inputs.cap[decodeURIComponent(t.dataset.mid)]=_sNum(t.value); }
@@ -4192,7 +4197,7 @@ document.getElementById('rRevenue').addEventListener('change', e=>{
 document.getElementById('rRevenue').addEventListener('click', e=>{
   const t=e.target;
   const segB=t.closest&&t.closest('#salesMonthSeg button[data-m]');
-  if(segB){ _salesMonth=parseInt(segB.dataset.m,10)||0; renderRevenue(); return; }
+  if(segB){ const mm=parseInt(segB.dataset.m,10)||0; if(mm===0){ _salesSel=[]; } else { const i=_salesSel.indexOf(mm); if(i>=0)_salesSel.splice(i,1); else _salesSel.push(mm); } renderRevenue(); return; }
   if(t.classList&&t.classList.contains('sales-bulk')){ const mid=decodeURIComponent(t.dataset.mid), val=t.dataset.val;
     salesCfg().midType[mid]=val;                                  // 중분류 영구 규칙(업로드와 무관하게 적용)
     SALES.inputs.itemType=SALES.inputs.itemType||{};
@@ -4210,7 +4215,7 @@ document.getElementById('salesFileInput').addEventListener('change', e=>{ const 
 function salesCfg(){ STORE.config=STORE.config||{}; const s=STORE.config.salesCfg=STORE.config.salesCfg||{}; s.marketing=s.marketing||{}; s.warranty=s.warranty||{}; s.carReg=s.carReg||{}; s.midType=s.midType||{}; s.exclKw=Array.isArray(s.exclKw)?s.exclKw:[]; s.dealerSales=s.dealerSales||{}; return s; }
 function _scSum(o){ let s=0; for(let m=1;m<=12;m++) s+=_sNum((o&&o[m])||0); return s; }
 function _scTot(o){ let s=0; _salesMonths().forEach(m=>s+=_sNum((o&&o[m])||0)); return s; }
-function _scPick(o){ if(_salesMonth) return _sNum((o&&o[_salesMonth])||0); return _scTot(o); }
+function _scPick(o){ let s=0; _salesActive().forEach(m=>s+=_sNum((o&&o[m])||0)); return s; }
 
 function salesKPI(){
   if(!SALES||!SALES.channels) return '';
@@ -4268,8 +4273,8 @@ function salesSummaryTable(){
     {n:'B2C', f:b2c, t:b2cT, note:pc(b2cT,bbT)},
     {n:'B2B', f:b2b, t:b2bT, note:pc(b2bT,bbT)},
     {n:'B2C + B2B 합계', f:bb, t:bbT, note:pc(bbT,entT), hi:1},
-    {n:'품질보증서', f:m=>_qc(m), t:_qcTot(), note:''},
-    {n:'신차등록', f:m=>_sNum(sc.carReg[m]||0), t:_scTot(sc.carReg), note:''},
+    {n:'품질보증서', f:m=>_qc(m), t:sum(m=>_qc(m)), note:''},
+    {n:'신차등록', f:m=>_sNum(sc.carReg[m]||0), t:sum(m=>_sNum(sc.carReg[m]||0)), note:''},
   ];
   let h=`<div class="srt" style="overflow-x:auto"><table style="border-collapse:collapse;min-width:100%;font-variant-numeric:tabular-nums"><tr><th ${thl}>구분</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}${showT?`<th ${th}>합계</th><th ${th}>비고</th>`:''}</tr>`;
   rows.forEach(r=>{ h+=`<tr${r.hi?' style="background:rgba(244,145,28,.04)"':''}><td ${tdl}>${r.n}</td>${MM.map(m=>`<td ${td}>${won(r.f(m))}</td>`).join('')}${showT?`<td ${tdt}>${won(r.t)}</td><td ${td}>${r.note}</td>`:''}</tr>`; });
@@ -4286,9 +4291,9 @@ function _qcAuto(){ return (typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.row
 function _capDef(mid){ return (/카본|모노|MONO|TBTECH/i.test(mid))?17:10; }  // 기본: 모노카본 17대, 그 외 10대
 function _capOf(mid){ const c=_sNum((((SALES&&SALES.inputs&&SALES.inputs.cap)||{})[mid])||0); return c>0?c:_capDef(mid); }
 function _rollCars(ch,m){ const cm=(SALES&&SALES.chMat&&SALES.chMat[ch])||{}; let s=0; Object.keys(cm).forEach(mat=>{ if(!_isRoll(mat))return; s+=(cm[mat][m]||0)*_capOf(_midOf(mat)); }); return s; }  // 롤 판매수 × 롤당대수 = 시공가능 차량수
-function _rollCarsPick(ch){ if(_salesMonth) return _rollCars(ch,_salesMonth); let s=0; _salesMonths().forEach(m=>s+=_rollCars(ch,m)); return s; }
+function _rollCarsPick(ch){ let s=0; _salesActive().forEach(m=>s+=_rollCars(ch,m)); return s; }
 function _dealerCars(m){ return _sNum(((salesCfg().dealerSales)||{})[m]||0); }
-function _dealerPick(){ if(_salesMonth) return _dealerCars(_salesMonth); let s=0; _salesMonths().forEach(m=>s+=_dealerCars(m)); return s; }
+function _dealerPick(){ let s=0; _salesActive().forEach(m=>s+=_dealerCars(m)); return s; }
 function _carRegPick(){ return _scPick(salesCfg().carReg); }
 
 
@@ -4308,13 +4313,13 @@ function salesRollTable(){
   const sec=(title,o,tag)=>{ const mids=Object.keys(o).sort((x,y)=>_sPick(o[y])-_sPick(o[x])); const st=sumT(o);
     let h=`<tr><td ${subl} rowspan="${mids.length+1}" style="vertical-align:top;background:var(--card);border-right:1px solid var(--line)">${tag} <b>${title}</b></td>`;
     let first=true;
-    mids.forEach(mid=>{ if(!first) h+='<tr>'; first=false; h+=`<td ${tdl}>${mid}</td>${M.map(m=>`<td ${td}>${roll(o[mid][m])}</td>`).join('')}${showT?`<td ${td}><b>${roll(_sTot(o[mid]))}</b></td>`:''}</tr>`; });
-    h+=`<tr><td ${subl}>소계</td>${M.map(m=>`<td ${sub}>${roll(st[m])}</td>`).join('')}${showT?`<td ${sub}>${roll(_sTot(st))}</td>`:''}</tr>`;
+    mids.forEach(mid=>{ if(!first) h+='<tr>'; first=false; h+=`<td ${tdl}>${mid}</td>${M.map(m=>`<td ${td}>${roll(o[mid][m])}</td>`).join('')}${showT?`<td ${td}><b>${roll(_sTotDisp(o[mid]))}</b></td>`:''}</tr>`; });
+    h+=`<tr><td ${subl}>소계</td>${M.map(m=>`<td ${sub}>${roll(st[m])}</td>`).join('')}${showT?`<td ${sub}>${roll(_sTotDisp(st))}</td>`:''}</tr>`;
     return h; };
   const st1=sumT(b2c), st2=sumT(b2b);
   let h=`<div class="srt" style="overflow-x:auto"><table style="border-collapse:collapse;min-width:100%;font-variant-numeric:tabular-nums"><tr><th ${thl} colspan="2">구분</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}${showT?`<th ${th}>합계</th>`:''}</tr>`;
   h+=sec('B2C',b2c,'2.')+sec('B2B',b2b,'3.');
-  h+=`<tr><td ${subl} colspan="2" style="background:rgba(244,145,28,.12)">4. B2C + B2B 합계</td>${M.map(m=>`<td ${td} style="font-weight:800;background:rgba(244,145,28,.12)">${roll(st1[m]+st2[m])}</td>`).join('')}${showT?`<td ${td} style="font-weight:800;background:rgba(244,145,28,.12)">${roll(_sTot(st1)+_sTot(st2))}</td>`:''}</tr>`;
+  h+=`<tr><td ${subl} colspan="2" style="background:rgba(244,145,28,.12)">4. B2C + B2B 합계</td>${M.map(m=>`<td ${td} style="font-weight:800;background:rgba(244,145,28,.12)">${roll(st1[m]+st2[m])}</td>`).join('')}${showT?`<td ${td} style="font-weight:800;background:rgba(244,145,28,.12)">${roll(_sTotDisp(st1)+_sTotDisp(st2))}</td>`:''}</tr>`;
   h+=`</table></div><div style="font-size:11px;color:var(--ink2);margin-top:6px">필름 롤 수량만 집계(기타품목·일반·제외 항목 제외) · 롤/일반 분류는 ⑤에서 조정</div>`;
   return h;
 }
@@ -4364,6 +4369,34 @@ function salesItemClassHTML(){
     s5+=`<details style="border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;font-size:13px;list-style:none">${mid} <span style="color:var(--ink2);font-weight:400">· ${items.length}품목 · 수량 ${roll(gq)} · 롤 ${nRoll}/일반 ${nGoods}${nExcl?`/<span style="color:var(--neg)">제외 ${nExcl}</span>`:''}</span>${bulk}</summary><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>품목(MatName)</th><th ${th}>판매수량</th><th ${th}>분류</th></tr>${rowsH}</table></details>`; });
   return s5;
 }
+
+// 시장 점유율 전용 — 월별 × 3가지 기준 (지부표 아래 배치)
+function salesShareTable(){
+  if(!SALES||!SALES.channels) return '<div class="cap">매출 ERP 업로드 후 표시됩니다.</div>';
+  const M=_salesDispMonths(), sc=salesCfg(), showT=M.length>1;
+  const cr=m=>_sNum((sc.carReg||{})[m]||0);
+  const fmt=v=>v==null?'<span style="color:var(--ink2)">—</span>':v.toFixed(2)+'%';
+  const pctOf=(num,m)=>{ const c=cr(m); return c>0?(num/c*100):null; };
+  const totShare=f=>{ let n=0,c=0; M.forEach(m=>{n+=f(m);c+=cr(m);}); return c>0?(n/c*100):null; };
+  const bases=[ {n:'품질보증서 기준',s:'1장=1대·자동',f:m=>_qc(m)},
+    {n:'대리점 판매 기준',s:'수기',f:m=>_dealerCars(m)},
+    {n:'판매 기준 · B2C',s:'롤×시공대수',f:m=>_rollCars('B2C',m)},
+    {n:'판매 기준 · B2B',s:'롤×시공대수',f:m=>_rollCars('B2B',m)},
+    {n:'판매 기준 · 합계',s:'B2C+B2B',f:m=>_rollCars('B2C',m)+_rollCars('B2B',m),hi:1} ];
+  const thl=`style="background:var(--ink);color:var(--bg);padding:8px 10px;font-size:11.5px;font-weight:800;text-align:left;white-space:nowrap;position:sticky;left:0"`;
+  const th=`style="background:var(--ink);color:var(--bg);padding:8px 10px;font-size:11.5px;font-weight:800;text-align:right;white-space:nowrap"`;
+  const tdl=`style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:12.5px;font-weight:700;white-space:nowrap;background:var(--card);position:sticky;left:0"`;
+  const td=`style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:12px"`;
+  const anyCr=M.some(m=>cr(m)>0);
+  let h=`<div class="cap" style="margin-bottom:8px">분모 = <b>월 차량 출고 대수(신차등록)</b> · ⚙설정에서 신차등록·대리점 판매·롤당 대수 입력 (롤당 10대·모노카본 17대)</div>`;
+  if(!anyCr) h+=`<div style="padding:9px 12px;background:rgba(244,145,28,.1);border-radius:8px;font-size:12px;margin-bottom:8px">⚠ <b>신차등록(월 출고 대수)</b>이 없어 점유율이 계산되지 않습니다. ⚙설정 → 매출 설정에서 입력하세요.</div>`;
+  h+=`<div class="srt" style="overflow-x:auto"><table style="border-collapse:collapse;min-width:100%;font-variant-numeric:tabular-nums"><tr><th ${thl}>기준</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}${showT?`<th ${th}>누적</th>`:''}</tr>`;
+  bases.forEach(b=>{ const hi=b.hi?' style="background:rgba(244,145,28,.08);font-weight:800"':'';
+    h+=`<tr${b.hi?' style="background:rgba(244,145,28,.06)"':''}><td ${tdl}>${b.n} <span style="color:var(--ink2);font-weight:400;font-size:11px">${b.s}</span></td>${M.map(m=>`<td ${td}${hi}>${fmt(pctOf(b.f(m),m))}</td>`).join('')}${showT?`<td ${td}${hi}>${fmt(totShare(b.f))}</td>`:''}</tr>`; });
+  h+=`</table></div><div class="cap" style="margin-top:6px">점유율 = 기준 차량대수 ÷ 월 출고 대수 · 신차등록 미입력 월은 '—'</div>`;
+  return h;
+}
+
 function salesSettingsSectionHTML(){
   const sc=salesCfg(), MM=[1,2,3,4,5,6,7,8,9,10,11,12], won=n=>n?Math.round(n).toLocaleString():'0';
   const thl=`style="background:var(--ink);color:var(--bg);padding:7px 8px;font-size:11px;font-weight:800;text-align:left;white-space:nowrap;position:sticky;left:0"`;
