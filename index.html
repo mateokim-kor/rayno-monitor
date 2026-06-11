@@ -1120,7 +1120,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 크롤버튼';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 크롤버튼2';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:false, autoRefreshToken:false } })
   : null;
@@ -4447,6 +4447,8 @@ function openCrawlPanel(){
   if(auth!=='admin'){ toast('관리자만 사용할 수 있습니다.',true); return; }
   if(state.view!=='dash'){ setView('dash'); }
   _dashToolsOpen=true; applyDashTools();
+  renderCrawlBar(_lastCrawlStatus);                         // 현재 권한으로 박스 즉시 렌더(빈 박스 방지)
+  try{ clearTimeout(_crawlPollTimer); pollCrawlStatus(); }catch(e){}   // 최신 상태로 새로고침
   setTimeout(()=>{
     const el=document.getElementById('crawlBar');
     if(el){ el.scrollIntoView({behavior:'smooth', block:'center'});
