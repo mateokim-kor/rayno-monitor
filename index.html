@@ -666,6 +666,28 @@
   .vc-class[hidden]{display:none}
   .vcard.dirty{border-left-color:var(--amber);box-shadow:0 0 0 1px rgba(232,137,59,.25) inset}
   .vcard.justsaved{animation:vsaved .7s ease}
+  .vcard.vactive{box-shadow:0 0 0 2px var(--amber) inset;border-left-color:var(--amber)}
+  .vsel{width:17px;height:17px;cursor:pointer;accent-color:var(--amber);flex:0 0 auto;margin:0}
+  .vf-hint{font-size:11.5px;color:var(--ink3);margin:2px 0 10px;line-height:1.6}
+  .vf-hint b{color:var(--ink2);background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:11px}
+  .vf-bulkbar{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:120;background:var(--card);
+    border:1px solid var(--line2);border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.28);padding:9px 12px;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;max-width:94vw}
+  .vf-bulkbar .bb-n{font-weight:800;font-size:13px;color:var(--amber);margin-right:4px}
+  .vf-bulkbar .bb-b{border:1.5px solid var(--line2);background:var(--bg2);color:var(--ink);border-radius:9px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer}
+  .vf-bulkbar .bb-b:hover{border-color:var(--amber);color:var(--amber)}
+  .vf-bulkbar .bb-x{background:transparent;border:0;color:var(--ink3);cursor:pointer;font-size:13px;font-weight:700;padding:4px 8px}
+  @media(max-width:640px){
+    .appsw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    #nav{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap}
+    .vf-ctrls{gap:8px}
+    .vf-bulkbar{left:8px;right:8px;transform:none;bottom:10px;max-width:none;justify-content:center}
+    .modal{width:100%!important;border-radius:14px}
+    .cmodal-card{width:96vw!important}
+    .vcard{padding:12px 13px}
+    .rep-kpis{grid-template-columns:1fr 1fr}
+    .sales-charts{grid-template-columns:1fr}
+  }
   @keyframes vsaved{0%{box-shadow:0 0 0 2px var(--pos) inset}100%{box-shadow:none}}
 
   /* 상세 모달 인라인 편집기 */
@@ -942,6 +964,7 @@
     </div>
     <div id="verifyList"></div>
     <div id="verifyMore"></div>
+    <div id="vfBulkBar" class="vf-bulkbar" style="display:none"></div>
   </div>
 
   <div id="report" style="display:none"></div>
@@ -1165,7 +1188,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 제품분석검토큐';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 검증일괄모바일';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3371,11 +3394,56 @@ async function optimizeAll(){
   if(typeof refreshVerify==='function') refreshVerify();
   return res;
 }
+let vSel=new Set(), vActive=-1;
+function saveRowsBulk(ids, changes){
+  if(auth!=='admin'){ toast('관리자만 가능합니다.', true); return 0; }
+  const store=loadStore(); let n=0;
+  ids.forEach(id=>{ const r=store.rows.find(x=>x.id===id); if(r){ Object.assign(r, {...changes}); n++; } });
+  if(!n) return 0;
+  saveStore(store); rebuildRAW();
+  if(state.view==='dash'){ buildTypeChips(); render(); } else { dashStale=true; }
+  updateAccStat(); updateVerifyHeader();
+  return n;
+}
+function applyBulk(sent){
+  if(auth!=='admin'){ toast('관리자만 가능합니다.', true); return; }
+  const ids=[...vSel]; if(!ids.length) return;
+  const n=saveRowsBulk(ids, {vSent:sent, vsrc:'manual', vconf:100});
+  vSel.clear(); renderVerify();
+  toast(`${n.toLocaleString()}건을 '${sent}'(으)로 검증했습니다`);
+}
+function renderBulkBar(){
+  const bar=document.getElementById('vfBulkBar'); if(!bar) return;
+  document.querySelectorAll('#verifyList .vsel').forEach(cb=>{ cb.checked=vSel.has(cb.dataset.id); });
+  if(!vSel.size || state.view!=='verify' || auth!=='admin'){ bar.style.display='none'; bar.innerHTML=''; return; }
+  bar.style.display='flex';
+  bar.innerHTML=`<span class="bb-n">✔ 선택 ${vSel.size}건</span>`
+    + ['긍정','부정','중립','없음'].map(s=>`<button class="bb-b" data-bulk="${s}">${s}</button>`).join('')
+    + `<button class="bb-x" data-bulkx="1">해제</button>`;
+}
+function setVActive(i){
+  const cards=[...document.querySelectorAll('#verifyList .vcard')];
+  if(!cards.length){ vActive=-1; return; }
+  i=Math.max(0, Math.min(i, cards.length-1)); vActive=i;
+  cards.forEach((c,idx)=>c.classList.toggle('vactive', idx===i));
+  cards[i].scrollIntoView({block:'nearest'});
+}
+function vShortcutSet(sent){
+  const cards=[...document.querySelectorAll('#verifyList .vcard')];
+  if(vActive<0||vActive>=cards.length) return;
+  const id=cards[vActive].dataset.id, keep=vActive;
+  if(!saveRow(id, {vSent:sent, vsrc:'manual', vconf:100})) return;
+  renderVerify();
+  const after=[...document.querySelectorAll('#verifyList .vcard')];
+  let ni=keep; if(after[keep] && after[keep].dataset.id===id) ni=keep+1;
+  setVActive(Math.min(ni, after.length-1));
+}
 function renderVerify(){
   if(!RAW){ return; }
   updateVerifyHeader();
   const cab=document.getElementById('confirmAllAutoBtn');
   if(cab){ const hasAuto=RAW.rows.some(r=>r.vsrc==='auto'); cab.style.display=(state.vfFilter==='auto'&&auth==='admin'&&hasAuto)?'':'none'; }
+  vActive=-1;
   const rows = verifyRows();
   const listEl=document.getElementById('verifyList');
   const moreEl=document.getElementById('verifyMore');
@@ -3384,16 +3452,18 @@ function renderVerify(){
       ? '🎉 미검증 데이터가 없습니다.<br>모든 항목의 감성 검증이 완료되었어요.'
       : '조건에 맞는 데이터가 없습니다.';
     listEl.innerHTML=`<div class="vf-empty"><span class="big">✓</span>${msg}</div>`;
-    moreEl.innerHTML=''; return;
+    moreEl.innerHTML=''; renderBulkBar(); return;
   }
   const shown = rows.slice(0, state.vfLimit);
-  const sortedNote=(state.vfFilter==='todo'||state.vfFilter==='all')?`<div class="cap" style="margin:2px 0 9px;color:var(--ink3)">🧭 검토 대기열 — AI 확신도가 낮거나 애매한 글을 먼저 보여줍니다.</div>`:'';
-  listEl.innerHTML = sortedNote + shown.map(vCard).join('');
+  const sortedNote=(state.vfFilter==='todo'||state.vfFilter==='all')?`<div class="cap" style="margin:2px 0 4px;color:var(--ink3)">🧭 검토 대기열 — AI 확신도가 낮거나 애매한 글을 먼저 보여줍니다.</div>`:'';
+  const kbdHint = auth==='admin'?`<div class="vf-hint">⌨ 단축키 <b>1</b>긍정 <b>2</b>부정 <b>3</b>중립 <b>4</b>없음 · <b>↑</b><b>↓</b> 이동 · <b>스페이스</b> 선택 · 체크 후 아래 막대에서 <b>일괄 처리</b></div>`:'';
+  listEl.innerHTML = sortedNote + kbdHint + shown.map(vCard).join('');
   moreEl.innerHTML = rows.length>shown.length
     ? `<button class="vf-more-btn" id="vfMore">+ ${Math.min(120, rows.length-shown.length)}건 더 보기 (전체 ${rows.length.toLocaleString()}건 중 ${shown.length.toLocaleString()}건)</button>`
     : (rows.length>120? `<div style="text-align:center;color:var(--ink3);font-size:12px;padding:8px">${rows.length.toLocaleString()}건 모두 표시됨</div>`:'');
   const mb=document.getElementById('vfMore');
   if(mb) mb.addEventListener('click', ()=>{ state.vfLimit+=60; renderVerify(); });
+  renderBulkBar();
 }
 
 function vCard(r){
@@ -3408,6 +3478,7 @@ function vCard(r){
   const linkBtn = linkUrl ? `<a class="vc-srcbtn" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">🔗 원문 ${r.isPost?'보기':'글 보기'}</a>` : '';
   return `<div class="vcard editor ${done?'done':''} ${pending[r.id]?'dirty':''}" data-id="${r.id}">
     <div class="vc-top">
+      <input type="checkbox" class="vsel" data-id="${r.id}" ${vSel.has(r.id)?'checked':''} title="선택(일괄 처리)">
       <span class="tagm cafe">${escapeHtml(r.cafe)}</span>
       ${r.date?`<span class="tagm date">${escapeHtml(r.date)}</span>`:''}
       <span class="tagm kind ${r.isPost?'':'c'}">${kind}</span>
@@ -3540,6 +3611,7 @@ function revertEditor(editorEl){
 
 // 편집기 공용 이벤트 (검증 리스트 + 상세 모달 양쪽에 부착)
 function onEditorClick(e){
+  if(e.target.closest && e.target.closest('.vsel')) return;
   const moreBtn=e.target.closest('.vc-more');
   if(moreBtn){ const b=moreBtn.previousElementSibling; b.classList.toggle('clamp');
     moreBtn.textContent=b.classList.contains('clamp')?'더 보기 ▾':'접기 ▴'; return; }
@@ -3594,6 +3666,27 @@ function onEditorChange(e){
 }
 document.getElementById('verifyList').addEventListener('click', onEditorClick);
 document.getElementById('verifyList').addEventListener('change', onEditorChange);
+document.getElementById('verifyList').addEventListener('change', e=>{
+  const cb=e.target.closest && e.target.closest('.vsel'); if(!cb) return;
+  const id=cb.dataset.id; if(cb.checked) vSel.add(id); else vSel.delete(id); renderBulkBar();
+});
+(function(){ const bb=document.getElementById('vfBulkBar'); if(bb) bb.addEventListener('click', e=>{
+  const b=e.target.closest('[data-bulk]'); if(b){ applyBulk(b.dataset.bulk); return; }
+  if(e.target.closest('[data-bulkx]')){ vSel.clear(); renderBulkBar(); }
+}); })();
+document.addEventListener('keydown', e=>{
+  if(state.view!=='verify' || auth!=='admin') return;
+  const tag=((e.target&&e.target.tagName)||'').toUpperCase();
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||(e.target&&e.target.isContentEditable)) return;
+  const cards=[...document.querySelectorAll('#verifyList .vcard')]; if(!cards.length) return;
+  const k=e.key;
+  if(k==='ArrowDown'||k==='j'){ e.preventDefault(); setVActive(vActive<0?0:vActive+1); return; }
+  if(k==='ArrowUp'||k==='k'){ e.preventDefault(); setVActive(vActive<0?0:vActive-1); return; }
+  if(k===' '||k==='x'||k==='X'){ if(vActive>=0&&vActive<cards.length){ e.preventDefault(); const id=cards[vActive].dataset.id; if(vSel.has(id))vSel.delete(id); else vSel.add(id); renderBulkBar(); } return; }
+  if(k==='Escape'){ if(vSel.size){ vSel.clear(); renderBulkBar(); } return; }
+  const map={'1':'긍정','2':'부정','3':'중립','4':'없음'};
+  if(map[k]){ e.preventDefault(); if(vActive<0){ setVActive(0); } vShortcutSet(map[k]); }
+});
 
 // 검증 페이지 컨트롤
 document.getElementById('autoVerifyBtn').addEventListener('click', autoVerifyAll);
