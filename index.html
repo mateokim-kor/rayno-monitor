@@ -1205,7 +1205,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 설정카테고리';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 설정카테고리수정';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5075,7 +5075,7 @@ function accessHTML(){
 }
 function warrSettingsSectionHTML(){
   let inner;
-  if(!WARR.rows||!WARR.rows.length){ inner=`<div class="card"><div class="empty">레이노 품질보증서 데이터가 아직 없습니다. 레이노 데이터 → 품질보증서에서 엑셀을 올리면 여기에서 표시 설정을 할 수 있습니다.</div></div>`; }
+  if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length){ inner=`<div class="card"><div class="empty">레이노 품질보증서 데이터가 아직 없습니다. 레이노 데이터 → 품질보증서에서 엑셀을 올리면 여기에서 표시 설정을 할 수 있습니다.</div></div>`; }
   else { ensureWarrCfg(); inner=warrCfgHTML(); }
   return `<div class="set-app-sec"><h2 class="set-app-h">📜 레이노 보증서 표시 설정</h2></div>`+inner;
 }
@@ -5118,13 +5118,13 @@ function renderSettingsApp(){
     return;
   }
   gate.style.display='none'; [oH,aH,cH,wH,sH].forEach(h=>{ if(h) h.style.display='block'; });
-  oH.innerHTML = optimizeHTML();
-  aH.innerHTML = accessHTML();
-  ensureCafeSettingsHost();
-  renderSettings();
-  wH.innerHTML = warrSettingsSectionHTML();
-  if(sH) sH.innerHTML = salesSettingsSectionHTML();
   const _sn=document.getElementById('setSubnav'); if(_sn) _sn.style.display='flex';
+  const _safe=(fn,host,label)=>{ if(!host) return; try{ host.innerHTML=fn(); }catch(e){ host.innerHTML=`<div class="card"><div class="empty">${label} 설정을 불러오지 못했습니다. (레이노 데이터 탭을 한 번 연 뒤 다시 시도해 주세요)</div></div>`; } };
+  _safe(optimizeHTML,oH,'데이터');
+  _safe(accessHTML,aH,'접근');
+  try{ ensureCafeSettingsHost(); renderSettings(); }catch(e){}
+  _safe(warrSettingsSectionHTML,wH,'품질보증서');
+  _safe(salesSettingsSectionHTML,sH,'매출');
   applySettingsCat();
 }
 document.getElementById('settingsApp').addEventListener('click', async e=>{
