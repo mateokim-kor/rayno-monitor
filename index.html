@@ -1190,7 +1190,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 이유표준칩';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 종합표비고삭제';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4572,8 +4572,8 @@ function salesSummaryTable(){
     {n:'품질보증서', f:m=>_qc(m), t:sum(m=>_qc(m)), note:''},
     {n:'신차등록', f:m=>_sNum(sc.carReg[m]||0), t:sum(m=>_sNum(sc.carReg[m]||0)), note:''},
   ];
-  let h=`<div class="iv-wrap"><table class="iv iv-sticky"><tr><th ${thl}>구분</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}${showT?`<th ${th}>합계</th><th ${th}>비고</th>`:''}</tr>`;
-  rows.forEach(r=>{ h+=`<tr class="${r.hi?'sub':''}"><td ${tdl}>${r.n}</td>${MM.map(m=>`<td ${td}>${won(r.f(m))}</td>`).join('')}${showT?`<td ${tdt}>${won(r.t)}</td><td ${td}>${r.note}</td>`:''}</tr>`; });
+  let h=`<div class="iv-wrap"><table class="iv iv-sticky"><tr><th ${thl}>구분</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}${showT?`<th ${th}>합계</th>`:''}</tr>`;
+  rows.forEach(r=>{ h+=`<tr class="${r.hi?'sub':''}"><td ${tdl}>${r.n}</td>${MM.map(m=>`<td ${td}>${won(r.f(m))}</td>`).join('')}${showT?`<td ${tdt}>${won(r.t)}</td>`:''}</tr>`; });
   h+=`</table></div><div style="font-size:11px;color:var(--ink2);margin-top:6px">매출=원 · 품질보증서/신차등록=건·대 · 품질보증서·신차등록은 ⚙설정에서 입력 · 전사 매출액은 별도채널 포함</div>`;
   return h;
 }
