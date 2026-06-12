@@ -1165,7 +1165,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 전사메일';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 제품분석검토큐';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2840,6 +2840,36 @@ function printMail(subject, body){
   w.document.close(); w.focus(); setTimeout(()=>{ try{ w.print(); }catch(e){} }, 350);
 }
 
+// ── 제품별 언급 분석: 제목·본문에서 RAYNO 제품 자동 인식 ──
+const RAYNO_PRODUCTS = {
+  '팬텀': ['팬텀','phantom'],
+  '스트라': ['스트라','stra'],
+  '크로마': ['크로마','chroma'],
+  '얼티넘': ['얼티넘','ultium'],
+  '스페셜': ['스페셜','special'],
+  '모노카본': ['모노카본','tbtech'],
+  'F95': ['f95'],
+  'F85': ['f85']
+};
+function _prodHits(text){
+  const t=(text||'').toLowerCase(); const out=[];
+  for(const p in RAYNO_PRODUCTS){
+    const hit=RAYNO_PRODUCTS[p].some(a=>{
+      const al=a.toLowerCase();
+      if(/[^\x00-\x7f]/.test(al)) return t.indexOf(al)>=0;           // 한글 → 부분일치
+      return new RegExp('\\b'+al.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(t); // 영문/숫자 → 단어경계
+    });
+    if(hit) out.push(p);
+  }
+  return out;
+}
+function productStats(set){
+  const st={}; Object.keys(RAYNO_PRODUCTS).forEach(p=>st[p]={n:0,pos:0,neg:0,neu:0});
+  set.forEach(r=>{ const hits=_prodHits((r.title||'')+' '+(r.body||'')); if(!hits.length)return;
+    const s=rsent(r); hits.forEach(p=>{ const o=st[p]; o.n++; if(s==='긍정')o.pos++; else if(s==='부정')o.neg++; else if(s==='중립')o.neu++; }); });
+  return st;
+}
+
 function renderReport(){
   const box=document.getElementById('report');
   if(!RAW || !RAW.rows.length){ box.innerHTML='<div class="card"><div class="empty">아직 데이터가 없습니다. 데이터가 쌓이면 리포트가 자동 생성됩니다.</div></div>'; return; }
@@ -3034,7 +3064,27 @@ function renderReport(){
   const signals = { price:priceCnt, as:asCnt, competitorLead:(coEnt.length>0 && coTotal>0 && coEnt[0][1]/coTotal>=0.15) };
   const marketingBlock = noteBlock('marketing','📣 마케팅 / 세일즈 제안', autoMarketingText(M,signals));
 
-  box.innerHTML = head + insightBlock + deptBlock + summary + repPos + repNeg + trend + sov + reasons + types + cafes + extra + advice + marketingBlock;
+  // ── 제품별 언급 분석 ──
+  const _pst=productStats(cur);
+  const _pEnt=Object.entries(_pst).filter(e=>e[1].n>0).sort((a,b)=>b[1].n-a[1].n);
+  const _pTot=_pEnt.reduce((a,e)=>a+e[1].n,0);
+  const _pTh='style="text-align:left;padding:6px 10px;color:var(--ink3);font-size:11px;font-weight:700"';
+  const _pThr='style="text-align:right;padding:6px 10px;color:var(--ink3);font-size:11px;font-weight:700"';
+  const _pRows=_pEnt.map(([p,o])=>{ const cls=o.pos+o.neg+o.neu||1;
+    const seg=`<span style="display:inline-flex;width:110px;height:9px;border-radius:5px;overflow:hidden;background:var(--bg2);vertical-align:middle">`+
+      `<i style="width:${o.pos/cls*100}%;background:var(--pos)"></i><i style="width:${o.neu/cls*100}%;background:#6b7280"></i><i style="width:${o.neg/cls*100}%;background:var(--neg)"></i></span>`;
+    return `<tr><td style="padding:8px 10px;border-bottom:1px solid var(--line);font-weight:700">${escapeHtml(p)}</td>`+
+      `<td style="padding:8px 10px;border-bottom:1px solid var(--line);text-align:right">${o.n.toLocaleString()}건</td>`+
+      `<td style="padding:8px 10px;border-bottom:1px solid var(--line);text-align:right;font-weight:700">${_pTot?(o.n/_pTot*100).toFixed(0):0}%</td>`+
+      `<td style="padding:8px 10px;border-bottom:1px solid var(--line)">${seg} <span style="font-size:11px;color:var(--ink2);margin-left:6px">긍${o.pos}·부${o.neg}·중${o.neu}</span></td></tr>`;
+  }).join('');
+  const productBlock=`
+   <div class="card rep-sec">
+     <h3><span class="dot"></span>제품별 언급 분석 <span class="rep-sub2">제목·본문에서 제품명 자동 인식</span></h3>
+     <div class="cap">제품 키워드가 등장한 글·댓글을 제품별로 집계했습니다. 한 글에 여러 제품이 나오면 각각에 반영됩니다.</div>
+     ${_pEnt.length?`<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px"><tr><th ${_pTh}>제품</th><th ${_pThr}>언급</th><th ${_pThr}>점유율</th><th ${_pTh}>감성(긍·부·중)</th></tr>${_pRows}</table>`:'<div class="empty">이 기간에 인식된 제품 언급이 없습니다. (제품 키워드는 코드의 RAYNO_PRODUCTS에서 조정)</div>'}
+   </div>`;
+  box.innerHTML = head + insightBlock + deptBlock + summary + repPos + repNeg + trend + sov + productBlock + reasons + types + cafes + extra + advice + marketingBlock;
   bindReport();
 }
 
@@ -3127,6 +3177,13 @@ function setView(v){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
+function _vUncertainty(r){
+  if(r.vconf!=null) return r.vconf;                       // 자동검증 확신도(낮을수록 먼저)
+  const s=r.aiSent||'';
+  let base=(s==='긍정'||s==='부정')?60:25;                // 중립/없음/미분류 = 더 불확실
+  if((((r.body||'')+(r.title||'')).length)<25) base-=10;  // 너무 짧은 글 = 애매
+  return base;
+}
 function verifyRows(){
   let rows = RAW.rows.slice();
   if(state.vfScope==='post')    rows = rows.filter(r=>r.isPost);
@@ -3141,6 +3198,7 @@ function verifyRows(){
   if(state.vfFilter==='auto') rows = rows.filter(r=>r.vsrc==='auto').sort((a,b)=>(a.vconf||0)-(b.vconf||0));
   const q=state.vfSearch.trim().toLowerCase();
   if(q) rows = rows.filter(r=>(r.title+' '+r.body+' '+r.cafe).toLowerCase().includes(q));
+  if(state.vfFilter==='todo' || state.vfFilter==='all') rows.sort((a,b)=>_vUncertainty(a)-_vUncertainty(b));  // 검토 대기열: 확신도 낮은 순
   return rows;
 }
 
@@ -3329,7 +3387,8 @@ function renderVerify(){
     moreEl.innerHTML=''; return;
   }
   const shown = rows.slice(0, state.vfLimit);
-  listEl.innerHTML = shown.map(vCard).join('');
+  const sortedNote=(state.vfFilter==='todo'||state.vfFilter==='all')?`<div class="cap" style="margin:2px 0 9px;color:var(--ink3)">🧭 검토 대기열 — AI 확신도가 낮거나 애매한 글을 먼저 보여줍니다.</div>`:'';
+  listEl.innerHTML = sortedNote + shown.map(vCard).join('');
   moreEl.innerHTML = rows.length>shown.length
     ? `<button class="vf-more-btn" id="vfMore">+ ${Math.min(120, rows.length-shown.length)}건 더 보기 (전체 ${rows.length.toLocaleString()}건 중 ${shown.length.toLocaleString()}건)</button>`
     : (rows.length>120? `<div style="text-align:center;color:var(--ink3);font-size:12px;padding:8px">${rows.length.toLocaleString()}건 모두 표시됨</div>`:'');
