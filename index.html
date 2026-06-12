@@ -361,6 +361,11 @@
   /* ── 설정 탭 ── */
   .set-card .cap{margin-bottom:14px}
   .set-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+  .set-subnav{position:sticky;top:0;z-index:30;display:flex;gap:7px;flex-wrap:wrap;background:var(--bg);padding:10px 0 12px;margin-bottom:8px;border-bottom:1px solid var(--line)}
+  .set-subnav button{border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-family:var(--font);font-weight:700;font-size:13px;padding:8px 15px;border-radius:10px;cursor:pointer;white-space:nowrap;transition:.12s}
+  .set-subnav button:hover{border-color:var(--amber);color:var(--ink)}
+  .set-subnav button.on{background:var(--amber);border-color:var(--amber);color:#1a1208}
+  @media(max-width:640px){ .set-subnav{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch} }
   .set-chip{display:inline-flex;align-items:center;gap:4px;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;padding:4px 4px 4px 4px}
   .set-input{border:0;background:transparent;color:var(--ink);font-family:var(--font);font-size:13px;font-weight:600;padding:5px 8px;outline:none;width:110px}
   .set-del{border:0;background:transparent;color:var(--ink3);cursor:pointer;font-size:13px;font-weight:800;padding:2px 6px;border-radius:6px}
@@ -1008,11 +1013,18 @@
 
   <div id="settingsApp" style="display:none">
     <div id="setGate" style="display:none"></div>
-    <div id="setOptHost"></div>
-    <div id="setAccessHost"></div>
+    <div id="setSubnav" class="set-subnav" style="display:none">
+      <button data-setcat="monitoring" class="on">🔍 모니터링</button>
+      <button data-setcat="sales">💰 매출</button>
+      <button data-setcat="warr">📋 품질보증서</button>
+      <button data-setcat="display">🏷 표시·접근</button>
+      <button data-setcat="data">🗂 데이터·계정</button>
+    </div>
     <div id="setCafeHost"></div>
-    <div id="setWarrHost"></div>
-    <div id="setSalesHost"></div>
+    <div id="setSalesHost" data-setcat="sales"></div>
+    <div id="setWarrHost" data-setcat="warr"></div>
+    <div id="setAccessHost" data-setcat="display"></div>
+    <div id="setOptHost" data-setcat="data"></div>
   </div>
 
   <footer>
@@ -1193,7 +1205,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 지역수기입력';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 설정카테고리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2393,7 +2405,7 @@ function renderSettings(){
   if(!setDraft) setDraftInit();
   const dirty=setDirty();
   box.innerHTML = `
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="display">
      <h3><span class="dot"></span>표시 정보 (헤더 · 문서 · 푸터)</h3>
      <div class="cap">화면에 표시되는 문구를 직접 바꿀 수 있습니다. 저장하면 모든 사용자에게 적용됩니다.</div>
      <div class="set-grid">
@@ -2404,7 +2416,7 @@ function renderSettings(){
        ${txtField('footer2','하단 문구 2줄')}
      </div>
    </div>
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="display">
      <h3><span class="dot"></span>탭(메뉴) 이름</h3>
      <div class="cap">상단 메뉴와 각 화면 탭의 이름입니다. (앞의 아이콘은 그대로 유지됩니다)</div>
      <div class="set-sub">상단 메뉴</div>
@@ -2427,7 +2439,7 @@ function renderSettings(){
        ${txtField('tabRevenue','매출')}
      </div>
    </div>
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="display">
      <h3><span class="dot"></span>화면 문구 (잠금 · 빈 화면 · 리포트)</h3>
      <div class="cap">레이노 데이터 잠금 화면, 데이터가 없을 때의 안내, 리포트 머리말 문구입니다.</div>
      <div class="set-grid">
@@ -2439,7 +2451,7 @@ function renderSettings(){
        ${txtField('reportSub','리포트 머리말 — 설명')}
      </div>
    </div>
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="monitoring">
      <h3><span class="dot"></span>브랜드 설정</h3>
      <div class="cap">자사 브랜드명과 경쟁사 목록입니다. 리포트의 ‘경쟁사 동시 언급(비교 노출)’과 본문 언급 집계에 사용됩니다.</div>
      <label class="set-field" style="max-width:300px"><span>자사 브랜드명</span><input class="set-text" data-k="ownBrand" value="${escapeHtml(setDraft.ownBrand)}"></label>
@@ -2447,13 +2459,13 @@ function renderSettings(){
      <div class="set-list">${chipRow('comp',setDraft.competitors)}</div>
      <div class="set-add"><input id="compNew" placeholder="경쟁사 추가"><button class="viewbtn" data-add="comp">＋ 추가</button></div>
    </div>
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="monitoring">
      <h3><span class="dot"></span>게시글 유형</h3>
      <div class="cap">데이터 검증 화면에서 선택하는 유형 목록입니다. 여기서 지운 유형은 검증 드롭다운에서 사라집니다. (이미 데이터에 입력된 유형은 통계에는 남습니다.)</div>
      <div class="set-list">${chipRow('type',setDraft.postTypes)}</div>
      <div class="set-add"><input id="typeNew" placeholder="유형 추가 (예: 배송문의)"><button class="viewbtn" data-add="type">＋ 추가</button></div>
    </div>
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="monitoring">
      <h3><span class="dot"></span>긍정·부정 이유 표준 명칭</h3>
      <div class="cap">검증 화면에서 [긍정 이유]/[부정 이유]를 <b>칩 클릭</b>으로 입력할 때 쓰는 표준 명칭입니다. 여기서 통일해두면 게시글마다 표기가 흩어지지 않고, 리포트의 ‘긍정·부정 요인’ 집계도 깔끔해집니다. (직접 입력도 계속 가능)</div>
      <div class="set-sub">긍정 이유</div>
@@ -2463,7 +2475,7 @@ function renderSettings(){
      <div class="set-list">${chipRow('negr',setDraft.negReasons)}</div>
      <div class="set-add"><input id="negrNew" placeholder="부정 이유 추가 (예: 기포/하자)"><button class="viewbtn" data-add="negr">＋ 추가</button></div>
    </div>
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="monitoring">
      <h3><span class="dot"></span>감성 하이라이트 단어</h3>
      <div class="cap">상세 보기에서 본문에 색칠되는 표현입니다. <b>긍정</b>은 노란 형광펜, <b>부정</b>은 빨간 형광펜으로 표시됩니다. 도메인에 맞는 표현을 자유롭게 추가/삭제하세요.</div>
      <div class="set-sub">긍정 표현</div>
@@ -2473,14 +2485,14 @@ function renderSettings(){
      <div class="set-list">${chipRow('hlneg',setDraft.hlNeg)}</div>
      <div class="set-add"><input id="hlNegNew" placeholder="부정 표현 추가 (예: 기포, 변색)"><button class="viewbtn" data-add="hlneg">＋ 추가</button></div>
    </div>
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="monitoring">
      <h3><span class="dot"></span>자동 처리 키워드/문장</h3>
      <div class="cap">여기에 등록한 <b>키워드나 문장</b>이 글의 제목·본문에 들어 있으면, 해당 글을 자동으로 <b>없음(감성 분석 제외) + 검증 완료</b>로 처리합니다. (대리점 광고문구 등 반복 글 정리에 유용. 띄어쓰기·줄바꿈은 무시하고 비교하며, <b>이미 검증한 글이라도 문장이 들어 있으면 '없음'으로 바뀝니다.</b>)</div>
      <div class="set-list">${chipRow('autokw',setDraft.autoKw)}</div>
      <div class="set-add"><input id="autoKwNew" placeholder="예: 카스페이스 본사 [구로점]입니다"><button class="viewbtn" data-add="autokw">＋ 추가</button></div>
      <div class="set-add" style="margin-top:6px"><button id="setApplyKw" class="viewbtn" style="background:var(--neu);color:#fff">🧹 지금 적용 (미검증 글에서 정리)</button></div>
    </div>
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="data">
      <h3><span class="dot"></span>관리자 계정</h3>
      ${ _isMaster() ? `
      <div class="cap">관리자 계정은 모두 <b>동일한 권한</b>입니다(업로드·검증·설정 변경). 현재 로그인: <b>${escapeHtml(_adminEmail||'-')}</b> <span style="color:var(--amber);font-weight:800">· 마스터</span><br>아래에 이메일·비밀번호를 넣으면 <b>나와 동일한 관리자 계정</b>이 만들어집니다. 만든 사람은 같은 로그인 화면에서 그 이메일/비밀번호로 로그인하면 관리자로 동작해요.</div>
@@ -2500,11 +2512,12 @@ function renderSettings(){
      <span class="vc-status ${dirty?'dirty':''}">${dirty?'● 미저장 변경 있음 — 저장하면 모든 사용자에게 적용됩니다':'저장됨'}</span>
      <span style="margin-left:auto;font-size:11px;color:var(--ink3)">빌드 ${BUILD}</span>
    </div>
-   <div class="card set-card">
+   <div class="card set-card" data-setcat="data">
      <h3><span class="dot"></span>업로드 파일 이력</h3>
      <div class="cap">일자별로 올린 엑셀 목록입니다. <b>교체</b>는 그 회차로 추가된 데이터를 새 엑셀로 바꾸고, <b>삭제</b>는 그 회차 데이터를 제거합니다. (다른 회차에서 중복으로 들어온 글은 유지됩니다.)</div>
      ${uploadHistoryHTML()}
    </div>`;
+  applySettingsCat();
 }
 function updateSaveBar(){
   const dirty=setDirty(); const b=document.getElementById('setSaveAll'); if(b) b.disabled=!dirty;
@@ -5081,12 +5094,21 @@ function optimizeHTML(){
     <div id="optResult" class="cap" style="margin-top:10px"></div>
   </div>`;
 }
+let _setCat='monitoring';
+function applySettingsCat(){
+  document.querySelectorAll('#settingsApp [data-setcat]').forEach(el=>{ el.style.display=(el.dataset.setcat===_setCat)?'':'none'; });
+  const cafeHost=document.getElementById('setCafeHost');
+  if(cafeHost) cafeHost.style.display=(_setCat==='sales'||_setCat==='warr')?'none':'';
+  document.querySelectorAll('#setSubnav button').forEach(b=>b.classList.toggle('on', b.dataset.setcat===_setCat));
+}
+(function(){ const sn=document.getElementById('setSubnav'); if(sn) sn.addEventListener('click', e=>{ const b=e.target.closest('button[data-setcat]'); if(!b) return; _setCat=b.dataset.setcat; applySettingsCat(); try{window.scrollTo({top:0,behavior:'smooth'});}catch(_){} }); })();
 function renderSettingsApp(){
   const gate=document.getElementById('setGate');
   const oH=document.getElementById('setOptHost');
   const aH=document.getElementById('setAccessHost'), cH=document.getElementById('setCafeHost'), wH=document.getElementById('setWarrHost'), sH=document.getElementById('setSalesHost');
   if(auth!=='admin'){
     [oH,aH,cH,wH,sH].forEach(h=>{ if(h) h.style.display='none'; });
+    const _sn=document.getElementById('setSubnav'); if(_sn) _sn.style.display='none';
     gate.style.display='block';
     gate.innerHTML=`<div class="card" style="text-align:center;padding:42px 20px">
       <div style="font-size:34px;margin-bottom:6px">🔐</div>
@@ -5102,6 +5124,8 @@ function renderSettingsApp(){
   renderSettings();
   wH.innerHTML = warrSettingsSectionHTML();
   if(sH) sH.innerHTML = salesSettingsSectionHTML();
+  const _sn=document.getElementById('setSubnav'); if(_sn) _sn.style.display='flex';
+  applySettingsCat();
 }
 document.getElementById('settingsApp').addEventListener('click', async e=>{
   if(e.target.id==='setAdminLogin'){ showLock(); return; }
