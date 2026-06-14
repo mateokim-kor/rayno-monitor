@@ -1205,7 +1205,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 설정카테고리수정';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 서브내비버튼수정';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5096,7 +5096,7 @@ function optimizeHTML(){
 }
 let _setCat='monitoring';
 function applySettingsCat(){
-  document.querySelectorAll('#settingsApp [data-setcat]').forEach(el=>{ el.style.display=(el.dataset.setcat===_setCat)?'':'none'; });
+  document.querySelectorAll('#settingsApp [data-setcat]').forEach(el=>{ if(el.closest('#setSubnav')) return; el.style.display=(el.dataset.setcat===_setCat)?'':'none'; });
   const cafeHost=document.getElementById('setCafeHost');
   if(cafeHost) cafeHost.style.display=(_setCat==='sales'||_setCat==='warr')?'none':'';
   document.querySelectorAll('#setSubnav button').forEach(b=>b.classList.toggle('on', b.dataset.setcat===_setCat));
