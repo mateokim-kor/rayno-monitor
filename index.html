@@ -1261,7 +1261,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 부정제품교차표';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 리포트제품통계버그수정';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3220,13 +3220,21 @@ function autoBrands(r){
 }
 function autoProducts(r){ return _prodHits((r.title||'')+' '+(r.body||'')); }
 function productStats(set){
-  const st={}; Object.keys(RAYNO_PRODUCTS).forEach(p=>st[p]={n:0,pos:0,neg:0,neu:0});
+  const st={}; Object.keys(effProducts()).forEach(p=>st[p]={n:0,pos:0,neg:0,neu:0});
   set.forEach(r=>{ const hits=_prodHits((r.title||'')+' '+(r.body||'')); if(!hits.length)return;
-    const s=rsent(r); hits.forEach(p=>{ const o=st[p]; o.n++; if(s==='긍정')o.pos++; else if(s==='부정')o.neg++; else if(s==='중립')o.neu++; }); });
+    const s=rsent(r); hits.forEach(p=>{ const o=st[p]||(st[p]={n:0,pos:0,neg:0,neu:0}); o.n++; if(s==='긍정')o.pos++; else if(s==='부정')o.neg++; else if(s==='중립')o.neu++; }); });
   return st;
 }
 
 function renderReport(){
+  try{ _renderReportImpl(); }
+  catch(e){
+    const box=document.getElementById('report');
+    if(box) box.innerHTML='<div class="card"><div class="empty">리포트 생성 중 문제가 발생했습니다.<br><small style="color:var(--ink3)">'+escapeHtml((e&&e.message)||String(e))+'</small><br><small style="color:var(--ink3)">'+escapeHtml(((e&&e.stack)||'').split('\n').slice(0,3).join(' | '))+'</small></div></div>';
+    console.error('renderReport error:', e);
+  }
+}
+function _renderReportImpl(){
   const box=document.getElementById('report');
   if(!RAW || !RAW.rows.length){ box.innerHTML='<div class="card"><div class="empty">아직 데이터가 없습니다. 데이터가 쌓이면 리포트가 자동 생성됩니다.</div></div>'; return; }
 
@@ -3438,7 +3446,7 @@ function renderReport(){
    <div class="card rep-sec">
      <h3><span class="dot"></span>제품별 언급 분석 <span class="rep-sub2">제목·본문에서 제품명 자동 인식</span></h3>
      <div class="cap">제품 키워드가 등장한 글·댓글을 제품별로 집계했습니다. 한 글에 여러 제품이 나오면 각각에 반영됩니다.</div>
-     ${_pEnt.length?`<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px"><tr><th ${_pTh}>제품</th><th ${_pThr}>언급</th><th ${_pThr}>점유율</th><th ${_pTh}>감성(긍·부·중)</th></tr>${_pRows}</table>`:'<div class="empty">이 기간에 인식된 제품 언급이 없습니다. (제품 키워드는 코드의 RAYNO_PRODUCTS에서 조정)</div>'}
+     ${_pEnt.length?`<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px"><tr><th ${_pTh}>제품</th><th ${_pThr}>언급</th><th ${_pThr}>점유율</th><th ${_pTh}>감성(긍·부·중)</th></tr>${_pRows}</table>`:'<div class="empty">이 기간에 인식된 제품 언급이 없습니다. (제품 키워드는 설정 &gt; 언급 제품 키워드에서 조정)</div>'}
    </div>`;
   box.innerHTML = head + insightBlock + deptBlock + summary + repPos + repNeg + trend + sov + productBlock + reasons + types + cafes + extra + advice + marketingBlock;
   bindReport();
