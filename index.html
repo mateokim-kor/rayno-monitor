@@ -381,6 +381,10 @@
   .set-add input:focus{border-color:var(--amber)}
   .set-actions{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:14px}
   .set-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  #settings{column-count:2;column-gap:16px}
+  #settings .set-card{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin:0 0 16px;width:100%}
+  #settings .set-savebar{column-span:all;-webkit-column-span:all;margin-bottom:14px}
+  @media(max-width:1000px){ #settings{column-count:1} }
   @media(max-width:640px){.set-grid{grid-template-columns:1fr}}
   .set-field{display:flex;flex-direction:column;gap:5px}
   .set-field span{font-size:11.5px;font-weight:700;color:var(--ink3)}
@@ -920,13 +924,13 @@
 
     <div class="card full" style="margin-top:16px">
       <h3><span class="dot"></span>주요 키워드</h3>
-      <div class="cap">본문·댓글 빈출 단어 (제외 키워드 적용) <span class="seehint">· 단어 클릭 시 포함 글 목록</span></div>
+      <div class="cap">본문·댓글 빈출 단어 · <b>출현 횟수</b> 기준(한 글에 여러 번 나오면 중복 집계) · 제외 키워드 적용 <span class="seehint">· 단어 클릭 시 포함 글 목록</span></div>
       <div class="kw-list" id="kwList"></div>
     </div>
 
     <div class="card full" style="margin-top:16px">
       <h3><span class="dot"></span>분류 요약 (검증 태그)</h3>
-      <div class="cap">검증 페이지에서 입력한 분류값 집계 <span class="seehint">· 칩 클릭 시 해당 글 목록</span></div>
+      <div class="cap">이유·추천·차종은 검증 입력값 / <b>언급 브랜드·제품</b>은 본문 자동 감지 · <b>글 단위</b> 집계(한 글에 여러 번 나와도 1건) <span class="seehint">· 칩 클릭 시 해당 글 목록</span></div>
       <div class="cls-grid" id="clsSummary"></div>
     </div>
   </div>
@@ -1193,7 +1197,7 @@ function runAutoKeywords(){
 const CLASS_FIELDS = [
   {key:'posReason',  col:'긍정이유', label:'긍정 이유', kind:'multi', presetsFn:()=>effPosReasons(), ph:'칩 클릭 또는 직접 입력 (쉼표 구분)'},
   {key:'negReason',  col:'부정이유', label:'부정 이유', kind:'multi', presetsFn:()=>effNegReasons(), ph:'칩 클릭 또는 직접 입력 (쉼표 구분)'},
-  {key:'brand',      col:'언급브랜드', label:'언급 브랜드', kind:'multi', presetsFn:()=>[effOwnBrand(), ...effCompetitors()], ph:'쉼표로 구분'},
+  {key:'brand',      col:'언급브랜드', label:'언급 브랜드', kind:'multi', presetsFn:()=>effBrandList(), ph:'쉼표로 구분'},
   {key:'product',    col:'언급제품', label:'언급 제품', kind:'multi', presetsFn:()=>Object.keys(effProducts()), ph:'쉼표로 구분'},
   {key:'recommender',col:'추천주체', label:'추천 주체', kind:'pick', presets:CONFIG.recommenderPresets, ph:'예) 시공업체'},
   {key:'carModel',   col:'차종',    label:'차종',     kind:'text',  ph:'예) 그랜저, 모델3'},
@@ -1216,7 +1220,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 제품설정자동집계카페더보기';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 브랜드키워드설정균형';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2387,7 +2391,7 @@ const TEXT_KEYS=['headerTitle','headerSub','docTitle','footer1','footer2',
 function setDraftInit(){
   setDraft={ ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice(),
     hlPos:effHlPos().slice(), hlNeg:effHlNeg().slice(), autoKw:effAutoKw().slice(),
-    posReasons:effPosReasons().slice(), negReasons:effNegReasons().slice(), products:effProductsList().slice() };
+    posReasons:effPosReasons().slice(), negReasons:effNegReasons().slice(), products:effProductsList().slice(), brands:effBrandList().slice() };
   TEXT_KEYS.forEach(k=>setDraft[k]=effText(k));
 }
 function setDirty(){
@@ -2398,8 +2402,8 @@ function setDirty(){
     c:(o.competitors||[]).map(x=>x.trim()).filter(Boolean),t:(o.postTypes||[]).map(x=>x.trim()).filter(Boolean),
     hp:(o.hlPos||[]).map(x=>x.trim()).filter(Boolean),hn:(o.hlNeg||[]).map(x=>x.trim()).filter(Boolean),
     ak:(o.autoKw||[]).map(x=>x.trim()).filter(Boolean),
-    pr:(o.posReasons||[]).map(x=>x.trim()).filter(Boolean),nr:(o.negReasons||[]).map(x=>x.trim()).filter(Boolean),pd:(o.products||[]).map(x=>x.trim()).filter(Boolean)});
-  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes(),hlPos:effHlPos(),hlNeg:effHlNeg(),autoKw:effAutoKw(),posReasons:effPosReasons(),negReasons:effNegReasons(),products:effProductsList()};
+    pr:(o.posReasons||[]).map(x=>x.trim()).filter(Boolean),nr:(o.negReasons||[]).map(x=>x.trim()).filter(Boolean),pd:(o.products||[]).map(x=>x.trim()).filter(Boolean),bd:(o.brands||[]).map(x=>x.trim()).filter(Boolean)});
+  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes(),hlPos:effHlPos(),hlNeg:effHlNeg(),autoKw:effAutoKw(),posReasons:effPosReasons(),negReasons:effNegReasons(),products:effProductsList(),brands:effBrandList()};
   TEXT_KEYS.forEach(k=>cur[k]=effText(k));
   return norm(setDraft)!==norm(cur);
 }
@@ -2504,6 +2508,12 @@ function renderSettings(){
      <div class="set-add"><input id="prodNew" placeholder="제품 추가 (예: 얼티넘, S9, 팬텀)"><button class="viewbtn" data-add="prod">＋ 추가</button></div>
    </div>
    <div class="card set-card" data-setcat="monitoring">
+     <h3><span class="dot"></span>언급 브랜드 키워드</h3>
+     <div class="cap">게시글·댓글에서 <b>자동 감지</b>할 브랜드명입니다. 기본값은 위 <b>브랜드 설정</b>의 자사·경쟁사이며, 여기서 별칭(예: 3M·쓰리엠)을 추가/조정할 수 있습니다. 모두 비우면 자사+경쟁사 목록을 사용합니다.</div>
+     <div class="set-list">${chipRow('brnd',setDraft.brands)}</div>
+     <div class="set-add"><input id="brandNew" placeholder="브랜드 추가 (예: 쓰리엠, 3M)"><button class="viewbtn" data-add="brnd">＋ 추가</button></div>
+   </div>
+   <div class="card set-card" data-setcat="monitoring">
      <h3><span class="dot"></span>감성 하이라이트 단어</h3>
      <div class="cap">상세 보기에서 본문에 색칠되는 표현입니다. <b>긍정</b>은 노란 형광펜, <b>부정</b>은 빨간 형광펜으로 표시됩니다. 도메인에 맞는 표현을 자유롭게 추가/삭제하세요.</div>
      <div class="set-sub">긍정 표현</div>
@@ -2566,11 +2576,12 @@ function saveAllSettings(){
   const posReasons=[...new Set(setDraft.posReasons.map(s=>s.trim()).filter(Boolean))];
   const negReasons=[...new Set(setDraft.negReasons.map(s=>s.trim()).filter(Boolean))];
   const products=[...new Set(setDraft.products.map(s=>s.trim()).filter(Boolean))];
+  const brands=[...new Set(setDraft.brands.map(s=>s.trim()).filter(Boolean))];
   if(!types.length){ toast('게시글 유형은 최소 1개가 필요합니다.',true); return; }
   const textObj={...((STORE.config&&STORE.config.text)||{})};
   TEXT_KEYS.forEach(k=>{ const v=(setDraft[k]||'').trim(); textObj[k]= v || CONFIG.text[k]; });
   STORE.config = {...(STORE.config||{}),
-    text:textObj, hlPos, hlNeg, autoKeywords, posReasons, negReasons, products,
+    text:textObj, hlPos, hlNeg, autoKeywords, posReasons, negReasons, products, brands,
     ownBrand:(setDraft.ownBrand.trim()||CONFIG.ownBrand), competitors:comps, postTypes:types };
   saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave();   // 설정은 즉시 반영(디바운스 대기 X)
   _typeUnionCache=null; _hlRe=null; setDraft=null;
@@ -2584,8 +2595,8 @@ function removeUploadBatch(bid){
   return before-store.rows.length;
 }
 let _replaceBatch=null;
-const GRP_MAP={comp:'competitors',type:'postTypes',hlpos:'hlPos',hlneg:'hlNeg',autokw:'autoKw',posr:'posReasons',negr:'negReasons',prod:'products'};
-const ADD_INPUT={comp:'compNew',type:'typeNew',hlpos:'hlPosNew',hlneg:'hlNegNew',autokw:'autoKwNew',posr:'posrNew',negr:'negrNew',prod:'prodNew'};
+const GRP_MAP={comp:'competitors',type:'postTypes',hlpos:'hlPos',hlneg:'hlNeg',autokw:'autoKw',posr:'posReasons',negr:'negReasons',prod:'products',brnd:'brands'};
+const ADD_INPUT={comp:'compNew',type:'typeNew',hlpos:'hlPosNew',hlneg:'hlNegNew',autokw:'autoKwNew',posr:'posrNew',negr:'negrNew',prod:'prodNew',brnd:'brandNew'};
 document.getElementById('settings').addEventListener('input', e=>{
   const t=e.target;
   if(t.classList.contains('set-text')){ setDraft[t.dataset.k]=t.value; updateSaveBar(); }
@@ -2614,6 +2625,7 @@ document.getElementById('settings').addEventListener('keydown', e=>{
   if(e.target.id==='typeNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="type"]').click(); }
   if(e.target.id==='posrNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="posr"]').click(); }
   if(e.target.id==='prodNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="prod"]').click(); }
+  if(e.target.id==='brandNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="brnd"]').click(); }
   if(e.target.id==='negrNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="negr"]').click(); }
   if(e.target.id==='hlPosNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="hlpos"]').click(); }
   if(e.target.id==='hlNegNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="hlneg"]').click(); }
@@ -3059,11 +3071,15 @@ function _prodHits(text){
   }
   return out;
 }
+function effBrandList(){
+  const c=(STORE&&STORE.config&&STORE.config.brands);
+  if(Array.isArray(c)&&c.length) return c.slice();
+  const own=(typeof effOwnBrand==='function'?effOwnBrand():'');
+  return [own, ...(typeof effCompetitors==='function'?effCompetitors():[])].filter(Boolean);
+}
 function autoBrands(r){
   const t=((r.title||'')+' '+(r.body||'')); const out=[];
-  const own=(typeof effOwnBrand==='function'?effOwnBrand():'');
-  if(own && t.indexOf(own)>=0) out.push(own);
-  (typeof effCompetitors==='function'?effCompetitors():[]).forEach(b=>{ if(b && t.indexOf(b)>=0 && out.indexOf(b)<0) out.push(b); });
+  effBrandList().forEach(b=>{ b=String(b).trim(); if(b && t.indexOf(b)>=0 && out.indexOf(b)<0) out.push(b); });
   return out;
 }
 function autoProducts(r){ return _prodHits((r.title||'')+' '+(r.body||'')); }
