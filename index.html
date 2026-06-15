@@ -665,6 +665,12 @@
   .mention-row .mbar > i{display:block;height:100%;background:linear-gradient(90deg,var(--amber),#ffb968);border-radius:7px;min-width:5%}
   .mention-row .mc{width:46px;flex:none;text-align:right;font-weight:800;color:var(--amber);font-variant-numeric:tabular-nums;font-size:14px}
   .mention-empty{color:var(--ink3);font-size:13px;padding:14px 0}
+  .mention-row.pos .mbar > i{background:linear-gradient(90deg,var(--pos),#34d399)}
+  .mention-row.pos .mc{color:var(--pos)}
+  .mention-row.neg .mbar > i{background:linear-gradient(90deg,var(--neg),#f87171)}
+  .mention-row.neg .mc{color:var(--neg)}
+  .bar-more{margin-top:8px;width:100%;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:8px 0;cursor:pointer;transition:.12s}
+  .bar-more:hover{border-color:var(--amber);color:var(--amber)}
   @media(max-width:760px){.cls-grid{grid-template-columns:1fr}}
   .cls-block .ttl{font-size:12px;font-weight:700;color:var(--ink);margin-bottom:9px;display:flex;align-items:center;gap:7px}
   .cls-block .ttl .dotc{width:7px;height:7px;border-radius:50%;background:var(--amber)}
@@ -945,8 +951,17 @@
     </div>
 
     <div class="card full" style="margin-top:16px">
+      <h3><span class="dot"></span>💬 긍정 · 부정 이유</h3>
+      <div class="cap">검증 페이지에서 입력한 긍정·부정 사유 집계 <span class="seehint">· 항목 클릭 시 해당 글 목록</span></div>
+      <div class="mention-grid">
+        <div><div class="mention-h"><span class="dotc" style="background:var(--pos)"></span>긍정 이유</div><div class="mention-list" id="mPosReason"></div></div>
+        <div><div class="mention-h"><span class="dotc" style="background:var(--neg)"></span>부정 이유</div><div class="mention-list" id="mNegReason"></div></div>
+      </div>
+    </div>
+
+    <div class="card full" style="margin-top:16px">
       <h3><span class="dot"></span>분류 요약 (검증 태그)</h3>
-      <div class="cap">긍정·부정 이유 · 추천 주체 · 차종 (검증 페이지 입력값) <span class="seehint">· 칩 클릭 시 해당 글 목록</span></div>
+      <div class="cap">추천 주체 · 차종 (검증 페이지 입력값) <span class="seehint">· 칩 클릭 시 해당 글 목록</span></div>
       <div class="cls-grid" id="clsSummary"></div>
     </div>
   </div>
@@ -1236,7 +1251,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 대시보드완성도개선';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 이유막대더보기';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -1800,6 +1815,7 @@ function render(){
   renderComp(drill);
   renderCafe(drill);
   renderMentions(drill);
+  renderReasons(drill);
   renderClassSummary(drill);
 }
 
@@ -1815,7 +1831,7 @@ function aggAuto(rows, fn){ const m={}; rows.forEach(r=>{ try{ fn(r).forEach(v=>
 function renderClassSummary(rows){
   const el=document.getElementById('clsSummary');
   if(!el) return;
-  el.innerHTML = CLASS_FIELDS.filter(f=>f.key!=='brand'&&f.key!=='product').map(f=>{
+  el.innerHTML = CLASS_FIELDS.filter(f=>['brand','product','posReason','negReason'].indexOf(f.key)<0).map(f=>{
     const ent=(f.key==='brand'?aggAuto(rows,autoBrands):f.key==='product'?aggAuto(rows,autoProducts):aggField(rows, f.key)).slice(0,14);
     const chips = ent.length
       ? `<div class="cls-chips">`+ent.map(([v,n])=>
@@ -2166,20 +2182,31 @@ function renderCafe(rows){
   });
 }
 
+let _barExpanded={};
+function renderBarList(elId, ent, pick, opts){
+  opts=opts||{};
+  const el=document.getElementById(elId); if(!el) return;
+  if(!ent.length){ el.innerHTML=`<div class="mention-empty">${escapeHtml(opts.emptyMsg||'표시할 항목이 없습니다.')}</div>`; return; }
+  const LIMIT=10, expanded=!!_barExpanded[elId], max=ent[0][1]||1, cls=opts.barCls?(' '+opts.barCls):'';
+  const rowsHTML=ent.map(([v,n],i)=>`<div class="mention-row${cls}${i>=LIMIT?' bar-xrow':''}"${i>=LIMIT&&!expanded?' style="display:none"':''} data-val="${escapeHtml(v)}"><span class="mn" title="${escapeHtml(v)}">${escapeHtml(v)}</span><span class="mbar"><i style="width:${Math.max(5,Math.round(n/max*100))}%"></i></span><span class="mc">${n.toLocaleString()}</span></div>`).join('');
+  const moreHTML=ent.length>LIMIT?`<button class="bar-more" type="button">${expanded?'접기 ▲':('더보기 (+'+(ent.length-LIMIT)+') ▼')}</button>`:'';
+  el.innerHTML=rowsHTML+moreHTML;
+  el.querySelectorAll('.mention-row').forEach(row=>{
+    row.addEventListener('click',()=>{ const v=row.dataset.val; const list=pick(v);
+      openDetail(`<b style="color:var(--amber)">${escapeHtml(v)}</b>${opts.modalLabel?' · '+escapeHtml(opts.modalLabel):''}`, list, `'${v}' 관련 글·댓글입니다`); });
+  });
+  const mb=el.querySelector('.bar-more');
+  if(mb) mb.addEventListener('click',()=>{ _barExpanded[elId]=!_barExpanded[elId]; renderBarList(elId, ent, pick, opts); });
+}
 function renderMentions(rows){
-  const fill=(elId,ent,pick)=>{
-    const el=document.getElementById(elId); if(!el) return;
-    const top=ent.slice(0,12);
-    if(!top.length){ el.innerHTML='<div class="mention-empty">감지된 항목이 없습니다.</div>'; return; }
-    const max=top[0][1]||1;
-    el.innerHTML=top.map(([v,n])=>`<div class="mention-row" data-val="${escapeHtml(v)}"><span class="mn" title="${escapeHtml(v)}">${escapeHtml(v)}</span><span class="mbar"><i style="width:${Math.max(5,Math.round(n/max*100))}%"></i></span><span class="mc">${n.toLocaleString()}</span></div>`).join('');
-    el.querySelectorAll('.mention-row').forEach(row=>{
-      row.addEventListener('click',()=>{ const v=row.dataset.val; const list=pick(v);
-        openDetail(`<b style="color:var(--amber)">${escapeHtml(v)}</b> 언급`, list, `'${v}'이(가) 언급된 글·댓글입니다`); });
-    });
-  };
-  fill('mBrand', aggAuto(rows,autoBrands), v=>rows.filter(r=>autoBrands(r).indexOf(v)>=0));
-  fill('mProduct', aggAuto(rows,autoProducts), v=>rows.filter(r=>autoProducts(r).indexOf(v)>=0));
+  renderBarList('mBrand', aggAuto(rows,autoBrands), v=>rows.filter(r=>autoBrands(r).indexOf(v)>=0), {modalLabel:'언급 브랜드', emptyMsg:'감지된 브랜드가 없습니다.'});
+  renderBarList('mProduct', aggAuto(rows,autoProducts), v=>rows.filter(r=>autoProducts(r).indexOf(v)>=0), {modalLabel:'언급 제품', emptyMsg:'감지된 제품이 없습니다.'});
+}
+function renderReasons(rows){
+  const has=v=>r=>(r.posReason||'').split(',').map(s=>s.trim()).indexOf(v)>=0;
+  const hasN=v=>r=>(r.negReason||'').split(',').map(s=>s.trim()).indexOf(v)>=0;
+  renderBarList('mPosReason', aggField(rows,'posReason'), v=>rows.filter(has(v)), {modalLabel:'긍정 이유', barCls:'pos', emptyMsg:'입력된 값이 없습니다 — 검증 페이지에서 분류하세요'});
+  renderBarList('mNegReason', aggField(rows,'negReason'), v=>rows.filter(hasN(v)), {modalLabel:'부정 이유', barCls:'neg', emptyMsg:'입력된 값이 없습니다 — 검증 페이지에서 분류하세요'});
 }
 function renderKeywords(rows){
   const STOP=new Set(CONFIG.stopwords);
