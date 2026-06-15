@@ -671,6 +671,16 @@
   .mention-row.neg .mc{color:var(--neg)}
   .bar-more{margin-top:8px;width:100%;background:var(--bg2);border:1px solid var(--line2);border-radius:9px;color:var(--ink2);font-family:var(--font);font-size:12px;font-weight:700;padding:8px 0;cursor:pointer;transition:.12s}
   .bar-more:hover{border-color:var(--amber);color:var(--amber)}
+  .xtab-wrap{overflow-x:auto;padding-bottom:4px}
+  .xtab{border-collapse:separate;border-spacing:4px;width:100%;min-width:560px}
+  .xtab th,.xtab td{font-size:12.5px;text-align:center;padding:9px 11px;white-space:nowrap}
+  .xtab thead th{color:var(--ink2);font-weight:700;font-size:11.5px}
+  .xtab th.xc-corner{text-align:left;color:var(--ink3);font-weight:600}
+  .xtab th.xc-row{text-align:left;color:var(--ink);font-weight:700;position:sticky;left:0;background:var(--card);z-index:1}
+  .xtab td.xc-cell{border-radius:8px;background:var(--bg2);color:var(--ink3);font-weight:800;font-variant-numeric:tabular-nums;min-width:44px}
+  .xtab td.xc-cell.has:hover{outline:2px solid var(--amber);outline-offset:-2px;cursor:pointer}
+  .xtab td.xc-tot,.xtab th.xc-tot{color:var(--ink2);font-weight:800;background:var(--bg2);border-radius:8px}
+  .xtab tr.xc-totrow td,.xtab tr.xc-totrow th{color:var(--ink2);font-weight:800;opacity:.9}
   @media(max-width:760px){.cls-grid{grid-template-columns:1fr}}
   .cls-block .ttl{font-size:12px;font-weight:700;color:var(--ink);margin-bottom:9px;display:flex;align-items:center;gap:7px}
   .cls-block .ttl .dotc{width:7px;height:7px;border-radius:50%;background:var(--amber)}
@@ -960,9 +970,9 @@
     </div>
 
     <div class="card full" style="margin-top:16px">
-      <h3><span class="dot"></span>분류 요약 (검증 태그)</h3>
-      <div class="cap">추천 주체 · 차종 (검증 페이지 입력값) <span class="seehint">· 칩 클릭 시 해당 글 목록</span></div>
-      <div class="cls-grid" id="clsSummary"></div>
+      <h3><span class="dot"></span>🔎 부정 이유 × 제품 교차표</h3>
+      <div class="cap">어떤 제품에서 어떤 불만이 나오는지 — 부정 글 기준 · 제품(본문 자동 감지) × 부정 사유(검증 입력) · 색이 진할수록 건수↑ <span class="seehint">· 칸 클릭 시 해당 글 목록</span></div>
+      <div class="xtab-wrap" id="crossTab"></div>
     </div>
   </div>
 
@@ -1251,7 +1261,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 이유막대더보기';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 부정제품교차표';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -1816,7 +1826,7 @@ function render(){
   renderCafe(drill);
   renderMentions(drill);
   renderReasons(drill);
-  renderClassSummary(drill);
+  renderCrossTab(drill);
 }
 
 // ── 분류 요약 (검증 태그 집계) ──
@@ -2207,6 +2217,48 @@ function renderReasons(rows){
   const hasN=v=>r=>(r.negReason||'').split(',').map(s=>s.trim()).indexOf(v)>=0;
   renderBarList('mPosReason', aggField(rows,'posReason'), v=>rows.filter(has(v)), {modalLabel:'긍정 이유', barCls:'pos', emptyMsg:'입력된 값이 없습니다 — 검증 페이지에서 분류하세요'});
   renderBarList('mNegReason', aggField(rows,'negReason'), v=>rows.filter(hasN(v)), {modalLabel:'부정 이유', barCls:'neg', emptyMsg:'입력된 값이 없습니다 — 검증 페이지에서 분류하세요'});
+}
+function renderCrossTab(rows){
+  const el=document.getElementById('crossTab'); if(!el) return;
+  const negRows=rows.filter(r=>(r.negReason||'').trim());
+  const cell={}, prodTot={}, reasonTot={};
+  negRows.forEach(r=>{
+    const prods=autoProducts(r);
+    const reasons=(r.negReason||'').split(',').map(s=>s.trim()).filter(Boolean);
+    if(!prods.length||!reasons.length) return;
+    prods.forEach(p=>reasons.forEach(rz=>{
+      cell[p+'\u0001'+rz]=(cell[p+'\u0001'+rz]||0)+1;
+      prodTot[p]=(prodTot[p]||0)+1; reasonTot[rz]=(reasonTot[rz]||0)+1;
+    }));
+  });
+  const prods=Object.entries(prodTot).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
+  const reasons=Object.entries(reasonTot).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
+  if(!prods.length||!reasons.length){ el.innerHTML='<div class="mention-empty">교차할 데이터가 없습니다 — 부정 글에 제품이 언급되고 검증 페이지에서 <b>부정 사유</b>가 입력되어야 표시됩니다.</div>'; return; }
+  let max=1; prods.forEach(p=>reasons.forEach(rz=>{ const n=cell[p+'\u0001'+rz]||0; if(n>max)max=n; }));
+  let html='<table class="xtab"><thead><tr><th class="xc-corner">제품 \\ 부정 이유</th>';
+  reasons.forEach(rz=>{ html+=`<th title="${escapeHtml(rz)}">${escapeHtml(rz)}</th>`; });
+  html+='<th class="xc-tot">합계</th></tr></thead><tbody>';
+  prods.forEach(p=>{
+    html+=`<tr><th class="xc-row" title="${escapeHtml(p)}">${escapeHtml(p)}</th>`;
+    reasons.forEach(rz=>{
+      const n=cell[p+'\u0001'+rz]||0;
+      if(n){ const a=(0.14+0.74*(n/max));
+        html+=`<td class="xc-cell has" style="background:rgba(229,72,77,${a.toFixed(3)});color:${a>0.5?'#fff':'var(--ink)'}" data-p="${escapeHtml(p)}" data-r="${escapeHtml(rz)}">${n}</td>`;
+      } else html+='<td class="xc-cell"></td>';
+    });
+    html+=`<td class="xc-tot">${prodTot[p]}</td></tr>`;
+  });
+  html+='<tr class="xc-totrow"><th class="xc-row">합계</th>';
+  reasons.forEach(rz=>{ html+=`<td class="xc-tot">${reasonTot[rz]}</td>`; });
+  html+='<td class="xc-tot"></td></tr></tbody></table>';
+  el.innerHTML=html;
+  el.querySelectorAll('.xc-cell.has').forEach(td=>{
+    td.addEventListener('click',()=>{
+      const p=td.dataset.p, rz=td.dataset.r;
+      const list=negRows.filter(r=>autoProducts(r).indexOf(p)>=0 && (r.negReason||'').split(',').map(s=>s.trim()).indexOf(rz)>=0);
+      openDetail(`<b style="color:var(--neg)">${escapeHtml(p)}</b> × <b>${escapeHtml(rz)}</b>`, list, `'${p}' 제품의 '${rz}' 부정 글·댓글입니다`);
+    });
+  });
 }
 function renderKeywords(rows){
   const STOP=new Set(CONFIG.stopwords);
