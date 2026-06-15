@@ -1220,7 +1220,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 브랜드키워드설정균형';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 제외KW칩버튼';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2391,7 +2391,8 @@ const TEXT_KEYS=['headerTitle','headerSub','docTitle','footer1','footer2',
 function setDraftInit(){
   setDraft={ ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice(),
     hlPos:effHlPos().slice(), hlNeg:effHlNeg().slice(), autoKw:effAutoKw().slice(),
-    posReasons:effPosReasons().slice(), negReasons:effNegReasons().slice(), products:effProductsList().slice(), brands:effBrandList().slice() };
+    posReasons:effPosReasons().slice(), negReasons:effNegReasons().slice(), products:effProductsList().slice(), brands:effBrandList().slice(),
+    excludeKw:((state.excludeKeywords&&state.excludeKeywords.length)?state.excludeKeywords.slice():CONFIG.excludeKeywordsDefault.slice()) };
   TEXT_KEYS.forEach(k=>setDraft[k]=effText(k));
 }
 function setDirty(){
@@ -2402,8 +2403,8 @@ function setDirty(){
     c:(o.competitors||[]).map(x=>x.trim()).filter(Boolean),t:(o.postTypes||[]).map(x=>x.trim()).filter(Boolean),
     hp:(o.hlPos||[]).map(x=>x.trim()).filter(Boolean),hn:(o.hlNeg||[]).map(x=>x.trim()).filter(Boolean),
     ak:(o.autoKw||[]).map(x=>x.trim()).filter(Boolean),
-    pr:(o.posReasons||[]).map(x=>x.trim()).filter(Boolean),nr:(o.negReasons||[]).map(x=>x.trim()).filter(Boolean),pd:(o.products||[]).map(x=>x.trim()).filter(Boolean),bd:(o.brands||[]).map(x=>x.trim()).filter(Boolean)});
-  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes(),hlPos:effHlPos(),hlNeg:effHlNeg(),autoKw:effAutoKw(),posReasons:effPosReasons(),negReasons:effNegReasons(),products:effProductsList(),brands:effBrandList()};
+    pr:(o.posReasons||[]).map(x=>x.trim()).filter(Boolean),nr:(o.negReasons||[]).map(x=>x.trim()).filter(Boolean),pd:(o.products||[]).map(x=>x.trim()).filter(Boolean),bd:(o.brands||[]).map(x=>x.trim()).filter(Boolean),ke:(o.excludeKw||[]).map(x=>x.trim()).filter(Boolean)});
+  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes(),hlPos:effHlPos(),hlNeg:effHlNeg(),autoKw:effAutoKw(),posReasons:effPosReasons(),negReasons:effNegReasons(),products:effProductsList(),brands:effBrandList(),excludeKw:((state.excludeKeywords&&state.excludeKeywords.length)?state.excludeKeywords:CONFIG.excludeKeywordsDefault)};
   TEXT_KEYS.forEach(k=>cur[k]=effText(k));
   return norm(setDraft)!==norm(cur);
 }
@@ -2532,8 +2533,9 @@ function renderSettings(){
    </div>
    <div class="card set-card" data-setcat="monitoring">
      <h3><span class="dot"></span>주요 키워드 제외</h3>
-     <div class="cap">대시보드 <b>주요 키워드</b>(빈출 단어) 분석에서 제외할 단어입니다. 브랜드명·인사말처럼 너무 흔한 단어를 빼면 의미 있는 키워드가 잘 보입니다. 쉼표로 구분해 입력하세요.</div>
-     <div class="set-add"><input id="kwExcludeSet" placeholder="예: 레이노, 틴팅, 안녕하세요, 입니다"></div>
+     <div class="cap">대시보드 <b>주요 키워드</b>(빈출 단어) 분석에서 제외할 단어입니다. 아래 칩이 <b>현재 적용 중인 제외어</b>이며, ✕로 삭제할 수 있습니다. 브랜드명·인사말처럼 너무 흔한 단어를 빼면 의미 있는 키워드가 잘 보입니다.</div>
+     <div class="set-list">${chipRow('kwx',setDraft.excludeKw)}</div>
+     <div class="set-add"><input id="kwExcludeNew" placeholder="제외할 단어 추가 (예: 레이노)"><button class="viewbtn" data-add="kwx">＋ 추가</button></div>
    </div>
    <div class="card set-card" data-setcat="data">
      <h3><span class="dot"></span>관리자 계정</h3>
@@ -2577,6 +2579,7 @@ function saveAllSettings(){
   const negReasons=[...new Set(setDraft.negReasons.map(s=>s.trim()).filter(Boolean))];
   const products=[...new Set(setDraft.products.map(s=>s.trim()).filter(Boolean))];
   const brands=[...new Set(setDraft.brands.map(s=>s.trim()).filter(Boolean))];
+  const excludeKw=[...new Set(setDraft.excludeKw.map(s=>s.trim()).filter(Boolean))];
   if(!types.length){ toast('게시글 유형은 최소 1개가 필요합니다.',true); return; }
   const textObj={...((STORE.config&&STORE.config.text)||{})};
   TEXT_KEYS.forEach(k=>{ const v=(setDraft[k]||'').trim(); textObj[k]= v || CONFIG.text[k]; });
@@ -2584,6 +2587,8 @@ function saveAllSettings(){
     text:textObj, hlPos, hlNeg, autoKeywords, posReasons, negReasons, products, brands,
     ownBrand:(setDraft.ownBrand.trim()||CONFIG.ownBrand), competitors:comps, postTypes:types };
   saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave();   // 설정은 즉시 반영(디바운스 대기 X)
+  state.excludeKeywords=excludeKw; if(typeof saveSettings==='function') saveSettings({excludeKeywords:excludeKw});
+  const _dk=document.getElementById('kwExclude'); if(_dk) _dk.value=excludeKw.join(', ');
   _typeUnionCache=null; _hlRe=null; setDraft=null;
   applyConfigAndSettings(); renderSettings(); toast('설정을 저장했습니다 · 모든 사용자에게 적용됩니다');
 }
@@ -2595,8 +2600,8 @@ function removeUploadBatch(bid){
   return before-store.rows.length;
 }
 let _replaceBatch=null;
-const GRP_MAP={comp:'competitors',type:'postTypes',hlpos:'hlPos',hlneg:'hlNeg',autokw:'autoKw',posr:'posReasons',negr:'negReasons',prod:'products',brnd:'brands'};
-const ADD_INPUT={comp:'compNew',type:'typeNew',hlpos:'hlPosNew',hlneg:'hlNegNew',autokw:'autoKwNew',posr:'posrNew',negr:'negrNew',prod:'prodNew',brnd:'brandNew'};
+const GRP_MAP={comp:'competitors',type:'postTypes',hlpos:'hlPos',hlneg:'hlNeg',autokw:'autoKw',posr:'posReasons',negr:'negReasons',prod:'products',brnd:'brands',kwx:'excludeKw'};
+const ADD_INPUT={comp:'compNew',type:'typeNew',hlpos:'hlPosNew',hlneg:'hlNegNew',autokw:'autoKwNew',posr:'posrNew',negr:'negrNew',prod:'prodNew',brnd:'brandNew',kwx:'kwExcludeNew'};
 document.getElementById('settings').addEventListener('input', e=>{
   const t=e.target;
   if(t.classList.contains('set-text')){ setDraft[t.dataset.k]=t.value; updateSaveBar(); }
@@ -2626,6 +2631,7 @@ document.getElementById('settings').addEventListener('keydown', e=>{
   if(e.target.id==='posrNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="posr"]').click(); }
   if(e.target.id==='prodNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="prod"]').click(); }
   if(e.target.id==='brandNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="brnd"]').click(); }
+  if(e.target.id==='kwExcludeNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="kwx"]').click(); }
   if(e.target.id==='negrNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="negr"]').click(); }
   if(e.target.id==='hlPosNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="hlpos"]').click(); }
   if(e.target.id==='hlNegNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="hlneg"]').click(); }
@@ -5426,7 +5432,6 @@ function applyConfigAndSettings(){
   const f2=document.getElementById('footerLine2');  if(f2) f2.textContent=effText('footer2');
   applyTexts();
   const kw=document.getElementById('kwExclude');    if(kw) kw.value=(state.excludeKeywords||[]).join(', ');
-  const kw2=document.getElementById('kwExcludeSet'); if(kw2) kw2.value=(state.excludeKeywords||[]).join(', ');
   document.querySelectorAll('#noneSeg button').forEach(b=>
     b.classList.toggle('on', (b.dataset.none==='exclude')===state.excludeNone));
 }
