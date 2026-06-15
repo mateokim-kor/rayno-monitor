@@ -1205,7 +1205,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 전사메일강화';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 메일분석가관점';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2847,23 +2847,31 @@ function buildBrandEmail(){
   const L=[];
   L.push('수신: 전사');
   L.push('');
-  L.push('안녕하세요. 마케팅팀입니다.');
-  L.push(`${lab} 레이노 온라인 브랜드 모니터링 결과를 공유드립니다.`);
+  const verified=cur.filter(r=>r.vSent).length;
+  const classRate=M.total?(M.classified/M.total*100):0;
+  const verRate=M.total?(verified/M.total*100):0;
+  L.push('안녕하세요. 데이터 분석 담당입니다.');
+  L.push(`${lab} 레이노 온라인 브랜드 언급 데이터를 분석한 결과를 공유드립니다. 아래 수치는 수집된 표본을 기준으로 산출되었습니다.`);
   L.push('');
-
-  // 한눈에 보기(헤드라인)
+  L.push('■ 분석 개요');
+  L.push(`· 분석 기간: ${lab}`);
+  L.push(`· 표본 규모: ${M.total.toLocaleString()}건 (게시글 ${M.posts.toLocaleString()} · 댓글 ${M.cmts.toLocaleString()}) · 출처 카페 ${M.cafes}곳`);
+  L.push(`· 감성 분류 완료: ${M.classified.toLocaleString()}건 (${classRate.toFixed(0)}%) · 사람 검증 ${verified.toLocaleString()}건 (${verRate.toFixed(0)}%)`);
+  L.push('· 분석 방법: 감성 자동분류 후 일부 수기 검증 / 경쟁사·제품·사유는 본문 키워드 매칭 기반');
+  L.push('');
+  // 주요 관측(헤드라인)
   L.push('━━━━━━━━━━━━━━━━━━');
-  L.push('▶ 한눈에 보기');
+  L.push('▶ 주요 관측 (데이터 요약)');
   let head=`${lab} 레이노 언급 ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''}, 순감성 ${M.net>=0?'+':''}${M.net.toFixed(1)}%p`;
   if(P) head+= (M.net>=P.net? ` (전기 대비 ▲${(M.net-P.net).toFixed(1)}%p 개선)` : ` (전기 대비 ▼${(P.net-M.net).toFixed(1)}%p 하락)`);
   L.push('· '+head);
-  if(negR.length) L.push(`· 부정 요인 '${negR[0][0]}'${negR[1]?`·'${negR[1][0]}'`:''} 모니터링 필요`);
-  if(posR.length) L.push(`· 강점 '${posR[0][0]}'${posR[1]?`·'${posR[1][0]}'`:''} 지속`);
+  if(negR.length) L.push(`· 부정 언급의 주요 사유로 '${negR[0][0]}'${negR[1]?`, '${negR[1][0]}'`:''}이(가) 빈번하게 관측됨`);
+  if(posR.length) L.push(`· 긍정 언급은 '${posR[0][0]}'${posR[1]?`, '${posR[1][0]}'`:''} 요인에 집중`);
   L.push('━━━━━━━━━━━━━━━━━━');
   L.push('');
 
   // 핵심 지표
-  L.push(`■ 핵심 지표 (${lab}${P?' · 전기 대비':''})`);
+  L.push(`■ 정량 지표 (${lab}${P?' · 전기 대비':''})`);
   L.push(`· 총 언급량: ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''}  [게시글 ${M.posts.toLocaleString()} · 댓글 ${M.cmts.toLocaleString()}]`);
   L.push(`· 감성 분류: 긍정 ${M.pos.toLocaleString()} · 부정 ${M.neg.toLocaleString()} · 중립 ${M.neu.toLocaleString()} (분류 ${M.classified.toLocaleString()}건)`);
   L.push(`· 긍정률 ${M.posRate.toFixed(1)}%${P?pp(M.posRate,P.posRate):''} / 부정률 ${M.negRate.toFixed(1)}%${P?pp(M.negRate,P.negRate):''}`);
@@ -2923,7 +2931,7 @@ function buildBrandEmail(){
   }
 
   // 제언/액션
-  L.push('■ 제언 / 액션 아이템');
+  L.push('■ 데이터 기반 제언');
   const acts=[];
   if(P && M.negRate>P.negRate+1) acts.push(`부정률이 전기 대비 ${(M.negRate-P.negRate).toFixed(1)}%p 상승 → 원인 점검 및 대응`);
   if(negR.length) acts.push(`부정 요인 '${negR[0][0]}' 관련 응대 가이드/FAQ 보강 검토`);
@@ -2936,11 +2944,18 @@ function buildBrandEmail(){
   if(marketing){ L.push(''); L.push('[마케팅 제안]'); L.push(marketing); }
   L.push('');
 
-  L.push('자세한 내용은 브랜드 모니터링 대시보드를 참고해 주세요.');
+  L.push('■ 해석 시 유의사항');
+  if(M.total<30) L.push(`· 표본이 ${M.total}건으로 적어 비율 지표의 변동성이 큽니다. 추세 해석에 유의가 필요합니다.`);
+  if(classRate<80) L.push(`· 감성 미분류가 ${(100-classRate).toFixed(0)}% 존재하여, 분류 완료 건 기준 비율은 실제와 차이가 있을 수 있습니다.`);
+  L.push('· 감성 라벨에는 자동분류가 포함되어 오분류 가능성이 있으며, 사람 검증 비율이 높을수록 신뢰도가 높습니다.');
+  L.push('· SOV·경쟁사·제품 수치는 본문 키워드 동시 언급 기반의 근사치입니다.');
+  if(P) L.push('· 전기 대비(▲/▼)는 직전 동일 단위 기간과의 비교값입니다.');
+  L.push('');
+  L.push('원자료와 세부 분포(추이·카페별·키워드별)는 브랜드 모니터링 대시보드에서 확인하실 수 있습니다.');
   try{ L.push('대시보드: '+location.origin+location.pathname); }catch(e){}
   L.push('');
   L.push('감사합니다.');
-  L.push('마케팅팀 드림');
+  L.push('데이터 분석 담당 드림');
   return { subject, body:L.join('\n') };
 }
 function openMailModal(){
