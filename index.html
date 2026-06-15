@@ -1205,7 +1205,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 메일분석가관점';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 제품S9추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3003,7 +3003,8 @@ const RAYNO_PRODUCTS = {
   '스페셜': ['스페셜','special'],
   '모노카본': ['모노카본','tbtech'],
   'F95': ['f95'],
-  'F85': ['f85']
+  'F85': ['f85'],
+  'S9': ['s9']
 };
 function _prodHits(text){
   const t=(text||'').toLowerCase(); const out=[];
