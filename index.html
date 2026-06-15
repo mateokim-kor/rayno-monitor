@@ -924,7 +924,7 @@
 
     <div class="card full" style="margin-top:16px">
       <h3><span class="dot"></span>주요 키워드</h3>
-      <div class="cap">본문·댓글 빈출 단어 · <b>출현 횟수</b> 기준(한 글에 여러 번 나오면 중복 집계) · 제외 키워드 적용 <span class="seehint">· 단어 클릭 시 포함 글 목록</span></div>
+      <div class="cap">본문·댓글 빈출 단어 · <b>글 단위</b> 집계(한 글에 여러 번 나와도 1건 · 분류 요약과 동일 기준) · 제외 키워드 적용 <span class="seehint">· 단어 클릭 시 포함 글 목록</span></div>
       <div class="kw-list" id="kwList"></div>
     </div>
 
@@ -1220,7 +1220,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 제외KW칩버튼';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 키워드글단위브랜드대소문자';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2138,7 +2138,9 @@ function renderKeywords(rows){
   const wc={};
   rows.forEach(r=>{
     const txt=(r.body+' '+r.title);
-    (txt.match(/[가-힣]{2,6}/g)||[]).forEach(w=>{ if(!STOP.has(w)) wc[w]=(wc[w]||0)+1; });
+    const seen=new Set();
+    (txt.match(/[가-힣]{2,6}/g)||[]).forEach(w=>{ if(!STOP.has(w)) seen.add(w); });
+    seen.forEach(w=>{ wc[w]=(wc[w]||0)+1; });   // 글 단위: 한 글에 여러 번 나와도 1건
   });
   const top=Object.entries(wc).sort((a,b)=>b[1]-a[1]).slice(0,20);
   const el=document.getElementById('kwList');
@@ -3084,8 +3086,8 @@ function effBrandList(){
   return [own, ...(typeof effCompetitors==='function'?effCompetitors():[])].filter(Boolean);
 }
 function autoBrands(r){
-  const t=((r.title||'')+' '+(r.body||'')); const out=[];
-  effBrandList().forEach(b=>{ b=String(b).trim(); if(b && t.indexOf(b)>=0 && out.indexOf(b)<0) out.push(b); });
+  const t=((r.title||'')+' '+(r.body||'')).toLowerCase(); const out=[];
+  effBrandList().forEach(b=>{ b=String(b).trim(); if(b && t.indexOf(b.toLowerCase())>=0 && out.indexOf(b)<0) out.push(b); });
   return out;
 }
 function autoProducts(r){ return _prodHits((r.title||'')+' '+(r.body||'')); }
