@@ -915,6 +915,7 @@
       <h3><span class="dot"></span>카페별 요약</h3>
       <div class="cap">카페별 수집량 · 감성 · 긍정률 <span class="seehint">· 우측 ‘보기’로 원문 목록</span></div>
       <div class="tbl-wrap"><table id="cafeTbl"></table></div>
+      <div id="cafeMoreWrap" style="text-align:center;margin-top:10px"></div>
     </div>
 
     <div class="card full" style="margin-top:16px">
@@ -1193,8 +1194,7 @@ const CLASS_FIELDS = [
   {key:'posReason',  col:'긍정이유', label:'긍정 이유', kind:'multi', presetsFn:()=>effPosReasons(), ph:'칩 클릭 또는 직접 입력 (쉼표 구분)'},
   {key:'negReason',  col:'부정이유', label:'부정 이유', kind:'multi', presetsFn:()=>effNegReasons(), ph:'칩 클릭 또는 직접 입력 (쉼표 구분)'},
   {key:'brand',      col:'언급브랜드', label:'언급 브랜드', kind:'multi', presetsFn:()=>[effOwnBrand(), ...effCompetitors()], ph:'쉼표로 구분'},
-  {key:'product',    col:'언급제품', label:'언급 제품', kind:'multi', presetsFn:()=>Object.keys(RAYNO_PRODUCTS), ph:'쉼표로 구분'},
-  {key:'product',    col:'언급제품', label:'언급 제품', kind:'text',  ph:'예) 헬리오스, 프로'},
+  {key:'product',    col:'언급제품', label:'언급 제품', kind:'multi', presetsFn:()=>Object.keys(effProducts()), ph:'쉼표로 구분'},
   {key:'recommender',col:'추천주체', label:'추천 주체', kind:'pick', presets:CONFIG.recommenderPresets, ph:'예) 시공업체'},
   {key:'carModel',   col:'차종',    label:'차종',     kind:'text',  ph:'예) 그랜저, 모델3'},
 ];
@@ -1216,7 +1216,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 검색자동감지제외KW';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 제품설정자동집계카페더보기';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -1791,11 +1791,12 @@ function aggField(rows, key){
   });
   return Object.entries(m).sort((a,b)=>b[1]-a[1]);
 }
+function aggAuto(rows, fn){ const m={}; rows.forEach(r=>{ try{ fn(r).forEach(v=>{ m[v]=(m[v]||0)+1; }); }catch(e){} }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); }
 function renderClassSummary(rows){
   const el=document.getElementById('clsSummary');
   if(!el) return;
   el.innerHTML = CLASS_FIELDS.map(f=>{
-    const ent=aggField(rows, f.key).slice(0,14);
+    const ent=(f.key==='brand'?aggAuto(rows,autoBrands):f.key==='product'?aggAuto(rows,autoProducts):aggField(rows, f.key)).slice(0,14);
     const chips = ent.length
       ? `<div class="cls-chips">`+ent.map(([v,n])=>
           `<span class="cls-chip" data-key="${f.key}" data-val="${escapeHtml(v)}"><span class="cv">${escapeHtml(v)}</span><span class="cc">${n}</span></span>`
@@ -1807,7 +1808,7 @@ function renderClassSummary(rows){
     chip.addEventListener('click', ()=>{
       const key=chip.dataset.key, v=chip.dataset.val;
       const f=CLASS_FIELDS.find(x=>x.key===key);
-      const list=rows.filter(r=>(r[key]||'').split(',').map(s=>s.trim()).includes(v));
+      const list=(key==='brand')?rows.filter(r=>autoBrands(r).indexOf(v)>=0):(key==='product')?rows.filter(r=>autoProducts(r).indexOf(v)>=0):rows.filter(r=>(r[key]||'').split(',').map(s=>s.trim()).includes(v));
       openDetail(`${f?f.label:key} · <b style="color:var(--amber)">${escapeHtml(v)}</b>`, list,
         `'${v}'(으)로 분류된 글·댓글입니다`);
     });
@@ -2081,6 +2082,7 @@ function renderComp(rows){
   });
 }
 
+let _cafeExpanded=false;
 function renderCafe(rows){
   const m={};
   rows.forEach(r=>{
@@ -2092,11 +2094,12 @@ function renderCafe(rows){
   const ent=Object.entries(m).map(([c,v])=>{
     const cl=v.pos+v.neg+v.neu, rate=cl?v.pos/cl*100:0;
     return {c,...v,total:v.post+v.cmt,rate};
-  }).sort((a,b)=>b.total-a.total);
+  }).sort((a,b)=>b.post-a.post || b.total-a.total);
 
   const head=`<thead><tr><th>카페</th><th>게시글</th><th>댓글</th><th>합계</th>
     <th>긍정</th><th>부정</th><th>중립</th><th class="bar-cell">긍정률</th><th></th></tr></thead>`;
-  const body=ent.map(e=>`<tr>
+  const CAFE_LIMIT=10;
+  const body=ent.map((e,i)=>`<tr class="${i>=CAFE_LIMIT?'cafe-xrow':''}"${i>=CAFE_LIMIT&&!_cafeExpanded?' style="display:none"':''}>
     <td><b>${escapeHtml(e.c)}</b></td>
     <td class="num">${e.post}</td><td class="num">${e.cmt}</td><td class="num"><b>${e.total}</b></td>
     <td class="num"><span class="pill pos">${e.pos}</span></td>
@@ -2107,6 +2110,14 @@ function renderCafe(rows){
   </tr>`).join('');
   const tbl=document.getElementById('cafeTbl');
   tbl.innerHTML=head+'<tbody>'+body+'</tbody>';
+  const moreWrap=document.getElementById('cafeMoreWrap');
+  if(moreWrap){
+    if(ent.length>CAFE_LIMIT){
+      const lbl=()=>_cafeExpanded?'접기 ▲':('더보기 (+'+(ent.length-CAFE_LIMIT)+'개 카페) ▼');
+      moreWrap.innerHTML=`<button class="viewbtn" id="cafeMoreBtn">${lbl()}</button>`;
+      document.getElementById('cafeMoreBtn').addEventListener('click', function(){ _cafeExpanded=!_cafeExpanded; tbl.querySelectorAll('.cafe-xrow').forEach(tr=>{ tr.style.display=_cafeExpanded?'':'none'; }); this.textContent=lbl(); });
+    } else moreWrap.innerHTML='';
+  }
   tbl.querySelectorAll('button[data-cafe]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const c=btn.dataset.cafe;
@@ -2376,7 +2387,7 @@ const TEXT_KEYS=['headerTitle','headerSub','docTitle','footer1','footer2',
 function setDraftInit(){
   setDraft={ ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice(),
     hlPos:effHlPos().slice(), hlNeg:effHlNeg().slice(), autoKw:effAutoKw().slice(),
-    posReasons:effPosReasons().slice(), negReasons:effNegReasons().slice() };
+    posReasons:effPosReasons().slice(), negReasons:effNegReasons().slice(), products:effProductsList().slice() };
   TEXT_KEYS.forEach(k=>setDraft[k]=effText(k));
 }
 function setDirty(){
@@ -2387,8 +2398,8 @@ function setDirty(){
     c:(o.competitors||[]).map(x=>x.trim()).filter(Boolean),t:(o.postTypes||[]).map(x=>x.trim()).filter(Boolean),
     hp:(o.hlPos||[]).map(x=>x.trim()).filter(Boolean),hn:(o.hlNeg||[]).map(x=>x.trim()).filter(Boolean),
     ak:(o.autoKw||[]).map(x=>x.trim()).filter(Boolean),
-    pr:(o.posReasons||[]).map(x=>x.trim()).filter(Boolean),nr:(o.negReasons||[]).map(x=>x.trim()).filter(Boolean)});
-  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes(),hlPos:effHlPos(),hlNeg:effHlNeg(),autoKw:effAutoKw(),posReasons:effPosReasons(),negReasons:effNegReasons()};
+    pr:(o.posReasons||[]).map(x=>x.trim()).filter(Boolean),nr:(o.negReasons||[]).map(x=>x.trim()).filter(Boolean),pd:(o.products||[]).map(x=>x.trim()).filter(Boolean)});
+  const cur={ownBrand:effOwnBrand(),competitors:effCompetitors(),postTypes:effPostTypes(),hlPos:effHlPos(),hlNeg:effHlNeg(),autoKw:effAutoKw(),posReasons:effPosReasons(),negReasons:effNegReasons(),products:effProductsList()};
   TEXT_KEYS.forEach(k=>cur[k]=effText(k));
   return norm(setDraft)!==norm(cur);
 }
@@ -2487,6 +2498,12 @@ function renderSettings(){
      <div class="set-add"><input id="negrNew" placeholder="부정 이유 추가 (예: 기포/하자)"><button class="viewbtn" data-add="negr">＋ 추가</button></div>
    </div>
    <div class="card set-card" data-setcat="monitoring">
+     <h3><span class="dot"></span>언급 제품 키워드</h3>
+     <div class="cap">게시글·댓글에서 <b>자동 감지</b>할 제품명입니다. 등록한 키워드가 본문에 있으면 리포트의 <b>언급 제품</b>·제품별 분석에 자동 집계됩니다. (언급 <b>브랜드</b>는 위 <b>브랜드 설정</b>의 자사·경쟁사 목록을 사용합니다)</div>
+     <div class="set-list">${chipRow('prod',setDraft.products)}</div>
+     <div class="set-add"><input id="prodNew" placeholder="제품 추가 (예: 얼티넘, S9, 팬텀)"><button class="viewbtn" data-add="prod">＋ 추가</button></div>
+   </div>
+   <div class="card set-card" data-setcat="monitoring">
      <h3><span class="dot"></span>감성 하이라이트 단어</h3>
      <div class="cap">상세 보기에서 본문에 색칠되는 표현입니다. <b>긍정</b>은 노란 형광펜, <b>부정</b>은 빨간 형광펜으로 표시됩니다. 도메인에 맞는 표현을 자유롭게 추가/삭제하세요.</div>
      <div class="set-sub">긍정 표현</div>
@@ -2548,11 +2565,12 @@ function saveAllSettings(){
   const autoKeywords=[...new Set(setDraft.autoKw.map(s=>s.trim()).filter(Boolean))];
   const posReasons=[...new Set(setDraft.posReasons.map(s=>s.trim()).filter(Boolean))];
   const negReasons=[...new Set(setDraft.negReasons.map(s=>s.trim()).filter(Boolean))];
+  const products=[...new Set(setDraft.products.map(s=>s.trim()).filter(Boolean))];
   if(!types.length){ toast('게시글 유형은 최소 1개가 필요합니다.',true); return; }
   const textObj={...((STORE.config&&STORE.config.text)||{})};
   TEXT_KEYS.forEach(k=>{ const v=(setDraft[k]||'').trim(); textObj[k]= v || CONFIG.text[k]; });
   STORE.config = {...(STORE.config||{}),
-    text:textObj, hlPos, hlNeg, autoKeywords, posReasons, negReasons,
+    text:textObj, hlPos, hlNeg, autoKeywords, posReasons, negReasons, products,
     ownBrand:(setDraft.ownBrand.trim()||CONFIG.ownBrand), competitors:comps, postTypes:types };
   saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave();   // 설정은 즉시 반영(디바운스 대기 X)
   _typeUnionCache=null; _hlRe=null; setDraft=null;
@@ -2566,8 +2584,8 @@ function removeUploadBatch(bid){
   return before-store.rows.length;
 }
 let _replaceBatch=null;
-const GRP_MAP={comp:'competitors',type:'postTypes',hlpos:'hlPos',hlneg:'hlNeg',autokw:'autoKw',posr:'posReasons',negr:'negReasons'};
-const ADD_INPUT={comp:'compNew',type:'typeNew',hlpos:'hlPosNew',hlneg:'hlNegNew',autokw:'autoKwNew',posr:'posrNew',negr:'negrNew'};
+const GRP_MAP={comp:'competitors',type:'postTypes',hlpos:'hlPos',hlneg:'hlNeg',autokw:'autoKw',posr:'posReasons',negr:'negReasons',prod:'products'};
+const ADD_INPUT={comp:'compNew',type:'typeNew',hlpos:'hlPosNew',hlneg:'hlNegNew',autokw:'autoKwNew',posr:'posrNew',negr:'negrNew',prod:'prodNew'};
 document.getElementById('settings').addEventListener('input', e=>{
   const t=e.target;
   if(t.classList.contains('set-text')){ setDraft[t.dataset.k]=t.value; updateSaveBar(); }
@@ -2595,6 +2613,7 @@ document.getElementById('settings').addEventListener('keydown', e=>{
   if(e.target.id==='compNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="comp"]').click(); }
   if(e.target.id==='typeNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="type"]').click(); }
   if(e.target.id==='posrNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="posr"]').click(); }
+  if(e.target.id==='prodNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="prod"]').click(); }
   if(e.target.id==='negrNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="negr"]').click(); }
   if(e.target.id==='hlPosNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="hlpos"]').click(); }
   if(e.target.id==='hlNegNew' && e.key==='Enter'){ e.preventDefault(); document.querySelector('[data-add="hlneg"]').click(); }
@@ -3022,10 +3041,16 @@ const RAYNO_PRODUCTS = {
   'F85': ['f85'],
   'S9': ['s9']
 };
+function effProducts(){
+  const c=(STORE&&STORE.config&&STORE.config.products);
+  if(Array.isArray(c)&&c.length){ const m={}; c.forEach(k=>{ k=String(k).trim(); if(k) m[k]=[k]; }); return m; }
+  return RAYNO_PRODUCTS;
+}
+function effProductsList(){ const c=(STORE&&STORE.config&&STORE.config.products); return (Array.isArray(c)&&c.length)?c.slice():Object.keys(RAYNO_PRODUCTS); }
 function _prodHits(text){
-  const t=(text||'').toLowerCase(); const out=[];
-  for(const p in RAYNO_PRODUCTS){
-    const hit=RAYNO_PRODUCTS[p].some(a=>{
+  const t=(text||'').toLowerCase(); const out=[]; const PR=effProducts();
+  for(const p in PR){
+    const hit=PR[p].some(a=>{
       const al=a.toLowerCase();
       if(/[^\x00-\x7f]/.test(al)) return t.indexOf(al)>=0;           // 한글 → 부분일치
       return new RegExp('\\b'+al.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(t); // 영문/숫자 → 단어경계
