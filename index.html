@@ -1205,7 +1205,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 서브내비버튼수정';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 전사메일강화';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2815,50 +2815,130 @@ function printReport(){ if(typeof window!=='undefined' && window.print) window.p
 function buildBrandEmail(){
   const cur=rpRows(RP), M=rpMetrics(cur);
   const prevP=rpPrev(RP), P=prevP?rpMetrics(rpRows(prevP)):null;
-  const lab=rpLabel(RP), comps=effCompetitors();
+  const lab=rpLabel(RP), comps=effCompetitors(), own=effOwnBrand();
+  // 경쟁사 동시 언급
   const coTotal=cur.length, coRows={}; comps.forEach(b=>{ if(b)coRows[b]=0; });
   cur.forEach(r=>{ const t=(r.title||'')+' '+(r.body||''); comps.forEach(b=>{ if(b&&t.includes(b))coRows[b]++; }); });
   const coEnt=Object.entries(coRows).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const posR=rpTopValues(cur,'posReason',5), negR=rpTopValues(cur,'negReason',5);
-  const neg=cur.filter(r=>r.isPost && rsent(r)==='부정').map(r=>({r,d:normDate(r.date)})).filter(x=>x.d).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,5);
+  const cafeTop=rpTopValues(cur,'cafe',5);
+  // 주목 게시글(부정/긍정·최근)
+  const _recent=(sent,n)=>cur.filter(r=>r.isPost && rsent(r)===sent).map(r=>({r,d:normDate(r.date)})).filter(x=>x.d).sort((a,b)=>b.d.localeCompare(a.d)).slice(0,n);
+  const negPosts=_recent('부정',5), posPosts=_recent('긍정',3);
+  // 추세
+  let trend=[]; try{ trend=rpTrend(cur,RP)||[]; }catch(e){}
+  // SOV (브랜드 언급 비중)
+  let bc={}; try{ bc=rpBrandCounts(cur)||{}; }catch(e){}
+  const sovTotal=Object.values(bc).reduce((a,b)=>a+b,0);
+  const ownShare=sovTotal?((bc[own]||0)/sovTotal*100):0;
+  const compSov=Object.entries(bc).filter(e=>e[0]!==own&&e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  // 제품 TOP
+  let pEnt=[]; try{ const pst=productStats(cur); pEnt=Object.entries(pst).filter(e=>e[1].n>0).sort((a,b)=>b[1].n-a[1].n).slice(0,5); }catch(e){}
+  // 노트
   const gn=k=>((typeof getNote==='function'?getNote(k):'')||(repDrafts&&repDrafts[k])||'').trim();
   const _strip=s=>String(s||'').replace(/\*\*|==|\+\+|~~/g,'').replace(/`/g,'');
   const insight=_strip(gn('insight')), marketing=_strip(gn('marketing'));
-  const dl=(c,p)=> p==null||!p?'':(c>=p?` (▲ ${(((c-p)/p)*100).toFixed(0)}%)`:` (▼ ${(((p-c)/p)*100).toFixed(0)}%)`);
-  const subject=`[레이노 브랜드 모니터링] ${lab} 온라인 언급·감성 리포트`;
+  // 델타 헬퍼
+  const dl=(c,p)=> (p==null||!p)?'':(c>=p?` (▲${(((c-p)/p)*100).toFixed(0)}%)`:` (▼${(((p-c)/p)*100).toFixed(0)}%)`);
+  const pp=(c,p)=> (p==null)?'':((c-p)>=0?` (▲${(c-p).toFixed(1)}%p)`:` (▼${(p-c).toFixed(1)}%p)`);
+  const prate=o=>{ const cl=o.pos+o.neg+o.neu; return cl?Math.round(o.pos/cl*100):0; };
+
+  const subject=`[레이노 브랜드 모니터링] ${lab} 리포트 — 언급 ${M.total.toLocaleString()}건 · 순감성 ${M.net>=0?'+':''}${M.net.toFixed(1)}%p`;
   const L=[];
   L.push('수신: 전사');
   L.push('');
   L.push('안녕하세요. 마케팅팀입니다.');
-  L.push(`${lab} 기준 레이노 온라인 브랜드 모니터링 결과를 공유드립니다.`);
+  L.push(`${lab} 레이노 온라인 브랜드 모니터링 결과를 공유드립니다.`);
   L.push('');
-  L.push('■ 핵심 요약');
-  L.push(`· 총 언급량: ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''} (게시글 ${M.posts} · 댓글 ${M.cmts})`);
-  L.push(`· 긍정률 ${M.posRate.toFixed(1)}% / 부정률 ${M.negRate.toFixed(1)}% / 순감성 ${M.net>=0?'+':''}${M.net.toFixed(1)}%p`);
-  L.push(`· 활동 카페: ${M.cafes}곳`);
+
+  // 한눈에 보기(헤드라인)
+  L.push('━━━━━━━━━━━━━━━━━━');
+  L.push('▶ 한눈에 보기');
+  let head=`${lab} 레이노 언급 ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''}, 순감성 ${M.net>=0?'+':''}${M.net.toFixed(1)}%p`;
+  if(P) head+= (M.net>=P.net? ` (전기 대비 ▲${(M.net-P.net).toFixed(1)}%p 개선)` : ` (전기 대비 ▼${(P.net-M.net).toFixed(1)}%p 하락)`);
+  L.push('· '+head);
+  if(negR.length) L.push(`· 부정 요인 '${negR[0][0]}'${negR[1]?`·'${negR[1][0]}'`:''} 모니터링 필요`);
+  if(posR.length) L.push(`· 강점 '${posR[0][0]}'${posR[1]?`·'${posR[1][0]}'`:''} 지속`);
+  L.push('━━━━━━━━━━━━━━━━━━');
   L.push('');
+
+  // 핵심 지표
+  L.push(`■ 핵심 지표 (${lab}${P?' · 전기 대비':''})`);
+  L.push(`· 총 언급량: ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''}  [게시글 ${M.posts.toLocaleString()} · 댓글 ${M.cmts.toLocaleString()}]`);
+  L.push(`· 감성 분류: 긍정 ${M.pos.toLocaleString()} · 부정 ${M.neg.toLocaleString()} · 중립 ${M.neu.toLocaleString()} (분류 ${M.classified.toLocaleString()}건)`);
+  L.push(`· 긍정률 ${M.posRate.toFixed(1)}%${P?pp(M.posRate,P.posRate):''} / 부정률 ${M.negRate.toFixed(1)}%${P?pp(M.negRate,P.negRate):''}`);
+  L.push(`· 순감성: ${M.net>=0?'+':''}${M.net.toFixed(1)}%p${P?pp(M.net,P.net):''} · 활동 카페 ${M.cafes}곳`);
+  L.push('');
+
+  // 감성 추세
+  if(trend.length>=2){
+    L.push('■ 감성 추세 (긍정률 흐름)');
+    L.push('· '+trend.map(t=>`${t.label} ${t.posRate}%`).join('  →  '));
+    L.push('');
+  }
+
+  // SOV
+  if(sovTotal>0){
+    L.push('■ 브랜드 점유율(SOV) · 언급 비중');
+    L.push(`· 레이노: ${ownShare.toFixed(0)}% (${(bc[own]||0).toLocaleString()}건)`);
+    if(compSov.length) L.push('· 경쟁사: '+compSov.map(([b,c])=>`${b} ${(c/sovTotal*100).toFixed(0)}%`).join(' · '));
+    L.push('');
+  }
   if(coEnt.length){
     L.push('■ 경쟁사 동시 언급 (레이노 글에 함께 등장)');
     coEnt.forEach(([b,c])=>L.push(`· ${b}: ${c.toLocaleString()}건 (${coTotal?(c/coTotal*100).toFixed(0):0}%)`));
     L.push('');
   }
+
+  // 제품 TOP
+  if(pEnt.length){
+    L.push('■ 제품별 언급 TOP');
+    pEnt.forEach(([p,o])=>L.push(`· ${p}: ${o.n.toLocaleString()}건 (긍정률 ${prate(o)}% · 긍 ${o.pos}/부 ${o.neg})`));
+    L.push('');
+  }
+
+  // 감성 요인
   if(posR.length||negR.length){
     L.push('■ 주요 감성 요인');
-    if(posR.length) L.push(`· 긍정: ${posR.map(x=>x[0]).join(', ')}`);
-    if(negR.length) L.push(`· 부정: ${negR.map(x=>x[0]).join(', ')}`);
+    if(posR.length) L.push(`· 긍정: ${posR.map(x=>`${x[0]}(${x[1]})`).join(', ')}`);
+    if(negR.length) L.push(`· 부정: ${negR.map(x=>`${x[0]}(${x[1]})`).join(', ')}`);
     L.push('');
   }
-  if(neg.length){
-    L.push('■ 주목 게시글 (부정·최근)');
-    neg.forEach(x=>L.push(`· [${x.r.cafe||''}] ${(x.r.title||'(제목 없음)').slice(0,50)} (${x.d.replace(/-/g,'.')})`));
+
+  // 카페 TOP
+  if(cafeTop.length){
+    L.push('■ 활동 많은 카페 TOP');
+    cafeTop.forEach(([c,n])=>L.push(`· ${c}: ${n.toLocaleString()}건`));
     L.push('');
   }
-  L.push('■ 인사이트 / 제언');
-  if(insight) L.push(insight);
-  if(marketing){ if(insight)L.push(''); L.push(marketing); }
-  if(!insight && !marketing) L.push('· (리포트의 ‘핵심 인사이트/마케팅 제안’을 작성하면 이 영역에 자동 반영됩니다.)');
+
+  // 주목 게시글
+  if(negPosts.length||posPosts.length){
+    L.push('■ 주목 게시글');
+    if(negPosts.length){ L.push('[부정·최근]');
+      negPosts.forEach(x=>L.push(`· [${x.r.cafe||''}] ${(x.r.title||'(제목 없음)').slice(0,50)} (${x.d.replace(/-/g,'.')})`)); }
+    if(posPosts.length){ if(negPosts.length)L.push(''); L.push('[긍정·최근]');
+      posPosts.forEach(x=>L.push(`· [${x.r.cafe||''}] ${(x.r.title||'(제목 없음)').slice(0,50)} (${x.d.replace(/-/g,'.')})`)); }
+    L.push('');
+  }
+
+  // 제언/액션
+  L.push('■ 제언 / 액션 아이템');
+  const acts=[];
+  if(P && M.negRate>P.negRate+1) acts.push(`부정률이 전기 대비 ${(M.negRate-P.negRate).toFixed(1)}%p 상승 → 원인 점검 및 대응`);
+  if(negR.length) acts.push(`부정 요인 '${negR[0][0]}' 관련 응대 가이드/FAQ 보강 검토`);
+  if(coEnt.length) acts.push(`경쟁사 '${coEnt[0][0]}' 동시 언급 ${coEnt[0][1].toLocaleString()}건 → 비교 콘텐츠 대응`);
+  if(posR.length) acts.push(`강점 '${posR[0][0]}'을(를) 캠페인 메시지로 강화`);
+  if(pEnt.length){ const lowP=pEnt.slice().sort((a,b)=>prate(a[1])-prate(b[1]))[0]; if(lowP && prate(lowP[1])<50 && lowP[1].n>=3) acts.push(`제품 '${lowP[0]}' 긍정률 ${prate(lowP[1])}%로 낮음 → 후기/이슈 점검`); }
+  if(acts.length){ acts.forEach((a,i)=>L.push(`${i+1}. ${a}`)); }
+  else L.push('· 특이 리스크 없음 — 현 기조 유지');
+  if(insight){ L.push(''); L.push('[핵심 인사이트]'); L.push(insight); }
+  if(marketing){ L.push(''); L.push('[마케팅 제안]'); L.push(marketing); }
   L.push('');
+
   L.push('자세한 내용은 브랜드 모니터링 대시보드를 참고해 주세요.');
+  try{ L.push('대시보드: '+location.origin+location.pathname); }catch(e){}
+  L.push('');
   L.push('감사합니다.');
   L.push('마케팅팀 드림');
   return { subject, body:L.join('\n') };
