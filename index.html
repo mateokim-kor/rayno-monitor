@@ -1261,7 +1261,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 리포트제품통계버그수정';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 제품최장일치';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3196,16 +3196,32 @@ function effProducts(){
 }
 function effProductsList(){ const c=(STORE&&STORE.config&&STORE.config.products); return (Array.isArray(c)&&c.length)?c.slice():Object.keys(RAYNO_PRODUCTS); }
 function _prodHits(text){
-  const t=(text||'').toLowerCase(); const out=[]; const PR=effProducts();
-  for(const p in PR){
-    const hit=PR[p].some(a=>{
-      const al=a.toLowerCase();
-      if(/[^\x00-\x7f]/.test(al)) return t.indexOf(al)>=0;           // 한글 → 부분일치
-      return new RegExp('\\b'+al.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b').test(t); // 영문/숫자 → 단어경계
-    });
-    if(hit) out.push(p);
-  }
-  return out;
+  const t=(text||'').toLowerCase(); const PR=effProducts();
+  // (제품, 별칭) 목록을 별칭 길이 내림차순 — 가장 긴(구체적) 이름 우선
+  const entries=[];
+  for(const p in PR){ (PR[p]||[]).forEach(a=>{ const al=String(a).toLowerCase(); if(al) entries.push([p,al]); }); }
+  entries.sort((a,b)=>b[1].length-a[1].length);
+  const consumed=new Array(t.length).fill(false);
+  const overlaps=(pos,len)=>{ for(let i=pos;i<pos+len;i++){ if(consumed[i]) return true; } return false; };
+  const consume=(pos,len)=>{ for(let i=pos;i<pos+len;i++){ consumed[i]=true; } };
+  const found=new Set();
+  entries.forEach(([p,al])=>{
+    if(/[^\x00-\x7f]/.test(al)){                                  // 한글 포함 → 부분일치(단, 더 긴 이름이 차지한 구간은 제외)
+      let idx=0,pos;
+      while((pos=t.indexOf(al,idx))>=0){
+        if(!overlaps(pos,al.length)){ found.add(p); consume(pos,al.length); }
+        idx=pos+al.length;
+      }
+    } else {                                                       // 영문/숫자 → 단어경계
+      const re=new RegExp('\\b'+al.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g');
+      let m;
+      while((m=re.exec(t))!==null){
+        if(!overlaps(m.index,al.length)){ found.add(p); consume(m.index,al.length); }
+        if(re.lastIndex===m.index) re.lastIndex++;
+      }
+    }
+  });
+  return [...found];
 }
 function effBrandList(){
   const c=(STORE&&STORE.config&&STORE.config.brands);
