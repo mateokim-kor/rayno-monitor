@@ -177,6 +177,12 @@
   .cmodal-x:hover{background:var(--neg);color:#fff}
   .cmodal-card .crawl{margin-bottom:0}
   /* 다크모드 토글 스위치 (워크스페이스 줄 우측) */
+  .hdr-search{margin-left:auto;display:inline-flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line2);border-radius:980px;padding:7px 14px;min-width:230px;max-width:330px}
+  .hdr-search .hs-ico{font-size:13px;opacity:.65}
+  .hdr-search input{border:0;background:transparent;outline:none;color:var(--ink);font-family:var(--font);font-size:13px;width:100%}
+  .hdr-search input::placeholder{color:var(--ink3)}
+  #appSwitcher .theme-switch{margin-left:12px}
+  @media(max-width:640px){ .hdr-search{min-width:0;flex:1;max-width:none} }
   .theme-switch{display:inline-flex;align-items:center;gap:9px;margin-left:auto;background:var(--card);
     border:1px solid var(--line2);border-radius:980px;padding:8px 14px;cursor:pointer;
     font-family:var(--font);font-size:12.5px;font-weight:700;color:var(--ink2);transition:.15s}
@@ -782,6 +788,10 @@
     <button class="appsw-btn on" data-ws="cafe">📡 <span data-txt="tabCafe">온라인 모니터링</span></button>
     <button class="appsw-btn" data-ws="rayno">📊 <span data-txt="tabRayno">레이노 데이터</span></button>
     <button class="appsw-btn" data-ws="settings">⚙ <span data-txt="tabSettings">설정</span></button>
+    <div class="hdr-search">
+      <span class="hs-ico">🔍</span>
+      <input id="globalSearch" type="text" placeholder="게시글·댓글 검색 (예: 스트라)" autocomplete="off">
+    </div>
     <button id="themeToggle" class="theme-switch" type="button" role="switch" aria-checked="false" aria-label="다크모드 전환" title="라이트/다크 전환">
       <span class="ts-ico">🌙</span><span class="ts-label">다크모드</span>
       <span class="ts-track"><span class="ts-knob"></span></span>
@@ -1183,6 +1193,7 @@ const CLASS_FIELDS = [
   {key:'posReason',  col:'긍정이유', label:'긍정 이유', kind:'multi', presetsFn:()=>effPosReasons(), ph:'칩 클릭 또는 직접 입력 (쉼표 구분)'},
   {key:'negReason',  col:'부정이유', label:'부정 이유', kind:'multi', presetsFn:()=>effNegReasons(), ph:'칩 클릭 또는 직접 입력 (쉼표 구분)'},
   {key:'brand',      col:'언급브랜드', label:'언급 브랜드', kind:'multi', presetsFn:()=>[effOwnBrand(), ...effCompetitors()], ph:'쉼표로 구분'},
+  {key:'product',    col:'언급제품', label:'언급 제품', kind:'multi', presetsFn:()=>Object.keys(RAYNO_PRODUCTS), ph:'쉼표로 구분'},
   {key:'product',    col:'언급제품', label:'언급 제품', kind:'text',  ph:'예) 헬리오스, 프로'},
   {key:'recommender',col:'추천주체', label:'추천 주체', kind:'pick', presets:CONFIG.recommenderPresets, ph:'예) 시공업체'},
   {key:'carModel',   col:'차종',    label:'차종',     kind:'text',  ph:'예) 그랜저, 모델3'},
@@ -1205,7 +1216,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 제품S9추가';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 검색자동감지제외KW';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2492,6 +2503,11 @@ function renderSettings(){
      <div class="set-add"><input id="autoKwNew" placeholder="예: 카스페이스 본사 [구로점]입니다"><button class="viewbtn" data-add="autokw">＋ 추가</button></div>
      <div class="set-add" style="margin-top:6px"><button id="setApplyKw" class="viewbtn" style="background:var(--neu);color:#fff">🧹 지금 적용 (미검증 글에서 정리)</button></div>
    </div>
+   <div class="card set-card" data-setcat="monitoring">
+     <h3><span class="dot"></span>주요 키워드 제외</h3>
+     <div class="cap">대시보드 <b>주요 키워드</b>(빈출 단어) 분석에서 제외할 단어입니다. 브랜드명·인사말처럼 너무 흔한 단어를 빼면 의미 있는 키워드가 잘 보입니다. 쉼표로 구분해 입력하세요.</div>
+     <div class="set-add"><input id="kwExcludeSet" placeholder="예: 레이노, 틴팅, 안녕하세요, 입니다"></div>
+   </div>
    <div class="card set-card" data-setcat="data">
      <h3><span class="dot"></span>관리자 계정</h3>
      ${ _isMaster() ? `
@@ -3018,6 +3034,14 @@ function _prodHits(text){
   }
   return out;
 }
+function autoBrands(r){
+  const t=((r.title||'')+' '+(r.body||'')); const out=[];
+  const own=(typeof effOwnBrand==='function'?effOwnBrand():'');
+  if(own && t.indexOf(own)>=0) out.push(own);
+  (typeof effCompetitors==='function'?effCompetitors():[]).forEach(b=>{ if(b && t.indexOf(b)>=0 && out.indexOf(b)<0) out.push(b); });
+  return out;
+}
+function autoProducts(r){ return _prodHits((r.title||'')+' '+(r.body||'')); }
 function productStats(set){
   const st={}; Object.keys(RAYNO_PRODUCTS).forEach(p=>st[p]={n:0,pos:0,neg:0,neu:0});
   set.forEach(r=>{ const hits=_prodHits((r.title||'')+' '+(r.body||'')); if(!hits.length)return;
@@ -3392,12 +3416,19 @@ function updateVerifyHeader(){
 
 // 미저장(스테이징) 편집 보관: id -> {field:value}
 const pending = {};
-function effRow(r){ return pending[r.id] ? {...r, ...pending[r.id]} : r; }
+function effRow(r){
+  const base = pending[r.id] ? {...r, ...pending[r.id]} : {...r};
+  try{
+    if(!String(base.brand||'').trim()){ const ab=autoBrands(r); if(ab.length) base.brand=ab.join(', '); }
+    if(!String(base.product||'').trim()){ const ap=autoProducts(r); if(ap.length) base.product=ap.join(', '); }
+  }catch(e){}
+  return base;
+}
 function isVerifiedId(id){ const r=RAW.rows.find(x=>x.id===id); return r ? isVerified(r) : false; }
 
 // 추가 분류 필드 HTML (필요할 때만 생성)
 function classFieldsHTML(eff){
-  return CLASS_FIELDS.map(f=>{
+  return '<div style="font-size:11px;color:var(--ink3);margin:0 0 7px;line-height:1.5">🤖 <b>언급 브랜드·제품</b>은 본문에서 자동 감지되어 미리 선택됩니다. 필요 시 칩을 눌러 수정하세요.</div>'+CLASS_FIELDS.map(f=>{
     const val=escapeHtml(eff[f.key]||''); let chips='';
     if(f.kind==='multi'||f.kind==='pick'){
       const cv=(eff[f.key]||'').split(',').map(s=>s.trim()).filter(Boolean);
@@ -5354,6 +5385,7 @@ function applyConfigAndSettings(){
   const f2=document.getElementById('footerLine2');  if(f2) f2.textContent=effText('footer2');
   applyTexts();
   const kw=document.getElementById('kwExclude');    if(kw) kw.value=(state.excludeKeywords||[]).join(', ');
+  const kw2=document.getElementById('kwExcludeSet'); if(kw2) kw2.value=(state.excludeKeywords||[]).join(', ');
   document.querySelectorAll('#noneSeg button').forEach(b=>
     b.classList.toggle('on', (b.dataset.none==='exclude')===state.excludeNone));
 }
@@ -5523,6 +5555,25 @@ function toggleTheme(){
   let t='light'; try{ t = localStorage.getItem('rayno_theme') || 'light'; }catch(e){}
   _applyThemeAttr(t);
   const b=document.getElementById('themeToggle'); if(b) b.addEventListener('click', toggleTheme);
+(function(){
+  const gi=document.getElementById('globalSearch');
+  if(gi) gi.addEventListener('keydown', e=>{
+    if(e.key!=='Enter') return;
+    const kw=(gi.value||'').trim(); if(!kw) return;
+    if(typeof RAW==='undefined'||!RAW||!RAW.rows||!RAW.rows.length){ toast('먼저 데이터를 불러와 주세요.', true); return; }
+    const q=kw.toLowerCase();
+    const list=RAW.rows.filter(r=>(((r.title||'')+' '+(r.body||'')).toLowerCase().indexOf(q)>=0));
+    if(!list.length){ toast(`'${kw}' 검색 결과가 없습니다.`); return; }
+    openDetail(`🔍 검색 · <b style="color:var(--amber)">${escapeHtml(kw)}</b>`, list, `'${kw}'이(가) 포함된 게시글·댓글입니다`);
+  });
+})();
+document.addEventListener('input', e=>{
+  if(e.target && e.target.id==='kwExcludeSet'){
+    state.excludeKeywords=e.target.value.split(',').map(s=>s.trim()).filter(Boolean);
+    if(typeof saveSettings==='function') saveSettings({excludeKeywords:state.excludeKeywords});
+    const dk=document.getElementById('kwExclude'); if(dk) dk.value=e.target.value;
+  }
+});
 })();
 // ── 상단 도구·필터 접기 (기본 접힘, 한 줄 브리핑은 항상 표시) ──
 let _dashToolsOpen=false;
