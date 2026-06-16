@@ -1261,7 +1261,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 제품최장일치';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 여론표시정리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -1747,9 +1747,9 @@ function renderBrief(rows){
   else { signal='특별히 두드러지는 신호는 없습니다'; signalTxt='특이 신호 없음'; }
   const period=_activePeriodLabel();
   const l1=`📌 <b>${escapeHtml(period)}</b> · 누적 <b>${m.total.toLocaleString()}건</b> (게시글 ${m.posts.toLocaleString()} · 댓글 ${m.cmts.toLocaleString()})`;
-  const l2=`🗣 여론 ${stance} — 순감성 <b>${m.net>=0?'+':''}${m.net.toFixed(0)}%p</b> (긍정 ${m.posRate.toFixed(0)}% · 부정 ${m.negRate.toFixed(0)}%)`;
+  const l2=`🗣 여론 ${stance} (긍정 ${m.posRate.toFixed(0)}% · 부정 ${m.negRate.toFixed(0)}%)`;
   const l3=`🔎 ${signal}`;
-  _briefPlain=`[RAYNO 온라인 모니터링 요약]\n· ${period} · 누적 ${m.total.toLocaleString()}건 (게시글 ${m.posts}·댓글 ${m.cmts})\n· 여론 ${stanceTxt} — 순감성 ${m.net>=0?'+':''}${m.net.toFixed(0)}%p (긍정 ${m.posRate.toFixed(0)}% / 부정 ${m.negRate.toFixed(0)}%)\n· ${signalTxt}`;
+  _briefPlain=`[RAYNO 온라인 모니터링 요약]\n· ${period} · 누적 ${m.total.toLocaleString()}건 (게시글 ${m.posts}·댓글 ${m.cmts})\n· 여론 ${stanceTxt} (긍정 ${m.posRate.toFixed(0)}% / 부정 ${m.negRate.toFixed(0)}%)\n· ${signalTxt}`;
   const al=computeAlerts();
   let alertHtml='';
   if(al.enough){
@@ -1984,24 +1984,6 @@ function renderKPIs(rows){
 }
 
 // ── 차트 % 표기 플러그인 ──
-const sentCenterPlugin = {
-  id:'sentCenter',
-  afterDraw(chart){
-    if(!chart.canvas || chart.canvas.id!=='cSent') return;
-    const d=(chart.data.datasets[0]||{}).data||[]; const tot=d.reduce((a,b)=>a+(b||0),0);
-    if(!tot) return;
-    const net=Math.round(((d[0]||0)-(d[1]||0))/tot*100);
-    const ca=chart.chartArea; if(!ca) return;
-    const cx=(ca.left+ca.right)/2, cy=(ca.top+ca.bottom)/2;
-    const ctx=chart.ctx; ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillStyle=_ck().text; ctx.globalAlpha=.62; ctx.font="700 11px 'Pretendard',system-ui,sans-serif";
-    ctx.fillText('순감성', cx, cy-14); ctx.globalAlpha=1;
-    ctx.font="800 23px 'Pretendard',system-ui,sans-serif";
-    ctx.fillStyle = net>0?COLORS.pos : net<0?COLORS.neg : _ck().text;
-    ctx.fillText((net>0?'+':'')+net+'%p', cx, cy+9);
-    ctx.restore();
-  }
-};
 const pctDonutPlugin = {
   id:'pctDonut',
   afterDatasetsDraw(chart){
@@ -2045,8 +2027,8 @@ function renderSentiment(rows){
   makeChart('cSent',{
     type:'doughnut',
     data:{labels,datasets:[{data,backgroundColor:bg,borderColor:_ck().donut,borderWidth:3,offset:off}]},
-    plugins:[pctDonutPlugin, sentCenterPlugin],
-    options:{cutout:'66%',onClick:(e,el)=>{
+    plugins:[pctDonutPlugin],
+    options:{cutout:'60%',onClick:(e,el)=>{
         if(el.length){ const lab=labels[el[0].index];
           state.sentFilter=(state.sentFilter===lab)?null:lab; render(); }
       },
@@ -2896,7 +2878,7 @@ function autoInsightText(ctx){
   const {M,P,RP,OWN,coEnt,coTotal,bcEnt,asCnt,priceCnt,negR,posR,byNeg}=ctx;
   const L=[];
   const stance = M.net>=20?'++매우 우호적++':M.net>=5?'++대체로 긍정적++':M.net<=-20?'~~부정 우위(위험)~~':M.net<=-5?'~~다소 부정적~~':'중립적';
-  L.push(`📊 **여론 종합** — ${rpLabel(RP)} 동안 **${M.total.toLocaleString()}건**이 수집됐습니다. 순감성 ==${M.net>=0?'+':''}${M.net.toFixed(0)}%p== (긍정 ${M.posRate.toFixed(0)}% · 부정 ${M.negRate.toFixed(0)}%)로 여론은 ${stance}입니다.`);
+  L.push(`📊 **여론 종합** — ${rpLabel(RP)} 동안 **${M.total.toLocaleString()}건**이 수집됐습니다. 긍정 ${M.posRate.toFixed(0)}% · 부정 ${M.negRate.toFixed(0)}%로 여론은 ${stance}입니다.`);
   if(P){ const dv=P.total?Math.round((M.total/P.total-1)*100):0, dp=M.posRate-P.posRate;
     const tag=(dv>20&&dp>=0)?'++양·질 동반 개선 국면++ — 모멘텀을 키울 적기입니다.':(dv>20&&dp<0)?'~~노출↑·호감도↓~~ — 확산 전에 메시지 리스크를 잡아야 합니다.':(dp>=5)?'++호감도 뚜렷이 개선++.':(dp<=-5)?'~~호감도 하락~~ — 원인 점검이 필요합니다.':'큰 변동은 없습니다.';
     L.push(`📈 **모멘텀** — 직전 대비 언급량 ==${dv>=0?'+':''}${dv}%==, 긍정률 ==${dp>=0?'+':''}${dp.toFixed(0)}%p==. ${tag}`); }
@@ -2953,7 +2935,7 @@ function autoBrandText(c){
   if(c.P){ const dp=c.M.posRate-c.P.posRate;
     if(dp<=-5) L.push(`• ~~긍정률 하락 국면~~ — 메시지 톤·캠페인을 점검하고 우호 여론 회복 콘텐츠가 필요합니다.`);
     else if(dp>=5) L.push(`• ++긍정률 상승 모멘텀++ — 신제품·프로모션 메시지를 키울 적기입니다.`); }
-  L.push(`💡 **반짝이는 아이디어** — 분기마다 ‘**브랜드 헬스 지수**(순감성·긍정키워드·경쟁사 동시언급)’를 한 장으로 시각화해, 검색 여론의 추세와 비교 압력을 ++한눈에 보이는 그래프++로 경영진에 공유하세요.`);
+  L.push(`💡 **반짝이는 아이디어** — 분기마다 ‘**브랜드 헬스 지수**(긍정률·긍정키워드·경쟁사 동시언급)’를 한 장으로 시각화해, 검색 여론의 추세와 비교 압력을 ++한눈에 보이는 그래프++로 경영진에 공유하세요.`);
   return L.join('\n');
 }
 function autoQualityText(c){
@@ -3026,7 +3008,7 @@ function buildBrandEmail(){
   const pp=(c,p)=> (p==null)?'':((c-p)>=0?` (▲${(c-p).toFixed(1)}%p)`:` (▼${(p-c).toFixed(1)}%p)`);
   const prate=o=>{ const cl=o.pos+o.neg+o.neu; return cl?Math.round(o.pos/cl*100):0; };
 
-  const subject=`[레이노 브랜드 모니터링] ${lab} 리포트 — 언급 ${M.total.toLocaleString()}건 · 순감성 ${M.net>=0?'+':''}${M.net.toFixed(1)}%p`;
+  const subject=`[레이노 브랜드 모니터링] ${lab} 리포트 — 언급 ${M.total.toLocaleString()}건`;
   const L=[];
   L.push('수신: 전사');
   L.push('');
@@ -3045,8 +3027,7 @@ function buildBrandEmail(){
   // 주요 관측(헤드라인)
   L.push('━━━━━━━━━━━━━━━━━━');
   L.push('▶ 주요 관측 (데이터 요약)');
-  let head=`${lab} 레이노 언급 ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''}, 순감성 ${M.net>=0?'+':''}${M.net.toFixed(1)}%p`;
-  if(P) head+= (M.net>=P.net? ` (전기 대비 ▲${(M.net-P.net).toFixed(1)}%p 개선)` : ` (전기 대비 ▼${(P.net-M.net).toFixed(1)}%p 하락)`);
+  let head=`${lab} 레이노 언급 ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''}`;
   L.push('· '+head);
   if(negR.length) L.push(`· 부정 언급의 주요 사유로 '${negR[0][0]}'${negR[1]?`, '${negR[1][0]}'`:''}이(가) 빈번하게 관측됨`);
   if(posR.length) L.push(`· 긍정 언급은 '${posR[0][0]}'${posR[1]?`, '${posR[1][0]}'`:''} 요인에 집중`);
@@ -3058,7 +3039,7 @@ function buildBrandEmail(){
   L.push(`· 총 언급량: ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''}  [게시글 ${M.posts.toLocaleString()} · 댓글 ${M.cmts.toLocaleString()}]`);
   L.push(`· 감성 분류: 긍정 ${M.pos.toLocaleString()} · 부정 ${M.neg.toLocaleString()} · 중립 ${M.neu.toLocaleString()} (분류 ${M.classified.toLocaleString()}건)`);
   L.push(`· 긍정률 ${M.posRate.toFixed(1)}%${P?pp(M.posRate,P.posRate):''} / 부정률 ${M.negRate.toFixed(1)}%${P?pp(M.negRate,P.negRate):''}`);
-  L.push(`· 순감성: ${M.net>=0?'+':''}${M.net.toFixed(1)}%p${P?pp(M.net,P.net):''} · 활동 카페 ${M.cafes}곳`);
+  L.push(`· 활동 카페 ${M.cafes}곳`);
   L.push('');
 
   // 감성 추세
@@ -3302,7 +3283,7 @@ function _renderReportImpl(){
        <div class="rk"><div class="rk-l">총 언급량</div><div class="rk-v">${M.total.toLocaleString()} ${volDelta}</div><div class="rk-m">게시글 ${M.posts} · 댓글 ${M.cmts}</div></div>
        <div class="rk"><div class="rk-l">긍정률</div><div class="rk-v" style="color:var(--pos)">${M.posRate.toFixed(1)}% ${prDelta}</div><div class="rk-m">분류 ${M.classified}건 기준</div></div>
        <div class="rk"><div class="rk-l">부정률</div><div class="rk-v" style="color:var(--neg)">${M.negRate.toFixed(1)}%</div><div class="rk-m">부정 ${M.neg}건</div></div>
-       <div class="rk"><div class="rk-l">순감성(긍정−부정)</div><div class="rk-v" style="color:${M.net>=0?'var(--pos)':'var(--neg)'}">${M.net>=0?'+':''}${M.net.toFixed(1)}%p</div><div class="rk-m">활동 카페 ${M.cafes}곳</div></div>
+       <div class="rk"><div class="rk-l">활동 카페</div><div class="rk-v">${M.cafes}곳</div><div class="rk-m">글이 올라온 카페 수</div></div>
      </div>
      <div class="rep-sentbar">
        <span class="sb pos" style="width:${M.classified?M.pos/M.classified*100:0}%">${M.pos?'긍정 '+M.pos:''}</span>
