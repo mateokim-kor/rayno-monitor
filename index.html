@@ -382,12 +382,19 @@
   .set-add input:focus{border-color:var(--amber)}
   .set-actions{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:14px}
   .set-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-  .wv-frow{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-  .wv-frow .wv-flbl{font-size:12.5px;font-weight:700;color:var(--ink2);padding-top:7px;white-space:nowrap}
-  .wv-fchips{display:flex;flex-wrap:wrap;gap:7px;flex:1}
-  .wv-fchip{display:inline-flex;align-items:center;padding:6px 13px;border-radius:980px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;transition:.12s;font-family:var(--font)}
-  .wv-fchip:hover{border-color:var(--amber);color:var(--amber)}
+  .wv-frow{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+  .wv-frow .wv-flbl{display:block;font-size:13px;font-weight:800;color:var(--ink);margin-bottom:2px}
+  .wv-fhint{font-size:11.5px;color:var(--ink3);margin-bottom:10px}
+  .wv-fhint b{color:var(--amber)}
+  .wv-fchips{display:flex;flex-wrap:wrap;gap:8px}
+  .wv-fchip{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:980px;border:1px solid var(--line2);background:var(--card);color:var(--ink);font-size:13px;font-weight:700;cursor:pointer;transition:.12s;font-family:var(--font)}
+  .wv-fchip small{font-size:11px;font-weight:600;opacity:.55;font-variant-numeric:tabular-nums}
+  .wv-fchip:hover{border-color:var(--amber)}
   .wv-fchip.on{background:var(--amber);border-color:var(--amber);color:#fff}
+  .wv-fchip.on small{opacity:.85;color:#fff}
+  .wv-fall{background:var(--bg2)}
+  .wv-fmore{display:inline-flex;align-items:center;padding:7px 14px;border-radius:980px;border:1px dashed var(--line2);background:transparent;color:var(--ink2);font-size:12px;font-weight:700;cursor:pointer;transition:.12s}
+  .wv-fmore:hover{border-color:var(--amber);color:var(--amber)}
   #settings{column-count:2;column-gap:16px}
   #settings .set-card{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin:0 0 16px;width:100%}
   #settings .set-savebar{column-span:all;-webkit-column-span:all;margin-bottom:14px}
@@ -1267,7 +1274,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 보증서제품복수선택';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 보증서제품묶음더보기';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4430,7 +4437,9 @@ function warrRangeRecs(){ const ex=warrExcludedSet(); let recs=(WARR.rows||[]).f
   return recs; }
 function warrApplyBranch(recs){ const bc=warrBranchCol(); return (bc&&WV.branch!=='전체')?recs.filter(r=>(r[bc]||'')===WV.branch):recs; }
 function warrFrontCol(){ const c=WARR.columns||[]; return c.find(x=>/시공내역.*전면/.test(x))||null; }
-function warrApplyFront(recs){ const fc=warrFrontCol(); if(!fc||!WV.fronts.length)return recs; const sel=new Set(WV.fronts); return recs.filter(r=>sel.has(warrLabelOf(fc,(r[fc]||'').trim()))); }
+function warrFrontBase(label){ return String(label||'').replace(/\s*\d+\s*%\s*$/,'').trim(); }   // '얼티넘XP 30%' → '얼티넘XP' (농도 묶기)
+let _warrFrontExpand=false;
+function warrApplyFront(recs){ const fc=warrFrontCol(); if(!fc||!WV.fronts.length)return recs; const sel=new Set(WV.fronts); return recs.filter(r=>sel.has(warrFrontBase(warrLabelOf(fc,(r[fc]||'').trim())))); }
 function warrTrend(recs){
   const map={};
   recs.forEach(r=>{ const d=warrDateStr(r); if(!d)return; let key,label;
@@ -4458,17 +4467,22 @@ function renderWarranty(){
   const recs=warrApplyBranch(recsProd);
   const TOPN=10;
   const fc=warrFrontCol();
-  if(fc && WV.fronts.length){ const _valid=new Set(recsRange.map(r=>warrLabelOf(fc,(r[fc]||'').trim()))); WV.fronts=WV.fronts.filter(v=>_valid.has(v)); }
+  if(fc && WV.fronts.length){ const _valid=new Set(recsRange.map(r=>warrFrontBase(warrLabelOf(fc,(r[fc]||'').trim())))); WV.fronts=WV.fronts.filter(v=>_valid.has(v)); }
   const granBtn=(g,t)=>`<button data-g="${g}" class="${WV.gran===g?'on':''}">${t}</button>`;
   const branchOpts = bc ? (()=>{ const m={}; recsProd.forEach(r=>{const v=(r[bc]||'').trim(); if(v)m[v]=(m[v]||0)+1;});
       const ent=Object.entries(m).sort((a,b)=>b[1]-a[1]);
       return `<option value="전체" ${WV.branch==='전체'?'selected':''}>전체 지부 (${recsProd.length.toLocaleString()})</option>`+
         ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.branch===v?'selected':''}>${escapeHtml(v)} (${c.toLocaleString()})</option>`).join(''); })() : '';
-  const frontChips = fc ? (()=>{ const m={}; recsRange.forEach(r=>{const raw=(r[fc]||'').trim(); if(!raw)return; const v=warrLabelOf(fc,raw); m[v]=(m[v]||0)+1;});
-      const ent=Object.entries(m).sort((a,b)=>b[1]-a[1]);
-      return `<span class="wv-fchip ${WV.fronts.length===0?'on':''}" data-front="__all">전체 (${recsRange.length.toLocaleString()})</span>`+
-        ent.map(([v,c])=>`<span class="wv-fchip ${WV.fronts.includes(v)?'on':''}" data-front="${escapeHtml(v)}">${escapeHtml(v)} (${c.toLocaleString()})</span>`).join(''); })() : '';
-  const frontRow = fc ? `<div class="wv-frow"><span class="wv-flbl">전면 제품 <small style="color:var(--ink3);font-weight:500">· 복수 선택 가능</small></span><div class="wv-fchips" id="wvFronts">${frontChips}</div></div>` : '';
+  const frontChips = fc ? (()=>{
+      const m={}; recsRange.forEach(r=>{const raw=(r[fc]||'').trim(); if(!raw)return; const b=warrFrontBase(warrLabelOf(fc,raw)); if(!b)return; m[b]=(m[b]||0)+1;});
+      const selSet=new Set(WV.fronts);
+      const ent=Object.entries(m).sort((a,b)=>(selSet.has(b[0])?1:0)-(selSet.has(a[0])?1:0) || b[1]-a[1]);
+      const LIM=14, shown=_warrFrontExpand?ent:ent.slice(0,LIM);
+      const allChip=`<span class="wv-fchip wv-fall ${WV.fronts.length===0?'on':''}" data-front="__all">전체 (${recsRange.length.toLocaleString()})</span>`;
+      const chips=shown.map(([v,c])=>`<span class="wv-fchip ${selSet.has(v)?'on':''}" data-front="${escapeHtml(v)}">${escapeHtml(v)}<small>${c.toLocaleString()}</small></span>`).join('');
+      const more=ent.length>LIM?`<span class="wv-fmore" data-fexpand="1">${_warrFrontExpand?'접기 ▲':('+'+(ent.length-LIM)+'개 더보기 ▼')}</span>`:'';
+      return allChip+chips+more; })() : '';
+  const frontRow = fc ? `<div class="wv-frow"><span class="wv-flbl">전면 제품</span><div class="wv-fhint">제품을 누르면 선택돼요. <b>여러 개</b> 누르면 모두 포함되고, 다시 누르면 해제됩니다.</div><div class="wv-fchips" id="wvFronts">${frontChips}</div></div>` : '';
   const allMonths=[...new Set(all.map(r=>warrDateStr(r).slice(0,7)).filter(s=>/^\d{4}-\d{2}$/.test(s)))].sort().reverse().slice(0,12);
   const monthChip=ym=>{ const r=monthRange(ym); const on=(WV.scope==='range'&&WV.from===r.from&&WV.to===r.to); const a=ym.split('-'); return `<span class="mchip ${on?'on':''}" data-ym="${ym}">${a[0]}년 ${+a[1]}월</span>`; };
   const monthChips=allMonths.length?`<div class="mchips"><span class="mchips-lbl">월 바로가기</span>${allMonths.map(monthChip).join('')}<span class="mchip ${WV.scope==='all'?'on':''}" data-ym="__all">전체</span></div>`:'';
@@ -5503,6 +5517,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
   if(e.target.id==='wvClearBranch'){ WV.branch='전체'; renderWarranty(); return; }
   if(e.target.id==='wvClearFront'){ WV.fronts=[]; renderWarranty(); return; }
+  if(e.target.closest('[data-fexpand]')){ _warrFrontExpand=!_warrFrontExpand; renderWarranty(); return; }
   { const _fchip=e.target.closest('.wv-fchip'); if(_fchip){ const v=_fchip.dataset.front; if(v==='__all'){ WV.fronts=[]; } else { const i=WV.fronts.indexOf(v); if(i>=0) WV.fronts.splice(i,1); else WV.fronts.push(v); } renderWarranty(); return; } }
   const exb=e.target.closest('.warr-exclude');
   if(exb){ const cfg=ensureWarrCfg(); const k=exb.dataset.key; if(!cfg.excluded.includes(k)) cfg.excluded.push(k);
