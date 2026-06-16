@@ -382,6 +382,12 @@
   .set-add input:focus{border-color:var(--amber)}
   .set-actions{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:14px}
   .set-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .wv-frow{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .wv-frow .wv-flbl{font-size:12.5px;font-weight:700;color:var(--ink2);padding-top:7px;white-space:nowrap}
+  .wv-fchips{display:flex;flex-wrap:wrap;gap:7px;flex:1}
+  .wv-fchip{display:inline-flex;align-items:center;padding:6px 13px;border-radius:980px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12.5px;font-weight:600;cursor:pointer;transition:.12s;font-family:var(--font)}
+  .wv-fchip:hover{border-color:var(--amber);color:var(--amber)}
+  .wv-fchip.on{background:var(--amber);border-color:var(--amber);color:#fff}
   #settings{column-count:2;column-gap:16px}
   #settings .set-card{break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;margin:0 0 16px;width:100%}
   #settings .set-savebar{column-span:all;-webkit-column-span:all;margin-bottom:14px}
@@ -1261,7 +1267,7 @@ const SUPA = {
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
 };
-const BUILD = '2026-06-11 · 여론표시정리';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 보증서제품복수선택';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4406,7 +4412,7 @@ function autoSuffix(raw){ const p=String(raw).split('-'); return p.length>1?p[p.
 function warrLabelOf(col,raw){ const lm=(WARR.config&&WARR.config.labelMap&&WARR.config.labelMap[col])||{}; return (lm[raw]!=null&&lm[raw]!=='')?lm[raw]:raw; }
 function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(a[0],a[1],0).getDate(); return {from:`${ym}-01`, to:`${ym}-${String(last).padStart(2,'0')}`}; }
 // 품질보증서 뷰 상태: 집계 단위 + 기간 + 지부 필터
-const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', front:'전체', showExcluded:false, _min:'', _max:'' };
+const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, _min:'', _max:'' };
 function weekKey(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d; const off=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-off);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
 function warrBranchCol(){ const c=WARR.columns||[]; return c.includes('담당지부')?'담당지부':(c.includes('대리점구분')?'대리점구분':null); }
@@ -4424,7 +4430,7 @@ function warrRangeRecs(){ const ex=warrExcludedSet(); let recs=(WARR.rows||[]).f
   return recs; }
 function warrApplyBranch(recs){ const bc=warrBranchCol(); return (bc&&WV.branch!=='전체')?recs.filter(r=>(r[bc]||'')===WV.branch):recs; }
 function warrFrontCol(){ const c=WARR.columns||[]; return c.find(x=>/시공내역.*전면/.test(x))||null; }
-function warrApplyFront(recs){ const fc=warrFrontCol(); if(!fc||WV.front==='전체')return recs; return recs.filter(r=>warrLabelOf(fc,(r[fc]||'').trim())===WV.front); }
+function warrApplyFront(recs){ const fc=warrFrontCol(); if(!fc||!WV.fronts.length)return recs; const sel=new Set(WV.fronts); return recs.filter(r=>sel.has(warrLabelOf(fc,(r[fc]||'').trim()))); }
 function warrTrend(recs){
   const map={};
   recs.forEach(r=>{ const d=warrDateStr(r); if(!d)return; let key,label;
@@ -4452,16 +4458,17 @@ function renderWarranty(){
   const recs=warrApplyBranch(recsProd);
   const TOPN=10;
   const fc=warrFrontCol();
-  if(fc && WV.front!=='전체' && !recsRange.some(r=>warrLabelOf(fc,(r[fc]||'').trim())===WV.front)) WV.front='전체';
+  if(fc && WV.fronts.length){ const _valid=new Set(recsRange.map(r=>warrLabelOf(fc,(r[fc]||'').trim()))); WV.fronts=WV.fronts.filter(v=>_valid.has(v)); }
   const granBtn=(g,t)=>`<button data-g="${g}" class="${WV.gran===g?'on':''}">${t}</button>`;
   const branchOpts = bc ? (()=>{ const m={}; recsProd.forEach(r=>{const v=(r[bc]||'').trim(); if(v)m[v]=(m[v]||0)+1;});
       const ent=Object.entries(m).sort((a,b)=>b[1]-a[1]);
       return `<option value="전체" ${WV.branch==='전체'?'selected':''}>전체 지부 (${recsProd.length.toLocaleString()})</option>`+
         ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.branch===v?'selected':''}>${escapeHtml(v)} (${c.toLocaleString()})</option>`).join(''); })() : '';
-  const frontOpts = fc ? (()=>{ const m={}; recsRange.forEach(r=>{const raw=(r[fc]||'').trim(); if(!raw)return; const v=warrLabelOf(fc,raw); m[v]=(m[v]||0)+1;});
+  const frontChips = fc ? (()=>{ const m={}; recsRange.forEach(r=>{const raw=(r[fc]||'').trim(); if(!raw)return; const v=warrLabelOf(fc,raw); m[v]=(m[v]||0)+1;});
       const ent=Object.entries(m).sort((a,b)=>b[1]-a[1]);
-      return `<option value="전체" ${WV.front==='전체'?'selected':''}>전체 제품 (${recsRange.length.toLocaleString()})</option>`+
-        ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.front===v?'selected':''}>${escapeHtml(v)} (${c.toLocaleString()})</option>`).join(''); })() : '';
+      return `<span class="wv-fchip ${WV.fronts.length===0?'on':''}" data-front="__all">전체 (${recsRange.length.toLocaleString()})</span>`+
+        ent.map(([v,c])=>`<span class="wv-fchip ${WV.fronts.includes(v)?'on':''}" data-front="${escapeHtml(v)}">${escapeHtml(v)} (${c.toLocaleString()})</span>`).join(''); })() : '';
+  const frontRow = fc ? `<div class="wv-frow"><span class="wv-flbl">전면 제품 <small style="color:var(--ink3);font-weight:500">· 복수 선택 가능</small></span><div class="wv-fchips" id="wvFronts">${frontChips}</div></div>` : '';
   const allMonths=[...new Set(all.map(r=>warrDateStr(r).slice(0,7)).filter(s=>/^\d{4}-\d{2}$/.test(s)))].sort().reverse().slice(0,12);
   const monthChip=ym=>{ const r=monthRange(ym); const on=(WV.scope==='range'&&WV.from===r.from&&WV.to===r.to); const a=ym.split('-'); return `<span class="mchip ${on?'on':''}" data-ym="${ym}">${a[0]}년 ${+a[1]}월</span>`; };
   const monthChips=allMonths.length?`<div class="mchips"><span class="mchips-lbl">월 바로가기</span>${allMonths.map(monthChip).join('')}<span class="mchip ${WV.scope==='all'?'on':''}" data-ym="__all">전체</span></div>`:'';
@@ -4469,7 +4476,7 @@ function renderWarranty(){
     <div class="card">
       <div class="rep-head-top">
         <div><h3 style="margin:0"><span class="dot"></span>기간 · 단위 · 지부</h3>
-          <div class="cap">집계 단위·기간을 고르고, 전면 제품/지부를 선택해 좁혀 볼 수 있습니다. (제품을 고르면 ‘담당지부 구성’이 그 제품 기준으로 바뀌어 어느 지부가 가장 많이 발급했는지 보입니다)</div></div>
+          <div class="cap">집계 단위·기간을 고르고, 전면 제품(여러 개 선택 가능)·지부로 좁혀 볼 수 있습니다. (제품을 고르면 ‘담당지부 구성’이 선택한 제품 기준으로 바뀌어 어느 지부가 가장 많이 발급했는지 보입니다)</div></div>
         <div class="rep-period">
           <div class="seg" id="wvGran">${granBtn('day','일별')}${granBtn('week','주별')}${granBtn('month','월별')}</div>
           <div class="seg" id="wvScope"><button data-s="all" class="${WV.scope==='all'?'on':''}">전체기간</button><button data-s="range" class="${WV.scope==='range'?'on':''}">기간지정</button></div>
@@ -4478,11 +4485,11 @@ function renderWarranty(){
             <span class="dt-tilde">~</span>
             <input type="date" class="dt-input" id="wvTo" value="${WV.to||maxD}" min="${minD}" max="${maxD}"></span>
           ${bc?`<select class="dt-select" id="wvBranch">${branchOpts}</select>`:''}
-          ${fc?`<select class="dt-select" id="wvFront" title="시공내역(전면) 제품">${frontOpts}</select>`:''}
         </div>
       </div>
+      ${frontRow}
       ${monthChips}
-      <div class="rep-badge">단위 <b>${WV.gran==='day'?'일별':WV.gran==='week'?'주별':'월별'}</b> · 기간 <b>${WV.scope==='range'?`${WV.from||minD} ~ ${WV.to||maxD}`:'전체'}</b>${fc?` · 전면제품 <b>${escapeHtml(WV.front)}</b>`:''} · 지부 <b>${escapeHtml(WV.branch)}</b> · <b>${recs.length.toLocaleString()}</b>건${(()=>{const bad=all.filter(r=>!warrDateStr(r)).length; return bad?` · <span style="color:var(--neg)">기준 날짜(${escapeHtml(cfg.dateCol||'-')}) 인식 안 됨 <b>${bad.toLocaleString()}</b>건</span>`:'';})()}${WV.front!=='전체'?` · <span id="wvClearFront" style="cursor:pointer;color:var(--amber);font-weight:800">제품 필터 해제 ✕</span>`:''}${WV.branch!=='전체'?` · <span id="wvClearBranch" style="cursor:pointer;color:var(--amber);font-weight:800">지부 필터 해제 ✕</span>`:''}</div>
+      <div class="rep-badge">단위 <b>${WV.gran==='day'?'일별':WV.gran==='week'?'주별':'월별'}</b> · 기간 <b>${WV.scope==='range'?`${WV.from||minD} ~ ${WV.to||maxD}`:'전체'}</b>${fc&&WV.fronts.length?` · 제품 <b>${WV.fronts.length===1?escapeHtml(WV.fronts[0]):WV.fronts.length+'개 선택'}</b>`:''} · 지부 <b>${escapeHtml(WV.branch)}</b> · <b>${recs.length.toLocaleString()}</b>건${(()=>{const bad=all.filter(r=>!warrDateStr(r)).length; return bad?` · <span style="color:var(--neg)">기준 날짜(${escapeHtml(cfg.dateCol||'-')}) 인식 안 됨 <b>${bad.toLocaleString()}</b>건</span>`:'';})()}${WV.fronts.length?` · <span id="wvClearFront" style="cursor:pointer;color:var(--amber);font-weight:800">제품 필터 해제 ✕</span>`:''}${WV.branch!=='전체'?` · <span id="wvClearBranch" style="cursor:pointer;color:var(--amber);font-weight:800">지부 필터 해제 ✕</span>`:''}</div>
     </div>`;
   const distinct=(set,col)=>{ const s=new Set(); set.forEach(r=>{const v=(r[col]||'').trim(); if(v)s.add(v);}); return s.size; };
   const tr=warrTrend(recs); const maxT=Math.max(1,...tr.rows.map(x=>x.n));
@@ -5495,7 +5502,8 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const sb=e.target.closest('#wvScope button'); if(sb){ WV.scope=sb.dataset.s; if(WV.scope==='range'){ if(!WV.from)WV.from=WV._min; if(!WV.to)WV.to=WV._max; } renderWarranty(); return; }
   const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
   if(e.target.id==='wvClearBranch'){ WV.branch='전체'; renderWarranty(); return; }
-  if(e.target.id==='wvClearFront'){ WV.front='전체'; renderWarranty(); return; }
+  if(e.target.id==='wvClearFront'){ WV.fronts=[]; renderWarranty(); return; }
+  { const _fchip=e.target.closest('.wv-fchip'); if(_fchip){ const v=_fchip.dataset.front; if(v==='__all'){ WV.fronts=[]; } else { const i=WV.fronts.indexOf(v); if(i>=0) WV.fronts.splice(i,1); else WV.fronts.push(v); } renderWarranty(); return; } }
   const exb=e.target.closest('.warr-exclude');
   if(exb){ const cfg=ensureWarrCfg(); const k=exb.dataset.key; if(!cfg.excluded.includes(k)) cfg.excluded.push(k);
     await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty(); toast('1건을 집계에서 제외했습니다'); return; }
@@ -5545,7 +5553,6 @@ document.getElementById('raynoApp').addEventListener('keydown', e=>{
 document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='warrLabelSel'){ warrLabelCol=e.target.value; renderWarranty(); return; }
   if(e.target.id==='wvBranch'){ WV.branch=e.target.value; renderWarranty(); }
-  if(e.target.id==='wvFront'){ WV.front=e.target.value; renderWarranty(); }
   if(e.target.id==='wvFrom'){ WV.from=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.to=WV.from; renderWarranty(); }
   if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; renderWarranty(); }
   if(e.target.id==='wrAnchor'){ WR.anchor=e.target.value; renderWarrReport(); }
