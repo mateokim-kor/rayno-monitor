@@ -1375,7 +1375,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 검증학습현황';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 카페합계정렬';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2254,7 +2254,7 @@ function renderCafe(rows){
   const ent=Object.entries(m).map(([c,v])=>{
     const cl=v.pos+v.neg+v.neu, rate=cl?v.pos/cl*100:0;
     return {c,...v,total:v.post+v.cmt,rate};
-  }).sort((a,b)=>b.post-a.post || b.total-a.total);
+  }).sort((a,b)=>b.total-a.total || b.post-a.post);
 
   const head=`<thead><tr><th>카페</th><th>게시글</th><th>댓글</th><th>합계</th>
     <th>긍정</th><th>부정</th><th>중립</th><th class="bar-cell">긍정률</th><th></th></tr></thead>`;
