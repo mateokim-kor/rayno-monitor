@@ -382,6 +382,29 @@
   .set-add input:focus{border-color:var(--amber)}
   .set-actions{display:flex;align-items:center;gap:10px;border-top:1px solid var(--line);padding-top:14px}
 
+
+  .pm-head-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pm-vtoggle{display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+  .pm-vt{padding:7px 14px;font-size:12.5px;font-weight:700;color:var(--ink2);cursor:pointer;background:var(--card)}
+  .pm-vt+.pm-vt{border-left:1px solid var(--line2)}
+  .pm-vt.on{background:var(--amber);color:#fff}
+  .pm-src{padding:3px 9px;border-radius:980px;background:rgba(59,130,246,.13);color:#3b82f6;font-size:11px;font-weight:800}
+  .pm-tl-wrap{position:relative;padding-top:26px}
+  .pm-tl-axis{position:absolute;top:0;left:170px;right:8px;height:100%;pointer-events:none}
+  .pm-tl-grid{position:absolute;top:0;height:100%;border-left:1px dashed var(--line)}
+  .pm-tl-grid span{position:absolute;top:-22px;left:3px;font-size:10.5px;color:var(--ink3);white-space:nowrap}
+  .pm-tl-today{position:absolute;top:-4px;bottom:0;width:2px;background:var(--amber);z-index:2}
+  .pm-tl-today::before{content:'오늘';position:absolute;top:-16px;left:-12px;font-size:10px;font-weight:800;color:var(--amber)}
+  .pm-tl-row{display:flex;align-items:center;gap:0;min-height:30px}
+  .pm-tl-label{width:170px;flex:0 0 170px;font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:10px}
+  .pm-tl-comp{font-size:11px}
+  .pm-tl-track{position:relative;flex:1;height:30px}
+  .pm-tl-bar{position:absolute;top:6px;height:17px;border-radius:980px;min-width:6px}
+  .pm-tl-bar.on{background:var(--pos)}
+  .pm-tl-bar.soon{background:#3b82f6}
+  .pm-tl-bar.end{background:var(--ink3);opacity:.5}
+  .pm-tl-note{margin-top:10px;font-size:11.5px;color:var(--ink3)}
+  @media(max-width:760px){ .pm-tl-axis{left:110px} .pm-tl-label{width:110px;flex-basis:110px} }
   /* 경쟁사 프로모션 */
   .pm-head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
   .pm-title{margin:0 0 4px;font-size:16px;font-weight:800;color:var(--ink)}
@@ -884,7 +907,7 @@
   <div class="nav" id="nav">
     <button class="nav-btn on" data-view="dash">📊 <span data-txt="tabDash">대시보드</span></button>
     <button class="nav-btn" data-view="report">📑 <span data-txt="tabReport">리포트</span></button>
-    <button class="nav-btn" data-view="promo">🎯 <span>경쟁사 프로모션</span></button>
+    <button class="nav-btn" data-view="promo">🎯 <span>경쟁사 프로모션</span> <span class="nav-badge" id="promoBadge" style="display:none">0</span></button>
     <button class="nav-btn admin-only" data-view="verify">✓ <span data-txt="tabVerify">데이터 검증</span> <span class="nav-badge" id="verifyBadge">0</span></button>
     <button class="nav-btn admin-only" id="navCrawlBtn" type="button" title="자동 수집(크롤링) 열기">🛰 <span>자동 수집</span></button>
     <div class="nav-tools">
@@ -1315,7 +1338,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 경쟁사프로모션탭';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 프로모션타임라인뱃지';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3590,7 +3613,7 @@ function setView(v){
   if(dash && dashStale){ dashStale=false; buildTypeChips(); render(); }  // 미뤄둔 대시보드 갱신을 한 번에
   if(v==='verify'){ state.vfLimit=60; renderVerify(); }
   if(v==='report') renderReport();
-  if(v==='promo') renderPromo();
+  if(v==='promo'){ renderPromo(); markPromoSeen(); updatePromoBadge(); }
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -4322,6 +4345,27 @@ let workspace='cafe', rview='revenue', raynoUnlocked=false, warrCfgOpen=false;
 let PROMO={version:1,items:[]}, promoLoaded=false, _promoWired=false, _promoEdit=null;
 let _promoFilter={comp:'',channel:'',status:''};
 const PROMO_CHANNELS=['홈페이지','이벤트페이지','인스타그램','네이버 블로그·카페','유튜브','기타'];
+let _promoView='card';
+function promoNewCount(){ let seen=0; try{ seen=+(localStorage.getItem('raynoPromoSeen')||0); }catch(e){} return (PROMO.items||[]).filter(it=>(it.createdAt||0)>seen).length; }
+function markPromoSeen(){ try{ localStorage.setItem('raynoPromoSeen', String(Date.now())); }catch(e){} }
+function updatePromoBadge(){ const b=document.getElementById('promoBadge'); if(!b)return; const n=promoNewCount(); if(n>0){ b.textContent=n>99?'99+':n; b.style.display=''; } else b.style.display='none'; }
+function promoTimelineHTML(items){
+  const withP=items.filter(it=>it.start||it.end), noP=items.filter(it=>!it.start&&!it.end);
+  if(!withP.length) return `<div class="card"><div class="empty">기간이 입력된 프로모션이 없어 타임라인을 표시할 수 없습니다. 카드 보기를 이용하거나 기간을 입력해 주세요.</div></div>`;
+  const today=new Date().toISOString().slice(0,10);
+  const ds=[]; withP.forEach(it=>{ if(it.start)ds.push(it.start); if(it.end)ds.push(it.end); }); ds.push(today);
+  const min=ds.reduce((a,b)=>a<b?a:b), max=ds.reduce((a,b)=>a>b?a:b);
+  const toMs=d=>new Date(d+'T00:00:00').getTime();
+  let lo=toMs(min), hi=toMs(max); if(hi<=lo) hi=lo+86400000; const span=hi-lo;
+  const pct=d=>((toMs(d)-lo)/span*100);
+  const months=[]; const cur=new Date(lo); cur.setDate(1);
+  let guard=0; while(cur.getTime()<=hi && guard++<60){ const dd=cur.toISOString().slice(0,10); const l=pct(dd); if(l>=-2&&l<=100) months.push({label:(cur.getMonth()+1)+'월', left:Math.max(0,l)}); cur.setMonth(cur.getMonth()+1); }
+  const rows=withP.map(it=>{ const s=it.start||min, e=it.end||max; const l=Math.max(0,pct(s)), r=Math.min(100,pct(e)); const w=Math.max(2,r-l); const stt=promoStatus(it); const cls=stt==='진행중'?'on':stt==='예정'?'soon':'end';
+    return `<div class="pm-tl-row"><div class="pm-tl-label"><span class="pm-tl-comp" style="color:${promoCompColor(it.comp)}">●</span> <b>${escapeHtml(it.comp||'')}</b> ${escapeHtml(it.title||'')}</div><div class="pm-tl-track"><div class="pm-tl-bar ${cls}" style="left:${l}%;width:${w}%" title="${escapeHtml((it.start||'?')+' ~ '+(it.end||'상시'))}"></div></div></div>`; }).join('');
+  const tl=pct(today); const todayMark=(tl>=0&&tl<=100)?`<div class="pm-tl-today" style="left:${tl}%"></div>`:'';
+  const grid=months.map(m=>`<div class="pm-tl-grid" style="left:${m.left}%"><span>${m.label}</span></div>`).join('');
+  return `<div class="card"><div class="pm-tl-wrap"><div class="pm-tl-axis">${grid}${todayMark}</div>${rows}</div>${noP.length?`<div class="pm-tl-note">※ 기간 미입력 ${noP.length}건은 타임라인에서 제외(카드 보기에서 확인)</div>`:''}</div>`;
+}
 async function ensurePromo(){ if(promoLoaded)return; const j=await cloudLoadJSON(SUPA.promoFile); if(j&&Array.isArray(j.items)) PROMO=j; promoLoaded=true; }
 async function cloudSavePromo(){ PROMO.version=1; return await cloudSaveJSON(SUPA.promoFile, PROMO); }
 function promoStatus(it){ const t=new Date().toISOString().slice(0,10); if(it.start && t<it.start) return '예정'; if(it.end && t>it.end) return '종료'; return '진행중'; }
@@ -4346,18 +4390,19 @@ function _renderPromoImpl(box){
   const chanFilter=chans.length?`<div class="pm-frow"><span class="pm-flbl">채널</span>${fchip('channel','','전체',!_promoFilter.channel)}${chans.map(c=>fchip('channel',c,c,_promoFilter.channel===c)).join('')}</div>`:'';
   const statFilter=`<div class="pm-frow"><span class="pm-flbl">상태</span>${['','진행중','예정','종료'].map(s=>fchip('status',s,s||'전체',_promoFilter.status===s)).join('')}</div>`;
   const active=items.filter(i=>promoStatus(i)==='진행중').length;
-  const head=`<div class="card pm-head"><div class="pm-head-top"><div><h3 class="pm-title">🎯 경쟁사 프로모션 모니터링</h3><div class="cap">경쟁사 홈페이지·이벤트페이지·SNS에서 확인한 프로모션을 기록·추적합니다. ${admin?'‘＋ 프로모션 추가’로 직접 등록하세요.':'(등록은 관리자만 가능합니다)'}</div></div>${admin?`<button class="pm-add" data-pact="add">＋ 프로모션 추가</button>`:''}</div><div class="pm-stat">전체 <b>${items.length}</b>건 · 진행중 <b style="color:var(--pos)">${active}</b>건</div>${compFilter}${chanFilter}${statFilter}</div>`;
-  let cards;
-  if(!items.length) cards=`<div class="card"><div class="empty">${admin?'아직 등록된 프로모션이 없습니다. ‘＋ 프로모션 추가’로 첫 항목을 등록해 보세요.':'아직 등록된 경쟁사 프로모션이 없습니다.'}</div></div>`;
-  else if(!view.length) cards=`<div class="card"><div class="empty">조건에 맞는 프로모션이 없습니다.</div></div>`;
-  else cards=view.map(it=>promoCardHTML(it,admin)).join('');
-  box.innerHTML=head+cards;
+  const viewToggle=`<div class="pm-vtoggle"><span class="pm-vt ${_promoView==='card'?'on':''}" data-pview="card">카드</span><span class="pm-vt ${_promoView==='timeline'?'on':''}" data-pview="timeline">타임라인</span></div>`;
+  const head=`<div class="card pm-head"><div class="pm-head-top"><div><h3 class="pm-title">🎯 경쟁사 프로모션 모니터링</h3><div class="cap">경쟁사 홈페이지·이벤트페이지·SNS에서 확인한 프로모션을 기록·추적합니다. ${admin?'‘＋ 프로모션 추가’로 직접 등록하세요.':'(등록은 관리자만 가능합니다)'}</div></div><div class="pm-head-right">${viewToggle}${admin?`<button class="pm-add" data-pact="add">＋ 프로모션 추가</button>`:''}</div></div><div class="pm-stat">전체 <b>${items.length}</b>건 · 진행중 <b style="color:var(--pos)">${active}</b>건</div>${compFilter}${chanFilter}${statFilter}</div>`;
+  let body;
+  if(!items.length) body=`<div class="card"><div class="empty">${admin?'아직 등록된 프로모션이 없습니다. ‘＋ 프로모션 추가’로 첫 항목을 등록해 보세요.':'아직 등록된 경쟁사 프로모션이 없습니다.'}</div></div>`;
+  else if(!view.length) body=`<div class="card"><div class="empty">조건에 맞는 프로모션이 없습니다.</div></div>`;
+  else body = _promoView==='timeline' ? promoTimelineHTML(view) : view.map(it=>promoCardHTML(it,admin)).join('');
+  box.innerHTML=head+body;
 }
 function promoCardHTML(it,admin){
   const st=promoStatus(it); const stCls=st==='진행중'?'on':st==='예정'?'soon':'end';
   const period=(it.start||it.end)?`${it.start||'?'} ~ ${it.end||'상시'}`:'기간 미입력';
   const col=promoCompColor(it.comp);
-  return `<div class="card pm-card"><div class="pm-card-top"><span class="pm-comp" style="background:${col}">${escapeHtml(it.comp||'경쟁사')}</span>${it.channel?`<span class="pm-chan">${escapeHtml(it.channel)}</span>`:''}<span class="pm-status ${stCls}">${st}</span><span class="pm-cap">기록 ${escapeHtml(it.captured||'')}</span>${admin?`<span class="pm-actions"><span class="pm-edit" data-pact="edit" data-id="${escapeHtml(it.id)}">수정</span><span class="pm-del" data-pact="del" data-id="${escapeHtml(it.id)}">삭제</span></span>`:''}</div><div class="pm-name">${escapeHtml(it.title||'(제목 없음)')}</div>${it.benefit?`<div class="pm-benefit">🎁 ${escapeHtml(it.benefit)}</div>`:''}<div class="pm-meta">📅 ${escapeHtml(period)}</div>${it.memo?`<div class="pm-memo">${escapeHtml(it.memo)}</div>`:''}${it.url?`<a class="pm-link" href="${escapeHtml(it.url)}" target="_blank" rel="noopener">🔗 원문 열기</a>`:''}</div>`;
+  return `<div class="card pm-card"><div class="pm-card-top"><span class="pm-comp" style="background:${col}">${escapeHtml(it.comp||'경쟁사')}</span>${it.channel?`<span class="pm-chan">${escapeHtml(it.channel)}</span>`:''}${it.source==='auto'?'<span class="pm-src">🤖 자동수집</span>':''}<span class="pm-status ${stCls}">${st}</span><span class="pm-cap">기록 ${escapeHtml(it.captured||'')}</span>${admin?`<span class="pm-actions"><span class="pm-edit" data-pact="edit" data-id="${escapeHtml(it.id)}">수정</span><span class="pm-del" data-pact="del" data-id="${escapeHtml(it.id)}">삭제</span></span>`:''}</div><div class="pm-name">${escapeHtml(it.title||'(제목 없음)')}</div>${it.benefit?`<div class="pm-benefit">🎁 ${escapeHtml(it.benefit)}</div>`:''}<div class="pm-meta">📅 ${escapeHtml(period)}</div>${it.memo?`<div class="pm-memo">${escapeHtml(it.memo)}</div>`:''}${it.url?`<a class="pm-link" href="${escapeHtml(it.url)}" target="_blank" rel="noopener">🔗 원문 열기</a>`:''}</div>`;
 }
 function promoFormHTML(which){
   const it = which==='new' ? {id:'',comp:'',channel:'홈페이지',title:'',benefit:'',start:'',end:'',url:'',memo:''} : (PROMO.items.find(x=>x.id===which)||{});
@@ -4373,7 +4418,8 @@ function promoFormHTML(which){
     <div class="pm-fbtns"><button class="pm-cancel" data-pact="cancel">취소</button><button class="pm-save" data-pact="save" data-id="${escapeHtml(which)}">저장</button></div></div>`;
 }
 async function onPromoClick(e){
-  const t=e.target.closest('[data-pact],[data-pfilter]'); if(!t)return;
+  const t=e.target.closest('[data-pact],[data-pfilter],[data-pview]'); if(!t)return;
+  if(t.dataset.pview){ _promoView=t.dataset.pview; renderPromo(); return; }
   if(t.dataset.pfilter){ _promoFilter[t.dataset.pfilter]=t.dataset.val; renderPromo(); return; }
   const act=t.dataset.pact;
   if(act==='add'){ if(auth!=='admin')return; _promoEdit='new'; renderPromo(); return; }
@@ -4386,7 +4432,7 @@ async function onPromoClick(e){
     const title=g('pmTitle'); if(!title){ toast('제목을 입력하세요.',true); return; }
     const which=t.dataset.id;
     const data={comp:g('pmComp'),channel:g('pmChannel'),title,benefit:g('pmBenefit'),start:g('pmStart'),end:g('pmEnd'),url:g('pmUrl'),memo:g('pmMemo')};
-    if(which==='new'){ data.id='pm'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); data.captured=new Date().toISOString().slice(0,10); PROMO.items.push(data); }
+    if(which==='new'){ data.id='pm'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); data.captured=new Date().toISOString().slice(0,10); data.source='manual'; data.createdAt=Date.now(); PROMO.items.push(data); }
     else { const it=PROMO.items.find(x=>x.id===which); if(it) Object.assign(it,data); }
     const ok=await cloudSavePromo();
     if(ok){ _promoEdit=null; renderPromo(); toast('✅ 저장 완료'); }
@@ -5963,6 +6009,7 @@ async function boot(){
   enterApp();
   applyDashTools();    // 상단 도구·필터 기본 접힘
   pollCrawlStatus();   // 자동 수집 진행률 폴링 시작
+  ensurePromo().then(updatePromoBadge).catch(()=>{});   // 경쟁사 프로모션 선로드 + 신규 뱃지
   const n = (STORE.rows||[]).length;
   if(n) setTimeout(()=>toast(`데이터 ${n.toLocaleString()}건 불러옴${auth==='admin'?' · 관리자 모드':''}`), 400);
 
