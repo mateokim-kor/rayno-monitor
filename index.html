@@ -258,6 +258,15 @@
   @keyframes pop{from{transform:translateY(14px) scale(.99);opacity:0}to{transform:none;opacity:1}}
   .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
               padding:18px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+
+  .xpl-modal{max-width:540px}
+  .xpl-modal .modal-body{padding:18px 22px 22px}
+  .xpl-sec{margin-bottom:16px}
+  .xpl-h{font-size:11.5px;font-weight:800;color:var(--ink3);letter-spacing:.02em;margin-bottom:6px}
+  .xpl-v{font-size:14px;color:var(--ink);line-height:1.6}
+  .xpl-calc{background:var(--bg2);border-radius:10px;padding:13px 15px;font-size:14.5px;line-height:1.7;font-variant-numeric:tabular-nums}
+  .xpl-note{font-size:12px;color:var(--ink3);line-height:1.6;border-top:1px solid var(--line);padding-top:12px}
+  #cShareWarr,#cShareDealer,#cShareSales{cursor:pointer}
   .modal-title{font-size:16px;font-weight:800;letter-spacing:-.02em}
   .modal-title .badge{display:inline-block;margin-left:8px;font-size:12px;padding:2px 10px;border-radius:20px;
                       background:var(--amber);color:#1a1208;font-weight:800;vertical-align:middle}
@@ -1188,6 +1197,14 @@
     <div class="modal-body" id="modalBody"></div>
   </div>
 </div>
+<!-- 점유율 계산 설명 모달 -->
+<div class="modal-bg" id="xplBg">
+  <div class="modal xpl-modal" role="dialog" aria-modal="true">
+    <div class="modal-head"><div><div class="modal-title" id="xplTitle">계산 근거</div></div>
+      <div class="modal-tools"><button class="modal-x" id="xplClose" aria-label="닫기">✕</button></div></div>
+    <div class="modal-body" id="xplBody"></div>
+  </div>
+</div>
 
 <!-- 접속 잠금 화면 -->
 <div id="lockScreen">
@@ -1338,7 +1355,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 대리점판매롤수';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 점유율계산설명';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2354,6 +2371,47 @@ let MODAL_ROWS = [];   // 현재 모달에 표시 중인 원본 행
 let MODAL_SENT = 'all';   // 모달 내 감성 필터
 let HL_ON = true;         // 본문 감성 하이라이트 on/off
 
+function openExplain(title, bodyHtml){
+  document.getElementById('xplTitle').innerHTML=title;
+  document.getElementById('xplBody').innerHTML=bodyHtml;
+  document.getElementById('xplBg').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeExplain(){ document.getElementById('xplBg').classList.remove('open'); document.body.style.overflow=''; }
+function shareExplain(kind, m){
+  const scc=salesCfg();
+  const cr=_sNum((scc.carReg||{})[m]||0);
+  const N=n=>Math.round(n).toLocaleString();
+  const F=v=>v.toFixed(2);
+  const ml=m+'월';
+  let title, formula, calc, note;
+  if(kind==='warr'){
+    const inst=_qc(m);
+    title='시장 점유율 · 품질보증서 ('+ml+')';
+    formula='그 달 <b>품질보증서 실시공 건수</b> ÷ <b>신차 등록(월 출고 대수)</b> × 100';
+    calc = cr>0 ? `${N(inst)}건 ÷ ${N(cr)}대 × 100 = <b style="color:#16a34a">${F(inst/cr*100)}%</b>`
+                : `실시공 ${N(inst)}건 — 신차 등록이 입력되지 않아 점유율을 계산할 수 없습니다.`;
+    note='실시공 건수는 품질보증서 탭에서 자동 집계됩니다. 신차 등록은 설정 → 매출에서 월별로 입력하세요.';
+  } else if(kind==='dealer'){
+    const rolls=_sNum((scc.dealerSales||{})[m]||0), cap=_sNum(scc.regionCap||0)||10, cars=rolls*cap;
+    title='시장 점유율 · 대리점 판매 ('+ml+')';
+    formula='<b>대리점 판매 롤 수</b> × <b>롤당 대수</b> ÷ <b>신차 등록</b> × 100';
+    calc = cr>0 ? `${N(rolls)}롤 × ${cap}대 = ${N(cars)}대(시공가능) ÷ ${N(cr)}대 × 100 = <b style="color:#f4911c">${F(cars/cr*100)}%</b>`
+                : `${N(rolls)}롤 × ${cap}대 = ${N(cars)}대 — 신차 등록 미입력으로 점유율 계산 불가`;
+    note='롤 수·신차 등록은 설정 → 매출 월별 입력, 롤당 대수는 설정의 값(기본 10대).';
+  } else {
+    const b2c=_rollCars('B2C',m), b2b=_rollCars('B2B',m), tot=b2c+b2b;
+    title='시장 점유율 · 판매(합계) ('+ml+')';
+    formula='(<b>B2C 롤 × 롤당대수</b> + <b>B2B 롤 × 롤당대수</b>) ÷ <b>신차 등록</b> × 100';
+    calc = cr>0 ? `B2C ${N(b2c)}대 + B2B ${N(b2b)}대 = ${N(tot)}대 ÷ ${N(cr)}대 × 100 = <b style="color:#3b82f6">${F(tot/cr*100)}%</b>`
+                : `B2C ${N(b2c)}대 + B2B ${N(b2b)}대 = ${N(tot)}대 — 신차 등록 미입력`;
+    note='롤 판매수는 ERP 집계, 롤당 시공가능대수는 설정 → 매출(기본 10대·모노카본 17대).';
+  }
+  const body=`<div class="xpl-sec"><div class="xpl-h">계산식</div><div class="xpl-v">${formula}</div></div>`
+    +`<div class="xpl-sec"><div class="xpl-h">${ml} 대입</div><div class="xpl-calc">${calc}</div></div>`
+    +`<div class="xpl-note">ℹ ${note}</div>`;
+  openExplain(title, body);
+}
 function openDetail(titleHtml, rows, capText){
   MODAL_ROWS = rows.slice().sort((a,b)=>a.idx-b.idx);
   document.getElementById('modalTitle').innerHTML = titleHtml +
@@ -2481,6 +2539,8 @@ document.addEventListener('click', e=>{ if(!e.target.closest('#briefCopyBtn')) r
   if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done, fb); } else fb();
 });
 document.getElementById('modalClose').addEventListener('click', closeDetail);
+document.getElementById('xplClose').addEventListener('click', closeExplain);
+document.getElementById('xplBg').addEventListener('click', e=>{ if(e.target.id==='xplBg') closeExplain(); });
 document.getElementById('modalBg').addEventListener('click', e=>{ if(e.target.id==='modalBg') closeDetail(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDetail(); });
 document.getElementById('modalSearch').addEventListener('input', e=>renderModalList(e.target.value));
@@ -4937,9 +4997,9 @@ function renderRevenue(){
     + chartCard('cRevTrend','월별 매출 추이','채널별 매출(원)')
     + chartCard('cChannel','채널 구성 · '+lab,'매출 비중')
     + chartCard('cProdTop','제품 TOP · '+lab,'롤 중분류별 판매수량')
-    + chartCard('cShareWarr','시장 점유율 · 품질보증서',lab+' 기준 · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 실시공</span>')
-    + chartCard('cShareDealer','시장 점유율 · 대리점 판매',lab+' 기준 · <b style="color:#f4911c">'+_shFmt(_shD)+'</b> <span style="color:var(--ink3)">· 수기</span>')
-    + chartCard('cShareSales','시장 점유율 · 판매(합계)',lab+' 기준 · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· 롤×시공대수</span>')
+    + chartCard('cShareWarr','시장 점유율 · 품질보증서',lab+' 기준 · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 실시공 · 막대를 누르면 계산식</span>')
+    + chartCard('cShareDealer','시장 점유율 · 대리점 판매',lab+' 기준 · <b style="color:#f4911c">'+_shFmt(_shD)+'</b> <span style="color:var(--ink3)">· 수기 · 막대를 누르면 계산식</span>')
+    + chartCard('cShareSales','시장 점유율 · 판매(합계)',lab+' 기준 · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· 롤×시공대수 · 막대를 누르면 계산식</span>')
     + `</div>`;
 
   let s1=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>구성비</th></tr>`;
@@ -5033,21 +5093,22 @@ function drawSalesCharts(){
         plugins:{ legend:{position:'bottom',labels:{color:ck.text,boxWidth:12,font:{size:11}}}, tooltip:{callbacks:{label:c=>c.label+': '+c.parsed.toLocaleString()+'원'}} } } }); }
   // 시장 점유율 — 기준별 월간 막대 (선택한 월 강조 · 월 출고대수 대비)
   { const scc=salesCfg(), active=_salesActive();
-    const shareBar=(id, perMonth, col)=>{
+    const shareBar=(id, perMonth, col, kind)=>{
       if(!document.getElementById(id)) return;
       const vals=M.map(m=>{ const cr=_sNum((scc.carReg||{})[m]||0); return cr>0? +(perMonth(m)/cr*100).toFixed(2):null; });
       const bg=M.map(m=> active.indexOf(m)>=0? col : col+'30');
       makeChart(id,{ type:'bar',
         data:{ labels:M.map(m=>m+'월'), datasets:[{label:'점유율', data:vals, backgroundColor:bg, borderRadius:5, maxBarThickness:46}] },
         options:{ responsive:true, maintainAspectRatio:false,
+          onClick:(e,els)=>{ if(els&&els.length) shareExplain(kind, M[els[0].index]); },
           plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>c.parsed.y!=null?c.parsed.y+'%':'-'}} },
           scales:{ x:{grid:{display:false},ticks:{color:ck.text}}, y:{beginAtZero:true,grid:{color:ck.grid},ticks:{color:ck.text,callback:v=>v+'%'}} } } });
     };
-    shareBar('cShareWarr', m=>_qc(m), '#16a34a');
-    shareBar('cShareSales', m=>_rollCars('B2C',m)+_rollCars('B2B',m), '#3b82f6');
+    shareBar('cShareWarr', m=>_qc(m), '#16a34a', 'warr');
+    shareBar('cShareSales', m=>_rollCars('B2C',m)+_rollCars('B2B',m), '#3b82f6', 'sales');
     const dealerEl=document.getElementById('cShareDealer');
     if(dealerEl){
-      if(M.some(m=>_dealerCars(m)>0)) shareBar('cShareDealer', m=>_dealerCars(m), '#f4911c');
+      if(M.some(m=>_dealerCars(m)>0)) shareBar('cShareDealer', m=>_dealerCars(m), '#f4911c', 'dealer');
       else { const wrap=dealerEl.closest('.biz-chart'); if(wrap) wrap.innerHTML='<div style="height:100%;display:grid;place-items:center;text-align:center;color:var(--ink2);font-size:12px;padding:12px;line-height:1.5">대리점 판매 롤 수를 입력하면<br>점유율이 표시됩니다.<br><span style="color:var(--ink3)">설정 → 매출 → 월별 입력</span></div>'; }
     }
   }
