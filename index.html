@@ -1358,7 +1358,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 프로모션메모접기';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 프로모션내용워딩';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4415,9 +4415,9 @@ function promoMemoBlock(it){
   const longMemo = it.memo.length > 90 || (it.memo.match(/\n/g)||[]).length >= 2;
   const open = _promoMemoExpand.has(it.id);
   if(longMemo && !open)
-    return `<div class="pm-memo pm-memo-clamp">${escapeHtml(it.memo)}</div><span class="pm-memo-toggle" data-pact="memo" data-id="${escapeHtml(it.id)}">메모 더보기 ▼</span>`;
+    return `<div class="pm-memo pm-memo-clamp">${escapeHtml(it.memo)}</div><span class="pm-memo-toggle" data-pact="memo" data-id="${escapeHtml(it.id)}">내용 더보기 ▼</span>`;
   if(longMemo && open)
-    return `<div class="pm-memo">${escapeHtml(it.memo)}</div><span class="pm-memo-toggle" data-pact="memo" data-id="${escapeHtml(it.id)}">메모 접기 ▲</span>`;
+    return `<div class="pm-memo">${escapeHtml(it.memo)}</div><span class="pm-memo-toggle" data-pact="memo" data-id="${escapeHtml(it.id)}">내용 접기 ▲</span>`;
   return `<div class="pm-memo">${escapeHtml(it.memo)}</div>`;
 }
 function promoNewCount(){ let seen=0; try{ seen=+(localStorage.getItem('raynoPromoSeen')||0); }catch(e){} return (PROMO.items||[]).filter(it=>(it.createdAt||0)>seen).length; }
@@ -4488,7 +4488,7 @@ function promoFormHTML(which){
     <div class="pm-fld"><label>혜택·할인</label><input id="pmBenefit" class="dt-input" value="${escapeHtml(it.benefit||'')}" placeholder="예: 전 제품 30%, 사은품 증정"></div>
     <div class="pm-fld2"><div><label>시작일</label><input id="pmStart" type="date" class="dt-input" value="${escapeHtml(it.start||'')}"></div><div><label>종료일</label><input id="pmEnd" type="date" class="dt-input" value="${escapeHtml(it.end||'')}"></div></div>
     <div class="pm-fld"><label>링크(URL)</label><input id="pmUrl" class="dt-input" value="${escapeHtml(it.url||'')}" placeholder="https://..."></div>
-    <div class="pm-fld"><label>메모</label><textarea id="pmMemo" class="dt-input" rows="2" placeholder="추가 메모">${escapeHtml(it.memo||'')}</textarea></div>
+    <div class="pm-fld"><label>내용</label><textarea id="pmMemo" class="dt-input" rows="3" placeholder="프로모션 상세 내용">${escapeHtml(it.memo||'')}</textarea></div>
     <div class="pm-fbtns"><button class="pm-cancel" data-pact="cancel">취소</button><button class="pm-save" data-pact="save" data-id="${escapeHtml(which)}">저장</button></div></div>`;
 }
 async function onPromoClick(e){
