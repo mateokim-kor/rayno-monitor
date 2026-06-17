@@ -267,6 +267,22 @@
   .xpl-calc{background:var(--bg2);border-radius:10px;padding:13px 15px;font-size:14.5px;line-height:1.7;font-variant-numeric:tabular-nums}
   .xpl-note{font-size:12px;color:var(--ink3);line-height:1.6;border-top:1px solid var(--line);padding-top:12px}
   #cShareWarr,#cShareDealer,#cShareSales{cursor:pointer}
+  .lv-top{display:flex;gap:10px;margin-bottom:14px}
+  .lv-stat{flex:1;background:var(--bg2);border-radius:10px;padding:12px 8px;text-align:center}
+  .lv-num{font-size:23px;font-weight:800;color:var(--ink);line-height:1}
+  .lv-lbl{font-size:10.5px;color:var(--ink3);margin-top:5px;line-height:1.35}
+  .lv-bar{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--line);margin-bottom:8px}
+  .lv-bar>div{height:100%}
+  .lv-leg{display:flex;flex-wrap:wrap;gap:10px 14px;font-size:11.5px;color:var(--ink2);margin-bottom:13px}
+  .lv-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+  .lv-note{font-size:12.5px;line-height:1.55;background:var(--bg2);border-radius:9px;padding:10px 12px;margin-bottom:15px;font-weight:600}
+  .lv-sec{margin-bottom:13px}
+  .lv-h{font-size:13px;font-weight:800;margin-bottom:7px}
+  .lv-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .lv-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:980px;border:1px solid var(--line2);background:var(--card);font-size:12.5px;font-weight:700}
+  .lv-chip small{font-size:10.5px;opacity:.6;font-weight:600}
+  .lv-foot{font-size:11.5px;color:var(--ink3);line-height:1.6;border-top:1px solid var(--line);padding-top:11px;margin-top:6px}
+
   .modal-title{font-size:16px;font-weight:800;letter-spacing:-.02em}
   .modal-title .badge{display:inline-block;margin-left:8px;font-size:12px;padding:2px 10px;border-radius:20px;
                       background:var(--amber);color:#1a1208;font-weight:800;vertical-align:middle}
@@ -1090,6 +1106,7 @@
         </div>
         <div class="ctl-group">
           <button class="acc-btn admin-only" id="autoVerifyBtn">🤖 자동 검증 실행</button>
+          <button class="acc-btn admin-only" id="learnVizBtn">🧠 학습 현황</button>
           <button class="acc-btn admin-only" id="confirmAllAutoBtn" style="display:none">✅ 자동(검토) 모두 검증 완료</button>
         </div>
         <div class="ctl-group">
@@ -1358,7 +1375,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 프로모션내용워딩';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 검증학습현황';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3860,6 +3877,36 @@ function autoVerifyAll(){
   state.vfLimit=60; refreshVerify(); updateVerifyHeader(); renderVerify();
   toast(n>0?`${n.toLocaleString()}건을 자동 검증했습니다 · 학습 ${M.n.toLocaleString()}건 기반 · 신뢰도 낮은 항목부터 검토하세요`:'새로 자동 검증할 항목이 없습니다.');
 }
+function _topClassWords(nb, lab, k){
+  const c=nb&&nb.cls&&nb.cls[lab]; if(!c) return [];
+  const others=Object.keys(nb.cls).filter(x=>x!==lab);
+  return Object.keys(c.tf).filter(w=>!w.startsWith('§')&&w.length>=2)
+    .map(w=>{ const pIn=(c.tf[w]+1)/(c.tot+nb.V);
+      let s=0,on=0; others.forEach(o=>{ const oc=nb.cls[o]; s+=((oc.tf[w]||0)+1)/(oc.tot+nb.V); on++; }); const pOut=s/(on||1);
+      return {w, n:c.tf[w], score:Math.log(pIn/pOut)}; })
+    .filter(x=>x.n>=2 && x.score>0.15)
+    .sort((a,b)=>b.score-a.score).slice(0,k);
+}
+function learnVizHTML(){
+  const rows=(RAW&&RAW.rows)||[];
+  const manual=rows.filter(r=>isVerified(r)&&r.vsrc!=='auto'&&r.vsrc!=='kw').length;
+  const auto=rows.filter(r=>r.vsrc==='auto').length;
+  const kw=rows.filter(r=>r.vsrc==='kw').length;
+  const unver=rows.filter(r=>!isVerified(r)).length;
+  const M=buildAutoModel(), nb=M.sentNB, ready=nb.total>=15, tot=rows.length||1;
+  const seg=(n,c,l)=> n>0?`<div style="width:${(n/tot*100).toFixed(1)}%;background:${c}" title="${l} ${n.toLocaleString()}건"></div>`:'';
+  const bar=`<div class="lv-bar">${seg(manual,'#3b82f6','직접 검증')}${seg(auto,'#f4911c','자동 분류')}${seg(kw,'#8b5cf6','키워드')}${seg(unver,'var(--line2)','미검증')}</div>`;
+  const leg=`<div class="lv-leg"><span><i style="background:#3b82f6"></i>직접 검증 ${manual.toLocaleString()}</span><span><i style="background:#f4911c"></i>자동 분류 ${auto.toLocaleString()}</span><span><i style="background:#8b5cf6"></i>키워드 ${kw.toLocaleString()}</span><span><i style="background:var(--line2)"></i>미검증 ${unver.toLocaleString()}</span></div>`;
+  const chipRow=(lab,col)=>{ const ws=_topClassWords(nb,lab,14);
+    return `<div class="lv-sec"><div class="lv-h" style="color:${col}">● ${lab} 신호 단어 <span style="color:var(--ink3);font-weight:600;font-size:11px">${ws.length}개</span></div><div class="lv-chips">${ws.length?ws.map(x=>`<span class="lv-chip" style="border-color:${col}55;color:${col}">${escapeHtml(x.w)}<small>${x.n}</small></span>`).join(''):'<span style="color:var(--ink3);font-size:12px">아직 충분히 학습되지 않았습니다</span>'}</div></div>`; };
+  const head=`<div class="lv-top"><div class="lv-stat"><div class="lv-num">${M.n.toLocaleString()}</div><div class="lv-lbl">직접 검증한<br>학습 데이터</div></div><div class="lv-stat"><div class="lv-num">${(nb.V||0).toLocaleString()}</div><div class="lv-lbl">학습한<br>단어(어휘)</div></div><div class="lv-stat"><div class="lv-num" style="color:#f4911c">${auto.toLocaleString()}</div><div class="lv-lbl">이 학습으로<br>자동 분류</div></div></div>`;
+  const status = ready
+    ? `<div class="lv-note" style="color:var(--pos)">✅ 충분히 학습되어 자동 검증이 작동합니다. 아래는 <b>당신의 검증에서 모델이 직접 뽑아낸 감성 신호 단어</b>입니다.</div>`
+    : `<div class="lv-note" style="color:#f4911c">⏳ 아직 학습 데이터가 적습니다 (${nb.total}/15건). ${Math.max(0,15-nb.total)}건 더 직접 검증하면 자동 검증이 켜집니다.</div>`;
+  return head + bar + leg + status + `<div>${chipRow('긍정','#16a34a')}${chipRow('부정','#e5484d')}${chipRow('중립','#8b8f98')}</div>`
+    + `<div class="lv-foot">작동 방식 — 당신이 직접 검증한 글로 <b>단어별 감성 확률(나이브 베이즈)</b>을 학습하고, 미검증 글에 적용해 자동 분류합니다. 검증을 더 할수록 신호 단어가 늘고 정확해집니다. 사람이 검증한 값은 자동 분류가 절대 덮어쓰지 않습니다.</div>`;
+}
+function openLearnViz(){ openExplain('🧠 검증 학습 현황', learnVizHTML()); }
 async function optimizeAll(){
   const res={cafeBefore:0,cafeAfter:0,cafeRemoved:0,warrBefore:0,warrAfter:0,warrRemoved:0};
   // 1) 카페 데이터: 중복(같은 내용) 합치기 + 빈 항목 제거 (검증값 보존)
@@ -4178,6 +4225,7 @@ document.addEventListener('keydown', e=>{
 
 // 검증 페이지 컨트롤
 document.getElementById('autoVerifyBtn').addEventListener('click', autoVerifyAll);
+document.getElementById('learnVizBtn').addEventListener('click', openLearnViz);
 document.getElementById('confirmAllAutoBtn').addEventListener('click', confirmAllAuto);
 document.getElementById('vfFrom').addEventListener('change', e=>{ state.vfFrom=e.target.value; state.vfLimit=60; renderVerify(); });
 document.getElementById('vfTo').addEventListener('change', e=>{ state.vfTo=e.target.value; state.vfLimit=60; renderVerify(); });
