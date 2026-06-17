@@ -1338,7 +1338,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 프로모션타임라인뱃지';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 대리점판매롤수';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5048,7 +5048,7 @@ function drawSalesCharts(){
     const dealerEl=document.getElementById('cShareDealer');
     if(dealerEl){
       if(M.some(m=>_dealerCars(m)>0)) shareBar('cShareDealer', m=>_dealerCars(m), '#f4911c');
-      else { const wrap=dealerEl.closest('.biz-chart'); if(wrap) wrap.innerHTML='<div style="height:100%;display:grid;place-items:center;text-align:center;color:var(--ink2);font-size:12px;padding:12px;line-height:1.5">대리점 판매 대수를 입력하면<br>점유율이 표시됩니다.<br><span style="color:var(--ink3)">설정 → 매출 → 월별 입력</span></div>'; }
+      else { const wrap=dealerEl.closest('.biz-chart'); if(wrap) wrap.innerHTML='<div style="height:100%;display:grid;place-items:center;text-align:center;color:var(--ink2);font-size:12px;padding:12px;line-height:1.5">대리점 판매 롤 수를 입력하면<br>점유율이 표시됩니다.<br><span style="color:var(--ink3)">설정 → 매출 → 월별 입력</span></div>'; }
     }
   }
   // 제품 TOP (롤 중분류, 선택 기간)
@@ -5184,7 +5184,7 @@ function _capDef(mid){ return (/카본|모노|MONO|TBTECH/i.test(mid))?17:10; } 
 function _capOf(mid){ const c=_sNum((((SALES&&SALES.inputs&&SALES.inputs.cap)||{})[mid])||0); return c>0?c:_capDef(mid); }
 function _rollCars(ch,m){ const cm=(SALES&&SALES.chMat&&SALES.chMat[ch])||{}; let s=0; Object.keys(cm).forEach(mat=>{ if(!_isRoll(mat))return; s+=(cm[mat][m]||0)*_capOf(_midOf(mat)); }); return s; }  // 롤 판매수 × 롤당대수 = 시공가능 차량수
 function _rollCarsPick(ch){ let s=0; _salesActive().forEach(m=>s+=_rollCars(ch,m)); return s; }
-function _dealerCars(m){ return _sNum(((salesCfg().dealerSales)||{})[m]||0); }
+function _dealerCars(m){ const rc=_sNum(salesCfg().regionCap||0)||10; return _sNum(((salesCfg().dealerSales)||{})[m]||0) * rc; }   // 대리점 판매 롤 수 × 롤당 대수 = 시공가능 차량수
 function _dealerPick(){ let s=0; _salesActive().forEach(m=>s+=_dealerCars(m)); return s; }
 function _carRegPick(){ return _scPick(salesCfg().carReg); }
 
@@ -5286,7 +5286,7 @@ function salesSettingsSectionHTML(){
   const mfields=(metric)=> MM.map(m=>`<td style="padding:2px"><input class="sc-in" data-metric="${metric}" data-month="${m}" type="number" min="0" value="${sc[metric][m]||''}" placeholder="0" style="width:88px;text-align:right;padding:4px 5px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:12px"></td>`).join('');
   let grid=`<div style="overflow-x:auto"><table style="border-collapse:collapse"><tr><th ${thl}>항목</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`
         +`<tr><td ${tdl}>신차등록(대)</td>${mfields('carReg')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.carReg))}</td></tr>`
-    +`<tr><td ${tdl}>대리점 판매(대)</td>${mfields('dealerSales')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.dealerSales))}</td></tr>`
+    +`<tr><td ${tdl}>대리점 판매(롤)</td>${mfields('dealerSales')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.dealerSales))}</td></tr>`
     +`</table></div>`;
   let capHTML;
   if(SALES&&SALES.prodAll){ const rm={}; SALES.prodList.forEach(mat=>{ if(_isRoll(mat)) rm[_midOf(mat)]=true; });
@@ -5332,7 +5332,7 @@ function salesSettingsSectionHTML(){
        <select id="salesCutoff" class="set-text" style="max-width:160px">${[0,1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}"${_salesCut()===m?' selected':''}>${m===0?'전체 표시(제한 없음)':m+'월까지'}</option>`).join('')}</select>
      </label></div>
    <div class="card set-card"><h3><span class="dot"></span>월별 수기 입력 (ERP에 없는 항목)</h3>
-     <div class="cap"><b>월 차량 출고 대수(신차등록)</b>와 <b>대리점 판매 대수</b>를 월별로 입력하면(품질보증서는 품질보증서 탭에서 자동 집계) 매출 종합표·KPI·시장점유율에 반영됩니다. 입력칸을 벗어나면 자동 저장됩니다.</div>
+     <div class="cap"><b>월 차량 출고 대수(신차등록)</b>와 <b>대리점 판매 롤 수</b>를 월별로 입력하면(롤당 대수로 환산해 점유율 계산)(품질보증서는 품질보증서 탭에서 자동 집계) 매출 종합표·KPI·시장점유율에 반영됩니다. 입력칸을 벗어나면 자동 저장됩니다.</div>
      ${grid}</div>
    ${regionCard}
    <div class="card set-card"><h3><span class="dot"></span>롤당 시공가능대수 (시장점유율 계산용)</h3>
