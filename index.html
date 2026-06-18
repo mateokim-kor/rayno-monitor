@@ -1375,7 +1375,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 카페합계정렬';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 신차장착점유율';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5126,6 +5126,7 @@ function renderRevenue(){
     + card(hh('🏢 지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
     + card(hh('📈 시장 점유율 · '+lab)+salesShareTable())
     + card(hh('🗺 지역별 시장 점유율 · '+lab)+salesRegionMap())
+    + card(hh('🚗 신차 장착 점유율 · '+lab)+newCarShareCard())
     + card(hh('① 채널 요약 · '+lab)+s1)
     + card(hh('② 롤 / 일반물품 구분 · '+lab)+s2)
     + card(hh('③ 월별 매출 추이')+s3)
@@ -5311,6 +5312,56 @@ function _rollCarsPick(ch){ let s=0; _salesActive().forEach(m=>s+=_rollCars(ch,m
 function _dealerCars(m){ const rc=_sNum(salesCfg().regionCap||0)||10; return _sNum(((salesCfg().dealerSales)||{})[m]||0) * rc; }   // 대리점 판매 롤 수 × 롤당 대수 = 시공가능 차량수
 function _dealerPick(){ let s=0; _salesActive().forEach(m=>s+=_dealerCars(m)); return s; }
 function _carRegPick(){ return _scPick(salesCfg().carReg); }
+
+// ── 신차 장착 점유율 (보증서 신차 ÷ 신차등록, 2-트랙) ──
+function _warrIsNew(r){ const s=String(r['신차/중고차']||'').trim(); return s==='신차'||s.indexOf('신차')===0; }
+function _warrNewByRegion(){ // 활성 월 기준 신차 보증서: {regionKey:count}, total
+  const R={}; let total=0; const act=_salesActive();
+  ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{
+    if(!_warrIsNew(r)) return;
+    const mm=parseInt(String(r['시공일자']||'').slice(5,7),10);
+    if(act.indexOf(mm)<0) return;
+    total++; const k=_regionKey(r['대리점지역(도)']); if(k) R[k]=(R[k]||0)+1;
+  });
+  return {byRegion:R, total};
+}
+function _regionCarRegPick(k){ const rr=((salesCfg().region)||{})[k]; if(!rr||!rr.carReg) return 0; let s=0; _salesActive().forEach(m=>s+=_sNum(rr.carReg[m]||0)); return s; }
+function _natCarRegPick(){ let s=0; _REGION_KEYS.forEach(k=>s+=_regionCarRegPick(k)); return s>0? s : _carRegPick(); }
+function _b2bAutoCars(){ // 모노카본·프레스토 B2B 롤 × 롤당 대수 (활성 월)
+  const cm=(SALES&&SALES.chMat&&SALES.chMat.B2B)||{}; const re=/모노|카본|프레스토|mono|presto/i; let s=0;
+  _salesActive().forEach(m=>{ Object.keys(cm).forEach(mat=>{ if(!_isRoll(mat))return; const mid=_midOf(mat); if(re.test(mid)||re.test(mat)) s+=(cm[mat][m]||0)*_capOf(mid); }); });
+  return s;
+}
+function newCarShareCard(){
+  const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const th ='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
+  const td ='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  const lab=_salesLabel();
+  const nw=_warrNewByRegion();
+  const retail=nw.total;
+  const b2b=Math.round(_b2bAutoCars());
+  const nat=_natCarRegPick();
+  const pct=v=> nat>0 ? '<b>'+(v/nat*100).toFixed(2)+'%</b>' : '<span style="color:var(--ink2)">신차등록 입력 필요</span>';
+  const tot=retail+b2b;
+  let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55">통계청 <b>신차 등록</b> 대비 레이노 장착 비율. <b style="color:#16a34a">리테일</b>은 품질보증서(신차만) 실시공, <b style="color:#3b82f6">B2B</b>는 모노카본·프레스토 차량용 판매(롤×시공대수). 두 트랙은 측정 방식이 달라 분리 표기합니다. 절대%는 보증서 발급률 때문에 과소평가 — <b>추세·지역 비교</b> 위주로 보세요.</div>`;
+  html+=`<div style="margin-bottom:11px">신차 등록 (${lab}): <b>${nat?nat.toLocaleString()+'대':'(미입력)'}</b></div>`;
+  html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>트랙</th><th ${th}>차량(대)</th><th ${th}>장착 점유율</th></tr>`
+    +`<tr><td ${tdl}>리테일 · 신차 보증서 <span style="color:var(--ink2);font-weight:400">(실시공·신차만)</span></td><td ${td}>${retail.toLocaleString()}</td><td ${td} style="color:#16a34a">${pct(retail)}</td></tr>`
+    +`<tr><td ${tdl}>B2B · 모노카본·프레스토 <span style="color:var(--ink2);font-weight:400">(롤×시공대수)</span></td><td ${td}>${b2b.toLocaleString()}</td><td ${td} style="color:#3b82f6">${pct(b2b)}</td></tr>`
+    +`<tr><td ${tdl} style="font-weight:800;background:rgba(244,145,28,.1)">합산 (리테일+B2B)</td><td ${td} style="font-weight:800;background:rgba(244,145,28,.1)">${tot.toLocaleString()}</td><td ${td} style="background:rgba(244,145,28,.1)">${pct(tot)}</td></tr></table>`;
+  const regs=_REGION_KEYS.map(k=>{ const inst=nw.byRegion[k]||0; const reg=_regionCarRegPick(k); return {k,inst,reg,sh:reg>0?inst/reg*100:null}; })
+    .filter(x=>x.inst>0||x.reg>0).sort((a,b)=>(b.sh==null?-1:b.sh)-(a.sh==null?-1:a.sh)||b.inst-a.inst);
+  if(regs.length){
+    html+=`<div style="font-weight:700;margin:15px 0 7px">시·도별 신차 장착 점유율 <span style="color:var(--ink2);font-weight:500;font-size:12px">(리테일 보증서 기준 · ${lab})</span></div>`;
+    html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도</th><th ${th}>신차 시공(건)</th><th ${th}>신차 등록</th><th ${th}>점유율</th></tr>`;
+    regs.forEach(x=>{ html+=`<tr><td ${tdl}>${x.k}</td><td ${td}>${x.inst.toLocaleString()}</td><td ${td}>${x.reg?x.reg.toLocaleString():'<span style="color:var(--ink2)">미입력</span>'}</td><td ${td}>${x.sh!=null?'<b>'+x.sh.toFixed(2)+'%</b>':'—'}</td></tr>`; });
+    html+=`</table><div style="font-size:11px;color:var(--ink3);margin-top:7px">시·도별 신차 등록(통계청 17개 시·도)은 ⚙ 설정 → 매출 → <b>지역별 세일즈 입력</b>에 넣으면 점유율이 채워집니다.</div>`;
+  } else {
+    html+=`<div class="empty" style="margin-top:13px">시·도별 신차 등록이 없습니다. ⚙ 설정 → 매출 → <b>지역별 세일즈 입력</b>에 통계청 17개 시·도 신차 등록을 넣으면 지역별 점유율이 표시됩니다.</div>`;
+  }
+  return html;
+}
 
 
 // Table A — 중분류별 롤 판매 수 (B2C / B2B / 합계, 월별)
