@@ -1408,7 +1408,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 전사메일_신포맷';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 매출KPI_선택월반영';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5339,9 +5339,9 @@ function salesKPI(){
   if(!SALES||!SALES.channels) return '';
   const C=SALES.channels, sc=salesCfg();
   const eok=n=>(n/1e8).toFixed(1), won=n=>Math.round(n||0).toLocaleString();
-  const entT=_sTot(C.B2C.ma)+_sTot(C.B2B.ma)+_sTot(C['별도채널'].ma);
-  const bbT=_sTot(C.B2C.ma)+_sTot(C.B2B.ma);
-  const wT=_qcTot(), crT=_scTot(sc.carReg);
+  const entT=_sPick(C.B2C.ma)+_sPick(C.B2B.ma)+_sPick(C['별도채널'].ma);   // 선택 월 기준
+  const bbT=_sPick(C.B2C.ma)+_sPick(C.B2B.ma);
+  const wT=_qcPick(), crT=_carRegPick();   // 차트 헤드라인과 동일(선택 월)
   let rollQ=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; rollQ+=_sPick(SALES.prodAll[p].mq); });
   const share= crT>0? (wT/crT*100).toFixed(2)+'%':'—';
   const kpi=(t,v,s)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px"><div style="font-size:12px;color:var(--ink2);margin-bottom:5px">${t}</div><div style="font-size:21px;font-weight:800;color:var(--ink)">${v}</div><div style="font-size:11px;color:var(--ink2);margin-top:3px">${s||''}</div></div>`;
