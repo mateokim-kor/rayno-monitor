@@ -338,6 +338,7 @@
   .wtab{flex:1;min-width:60px;border:0;background:transparent;color:var(--ink2);font-family:var(--font);font-size:13.5px;font-weight:700;padding:9px 10px;border-radius:9px;cursor:pointer;transition:.12s}
   .wtab.on{background:var(--card);color:var(--ink);box-shadow:var(--shadow-sm)}
   .wtab:hover:not(.on){color:var(--ink)}
+  .warr-sec{font-size:15px;font-weight:800;letter-spacing:-.01em;margin:10px 0 12px;display:flex;align-items:center;gap:8px;color:var(--ink)}
   .card{margin-bottom:16px}
   .biz-grid{margin-bottom:16px}
   .biz-grid>.card,.rep-2col>.card,.rep-3col>.card,.grid>.card,.cols>.card{margin-bottom:0}
@@ -1407,7 +1408,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 보증서탭_간격통일';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 보증서세로스택_동의수정';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4935,62 +4936,38 @@ function renderWarranty(){
       <div class="cap">아래 건들은 모든 집계·차트·표에서 빠집니다. 홈페이지와 수치를 맞출 때 사용하세요.</div>
       ${exRows.length?`<div class="tbl-wrap"><table><thead><tr>${tcols.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}<th></th></tr></thead><tbody>${exRows.slice(0,300).map(r=>`<tr>${tcols.map(c=>`<td>${escapeHtml(r[c]||'-')}</td>`).join('')}<td style="text-align:right"><button class="viewbtn warr-restore" data-key="${escapeHtml(warrRecKey(r))}">복원</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">제외된 건이 없습니다.</div>'}
     </div>` : '';
-  // ── 탭 ──
-  const _TABS=[['overview','개요'],['customer','고객'],['vehicle','차량'],['product','제품'],['region','지역']];
-  const tabBar=`<div class="wtabs">${_TABS.map(([k,t])=>`<button class="wtab ${WV.tab===k?'on':''}" data-wtab="${k}">${t}</button>`).join('')}</div>`;
-  const _grid=cards=>{ const c=cards.filter(Boolean); return c.length?`<div class="biz-grid">${c.join('')}</div>`:'<div class="card"><div class="empty">이 데이터엔 해당 항목 컬럼이 없습니다.</div></div>'; };
-  const agY=v=>/^y/i.test(v)||(/동의/.test(v)&&!/미|비동의|거부|n/i.test(v));
-  let tabHTML='';
-  if(WV.tab==='overview'){
-    tabHTML = kpis + trendCard + (breakdownCards?`<div class="biz-grid">${breakdownCards}</div>`:'');
-  } else if(WV.tab==='customer'){
-    const mkt=_warrHas('마케팅동의')?_warrRatio(recs,'마케팅동의',agY):null;
-    const pii=_warrHas('개인정보동의')?_warrRatio(recs,'개인정보동의',agY):null;
-    tabHTML = warrKpiCard('고객 동의 · 규모', [{l:'총 고객(건)',v:recs.length.toLocaleString(),m:'시공 건수'}]
-        .concat(mkt?[{l:'마케팅 동의',v:mkt.pct.toFixed(0)+'%',m:mkt.y.toLocaleString()+'명 · CRM 활용 가능'}]:[])
-        .concat(pii?[{l:'개인정보 동의',v:pii.pct.toFixed(0)+'%',m:pii.y.toLocaleString()+'명'}]:[]))
-      + _grid([
-        warrDistCard(recs,'고객 성별','성별 분포',{color:'#3b82f6'}),
-        warrDistCard(recs,'고객 연령대/나이','연령대 분포',{color:'#8b5cf6',n:12,orderFn:(a,b)=>(parseInt(a[0])||999)-(parseInt(b[0])||999)}),
-        warrDistCard(recs,'고객 거주 지역','고객 거주 지역(도)',{color:'#10b981',n:17}),
-        warrDistCard(recs,'고객 거주 시군구','고객 거주 시군구 TOP',{color:'#10b981',n:12}),
-      ]);
-  } else if(WV.tab==='vehicle'){
-    const newR=_warrHas('신차/중고차')?_warrRatio(recs,'신차/중고차',v=>v.indexOf('신차')===0):null;
-    const impR=_warrHas('수입/국산')?_warrRatio(recs,'수입/국산',v=>/수입/.test(v)):null;
-    tabHTML = warrKpiCard('차량 구성', (newR?[{l:'신차 비율',v:newR.pct.toFixed(0)+'%',m:'신차 '+newR.y.toLocaleString()+'대'}]:[])
-        .concat(impR?[{l:'수입차 비율',v:impR.pct.toFixed(0)+'%',m:'수입 '+impR.y.toLocaleString()+'대'}]:[])
-        .concat([{l:'제조사 수',v:distinct(recs,'제조사').toLocaleString(),m:'브랜드'},{l:'모델 수',v:distinct(recs,'모델명').toLocaleString(),m:'모델'}]))
-      + _grid([
-        warrDistCard(recs,'제조사','제조사 TOP',{color:'#f4911c',n:12}),
-        warrDistCard(recs,'모델명','모델 TOP',{color:'#f4911c',n:12}),
-        warrDistCard(recs,'차종','차종 구성',{color:'#3b82f6'}),
-        warrDistCard(recs,'수입/국산','수입/국산',{color:'#8b5cf6'}),
-        warrDistCard(recs,'신차/중고차','신차/중고',{color:'#10b981'}),
-      ]);
-  } else if(WV.tab==='product'){
-    const pc=['시공내역(전면)','시공내역(측면1열)','시공내역(측면2열)','시공내역(측면3열)','시공내역(후면)','시공내역(썬루프)','시공내역(파노라마 썬루프)'].filter(_warrHas);
-    let full=0,part=0,ps=0,pn=0;
-    recs.forEach(r=>{ const cnt=pc.filter(c=>String(r[c]==null?'':r[c]).trim()).length; if(!cnt)return; ps+=cnt; pn++; const f=String(r['시공내역(전면)']||'').trim(),s=String(r['시공내역(측면1열)']||'').trim(),b=String(r['시공내역(후면)']||'').trim(); if(f&&s&&b)full++; else part++; });
-    const tt=full+part||1;
-    tabHTML = warrKpiCard('시공 형태', [{l:'전체 시공',v:(full/tt*100).toFixed(0)+'%',m:'전·측·후 모두 '+full.toLocaleString()+'대'},{l:'부분 시공',v:(part/tt*100).toFixed(0)+'%',m:part.toLocaleString()+'대'},{l:'평균 시공 면',v:(pn?ps/pn:0).toFixed(1),m:'대당 패널 수'}])
-      + _grid([
-        warrDistCard(recs,'시공내역(전면)','전면 제품 TOP',{label:true,color:'#16a34a',n:12}),
-        warrDistCard(recs,'시공내역(측면1열)','측면 제품 TOP',{label:true,color:'#3b82f6',n:12}),
-        warrDistCard(recs,'시공내역(후면)','후면 제품 TOP',{label:true,color:'#8b5cf6',n:12}),
-        warrDistCard(recs,'시공내역(썬루프)','썬루프 제품',{label:true,color:'#f4911c',n:10}),
-      ]);
-  } else if(WV.tab==='region'){
-    tabHTML = _grid([
-      warrDistCard(recsProd,'담당지부','담당지부 구성',{color:'#f4911c',n:12}),
-      warrDistCard(recs,'대리점지역(도)','지역(도) 구성',{color:'#3b82f6',n:17}),
-      warrDistCard(recs,'대리점지역(시군구)','시군구 TOP',{color:'#10b981',n:15}),
-      warrDistCard(recs,'매장명','매장(대리점) TOP',{color:'#8b5cf6',n:15}),
-      warrDistCard(recs,'대리점구분','대리점 구분',{color:'#ec4899'}),
-    ]);
-  }
+  // ── 분석 섹션(세로 스택) ──
+  const _grid=cards=>{ const c=cards.filter(Boolean); return c.length?`<div class="biz-grid">${c.join('')}</div>`:''; };
+  const _sec=t=>`<div class="warr-sec"><span class="dot"></span>${t}</div>`;
+  const agY=v=>{ const s=String(v).trim().toLowerCase(); if(!s) return false; if(/^(x|n|0|false|아니|미동의|비동의|거부|거절|off|no)/.test(s)) return false; return /^(o|y|예|동의|수신|true|1|허용|yes|on)/.test(s)||(/동의/.test(s)&&!/미|비/.test(s)); };
+  // 고객
+  const mkt=_warrHas('마케팅동의')?_warrRatio(recs,'마케팅동의',agY):null;
+  const pii=_warrHas('개인정보동의')?_warrRatio(recs,'개인정보동의',agY):null;
+  const custCards=[ warrDistCard(recs,'고객 성별','성별 분포',{color:'#3b82f6'}), warrDistCard(recs,'고객 연령대/나이','연령대 분포',{color:'#8b5cf6',n:12,orderFn:(a,b)=>(parseInt(a[0])||999)-(parseInt(b[0])||999)}), warrDistCard(recs,'고객 거주 지역','고객 거주 지역(도)',{color:'#10b981',n:17}), warrDistCard(recs,'고객 거주 시군구','고객 거주 시군구 TOP',{color:'#10b981',n:12}) ];
+  const custKpi=(mkt||pii)? warrKpiCard('고객 동의 · 규모', [{l:'총 고객(건)',v:recs.length.toLocaleString(),m:'시공 건수'}].concat(mkt?[{l:'마케팅 동의',v:mkt.pct.toFixed(0)+'%',m:mkt.y.toLocaleString()+'명 · CRM 활용 가능'}]:[]).concat(pii?[{l:'개인정보 동의',v:pii.pct.toFixed(0)+'%',m:pii.y.toLocaleString()+'명'}]:[])) : '';
+  const custBlock=(custKpi||custCards.some(Boolean))?(_sec('고객')+custKpi+_grid(custCards)):'';
+  // 차량
+  const newR=_warrHas('신차/중고차')?_warrRatio(recs,'신차/중고차',v=>v.indexOf('신차')===0):null;
+  const impR=_warrHas('수입/국산')?_warrRatio(recs,'수입/국산',v=>/수입/.test(v)):null;
+  const vehCards=[ warrDistCard(recs,'제조사','제조사 TOP',{color:'#f4911c',n:12}), warrDistCard(recs,'모델명','모델 TOP',{color:'#f4911c',n:12}), warrDistCard(recs,'차종','차종 구성',{color:'#3b82f6'}), warrDistCard(recs,'수입/국산','수입/국산',{color:'#8b5cf6'}), warrDistCard(recs,'신차/중고차','신차/중고',{color:'#10b981'}) ];
+  const vehKpi=vehCards.some(Boolean)? warrKpiCard('차량 구성', (newR?[{l:'신차 비율',v:newR.pct.toFixed(0)+'%',m:'신차 '+newR.y.toLocaleString()+'대'}]:[]).concat(impR?[{l:'수입차 비율',v:impR.pct.toFixed(0)+'%',m:'수입 '+impR.y.toLocaleString()+'대'}]:[]).concat(_warrHas('제조사')?[{l:'제조사 수',v:distinct(recs,'제조사').toLocaleString(),m:'브랜드'}]:[]).concat(_warrHas('모델명')?[{l:'모델 수',v:distinct(recs,'모델명').toLocaleString(),m:'모델'}]:[])) : '';
+  const vehBlock=vehCards.some(Boolean)?(_sec('차량')+vehKpi+_grid(vehCards)):'';
+  // 제품
+  const pc=['시공내역(전면)','시공내역(측면1열)','시공내역(측면2열)','시공내역(측면3열)','시공내역(후면)','시공내역(썬루프)','시공내역(파노라마 썬루프)'].filter(_warrHas);
+  let _full=0,_part=0,_ps=0,_pn=0;
+  if(pc.length) recs.forEach(r=>{ const cnt=pc.filter(c=>String(r[c]==null?'':r[c]).trim()).length; if(!cnt)return; _ps+=cnt;_pn++; const f=String(r['시공내역(전면)']||'').trim(),s=String(r['시공내역(측면1열)']||'').trim(),b=String(r['시공내역(후면)']||'').trim(); if(f&&s&&b)_full++; else _part++; });
+  const _tt=_full+_part||1;
+  const prodCards=[ warrDistCard(recs,'시공내역(전면)','전면 제품 TOP',{label:true,color:'#16a34a',n:12}), warrDistCard(recs,'시공내역(측면1열)','측면 제품 TOP',{label:true,color:'#3b82f6',n:12}), warrDistCard(recs,'시공내역(후면)','후면 제품 TOP',{label:true,color:'#8b5cf6',n:12}), warrDistCard(recs,'시공내역(썬루프)','썬루프 제품',{label:true,color:'#f4911c',n:10}) ];
+  const prodKpi=pc.length? warrKpiCard('시공 형태', [{l:'전체 시공',v:(_full/_tt*100).toFixed(0)+'%',m:'전·측·후 모두 '+_full.toLocaleString()+'대'},{l:'부분 시공',v:(_part/_tt*100).toFixed(0)+'%',m:_part.toLocaleString()+'대'},{l:'평균 시공 면',v:(_pn?_ps/_pn:0).toFixed(1),m:'대당 패널 수'}]) : '';
+  const prodBlock=prodCards.some(Boolean)?(_sec('제품')+prodKpi+_grid(prodCards)):'';
+  // 지역
+  const regCards=[ warrDistCard(recsProd,'담당지부','담당지부 구성',{color:'#f4911c',n:12}), warrDistCard(recs,'대리점지역(도)','지역(도) 구성',{color:'#3b82f6',n:17}), warrDistCard(recs,'대리점지역(시군구)','시군구 TOP',{color:'#10b981',n:15}), warrDistCard(recs,'매장명','매장(대리점) TOP',{color:'#8b5cf6',n:15}), warrDistCard(recs,'대리점구분','대리점 구분',{color:'#ec4899'}) ];
+  const regBlock=regCards.some(Boolean)?(_sec('지역')+_grid(regCards)):'';
   const adminRow = admin ? `<div style="margin-bottom:16px;display:flex;justify-content:flex-end"><button class="acc-btn" id="warrExclToggle">집계 제외 관리 (${exRows.length})</button></div>` : '';
-  box.innerHTML = cfgCard + controls + tabBar + adminRow + tabHTML + exPanel;
+  box.innerHTML = cfgCard + controls + kpis + trendCard
+    + (breakdownCards?`<div class="biz-grid">${breakdownCards}</div>`:'')
+    + custBlock + vehBlock + prodBlock + regBlock
+    + adminRow + exPanel;
 }
 
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
