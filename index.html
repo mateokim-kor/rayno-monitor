@@ -411,6 +411,29 @@
 
   .pm-head-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .pm-vtoggle{display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+  .pcal-card{padding:14px 16px 12px}
+  .pcal-nav{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .pcal-navbtn{width:30px;height:30px;border:1px solid var(--line2);background:var(--card);border-radius:8px;font-size:18px;line-height:1;cursor:pointer;color:var(--ink)}
+  .pcal-navbtn:hover{background:var(--bg2)}
+  .pcal-title{font-weight:800;font-size:15px}
+  .pcal-today{margin-left:auto;border:1px solid var(--line2);background:var(--card);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;color:var(--ink)}
+  .pcal-head{display:grid;grid-template-columns:repeat(7,1fr)}
+  .pcal-hd{text-align:center;font-size:11px;font-weight:700;color:var(--ink3);padding:5px 0}
+  .pcal-hd.sun{color:#e5484d}.pcal-hd.sat{color:#3b82f6}
+  .pcal-week{position:relative;display:grid;grid-template-columns:repeat(7,1fr);border-top:1px solid var(--line)}
+  .pcal-day{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:3px 4px;min-height:62px;box-sizing:border-box}
+  .pcal-day:first-child{border-left:1px solid var(--line)}
+  .pcal-day.other{background:var(--bg2)}
+  .pcal-day.today{background:rgba(244,145,28,.10)}
+  .pcal-dn{font-size:11px;color:var(--ink2)}.pcal-day.other .pcal-dn{opacity:.45}
+  .pcal-dn.sun{color:#e5484d}.pcal-dn.sat{color:#3b82f6}
+  .pcal-bar{position:absolute;height:18px;line-height:18px;font-size:10.5px;font-weight:600;color:#fff;padding:0 6px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box;border-radius:0;opacity:.96}
+  .pcal-bar.r-l,.pcal-bar.r-lr{border-top-left-radius:5px;border-bottom-left-radius:5px;margin-left:2px}
+  .pcal-bar.r-r,.pcal-bar.r-lr{border-top-right-radius:5px;border-bottom-right-radius:5px}
+  .pcal-bar.r-l,.pcal-bar.r-lr,.pcal-bar.r-r{}
+  .pcal-bar.ended{opacity:.5}
+  .pcal-foot{font-size:11.5px;color:var(--ink3);margin-top:9px}
+
   .pm-vt{padding:7px 14px;font-size:12.5px;font-weight:700;color:var(--ink2);cursor:pointer;background:var(--card)}
   .pm-vt+.pm-vt{border-left:1px solid var(--line2)}
   .pm-vt.on{background:var(--amber);color:#fff}
@@ -1376,7 +1399,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 지역화이트스페이스';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 프로모션달력';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4457,7 +4480,8 @@ let workspace='cafe', rview='revenue', raynoUnlocked=false, warrCfgOpen=false;
 let PROMO={version:1,items:[]}, promoLoaded=false, _promoWired=false, _promoEdit=null;
 let _promoFilter={comp:'',channel:'',status:''};
 const PROMO_CHANNELS=['홈페이지','이벤트페이지','인스타그램','네이버 블로그·카페','유튜브','기타'];
-let _promoView='card';
+let _promoView='calendar';
+let _promoCalYM=null;
 const _promoMemoExpand=new Set();
 function promoMemoBlock(it){
   if(!it.memo) return '';
@@ -4472,6 +4496,37 @@ function promoMemoBlock(it){
 function promoNewCount(){ let seen=0; try{ seen=+(localStorage.getItem('raynoPromoSeen')||0); }catch(e){} return (PROMO.items||[]).filter(it=>(it.createdAt||0)>seen).length; }
 function markPromoSeen(){ try{ localStorage.setItem('raynoPromoSeen', String(Date.now())); }catch(e){} }
 function updatePromoBadge(){ const b=document.getElementById('promoBadge'); if(!b)return; const n=promoNewCount(); if(n>0){ b.textContent=n>99?'99+':n; b.style.display=''; } else b.style.display='none'; }
+function _promoCalCurYM(){ if(_promoCalYM) return _promoCalYM; const t=new Date(); return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0'); }
+function _ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function promoCalendarHTML(items){
+  const ym=_promoCalCurYM(); const [Y,M]=ym.split('-').map(Number);
+  const first=new Date(Y,M-1,1), daysIn=new Date(Y,M,0).getDate(), startWd=first.getDay();
+  const cells=[]; for(let i=0;i<startWd;i++) cells.push(new Date(Y,M-1,1-(startWd-i)));
+  for(let d=1; d<=daysIn; d++) cells.push(new Date(Y,M-1,d));
+  while(cells.length%7!==0){ const lastC=cells[cells.length-1]; cells.push(new Date(lastC.getFullYear(),lastC.getMonth(),lastC.getDate()+1)); }
+  const weeks=[]; for(let i=0;i<cells.length;i+=7) weeks.push(cells.slice(i,i+7));
+  const todayStr=_ymd(new Date());
+  const noDate=items.filter(it=>!it.start).length;
+  let html=`<div class="card pcal-card"><div class="pcal-nav"><button class="pcal-navbtn" data-pcal="prev">‹</button><div class="pcal-title">${Y}년 ${M}월</div><button class="pcal-navbtn" data-pcal="next">›</button><button class="pcal-today" data-pcal="today">오늘</button></div>`;
+  html+=`<div class="pcal-head">${['일','월','화','수','목','금','토'].map((w,i)=>`<div class="pcal-hd${i===0?' sun':i===6?' sat':''}">${w}</div>`).join('')}</div>`;
+  weeks.forEach(week=>{
+    const wkS=_ymd(week[0]), wkE=_ymd(week[6]);
+    const bars=[];
+    items.forEach(it=>{ const s=it.start; if(!s) return; const e=it.end||'9999-12-31'; if(e<wkS||s>wkE) return;
+      let c0=-1,c1=-1; for(let i=0;i<7;i++){ const ds=_ymd(week[i]); if(ds>=s&&ds<=e){ if(c0<0)c0=i; c1=i; } }
+      if(c0<0) return; bars.push({it,c0,c1,startsHere:s>=wkS,endsHere:(it.end?e<=wkE:false)}); });
+    bars.sort((a,b)=> a.c0-b.c0 || (b.c1-b.c0)-(a.c1-a.c0));
+    const lanes=[]; bars.forEach(b=>{ let placed=false; for(let li=0;li<lanes.length;li++){ if(lanes[li] < b.c0){ lanes[li]=b.c1; b.lane=li; placed=true; break; } } if(!placed){ b.lane=lanes.length; lanes.push(b.c1); } });
+    const laneN=lanes.length, wH=Math.max(62, 24+laneN*20+6);
+    html+=`<div class="pcal-week" style="min-height:${wH}px">`;
+    html+=week.map(d=>{ const ds=_ymd(d); const other=d.getMonth()!==(M-1); const today=ds===todayStr; const wd=d.getDay(); return `<div class="pcal-day${other?' other':''}${today?' today':''}"><span class="pcal-dn${wd===0?' sun':wd===6?' sat':''}">${d.getDate()}</span></div>`; }).join('');
+    bars.forEach(b=>{ const left=(b.c0/7*100), width=((b.c1-b.c0+1)/7*100), top=22+b.lane*20; const col=promoCompColor(b.it.comp); const ended=promoStatus(b.it)==='종료'; const rc=(b.startsHere?'l':'')+(b.endsHere?'r':'')||'mid';
+      html+=`<div class="pcal-bar r-${rc}${ended?' ended':''}" style="left:${left}%;width:${width}%;top:${top}px;background:${col}" title="${escapeHtml((b.it.comp||'')+' · '+(b.it.title||'')+' · '+(b.it.start||'?')+'~'+(b.it.end||'상시')+(b.it.benefit?' · '+b.it.benefit:''))}">${escapeHtml((b.it.comp?b.it.comp+' ':'')+(b.it.title||''))}</div>`; });
+    html+=`</div>`;
+  });
+  html+=`<div class="pcal-foot">막대에 마우스를 올리면 상세가 보입니다.${noDate?` · 날짜가 없는 <b>${noDate}</b>건은 카드 보기에서 확인하세요.`:''}</div></div>`;
+  return html;
+}
 function promoTimelineHTML(items){
   const withP=items.filter(it=>it.start||it.end), noP=items.filter(it=>!it.start&&!it.end);
   if(!withP.length) return `<div class="card"><div class="empty">기간이 입력된 프로모션이 없어 타임라인을 표시할 수 없습니다. 카드 보기를 이용하거나 기간을 입력해 주세요.</div></div>`;
@@ -4513,12 +4568,14 @@ function _renderPromoImpl(box){
   const chanFilter=chans.length?`<div class="pm-frow"><span class="pm-flbl">채널</span>${fchip('channel','','전체',!_promoFilter.channel)}${chans.map(c=>fchip('channel',c,c,_promoFilter.channel===c)).join('')}</div>`:'';
   const statFilter=`<div class="pm-frow"><span class="pm-flbl">상태</span>${['','진행중','예정','종료'].map(s=>fchip('status',s,s||'전체',_promoFilter.status===s)).join('')}</div>`;
   const active=items.filter(i=>promoStatus(i)==='진행중').length;
-  const viewToggle=`<div class="pm-vtoggle"><span class="pm-vt ${_promoView==='card'?'on':''}" data-pview="card">카드</span><span class="pm-vt ${_promoView==='timeline'?'on':''}" data-pview="timeline">타임라인</span></div>`;
+  const viewToggle=`<div class="pm-vtoggle"><span class="pm-vt ${_promoView==='card'?'on':''}" data-pview="card">카드</span><span class="pm-vt ${_promoView==='timeline'?'on':''}" data-pview="timeline">타임라인</span><span class="pm-vt ${_promoView==='calendar'?'on':''}" data-pview="calendar">달력</span></div>`;
   const head=`<div class="card pm-head"><div class="pm-head-top"><div><h3 class="pm-title">🎯 경쟁사 프로모션 모니터링</h3><div class="cap">경쟁사 홈페이지·이벤트페이지·SNS에서 확인한 프로모션을 기록·추적합니다. ${admin?'‘＋ 프로모션 추가’로 직접 등록하세요.':'(등록은 관리자만 가능합니다)'}</div></div><div class="pm-head-right">${viewToggle}${admin?`<button class="pm-add" data-pact="add">＋ 프로모션 추가</button>`:''}</div></div><div class="pm-stat">전체 <b>${items.length}</b>건 · 진행중 <b style="color:var(--pos)">${active}</b>건</div>${compFilter}${chanFilter}${statFilter}</div>`;
   let body;
   if(!items.length) body=`<div class="card"><div class="empty">${admin?'아직 등록된 프로모션이 없습니다. ‘＋ 프로모션 추가’로 첫 항목을 등록해 보세요.':'아직 등록된 경쟁사 프로모션이 없습니다.'}</div></div>`;
   else if(!view.length) body=`<div class="card"><div class="empty">조건에 맞는 프로모션이 없습니다.</div></div>`;
-  else body = _promoView==='timeline' ? promoTimelineHTML(view) : view.map(it=>promoCardHTML(it,admin)).join('');
+  else if(_promoView==='timeline') body=promoTimelineHTML(view);
+  else if(_promoView==='calendar') body=promoCalendarHTML(view);
+  else body=view.map(it=>promoCardHTML(it,admin)).join('');
   box.innerHTML=head+body;
 }
 function promoCardHTML(it,admin){
@@ -4541,7 +4598,8 @@ function promoFormHTML(which){
     <div class="pm-fbtns"><button class="pm-cancel" data-pact="cancel">취소</button><button class="pm-save" data-pact="save" data-id="${escapeHtml(which)}">저장</button></div></div>`;
 }
 async function onPromoClick(e){
-  const t=e.target.closest('[data-pact],[data-pfilter],[data-pview]'); if(!t)return;
+  const t=e.target.closest('[data-pact],[data-pfilter],[data-pview],[data-pcal]'); if(!t)return;
+  if(t.dataset.pcal){ let [Y,M]=_promoCalCurYM().split('-').map(Number); const a=t.dataset.pcal; if(a==='prev'){ M--; if(M<1){M=12;Y--;} } else if(a==='next'){ M++; if(M>12){M=1;Y++;} } else { const d=new Date(); Y=d.getFullYear(); M=d.getMonth()+1; } _promoCalYM=Y+'-'+String(M).padStart(2,'0'); renderPromo(); return; }
   if(t.dataset.pview){ _promoView=t.dataset.pview; renderPromo(); return; }
   if(t.dataset.pfilter){ _promoFilter[t.dataset.pfilter]=t.dataset.val; renderPromo(); return; }
   const act=t.dataset.pact;
