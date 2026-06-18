@@ -1408,7 +1408,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 지부표_점유율정렬';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 지부합계열_점유율일관화';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2439,12 +2439,12 @@ function shareExplain(kind, m){
   const ml=m+'월';
   let title, formula, calc, note;
   if(kind==='warr'){
-    const inst=_qc(m);
-    title='시장 점유율 · 품질보증서 ('+ml+')';
-    formula='그 달 <b>품질보증서 실시공 건수</b> ÷ <b>신차 등록(월 출고 대수)</b> × 100';
+    const inst=_qcNew(m);
+    title='신차 장착률 · 보증서 ('+ml+')';
+    formula='그 달 <b>신차 보증서 실시공(신차만, 중고 제외)</b> ÷ <b>신차 등록(월 출고 대수)</b> × 100';
     calc = cr>0 ? `${N(inst)}건 ÷ ${N(cr)}대 × 100 = <b style="color:#16a34a">${F(inst/cr*100)}%</b>`
-                : `실시공 ${N(inst)}건 — 신차 등록이 입력되지 않아 점유율을 계산할 수 없습니다.`;
-    note='실시공 건수는 품질보증서 탭에서 자동 집계됩니다. 신차 등록은 설정 → 매출에서 월별로 입력하세요.';
+                : `신차 실시공 ${N(inst)}건 — 신차 등록이 입력되지 않아 계산할 수 없습니다.`;
+    note='보증서의 신차/중고차=신차 건만 집계합니다(중고 제외). 그래서 전체 시공 기준보다 낮게 나옵니다. 신차 등록은 설정 → 매출에서 입력.';
   } else if(kind==='dealer'){
     const rolls=_sNum((scc.dealerSales||{})[m]||0), cap=_sNum(scc.regionCap||0)||10, cars=rolls*cap;
     title='시장 점유율 · 대리점 판매 ('+ml+')';
@@ -5144,17 +5144,17 @@ function renderRevenue(){
   // ── 차트 대시보드 ──
   const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
   // 시장 점유율(선택 기간) 헤드라인 — 월 선택에 따라 변동
-  const _crp=_carRegPick(), _shFmt=v=> v!=null? v.toFixed(1)+'%':'—';
-  const _shW=_crp>0? _qcPick()/_crp*100 : null;
+  const _crp=_natCarRegPick(), _shFmt=v=> v!=null? v.toFixed(1)+'%':'—';   // 신차 카드와 동일 분모
+  const _shW=_crp>0? _qcNewPick()/_crp*100 : null;   // 보증서=신차 실시공만
   const _shD=_crp>0? _dealerPick()/_crp*100 : null;
   const _shS=_crp>0? (_rollCarsPick('B2C')+_rollCarsPick('B2B'))/_crp*100 : null;
   let charts=`<div class="sales-charts" style="margin-bottom:13px">`
     + chartCard('cRevTrend','월별 매출 추이','채널별 매출(원)')
     + chartCard('cChannel','채널 구성 · '+lab,'매출 비중')
     + chartCard('cProdTop','제품 TOP · '+lab,'롤 중분류별 판매수량')
-    + chartCard('cShareWarr','시장 점유율 · 품질보증서',lab+' 기준 · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 실시공 · 막대를 누르면 계산식</span>')
-    + chartCard('cShareDealer','시장 점유율 · 대리점 판매',lab+' 기준 · <b style="color:#f4911c">'+_shFmt(_shD)+'</b> <span style="color:var(--ink3)">· 수기 · 막대를 누르면 계산식</span>')
-    + chartCard('cShareSales','시장 점유율 · 판매(합계)',lab+' 기준 · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· 롤×시공대수 · 막대를 누르면 계산식</span>')
+    + chartCard('cShareWarr','신차 장착률 · 보증서(실측)',lab+' · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 신차 실시공 ÷ 신차 등록 · 막대=계산식</span>')
+    + chartCard('cShareDealer','출고 추정 · 대리점',lab+' · <b style="color:#f4911c">'+_shFmt(_shD)+'</b> <span style="color:var(--ink3)">· 대리점 롤×시공대수 ÷ 신차 등록</span>')
+    + chartCard('cShareSales','출고 추정 · ERP 판매',lab+' · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· ERP 롤×시공대수 ÷ 신차 등록</span>')
     + `</div>`;
 
   let s1=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>구성비</th></tr>`;
@@ -5261,7 +5261,7 @@ function drawSalesCharts(){
           plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>c.parsed.y!=null?c.parsed.y+'%':'-'}} },
           scales:{ x:{grid:{display:false},ticks:{color:ck.text}}, y:{beginAtZero:true,grid:{color:ck.grid},ticks:{color:ck.text,callback:v=>v+'%'}} } } });
     };
-    shareBar('cShareWarr', m=>_qc(m), '#16a34a', 'warr');
+    shareBar('cShareWarr', m=>_qcNew(m), '#16a34a', 'warr');
     shareBar('cShareSales', m=>_rollCars('B2C',m)+_rollCars('B2B',m), '#3b82f6', 'sales');
     const dealerEl=document.getElementById('cShareDealer');
     if(dealerEl){
@@ -5341,7 +5341,7 @@ function salesKPI(){
   const eok=n=>(n/1e8).toFixed(1), won=n=>Math.round(n||0).toLocaleString();
   const entT=_sPick(C.B2C.ma)+_sPick(C.B2B.ma)+_sPick(C['별도채널'].ma);   // 선택 월 기준
   const bbT=_sPick(C.B2C.ma)+_sPick(C.B2B.ma);
-  const wT=_qcPick(), crT=_carRegPick();   // 차트 헤드라인과 동일(선택 월)
+  const wT=_qcNewPick(), crT=_natCarRegPick();   // 신차 장착률(신차 시공 ÷ 신차 등록) · 신차 카드와 동일
   let rollQ=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; rollQ+=_sPick(SALES.prodAll[p].mq); });
   const share= crT>0? (wT/crT*100).toFixed(2)+'%':'—';
   const kpi=(t,v,s)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px"><div style="font-size:12px;color:var(--ink2);margin-bottom:5px">${t}</div><div style="font-size:21px;font-weight:800;color:var(--ink)">${v}</div><div style="font-size:11px;color:var(--ink2);margin-top:3px">${s||''}</div></div>`;
@@ -5349,7 +5349,7 @@ function salesKPI(){
     + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도 · 별도채널 포함')
     + kpi('B2C+B2B 합계', eok(bbT)+'억', entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'')
     + kpi('롤 판매수량', won(rollQ)+' 롤', '제외 항목 미포함')
-    + kpi('시장점유율(품질보증서)', share, crT?`보증서 ${won(wT)} / 신차 ${won(crT)}`:'설정에서 입력')
+    + kpi('신차 장착률(보증서)', share, crT?`신차 시공 ${won(wT)} ÷ 신차 등록 ${won(crT)}`:'설정에서 신차 등록 입력')
     + `</div>`;
 }
 function salesCompareCard(){
@@ -5395,6 +5395,8 @@ function salesSummaryTable(){
 // ── 설정 워크스페이스: 매출 설정 ──
 // 품질보증서 월별 건수: 프로그램의 품질보증서(WARR) 데이터에서 시공일자 기준 자동 집계 (없으면 수기값)
 function _qc(m){ if(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length){ return _warrByJibu(m).total; } return _sNum(((salesCfg().warranty)||{})[m]||0); }
+function _qcNew(m){ if(!(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)) return _sNum(((salesCfg().warranty)||{})[m]||0); if(!(WARR.columns&&WARR.columns.includes('신차/중고차'))) return _qc(m); let n=0; WARR.rows.forEach(r=>{ if(!_warrIsNew(r))return; const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(mm===m)n++; }); return n; }  // 신차 보증서만(중고 제외), 컬럼 없으면 전체로 폴백
+function _qcNewPick(){ let s=0; _salesActive().forEach(m=>s+=_qcNew(m)); return s; }
 function _qcTot(){ let s=0; _salesMonths().forEach(m=>s+=_qc(m)); return s; }
 
 // ── 롤당 시공대수 + 시장점유율(판매/대리점 기준) ──
@@ -5539,11 +5541,14 @@ function salesJibuRollTable(){
   const totQ=_sMz(), totA=_sMz(); for(let m=1;m<=12;m++){ rows.forEach(r=>totQ[m]+=r.q[m]); totA[m]=C.B2C.ma[m]||0; }
   const thl=`class="l"`, th=``, tdl=`class="l"`, td=``;
   const shr=(a,m)=> (C.B2C.ma[m]>0)? (a/C.B2C.ma[m]*100).toFixed(2)+'%':'—';
-  let h=`<div class="iv-wrap"><table class="iv iv-sticky"><tr><th ${thl}>구분</th>${M.map(m=>`<th ${th}>${m}월 롤수</th><th ${th}>${m}월 매출액</th><th ${th}>${m}월 점유율</th>`).join('')}</tr>`;
-  rows.forEach(r=>{ h+=`<tr><td ${tdl}>${r.j==='본사'?'<b>본사</b>':r.j}</td>${M.map(m=>`<td>${roll(r.q[m])}</td><td>${won(r.a[m])}</td><td>${shr(r.a[m],m)}</td>`).join('')}</tr>`; });
-  h+=`<tr><td ${tdl}>기타 자재</td>${M.map(m=>`<td>0</td><td>${won(etcA[m])}</td><td>${shr(etcA[m],m)}</td>`).join('')}</tr>`;
-  h+=`<tr class="grand"><td class="l">합계</td>${M.map(m=>`<td>${roll(totQ[m])}</td><td>${won(totA[m])}</td><td>100%</td>`).join('')}</tr>`;
-  h+=`</table></div><div style="font-size:11px;color:var(--ink2);margin-top:6px">매출액=롤 매출(기타 자재=비롤 매출) · 점유율=매출 구성비(지부÷B2C 총매출) · 합계 매출=B2C 전체</div>`;
+  const b2cTot=M.reduce((s,m)=>s+(C.B2C.ma[m]||0),0), sumM=o=>M.reduce((s,m)=>s+(o[m]||0),0);
+  const shrT=a=> b2cTot>0? (a/b2cTot*100).toFixed(2)+'%':'—';
+  const tT='style="background:rgba(244,145,28,.10);font-weight:800"', tTL='style="background:rgba(244,145,28,.10);font-weight:800;border-right:2px solid var(--line2)"', brl='style="border-right:2px solid var(--line2)"';
+  let h=`<div class="iv-wrap"><table class="iv iv-sticky"><tr><th ${thl}>구분</th><th ${th} ${tT}>합계 롤수</th><th ${th} ${tT}>합계 매출액</th><th ${th} ${tTL}>합계 점유율</th>${M.map(m=>`<th ${th}>${m}월 롤수</th><th ${th}>${m}월 매출액</th><th ${th}>${m}월 점유율</th>`).join('')}</tr>`;
+  rows.forEach(r=>{ const rq=sumM(r.q), ra=sumM(r.a); h+=`<tr><td ${tdl}>${r.j==='본사'?'<b>본사</b>':r.j}</td><td ${tT}>${roll(rq)}</td><td ${tT}>${won(ra)}</td><td ${tTL}>${shrT(ra)}</td>${M.map(m=>`<td>${roll(r.q[m])}</td><td>${won(r.a[m])}</td><td>${shr(r.a[m],m)}</td>`).join('')}</tr>`; });
+  { const ea=sumM(etcA); h+=`<tr><td ${tdl}>기타 자재</td><td ${tT}>0</td><td ${tT}>${won(ea)}</td><td ${tTL}>${shrT(ea)}</td>${M.map(m=>`<td>0</td><td>${won(etcA[m])}</td><td>${shr(etcA[m],m)}</td>`).join('')}</tr>`; }
+  { const tq=sumM(totQ), ta=sumM(totA); h+=`<tr class="grand"><td class="l">합계</td><td>${roll(tq)}</td><td>${won(ta)}</td><td ${brl}>100%</td>${M.map(m=>`<td>${roll(totQ[m])}</td><td>${won(totA[m])}</td><td>100%</td>`).join('')}</tr>`; }
+  h+=`</table></div><div style="font-size:11px;color:var(--ink2);margin-top:6px">매출액=롤 매출(기타 자재=비롤 매출) · 점유율=매출 구성비(지부÷B2C 총매출) · 합계 매출=B2C 전체 · <b>맨 왼쪽 합계(기간 누계)의 점유율 순 정렬</b></div>`;
   return h;
 }
 
@@ -5578,14 +5583,14 @@ function salesShareTable(){
   const fmt=v=>v==null?'<span style="color:var(--ink2)">—</span>':v.toFixed(2)+'%';
   const pctOf=(num,m)=>{ const c=cr(m); return c>0?(num/c*100):null; };
   const totShare=f=>{ let n=0,c=0; M.forEach(m=>{n+=f(m);c+=cr(m);}); return c>0?(n/c*100):null; };
-  const bases=[ {n:'품질보증서 기준',s:'1장=1대·자동',f:m=>_qc(m)},
+  const bases=[ {n:'보증서 · 신차 실시공',s:'신차만·실측',f:m=>_qcNew(m)},
     {n:'대리점 판매 기준',s:'수기',f:m=>_dealerCars(m)},
     {n:'판매 기준 · B2C',s:'롤×시공대수',f:m=>_rollCars('B2C',m)},
     {n:'판매 기준 · B2B',s:'롤×시공대수',f:m=>_rollCars('B2B',m)},
     {n:'판매 기준 · 합계',s:'B2C+B2B',f:m=>_rollCars('B2C',m)+_rollCars('B2B',m),hi:1} ];
   const thl=`class="l"`, th=``, tdl=`class="l"`, td=``;
   const anyCr=M.some(m=>cr(m)>0);
-  let h=`<div class="cap" style="margin-bottom:8px">분모 = <b>월 차량 출고 대수(신차등록)</b> · ⚙설정에서 신차등록·대리점 판매·롤당 대수 입력 (롤당 10대·모노카본 17대)</div>`;
+  let h=`<div class="cap" style="margin-bottom:8px;line-height:1.65">모든 점유율의 <b>분모 = 신차 등록(시장)</b>으로 같습니다. 분자(우리 실적)를 3가지로 봅니다 — <b style="color:#16a34a">보증서</b>=실제 <b>신차</b> 시공(실측·가장 정확), <b style="color:#f4911c">대리점</b>·<b style="color:#3b82f6">판매</b>=롤 출고를 시공대수로 환산한 <b>추정치</b>라 보통 보증서보다 큽니다. ⚙설정에서 신차등록·대리점 판매·롤당 대수 입력(롤당 10대·모노카본 17대).</div>`;
   if(!anyCr) h+=`<div style="padding:9px 12px;background:rgba(244,145,28,.1);border-radius:8px;font-size:12px;margin-bottom:8px">⚠ <b>신차등록(월 출고 대수)</b>이 없어 점유율이 계산되지 않습니다. ⚙설정 → 매출 설정에서 입력하세요.</div>`;
   h+=`<div class="iv-wrap"><table class="iv iv-sticky"><tr><th ${thl}>기준</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}${showT?`<th ${th}>누적</th>`:''}</tr>`;
   bases.forEach(b=>{ h+=`<tr class="${b.hi?'sub':''}"><td class="l">${b.n} <span class="s">${b.s}</span></td>${M.map(m=>`<td>${fmt(pctOf(b.f(m),m))}</td>`).join('')}${showT?`<td>${fmt(totShare(b.f))}</td>`:''}</tr>`; });
