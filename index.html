@@ -1375,7 +1375,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · B2B모노프레스토분리';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 보증서압축저장';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4565,13 +4565,24 @@ async function onPromoClick(e){
 }
 const WARR_PII=['고객 이름','고객 연락처','차량(차대)번호','시리얼번호','정보숨김URL','할인쿠폰코드'];
 
-async function cloudLoadJSON(file){ if(!SB)return null; try{ const {data,error}=await SB.storage.from(SUPA.bucket).download(file+'?cb='+Date.now()); if(error||!data)return null; return JSON.parse(await data.text()); }catch(e){ return null; } }
+function _gzAvail(){ return typeof CompressionStream!=='undefined' && typeof DecompressionStream!=='undefined'; }
+async function _gzipBlob(str){ const cs=new CompressionStream('gzip'); const w=cs.writable.getWriter(); w.write(new TextEncoder().encode(str)); w.close(); const buf=await new Response(cs.readable).arrayBuffer(); return new Blob([buf],{type:'application/gzip'}); }
+async function _gunzipText(u8){ const ds=new DecompressionStream('gzip'); const w=ds.writable.getWriter(); w.write(u8); w.close(); return await new Response(ds.readable).text(); }
+async function cloudLoadJSON(file){ if(!SB)return null; try{ const {data,error}=await SB.storage.from(SUPA.bucket).download(file+'?cb='+Date.now()); if(error||!data)return null;
+  const u8=new Uint8Array(await data.arrayBuffer());
+  let text;
+  if(u8.length>=2 && u8[0]===0x1f && u8[1]===0x8b && _gzAvail()){ text=await _gunzipText(u8); }   // gzip 압축 파일
+  else { text=new TextDecoder().decode(u8); }                                                       // 기존 비압축 파일 호환
+  return JSON.parse(text); }catch(e){ return null; } }
 let _cloudErr='';
 async function cloudSaveJSON(file,obj){
   if(!SB){ _cloudErr='클라우드 미연결(SB 없음)'; toast('⚠ 클라우드에 연결되어 있지 않습니다.',true); return false; }
   if(auth!=='admin'){ _cloudErr='관리자 아님 (auth='+auth+')'; toast('⚠ 관리자만 저장할 수 있습니다.',true); return false; }
   try{
-    const {error}=await SB.storage.from(SUPA.bucket).upload(file, JSON.stringify(obj), {upsert:true, contentType:'application/json', cacheControl:'0'});
+    const str=JSON.stringify(obj);
+    let body=str, ctype='application/json';
+    if(str.length>1000000 && _gzAvail()){ try{ body=await _gzipBlob(str); ctype='application/gzip'; }catch(_){ body=str; ctype='application/json'; } }   // 큰 파일은 gzip(보증서 등)
+    const {error}=await SB.storage.from(SUPA.bucket).upload(file, body, {upsert:true, contentType:ctype, cacheControl:'0'});
     if(error)throw error; _cloudErr=''; return true;
   }catch(e){
     _cloudErr=(e&&(e.message||e.error||e.statusCode&&('HTTP '+e.statusCode)))||(e?JSON.stringify(e).slice(0,200):'알 수 없는 오류');
@@ -4666,7 +4677,7 @@ function handleWarrFile(file){
     if(!p||!p.rows.length){ toast('보증서 데이터를 인식하지 못했습니다. 첫 행이 헤더인지 확인하세요.',true); return; }
     mergeWarr(p); warrLoaded=true;
     const saved=await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty();
-    if(saved) toast(`✅ 저장 완료 · ${file.name} · ${p.rows.length.toLocaleString()}건 반영 → 누적 ${WARR.rows.length.toLocaleString()}건 (새로고침해도 유지됩니다)`);
+    if(saved){ const _mb=(JSON.stringify(WARR).length/1048576).toFixed(1); toast(`✅ 저장 완료 · ${file.name} · ${p.rows.length.toLocaleString()}건 반영 → 누적 ${WARR.rows.length.toLocaleString()}건 · 원본 ${_mb}MB(압축 저장) · 새로고침해도 유지`); }
     else { const _mb=(JSON.stringify(WARR).length/1048576).toFixed(1); toast(`⚠ 저장 실패: ${_cloudErr||'원인 미상'} · 데이터 ${_mb}MB · 누적 ${WARR.rows.length.toLocaleString()}건 (새로고침하면 사라집니다)`, true); }
   }catch(ex){ toast('파일 오류: '+ex.message,true); } };
   rd.readAsArrayBuffer(file);
