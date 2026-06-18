@@ -1376,7 +1376,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 보증서업로드일자보완';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 지역화이트스페이스';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5149,6 +5149,7 @@ function renderRevenue(){
     + card(hh('📈 시장 점유율 · '+lab)+salesShareTable())
     + card(hh('🗺 지역별 시장 점유율 · '+lab)+salesRegionMap())
     + card(hh('🚗 신차 장착 점유율 · '+lab)+newCarShareCard())
+    + card(hh('🎯 지역 화이트스페이스 (확장 타깃) · '+lab)+whiteSpaceCard())
     + card(hh('① 채널 요약 · '+lab)+s1)
     + card(hh('② 롤 / 일반물품 구분 · '+lab)+s2)
     + card(hh('③ 월별 매출 추이')+s3)
@@ -5356,6 +5357,48 @@ function _b2bCarsBy(re){ // 매칭되는 B2B 제품의 롤 × 롤당 대수 (활
 }
 const _RE_MONO=/모노|mono|카본|carbon/i, _RE_PRESTO=/프레스토|presto/i;
 function _b2bAutoCars(){ return _b2bCarsBy(_RE_MONO)+_b2bCarsBy(_RE_PRESTO); }
+function _warrGeoStats(){
+  const act=_salesActive(); const sido={}, sgg={};
+  ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{
+    const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(act.indexOf(mm)<0) return;
+    const k=_regionKey(r['대리점지역(도)']); if(!k) return;
+    const sg=String(r['대리점지역(시군구)']||'').trim();
+    const dealer=String(r['대리점코드']||r['매장명']||'').trim();
+    const s=sido[k]||(sido[k]={inst:0,dealers:new Set(),sgg:new Set()});
+    s.inst++; if(dealer)s.dealers.add(dealer); if(sg)s.sgg.add(sg);
+    if(sg){ const key=k+'│'+sg; const g=sgg[key]||(sgg[key]={sido:k,sgg:sg,inst:0,dealers:new Set()}); g.inst++; if(dealer)g.dealers.add(dealer); }
+  });
+  return {sido,sgg};
+}
+function whiteSpaceCard(){
+  const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const th ='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
+  const td ='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  const lab=_salesLabel();
+  if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '<div class="empty">품질보증서 데이터가 없습니다.</div>';
+  const G=_warrGeoStats();
+  const nw=_warrNewByRegion();
+  let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>장착 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
+
+  // 시·도: 점유율 낮은 순(약한 시장 먼저)
+  const sds=_REGION_KEYS.map(k=>{ const s=G.sido[k]||{inst:0,dealers:new Set(),sgg:new Set()}; const ni=nw.byRegion[k]||0; const reg=_regionCarRegPick(k); return {k, inst:s.inst, dealers:s.dealers.size, sgg:s.sgg.size, sh: reg>0? ni/reg*100 : null}; })
+    .filter(x=>x.inst>0||x.sh!=null).sort((a,b)=>{ if(a.sh==null&&b.sh==null) return b.inst-a.inst; if(a.sh==null) return 1; if(b.sh==null) return -1; return a.sh-b.sh; });
+  html+=`<div style="font-weight:700;margin:4px 0 7px">시·도 침투 (점유율 낮은 순 = 확장 여지)</div>`;
+  html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도</th><th ${th}>신차 점유율</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>시군구</th></tr>`;
+  sds.forEach(x=>{ const weak = x.sh!=null && x.sh < 5; html+=`<tr${weak?' style="background:rgba(244,145,28,.08)"':''}><td ${tdl}>${x.k}${weak?' <span style="color:var(--amber);font-size:10px;font-weight:700">확장후보</span>':''}</td><td ${td}>${x.sh!=null?x.sh.toFixed(2)+'%':'<span style="color:var(--ink2)">—</span>'}</td><td ${td}>${x.inst.toLocaleString()}</td><td ${td}>${x.dealers}</td><td ${td}>${x.sgg}</td></tr>`; });
+  html+=`</table>`;
+
+  // 시군구: 대리점당 시공 많은 순(추가 개설 여력) · 시공 3건 이상
+  const sgs=Object.values(G.sgg).filter(g=>g.inst>=3).map(g=>({...g, dn:g.dealers.size, per: g.dealers.size? g.inst/g.dealers.size : g.inst})).sort((a,b)=> b.per-a.per || b.inst-a.inst).slice(0,15);
+  if(sgs.length){
+    html+=`<div style="font-weight:700;margin:16px 0 7px">대리점 추가 여력 시군구 <span style="color:var(--ink2);font-weight:500;font-size:12px">(대리점당 시공 많은 순 · TOP 15)</span></div>`;
+    html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도 · 시군구</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>대리점당 시공</th></tr>`;
+    sgs.forEach(g=>{ const hot=g.dn<=1; html+=`<tr><td ${tdl}>${g.sido} · ${escapeHtml(g.sgg)}${hot?' <span style="color:var(--amber);font-size:10px;font-weight:700">단일대리점</span>':''}</td><td ${td}>${g.inst.toLocaleString()}</td><td ${td}>${g.dn}</td><td ${td}><b>${g.per.toFixed(1)}</b></td></tr>`; });
+    html+=`</table><div style="font-size:11px;color:var(--ink3);margin-top:7px">‘단일대리점’은 그 시군구를 한 곳이 전담 — 추가 개설·이원화 여력이 큽니다. 정확한 시군구 점유율을 원하면 시군구별 신차(또는 자동차) 등록을 확보하면 됩니다.</div>`;
+  }
+  return html;
+}
 function newCarShareCard(){
   const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
   const th ='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
