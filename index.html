@@ -1408,7 +1408,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 보증서세로스택_동의수정';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 전사메일_신포맷';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3198,118 +3198,89 @@ function buildBrandEmail(){
   const pp=(c,p)=> (p==null)?'':((c-p)>=0?` (▲${(c-p).toFixed(1)}%p)`:` (▼${(p-c).toFixed(1)}%p)`);
   const prate=o=>{ const cl=o.pos+o.neg+o.neu; return cl?Math.round(o.pos/cl*100):0; };
 
-  const subject=`[레이노 브랜드 모니터링] ${lab} 리포트 — 언급 ${M.total.toLocaleString()}건`;
+  // 기간(요일 포함)
+  const _wd=['일','월','화','수','목','금','토'];
+  const _kdate=s=>{ const d=normDate(s); if(!d) return s||''; const dt=new Date(d+'T00:00:00'); return `${+d.slice(5,7)}월 ${+d.slice(8,10)}일(${_wd[dt.getDay()]||''})`; };
+  const periodKor=(RP.from||RP.to)?`${_kdate(RP.from)} ~ ${_kdate(RP.to)}`:lab;
+  // 분석 대상 카페(전체 모니터링)
+  let monCafes=M.cafes; try{ const n=new Set((RAW.rows||[]).map(r=>r.cafe).filter(Boolean)).size; if(n>monCafes) monCafes=n; }catch(e){}
+  // 분석 키워드
+  const kws=[own, ...((typeof effProductsList==='function')?effProductsList():[])].filter(Boolean).slice(0,6);
+  // 감성 퍼센트(전체 기준)
+  const _tot=M.total||1, pPos=M.pos/_tot*100, pNeu=M.neu/_tot*100, pNeg=M.neg/_tot*100;
+  // 제품 자동 태그
+  const _prodTag=(o,i)=>{ const r=prate(o); if(i===0) return '시장 주도 제품'; if(r>=60) return '최상위 만족도'; if(r<40) return '※ 부정 언급 및 비율 지속 모니터링 필요'; return ''; };
+  // 주요 부정 게시글: 사유별 원문 URL
+  const negByReason={};
+  cur.forEach(r=>{ if(!r.isPost||rsent(r)!=='부정') return; const reason=((r.negReason||'').trim())||'기타'; const url=(r.link||'').trim(); if(!url) return; (negByReason[reason]=negByReason[reason]||[]).push(url); });
+  const negReasonEnt=Object.entries(negByReason).sort((a,b)=>b[1].length-a[1].length).slice(0,5);
+  const dash=(()=>{ try{ return location.origin+location.pathname; }catch(e){ return 'https://mateokim-kor.github.io/rayno-monitor/'; } })();
+
+  const subject=`[레이노 브랜드 모니터링] ${periodKor} 여론 분석 결과`;
   const L=[];
-  L.push('수신: 전사');
+  L.push('안녕하세요, 브랜드전략실 김도균 선임입니다 :)');
+  L.push('레이노 온라인 브랜드 언급 데이터 및 여론 분석 결과 보고드립니다.');
+  L.push(`▶ 온라인 모니터링 대시보드: ${dash}`);
   L.push('');
-  const verified=cur.filter(r=>r.vSent).length;
-  const classRate=M.total?(M.classified/M.total*100):0;
-  const verRate=M.total?(verified/M.total*100):0;
-  L.push('안녕하세요. 데이터 분석 담당입니다.');
-  L.push(`${lab} 레이노 온라인 브랜드 언급 데이터를 분석한 결과를 공유드립니다. 아래 수치는 수집된 표본을 기준으로 산출되었습니다.`);
+  L.push('전반적인 여론은 여전히 우호적인 지표를 나타내고 있으나, 주요 부정 요인이 관측되어 아래와 같이 요약 보고합니다.');
   L.push('');
-  L.push('■ 분석 개요');
-  L.push(`· 분석 기간: ${lab}`);
-  L.push(`· 표본 규모: ${M.total.toLocaleString()}건 (게시글 ${M.posts.toLocaleString()} · 댓글 ${M.cmts.toLocaleString()}) · 출처 카페 ${M.cafes}곳`);
-  L.push(`· 감성 분류 완료: ${M.classified.toLocaleString()}건 (${classRate.toFixed(0)}%) · 사람 검증 ${verified.toLocaleString()}건 (${verRate.toFixed(0)}%)`);
-  L.push('· 분석 방법: 감성 자동분류 후 일부 수기 검증 / 경쟁사·제품·사유는 본문 키워드 매칭 기반');
+  L.push('[주요 내용]');
+  L.push('1. 분석 개요');
+  L.push(`- 분석 대상: 네이버 주요 자동차·전기차 동호회 카페 총 ${monCafes}곳`);
+  L.push(`- 분석 기간: ${periodKor}`);
+  L.push(`- 표본 규모: 총 ${M.total.toLocaleString()}건 (게시글 ${M.posts.toLocaleString()}건 / 댓글 ${M.cmts.toLocaleString()}건)`);
+  if(kws.length) L.push(`- 분석 키워드: ${kws.join(', ')}`);
+  L.push(`※ 감성이 없는 '입점업체 광고 글' 같은 경우는 집계에서 제외됩니다.`);
   L.push('');
-  // 주요 관측(헤드라인)
-  L.push('━━━━━━━━━━━━━━━━━━');
-  L.push('▶ 주요 관측 (데이터 요약)');
-  let head=`${lab} 레이노 언급 ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''}`;
-  L.push('· '+head);
-  if(negR.length) L.push(`· 부정 언급의 주요 사유로 '${negR[0][0]}'${negR[1]?`, '${negR[1][0]}'`:''}이(가) 빈번하게 관측됨`);
-  if(posR.length) L.push(`· 긍정 언급은 '${posR[0][0]}'${posR[1]?`, '${posR[1][0]}'`:''} 요인에 집중`);
-  L.push('━━━━━━━━━━━━━━━━━━');
+  L.push('2. 감성 분포 및 브랜드 점유율');
+  L.push(`- 감성 지표: 긍정 ${M.pos.toLocaleString()}건(${pPos.toFixed(1)}%) | 중립 ${M.neu.toLocaleString()}건(${pNeu.toFixed(1)}%) | 부정 ${M.neg.toLocaleString()}건(${pNeg.toFixed(1)}%)`);
+  if(coEnt.length) L.push(`- 경쟁사 동시 언급 빈도 (자사 글 내 노출 수): ${coEnt.map(([b,c])=>`${b}: ${c.toLocaleString()}건 (${coTotal?Math.round(c/coTotal*100):0}%)`).join(' | ')}`);
   L.push('');
-
-  // 핵심 지표
-  L.push(`■ 정량 지표 (${lab}${P?' · 전기 대비':''})`);
-  L.push(`· 총 언급량: ${M.total.toLocaleString()}건${P?dl(M.total,P.total):''}  [게시글 ${M.posts.toLocaleString()} · 댓글 ${M.cmts.toLocaleString()}]`);
-  L.push(`· 감성 분류: 긍정 ${M.pos.toLocaleString()} · 부정 ${M.neg.toLocaleString()} · 중립 ${M.neu.toLocaleString()} (분류 ${M.classified.toLocaleString()}건)`);
-  L.push(`· 긍정률 ${M.posRate.toFixed(1)}%${P?pp(M.posRate,P.posRate):''} / 부정률 ${M.negRate.toFixed(1)}%${P?pp(M.negRate,P.negRate):''}`);
-  L.push(`· 활동 카페 ${M.cafes}곳`);
-  L.push('');
-
-  // 감성 추세
-  if(trend.length>=2){
-    L.push('■ 감성 추세 (긍정률 흐름)');
-    L.push('· '+trend.map(t=>`${t.label} ${t.posRate}%`).join('  →  '));
+  if(pEnt.length){
+    L.push('3. 제품별 여론 분석');
+    pEnt.forEach(([p,o],i)=>{ const tag=_prodTag(o,i); L.push(`- ${p}: ${o.n.toLocaleString()}건 (긍정 ${o.pos} / 부정 ${o.neg}) | 긍정률 ${prate(o)}%${tag?` (${tag})`:''}`); });
     L.push('');
   }
-
-  // SOV
-  if(sovTotal>0){
-    L.push('■ 브랜드 점유율(SOV) · 언급 비중');
-    L.push(`· 레이노: ${ownShare.toFixed(0)}% (${(bc[own]||0).toLocaleString()}건)`);
-    if(compSov.length) L.push('· 경쟁사: '+compSov.map(([b,c])=>`${b} ${(c/sovTotal*100).toFixed(0)}%`).join(' · '));
+  if(posR.length||negR.length){
+    L.push('4. 감성 요인 키워드');
+    if(posR.length) L.push(`- 긍정 요인: ${posR.map(x=>`${x[0]}(${x[1]})`).join(', ')}`);
+    if(negR.length) L.push(`- 부정 요인: ${negR.map(x=>`${x[0]}(${x[1]})`).join(', ')}`);
     L.push('');
+  }
+  L.push('[데이터 요약 및 핵심 인사이트]');
+  L.push('1. 우호적 여론 지속');
+  L.push(`- 총 ${M.total.toLocaleString()}건의 유효 표본 중 긍정 반응이 ${pPos.toFixed(1)}%를 차지하며 부정 반응(${pNeg.toFixed(1)}%)을 ${pPos>=pNeg?'안정적으로 상회':'하회'}하고 있습니다. 전반적인 시장 신뢰도는 ${pPos>=pNeg?'견고하게 유지':'주의가 필요한 흐름으로 관측'}되고 있습니다.`);
+  if(posR.length||negR.length){
+    const ps=posR.slice(0,2).map(x=>x[0]).join('·')||'-', ns=negR.slice(0,2).map(x=>x[0]).join('·')||'-';
+    L.push(`2. 소비자 인식 요인: '${ps}' vs '${ns}'`);
+    L.push(`- 레이노를 선택하는 핵심 경쟁력은 '${ps}'에 집중되어 있습니다. 다만 부정 여론의 주요 포인트로 '${ns}' 관련 체감 언급이 빈번하게 관측되었습니다.`);
   }
   if(coEnt.length){
-    L.push('■ 경쟁사 동시 언급 (레이노 글에 함께 등장)');
-    coEnt.forEach(([b,c])=>L.push(`· ${b}: ${c.toLocaleString()}건 (${coTotal?(c/coTotal*100).toFixed(0):0}%)`));
-    L.push('');
+    const top=coEnt[0];
+    L.push(`3. 가장 강력한 비교 대조군: '${top[0]}'`);
+    L.push(`- 레이노 언급 게시글 내 경쟁 브랜드 동시 노출 비율을 분석한 결과, ${top[0]}(${coTotal?Math.round(top[1]/coTotal*100):0}%, ${top[1].toLocaleString()}건)가 가장 높게 나타났습니다. 소비자들이 최종 시공 단계에서 두 브랜드를 대안군으로 비교 검토하고 있음을 시사합니다.`);
   }
-
-  // 제품 TOP
-  if(pEnt.length){
-    L.push('■ 제품별 언급 TOP');
-    pEnt.forEach(([p,o])=>L.push(`· ${p}: ${o.n.toLocaleString()}건 (긍정률 ${prate(o)}% · 긍 ${o.pos}/부 ${o.neg})`));
-    L.push('');
-  }
-
-  // 감성 요인
-  if(posR.length||negR.length){
-    L.push('■ 주요 감성 요인');
-    if(posR.length) L.push(`· 긍정: ${posR.map(x=>`${x[0]}(${x[1]})`).join(', ')}`);
-    if(negR.length) L.push(`· 부정: ${negR.map(x=>`${x[0]}(${x[1]})`).join(', ')}`);
-    L.push('');
-  }
-
-  // 카페 TOP
-  if(cafeTop.length){
-    L.push('■ 활동 많은 카페 TOP');
-    cafeTop.forEach(([c,n])=>L.push(`· ${c}: ${n.toLocaleString()}건`));
-    L.push('');
-  }
-
-  // 주목 게시글
-  if(negPosts.length||posPosts.length){
-    L.push('■ 주목 게시글');
-    if(negPosts.length){ L.push('[부정·최근]');
-      negPosts.forEach(x=>L.push(`· [${x.r.cafe||''}] ${(x.r.title||'(제목 없음)').slice(0,50)} (${x.d.replace(/-/g,'.')})`)); }
-    if(posPosts.length){ if(negPosts.length)L.push(''); L.push('[긍정·최근]');
-      posPosts.forEach(x=>L.push(`· [${x.r.cafe||''}] ${(x.r.title||'(제목 없음)').slice(0,50)} (${x.d.replace(/-/g,'.')})`)); }
-    L.push('');
-  }
-
-  // 제언/액션
-  L.push('■ 데이터 기반 제언');
-  const acts=[];
-  if(P && M.negRate>P.negRate+1) acts.push(`부정률이 전기 대비 ${(M.negRate-P.negRate).toFixed(1)}%p 상승 → 원인 점검 및 대응`);
-  if(negR.length) acts.push(`부정 요인 '${negR[0][0]}' 관련 응대 가이드/FAQ 보강 검토`);
-  if(coEnt.length) acts.push(`경쟁사 '${coEnt[0][0]}' 동시 언급 ${coEnt[0][1].toLocaleString()}건 → 비교 콘텐츠 대응`);
-  if(posR.length) acts.push(`강점 '${posR[0][0]}'을(를) 캠페인 메시지로 강화`);
-  if(pEnt.length){ const lowP=pEnt.slice().sort((a,b)=>prate(a[1])-prate(b[1]))[0]; if(lowP && prate(lowP[1])<50 && lowP[1].n>=3) acts.push(`제품 '${lowP[0]}' 긍정률 ${prate(lowP[1])}%로 낮음 → 후기/이슈 점검`); }
-  if(acts.length){ acts.forEach((a,i)=>L.push(`${i+1}. ${a}`)); }
-  else L.push('· 특이 리스크 없음 — 현 기조 유지');
-  if(insight){ L.push(''); L.push('[핵심 인사이트]'); L.push(insight); }
-  if(marketing){ L.push(''); L.push('[마케팅 제안]'); L.push(marketing); }
   L.push('');
-
-  L.push('■ 해석 시 유의사항');
-  if(M.total<30) L.push(`· 표본이 ${M.total}건으로 적어 비율 지표의 변동성이 큽니다. 추세 해석에 유의가 필요합니다.`);
-  if(classRate<80) L.push(`· 감성 미분류가 ${(100-classRate).toFixed(0)}% 존재하여, 분류 완료 건 기준 비율은 실제와 차이가 있을 수 있습니다.`);
-  L.push('· 감성 라벨에는 자동분류가 포함되어 오분류 가능성이 있으며, 사람 검증 비율이 높을수록 신뢰도가 높습니다.');
-  L.push('· SOV·경쟁사·제품 수치는 본문 키워드 동시 언급 기반의 근사치입니다.');
-  if(P) L.push('· 전기 대비(▲/▼)는 직전 동일 단위 기간과의 비교값입니다.');
+  if(negReasonEnt.length){
+    L.push('[주요 부정 게시글]');
+    negReasonEnt.forEach(([reason,urls],i)=>{ const us=[...new Set(urls)].slice(0,3).join(' / '); L.push(`${i+1}. ${reason} [원문 ${us}]`); });
+    L.push('');
+  }
+  L.push('[데이터 기반 부서별 제언] * 요약 제공');
+  L.push('[브랜드전략실]');
+  L.push(`- 최대 강점인 '${posR[0]?posR[0][0]:'가성비'}'를 단순 저가 이미지가 아닌 '합리적인 프리미엄 선택'으로 포지셔닝하는 캠페인 메시지 강화`);
+  L.push('[영업팀]');
+  L.push(`- 대리점 세일즈 툴 가이드 보강 및 '${negR[0]?negR[0][0]:'주요 이슈'}${negR[1]?'·'+negR[1][0]:''}' 관련 대리점 대응`);
+  L.push('[품질혁신팀]');
+  const _lowProd=pEnt.slice().sort((a,b)=>prate(a[1])-prate(b[1]))[0];
+  L.push(`- ${(_lowProd&&prate(_lowProd[1])<50)?`${_lowProd[0]} 제품군 품질`:'주요 제품군 품질'} 및 시장 피드백(시공 품질 관리) 점검`);
   L.push('');
-  L.push('원자료와 세부 분포(추이·카페별·키워드별)는 브랜드 모니터링 대시보드에서 확인하실 수 있습니다.');
-  try{ L.push('대시보드: '+location.origin+location.pathname); }catch(e){}
+  L.push('※ 원문 자료 및 채널별 세부 데이터는 아래 브랜드 모니터링 대시보드에서 실시간으로 확인하실 수 있습니다.');
+  L.push(`▶ 브랜드 모니터링 대시보드 URL: ${dash}`);
+  L.push('※ 차주부터는 주간 단위로 공유드릴 예정입니다.');
   L.push('');
   L.push('감사합니다.');
-  L.push('데이터 분석 담당 드림');
+  L.push('브랜드전략실 김도균 드림.');
   return { subject, body:L.join('\n') };
 }
 function openMailModal(){
