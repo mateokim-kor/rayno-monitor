@@ -1408,7 +1408,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 도구필터토글_모니터링전용';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 지부표_점유율정렬';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5532,6 +5532,8 @@ function salesJibuRollTable(){
   const roll=n=>n?Math.round(n).toLocaleString():'0', won=n=>n?Math.round(n).toLocaleString():'0';
   function jr(j){ const q=_sMz(),a=_sMz(); const pm=SALES.jibuProd[j]||{}; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const o=pm[mat]; const oq=o.q||o, oa=o.a||_sMz(); for(let m=1;m<=12;m++){q[m]+=oq[m]||0; a[m]+=oa[m]||0;} }); return {q,a}; }
   const rows=JG.map(j=>({j,...jr(j)}));
+  const _rtot=r=>{ let s=0; M.forEach(m=>s+=r.a[m]||0); return s; };   // 표시 기간 롤 매출 합(점유율=매출÷B2C이라 매출 합 내림차순=점유율 내림차순)
+  rows.sort((x,y)=> _rtot(y)-_rtot(x));   // 점유율 순 정렬
   // 기타 자재(비롤) 월별 = B2C 총매출 - Σ지부 롤매출
   const etcA=_sMz(); for(let m=1;m<=12;m++){ let s=0; rows.forEach(r=>s+=r.a[m]); etcA[m]=Math.max(0,(C.B2C.ma[m]||0)-s); }
   const totQ=_sMz(), totA=_sMz(); for(let m=1;m<=12;m++){ rows.forEach(r=>totQ[m]+=r.q[m]); totA[m]=C.B2C.ma[m]||0; }
