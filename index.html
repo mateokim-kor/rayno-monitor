@@ -1306,6 +1306,16 @@ function _ck(){ return document.documentElement.getAttribute('data-theme')==='da
   : {text:'#56616f', grid:'#e3e7ee', donut:'#ffffff'}; }
 Chart.defaults.color = _ck().text;
 Chart.defaults.font.size = 12;
+try{ // 차트 공통 테마(격자·툴팁·둥근 막대·범례) — 버전별 구조 차이 안전 가드
+  Chart.defaults.font.weight = 600;
+  if(Chart.defaults.scale&&Chart.defaults.scale.grid){ Chart.defaults.scale.grid.color=_ck().grid; Chart.defaults.scale.grid.drawTicks=false; }
+  if(Chart.defaults.scale&&Chart.defaults.scale.border){ Chart.defaults.scale.border.display=false; }
+  if(Chart.defaults.elements){ if(Chart.defaults.elements.bar) Chart.defaults.elements.bar.borderRadius=6; if(Chart.defaults.elements.point){ Chart.defaults.elements.point.radius=2; Chart.defaults.elements.point.hoverRadius=4; } if(Chart.defaults.elements.line) Chart.defaults.elements.line.tension=0.32; }
+  if(Chart.defaults.plugins){
+    if(Chart.defaults.plugins.legend){ Chart.defaults.plugins.legend.labels=Object.assign({},Chart.defaults.plugins.legend.labels,{boxWidth:10,boxHeight:10,usePointStyle:true,padding:14}); }
+    if(Chart.defaults.plugins.tooltip){ Object.assign(Chart.defaults.plugins.tooltip,{backgroundColor:'rgba(20,22,26,.92)',padding:10,cornerRadius:8,titleColor:'#fff',bodyColor:'#e8e8ed',boxPadding:5,usePointStyle:true,displayColors:true}); }
+  }
+}catch(e){ console.warn('chart theme skip', e); }
 
 /* ════════════════════════════════════════════════════════════
    ⚙️  설정 (CONFIG) — 여기 값만 바꾸면 화면 문구·암호·분류 항목 등이 바뀝니다
@@ -1423,7 +1433,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 완성도1_백업저장신선도';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 차트테마_스파크라인_대리점카드';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5244,6 +5254,7 @@ function renderRevenue(){
     + card(hh('🗺 지역별 시장 점유율 · '+lab)+salesRegionMap())
     + card(hh('🚗 신차 장착 점유율 · '+lab)+newCarShareCard())
     + card(hh('🎯 지역 화이트스페이스 (확장 타깃) · '+lab)+whiteSpaceCard())
+    + card(hh('🏆 대리점 스코어카드 · '+lab)+dealerScorecard())
     + card(hh('① 채널 요약 · '+lab)+s1)
     + card(hh('② 롤 / 일반물품 구분 · '+lab)+s2)
     + card(hh('③ 월별 매출 추이')+s3)
@@ -5359,6 +5370,14 @@ function _scSum(o){ let s=0; for(let m=1;m<=12;m++) s+=_sNum((o&&o[m])||0); retu
 function _scTot(o){ let s=0; _salesMonths().forEach(m=>s+=_sNum((o&&o[m])||0)); return s; }
 function _scPick(o){ let s=0; _salesActive().forEach(m=>s+=_sNum((o&&o[m])||0)); return s; }
 
+function _spark(vals, color){
+  const a=(vals||[]).map(x=>+x||0); if(a.length<2) return '';
+  const w=120,hh=26,pad=2, mn=Math.min(...a), mx=Math.max(...a), rng=(mx-mn)||1;
+  const pts=a.map((v,i)=>{ const x=pad+i*(w-2*pad)/(a.length-1); const y=hh-pad-((v-mn)/rng)*(hh-2*pad); return x.toFixed(1)+','+y.toFixed(1); }).join(' ');
+  const c=color||'var(--amber)';
+  const lx=w-pad, ly=hh-pad-((a[a.length-1]-mn)/rng)*(hh-2*pad);
+  return `<svg viewBox="0 0 ${w} ${hh}" width="100%" height="22" preserveAspectRatio="none" style="margin-top:6px;display:block;overflow:visible"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.4" fill="${c}" vector-effect="non-scaling-stroke"/></svg>`;
+}
 function salesKPI(){
   if(!SALES||!SALES.channels) return '';
   const C=SALES.channels, sc=salesCfg();
@@ -5368,12 +5387,19 @@ function salesKPI(){
   const wT=_qcNewPick(), crT=_natCarRegPick();   // 신차 장착률(신차 시공 ÷ 신차 등록) · 신차 카드와 동일
   let rollQ=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; rollQ+=_sPick(SALES.prodAll[p].mq); });
   const share= crT>0? (wT/crT*100).toFixed(2)+'%':'—';
-  const kpi=(t,v,s)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px"><div style="font-size:12px;color:var(--ink2);margin-bottom:5px">${t}</div><div style="font-size:21px;font-weight:800;color:var(--ink)">${v}</div><div style="font-size:11px;color:var(--ink2);margin-top:3px">${s||''}</div></div>`;
+  const kpi=(t,v,s,spark)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px"><div style="font-size:12px;color:var(--ink2);margin-bottom:5px">${t}</div><div style="font-size:21px;font-weight:800;color:var(--ink)">${v}</div>${spark||''}<div style="font-size:11px;color:var(--ink2);margin-top:3px">${s||''}</div></div>`;
+  const _km=_salesMonths(), _cc=(typeof C!=='undefined')?C:(SALES&&SALES.channels)||{B2C:{ma:{}},B2B:{ma:{}},'별도채널':{ma:{}}};
+  const _rollM=m=>{ let q=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; q+=(SALES.prodAll[p].mq[m]||0); }); return q; };
+  const _crM=m=>_sNum((salesCfg().carReg||{})[m]||0);
+  const spEnt=_spark(_km.map(m=>(_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)+((_cc['별도채널']&&_cc['별도채널'].ma[m])||0)),'var(--dv4)');
+  const spBB=_spark(_km.map(m=>(_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)),'var(--dv1)');
+  const spRoll=_spark(_km.map(_rollM),'var(--dv2)');
+  const spShare=_spark(_km.map(m=>{ const cr=_crM(m); return cr>0?_qcNew(m)/cr*100:0; }),'var(--dv6)');
   return `<div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:14px">`
-    + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도 · 별도채널 포함')
-    + kpi('B2C+B2B 합계', eok(bbT)+'억', entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'')
-    + kpi('롤 판매수량', won(rollQ)+' 롤', '제외 항목 미포함')
-    + kpi('신차 장착률(보증서)', share, crT?`신차 시공 ${won(wT)} ÷ 신차 등록 ${won(crT)}`:'설정에서 신차 등록 입력')
+    + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도 · 별도채널 포함', spEnt)
+    + kpi('B2C+B2B 합계', eok(bbT)+'억', entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'', spBB)
+    + kpi('롤 판매수량', won(rollQ)+' 롤', '제외 항목 미포함', spRoll)
+    + kpi('신차 장착률(보증서)', share, crT?`신차 시공 ${won(wT)} ÷ 신차 등록 ${won(crT)}`:'설정에서 신차 등록 입력', spShare)
     + `</div>`;
 }
 function salesCompareCard(){
@@ -5465,6 +5491,40 @@ function _warrGeoStats(){
     if(sg){ const key=k+'│'+sg; const g=sgg[key]||(sgg[key]={sido:k,sgg:sg,inst:0,dealers:new Set()}); g.inst++; if(dealer)g.dealers.add(dealer); }
   });
   return {sido,sgg};
+}
+function dealerScorecard(){
+  if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '<div class="empty">품질보증서 데이터가 없습니다.</div>';
+  const act=_salesActive(), today=Date.now(), byD={};
+  WARR.rows.forEach(r=>{
+    const name=String(r['매장명']||r['대리점코드']||'').trim(); if(!name) return;
+    const d=byD[name]||(byD[name]={name, jibu:'', inst:0, nw:0, last:'', prod:{}});
+    const ds=String(r['시공일자']||'').slice(0,10); if(ds && ds>d.last) d.last=ds;
+    if(!d.jibu){ const j=String(r['담당지부']||'').trim(); if(j) d.jibu=j; }
+    const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(act.indexOf(mm)<0) return;
+    d.inst++; if(_warrIsNew(r)) d.nw++;
+    let p=String(r['시공내역(전면)']||'').trim(); if(p&&typeof warrLabelOf==='function') p=warrLabelOf('시공내역(전면)',p);
+    if(p) d.prod[p]=(d.prod[p]||0)+1;
+  });
+  let arr=Object.values(byD).filter(d=>d.inst>0).sort((a,b)=>b.inst-a.inst);
+  const dormant=arr.filter(d=>{ if(!d.last)return false; const days=Math.floor((today-new Date(d.last+'T00:00:00').getTime())/86400000); return days>60; }).length;
+  const top=arr.slice(0,20);
+  const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const th='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
+  const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">매장(대리점)별 시공 성과. <b>시공 건수</b> 순 상위 20곳 · 신차 비율 · 최근 시공 경과(60일 초과 시 <b style="color:var(--amber)">휴면</b>) · 주력 제품. (선택 기간 기준, 최근 시공일은 전체 기준)`+(dormant?` · 전체 <b>${dormant}</b>곳 휴면 추정`:'')+`</div>`;
+  html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>매장 · 지부</th><th ${th}>시공</th><th ${th}>신차%</th><th ${th}>최근 시공</th><th ${thl} style="text-align:left">주력 제품</th></tr>`;
+  top.forEach(d=>{
+    const nwp=d.inst?Math.round(d.nw/d.inst*100):0;
+    let days=d.last?Math.floor((today-new Date(d.last+'T00:00:00').getTime())/86400000):null;
+    const dorm=days!=null&&days>60;
+    const recent= days==null?'—':(days<=0?'오늘':days+'일 전');
+    const pe=Object.entries(d.prod).sort((a,b)=>b[1]-a[1])[0];
+    const prod=pe?escapeHtml(pe[0])+` <span style="color:var(--ink3)">${pe[1]}</span>`:'—';
+    html+=`<tr><td ${tdl}>${escapeHtml(d.name)}${d.jibu?` <span style="color:var(--ink3);font-size:11px">${escapeHtml(d.jibu)}</span>`:''}${dorm?' <span style="color:var(--amber);font-size:10px;font-weight:700">휴면</span>':''}</td><td ${td}>${d.inst.toLocaleString()}</td><td ${td}>${nwp}%</td><td ${td}>${recent}</td><td ${tdl} style="text-align:left">${prod}</td></tr>`;
+  });
+  html+=`</table>`;
+  return html;
 }
 function whiteSpaceCard(){
   const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
@@ -6335,7 +6395,7 @@ function _applyThemeAttr(t){
     b.setAttribute('aria-checked', dark?'true':'false');
     const ico=b.querySelector('.ts-ico'); if(ico) ico.textContent = dark?'☀️':'🌙';
   }
-  if(window.Chart) Chart.defaults.color = _ck().text;
+  if(window.Chart){ Chart.defaults.color=_ck().text; try{ if(Chart.defaults.scale&&Chart.defaults.scale.grid) Chart.defaults.scale.grid.color=_ck().grid; }catch(_){} }
 }
 function toggleTheme(){
   const nx = (document.documentElement.getAttribute('data-theme')==='dark') ? 'light' : 'dark';
