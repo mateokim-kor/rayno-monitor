@@ -26,6 +26,18 @@
     --font:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"SF Pro Display",system-ui,sans-serif;
   }
   body{font-variant-numeric:tabular-nums}
+  .fab-top{position:fixed;right:18px;bottom:18px;width:44px;height:44px;border-radius:50%;border:1px solid var(--line2);background:var(--card);color:var(--ink);box-shadow:var(--shadow);font-size:19px;line-height:1;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .2s;z-index:60}
+  .fab-top.on{opacity:1;pointer-events:auto}
+  .fab-top:hover{background:var(--bg2)}
+  .bk-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  @media (max-width:640px){
+    .card{padding:16px 14px 14px}
+    .biz-grid,.rep-2col,.rep-3col{grid-template-columns:1fr !important}
+    .iv-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .acc-btn,.vc-save{min-height:40px}
+    .wtab{min-width:56px;font-size:12.5px}
+    .upl-date{display:block;margin-left:0;margin-top:4px}
+  }
   html[data-theme="dark"]{
     --bg:#121417; --bg2:#1a1e24; --card:#1a1e24; --card2:#22272f;
     --line:#2a2f38; --line2:#3a414c;
@@ -1411,7 +1423,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 디자인시스템_색토큰';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 완성도1_백업저장신선도';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4624,8 +4636,13 @@ async function cloudSaveJSON(file,obj){
     const str=JSON.stringify(obj);
     let body=str, ctype='application/json';
     if(str.length>1000000 && _gzAvail()){ try{ body=await _gzipBlob(str); ctype='application/gzip'; }catch(_){ body=str; ctype='application/json'; } }   // 큰 파일은 gzip(보증서 등)
-    const {error}=await SB.storage.from(SUPA.bucket).upload(file, body, {upsert:true, contentType:ctype, cacheControl:'0'});
-    if(error)throw error; _cloudErr=''; return true;
+    let lastErr=null;
+    for(let attempt=0; attempt<2; attempt++){
+      const {error}=await SB.storage.from(SUPA.bucket).upload(file, body, {upsert:true, contentType:ctype, cacheControl:'0'});
+      if(!error){ _cloudErr=''; return true; }
+      lastErr=error; if(attempt===0){ await new Promise(r=>setTimeout(r,800)); }   // 일시 오류 1회 재시도
+    }
+    throw lastErr;
   }catch(e){
     _cloudErr=(e&&(e.message||e.error||e.statusCode&&('HTTP '+e.statusCode)))||(e?JSON.stringify(e).slice(0,200):'알 수 없는 오류');
     console.error('cloudSaveJSON fail', file, e);
@@ -5848,7 +5865,7 @@ function setRView(v){
   else if(v==='search') renderMetric('search');
   else renderRevenue();
 }
-function _fmtUpl(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d.getTime())) return ''; const p=n=>String(n).padStart(2,'0'); return `최근 업로드 ${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
+function _fmtUpl(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d.getTime())) return ''; const p=n=>String(n).padStart(2,'0'); const rel=_relDays(v); return `최근 업로드 ${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${rel?' · '+rel:''}`; }
 function _setUpl(id,v){ const el=document.getElementById(id); if(el) el.textContent=v?_fmtUpl(v):''; }
 async function _cloudFileMtime(file){ if(!SB) return null; try{ const {data,error}=await SB.storage.from(SUPA.bucket).list('',{limit:100}); if(error||!data) return null; const f=data.find(x=>x.name===file); return f? (f.updated_at||f.created_at||(f.metadata&&f.metadata.lastModified)||null) : null; }catch(e){ return null; } }
 function updateUploadDates(){
@@ -5939,6 +5956,43 @@ function ensureCafeSettingsHost(){
   const s=document.getElementById('settings');
   if(s && s.parentElement!==cH){ s.style.display='block'; cH.appendChild(s); }
 }
+function fmtKRW(v){ v=Number(v)||0; const a=Math.abs(v); if(a>=1e8) return (v/1e8).toFixed(1).replace(/\.0$/,'')+'억'; if(a>=1e4) return Math.round(v/1e4).toLocaleString()+'만'; return Math.round(v).toLocaleString(); }
+function fmtPct(v,d){ if(v==null||isNaN(v)) return '—'; return Number(v).toFixed(d==null?1:d)+'%'; }
+function _relDays(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d.getTime())) return ''; const n=Math.floor((Date.now()-d.getTime())/86400000); return n<=0?'오늘':(n===1?'어제':n+'일 전'); }
+function _dlFile(name, text){ try{ const blob=new Blob([text],{type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ a.remove(); URL.revokeObjectURL(url); },120); }catch(e){ console.error('download fail',e); toast('내려받기에 실패했습니다.',true); } }
+function exportBackup(){
+  const pack={ _backup:'rayno-monitor', version:1, exportedAt:new Date().toISOString(),
+    store:(typeof loadStore==='function')?loadStore():(typeof STORE!=='undefined'?STORE:null),
+    warranty:(typeof WARR!=='undefined')?WARR:null,
+    sales:(typeof SALES!=='undefined')?SALES:null,
+    promo:(typeof PROMO!=='undefined')?PROMO:null,
+    biz:(typeof BIZ!=='undefined')?BIZ:null };
+  _dlFile('rayno-backup-'+new Date().toISOString().slice(0,10)+'.json', JSON.stringify(pack));
+  toast('전체 백업을 내려받았습니다');
+}
+async function importBackup(text){
+  let p; try{ p=JSON.parse(text); }catch(e){ toast('백업 파일을 읽을 수 없습니다 (JSON 오류).',true); return; }
+  if(!p || p._backup!=='rayno-monitor'){ if(!window.confirm('레이노 백업 형식이 아닐 수 있습니다. 그래도 복원할까요?')) return; }
+  if(auth!=='admin'){ toast('복원은 관리자만 가능합니다.',true); return; }
+  if(!window.confirm('백업으로 현재 데이터를 덮어씁니다. 계속할까요? (먼저 현재 상태를 내려받아 두는 것을 권장합니다)')) return;
+  try{
+    const jobs=[];
+    if(p.store){ STORE=p.store; saveStore(STORE); }
+    if(p.warranty!=null){ WARR=p.warranty; jobs.push(cloudSaveJSON(SUPA.warrFile, WARR)); }
+    if(p.sales!=null){ SALES=p.sales; jobs.push(cloudSaveJSON(SUPA.salesFile, SALES)); }
+    if(p.promo!=null){ PROMO=p.promo; jobs.push(cloudSaveJSON(SUPA.promoFile, PROMO)); }
+    if(p.biz!=null){ BIZ=p.biz; jobs.push(cloudSaveJSON(SUPA.bizFile, BIZ)); }
+    await Promise.all(jobs);
+    toast('복원 완료 — 잠시 후 새로고침합니다');
+    setTimeout(()=>{ try{ location.reload(); }catch(_){} }, 900);
+  }catch(e){ toast('복원 중 오류: '+((e&&e.message)||e),true); }
+}
+(function(){ try{ if(typeof document==='undefined'||!document.body) return; if(document.getElementById('fabTop'))return;
+  const b=document.createElement('button'); b.className='fab-top'; b.id='fabTop'; b.type='button'; b.setAttribute('aria-label','맨 위로'); b.textContent='↑';
+  b.addEventListener('click',()=>{ try{ window.scrollTo({top:0,behavior:'smooth'}); }catch(_){ window.scrollTo(0,0); } });
+  document.body.appendChild(b);
+  window.addEventListener('scroll',()=>{ b.classList.toggle('on', (window.scrollY||window.pageYOffset||0)>400); },{passive:true});
+}catch(_){} })();
 function optimizeHTML(){
   return `<div class="set-app-sec"><h2 class="set-app-h">⚡ 데이터 최적화</h2></div>
   <div class="card set-card">
@@ -5946,6 +6000,13 @@ function optimizeHTML(){
     <div class="cap">누적된 <b>중복 글/보증서</b>를 합치고, <b>빈 항목</b>을 정리하고, 내부 <b>캐시를 재계산</b>해 앱을 가볍게 만듭니다. 데이터는 삭제되지 않고 <b>중복만 합쳐지며</b>, 검증값은 보존됩니다. 결과는 클라우드에 반영됩니다.</div>
     <div class="set-add" style="margin-top:10px"><button class="vc-save" id="optimizeBtn">⚡ 지금 최적화 실행</button></div>
     <div id="optResult" class="cap" style="margin-top:10px"></div>
+  </div>
+  <div class="set-app-sec"><h2 class="set-app-h">🗄 백업 · 복원</h2></div>
+  <div class="card set-card">
+    <h3><span class="dot"></span>전체 데이터 백업 / 복원</h3>
+    <div class="cap">보증서·매출·카페·프로모션·설정을 <b>JSON 한 파일</b>로 내려받아 보관하고, 필요할 때 복원합니다. 클라우드(Supabase)에 문제가 생겨도 데이터를 지킬 수 있어요.</div>
+    <div class="bk-row"><button class="vc-save" id="backupExportBtn">⬇ 전체 백업 내려받기</button><button class="acc-btn" id="backupImportBtn">⬆ 백업 파일로 복원</button><input type="file" id="backupFile" accept="application/json,.json" style="display:none"></div>
+    <div class="cap" style="margin-top:8px;color:var(--ink3)">복원은 현재 데이터를 덮어씁니다. 먼저 백업을 내려받아 두세요.</div>
   </div>`;
 }
 let _setCat='monitoring';
@@ -5956,6 +6017,7 @@ function applySettingsCat(){
   document.querySelectorAll('#setSubnav button').forEach(b=>b.classList.toggle('on', b.dataset.setcat===_setCat));
 }
 (function(){ const sn=document.getElementById('setSubnav'); if(sn) sn.addEventListener('click', e=>{ const b=e.target.closest('button[data-setcat]'); if(!b) return; _setCat=b.dataset.setcat; applySettingsCat(); try{window.scrollTo({top:0,behavior:'smooth'});}catch(_){} }); })();
+try{ document.getElementById('settingsApp').addEventListener('change', e=>{ if(e.target && e.target.id==='backupFile'){ const file=e.target.files&&e.target.files[0]; if(!file) return; const rd=new FileReader(); rd.onload=()=>importBackup(String(rd.result||'')); rd.readAsText(file); e.target.value=''; } }); }catch(_){}
 function renderSettingsApp(){
   const gate=document.getElementById('setGate');
   const oH=document.getElementById('setOptHost');
@@ -5983,6 +6045,8 @@ function renderSettingsApp(){
 }
 document.getElementById('settingsApp').addEventListener('click', async e=>{
   if(e.target.id==='setAdminLogin'){ showLock(); return; }
+  if(e.target.id==='backupExportBtn'){ exportBackup(); return; }
+  if(e.target.id==='backupImportBtn'){ const f=document.getElementById('backupFile'); if(f) f.click(); return; }
   if(e.target.id==='optimizeBtn'){
     if(!window.confirm('누적 중복/빈 항목을 정리하고 캐시를 재계산합니다. (검증값은 보존, 데이터 삭제 없음) 진행할까요?')) return;
     e.target.disabled=true; e.target.textContent='최적화 중…';
