@@ -41,6 +41,8 @@
   @keyframes skel{100%{transform:translateX(100%)}}
   .skel-row{height:14px;margin:9px 0;width:100%}
   .skel-card{padding:18px}
+  #bootSkel{position:fixed;inset:0;z-index:40;background:var(--bg);padding:74px 18px 18px;overflow:hidden}
+  .boot-skel-inner{max-width:1120px;margin:0 auto;display:flex;flex-direction:column}
   @media (max-width:640px){
     .card{padding:16px 14px 14px}
     .biz-grid,.rep-2col,.rep-3col{grid-template-columns:1fr !important}
@@ -568,7 +570,7 @@
   .rep-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:6px 0 16px}
   .rk{background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:13px 15px}
   .rk-l{font-size:11.5px;color:var(--ink3);font-weight:700}
-  .rk-v{font-size:23px;font-weight:800;margin:4px 0;font-variant-numeric:tabular-nums}
+  .rk-v{font-size:24px;font-weight:800;margin:4px 0;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
   .rk-m{font-size:11.5px;color:var(--ink3)}
   .dlt{font-size:12px;font-weight:800;margin-left:4px}
   .dlt.up{color:var(--pos)} .dlt.down{color:var(--neg)} .dlt.flat{color:var(--ink3)}
@@ -1444,7 +1446,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 충돌방지_색맹안전';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 마감_스켈레톤_타이포_감성라벨';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2201,6 +2203,7 @@ function makeChart(id,cfg){ if(charts[id])charts[id].destroy(); charts[id]=new C
 function renderSentiment(rows){
   const s=rows.map(sentOf);
   const labels=['긍정','부정','중립'];
+  const dlabels=['▲ 긍정','▼ 부정','■ 중립'];   // 색맹 안전 표시용(클릭/필터 로직은 labels 사용)
   const base=[COLORS.pos,COLORS.neg,COLORS.neu];
   const data=[s.filter(x=>x==='긍정').length, s.filter(x=>x==='부정').length, s.filter(x=>x==='중립').length];
   const tot=data.reduce((a,b)=>a+b,0)||1;
@@ -2209,7 +2212,7 @@ function renderSentiment(rows){
   const off = base.map((c,i)=> (state.sentFilter && labels[i]!==state.sentFilter) ? 4 : 0);
   makeChart('cSent',{
     type:'doughnut',
-    data:{labels,datasets:[{data,backgroundColor:bg,borderColor:_ck().donut,borderWidth:3,offset:off}]},
+    data:{labels:dlabels,datasets:[{data,backgroundColor:bg,borderColor:_ck().donut,borderWidth:3,offset:off}]},
     plugins:[pctDonutPlugin],
     options:{cutout:'60%',onClick:(e,el)=>{
         if(el.length){ const lab=labels[el[0].index];
@@ -5407,7 +5410,7 @@ function salesKPI(){
   const wT=_qcNewPick(), crT=_natCarRegPick();   // 신차 장착률(신차 시공 ÷ 신차 등록) · 신차 카드와 동일
   let rollQ=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; rollQ+=_sPick(SALES.prodAll[p].mq); });
   const share= crT>0? (wT/crT*100).toFixed(2)+'%':'—';
-  const kpi=(t,v,s,spark)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px"><div style="font-size:12px;color:var(--ink2);margin-bottom:5px">${t}</div><div style="font-size:21px;font-weight:800;color:var(--ink)">${v}</div>${spark||''}<div style="font-size:11px;color:var(--ink2);margin-top:3px">${s||''}</div></div>`;
+  const kpi=(t,v,s,spark)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px"><div style="font-size:11.5px;color:var(--ink3);font-weight:700;margin-bottom:5px">${t}</div><div style="font-size:24px;font-weight:800;color:var(--ink);letter-spacing:-.01em">${v}</div>${spark||''}<div style="font-size:11px;color:var(--ink2);margin-top:3px">${s||''}</div></div>`;
   const _km=_salesMonths(), _cc=(typeof C!=='undefined')?C:(SALES&&SALES.channels)||{B2C:{ma:{}},B2B:{ma:{}},'별도채널':{ma:{}}};
   const _rollM=m=>{ let q=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; q+=(SALES.prodAll[p].mq[m]||0); }); return q; };
   const _crM=m=>_sNum((salesCfg().carReg||{})[m]||0);
@@ -6471,6 +6474,10 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape' && _crawlModalOpen
 (function(){ const b=document.getElementById('dashToolToggle');
   if(b) b.addEventListener('click', ()=>{ _dashToolsOpen=!_dashToolsOpen; applyDashTools(); }); })();
 async function boot(){
+  let _bootSkel=null;
+  try{ if(document.body){ _bootSkel=document.createElement('div'); _bootSkel.id='bootSkel'; _bootSkel.setAttribute('aria-hidden','true');
+    _bootSkel.innerHTML='<div class="boot-skel-inner"><div class="skeleton skel-row" style="width:38%;height:24px;margin-bottom:18px"></div><div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:14px"><div class="skeleton" style="flex:1;min-width:150px;height:84px;border-radius:14px"></div><div class="skeleton" style="flex:1;min-width:150px;height:84px;border-radius:14px"></div><div class="skeleton" style="flex:1;min-width:150px;height:84px;border-radius:14px"></div><div class="skeleton" style="flex:1;min-width:150px;height:84px;border-radius:14px"></div></div><div class="skeleton" style="height:230px;border-radius:14px"></div></div>';
+    document.body.appendChild(_bootSkel); setTimeout(()=>{ try{ _bootSkel&&_bootSkel.remove(); }catch(_){} }, 6000); } }catch(_){}
   applyConfigAndSettings();
   // 보안: 이전에 브라우저에 저장돼 자동 로그인되던 세션 토큰을 정리 → 새 접속 시 항상 재로그인
   try{ if(localStorage.getItem('rayno_trust')!=='1'){ Object.keys(localStorage).forEach(k=>{ if(/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); }); } }catch(e){}
@@ -6496,6 +6503,7 @@ async function boot(){
   // 4) 화면 구성
   applyAutoKeywords();   // 등록된 키워드/문장에 걸리는 미검증 글 자동 정리
   enterApp();
+  try{ if(_bootSkel){ _bootSkel.remove(); _bootSkel=null; } }catch(_){}
   applyDashTools();    // 상단 도구·필터 기본 접힘
   pollCrawlStatus();   // 자동 수집 진행률 폴링 시작
   ensurePromo().then(updatePromoBadge).catch(()=>{});   // 경쟁사 프로모션 선로드 + 신규 뱃지
