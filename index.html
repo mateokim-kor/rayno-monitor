@@ -1491,7 +1491,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 매출카드_미니막대';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 글라스_월별막대';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5006,15 +5006,15 @@ function renderGlass(){
   const dayN=new Set(recs.map(dstr).filter(Boolean)).size;
   const mkt=recs.filter(r=>/^(O|Y|예|동의|true|1)$/i.test(String(r['마케팅동의']||'').trim())).length;
   const scope=_glScope;
-  const dayCnt={}; recs.forEach(r=>{ const d=dstr(r); if(d) dayCnt[d]=(dayCnt[d]||0)+1; });
-  const dayKeys=Object.keys(dayCnt).sort(); const spark=_spark(dayKeys.map(d=>dayCnt[d]),'var(--dv1)');
+  const monCnt={}; recs.forEach(r=>{ const d=dstr(r); if(d){ const ym=d.slice(0,7); monCnt[ym]=(monCnt[ym]||0)+1; } });
+  const monKeys=Object.keys(monCnt).sort(); const spark=_sparkbar(monKeys.map(k=>monCnt[k]),'var(--dv1)',{label:'월별 가입',fmt:v=>v.toLocaleString()+'건'});
   const rk=(l,v,m)=>`<div class="rk"><div class="rk-l">${l}</div><div class="rk-v">${v}</div><div class="rk-m">${m}</div></div>`;
   const kpis=`<div class="card"><div class="rep-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px">`
     + rk('총 가입수', total.toLocaleString()+'건', (GV.scope==='range'?`${GV.from||minD} ~ ${GV.to||maxD}`:'전체기간'))
     + rk('가입 대리점', dealerN.toLocaleString()+'곳', '가입 발생 매장 수')
     + rk('일평균', (dayN?(total/dayN):0).toFixed(1)+'건', `${dayN}일 기준`)
     + rk('마케팅 동의', total?Math.round(mkt/total*100)+'%':'—', `${mkt.toLocaleString()}건 동의`)
-    + `</div>${spark?`<div style="margin-top:6px"><div class="cap">일별 가입 추이</div>${spark}</div>`:''}</div>`;
+    + `</div>${spark?`<div style="margin-top:6px"><div class="cap">월별 가입 추이</div>${spark}</div>`:''}</div>`;
   // 제품 필터 칩 (대분류 → 중분류, 복수 선택)
   const catMap={}; GLASS.rows.forEach(r=>{ const c=catOf(r); (catMap[c.major]=catMap[c.major]||new Set()).add(c.sub); });
   const MAJ=['얼티넘','팬텀','스트라','크로마','기타'];
