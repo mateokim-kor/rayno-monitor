@@ -1491,7 +1491,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 가입율_대상보증서';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 글라스_집계날짜선택';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5007,7 +5007,7 @@ function renderDealer(){
 function renderGlass(){
   const box=document.getElementById('rGlass'); if(!box) return; const admin=(auth==='admin');
   if(!GLASS||!GLASS.rows||!GLASS.rows.length){ box.innerHTML=`<div class="card"><div class="empty">글라스케어 가입 데이터가 없습니다.${admin?' 우측 상단 <b>＋ 글라스케어 엑셀</b>로 업로드하세요.':''}</div></div>`; return; }
-  const cols=GLASS.columns||[]; const dcol = cols.includes('시공일자')?'시공일자':(cols.find(c=>/일자|날짜/.test(c))||'시공일자');
+  const cols=GLASS.columns||[]; const dateCols=cols.filter(c=>/일자|날짜|일$|date/i.test(c)); const _dcAuto = cols.includes('시공일자')?'시공일자':(dateCols[0]||'시공일자'); const dcol = (GV.dateCol&&cols.includes(GV.dateCol))?GV.dateCol:_dcAuto; if(dateCols.indexOf(dcol)<0) dateCols.unshift(dcol);
   const dealerCol = cols.includes('매장명(대리점명)')?'매장명(대리점명)':(cols.includes('매장명')?'매장명':'매장명(대리점명)');
   const dstr=r=>String(r[dcol]||'').slice(0,10);
   const allD=GLASS.rows.map(dstr).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
@@ -5041,6 +5041,7 @@ function renderGlass(){
     <div class="rep-period" style="margin-top:10px">
       <div class="seg" id="glScope"><button data-s="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-s="dealer" class="${scope==='dealer'?'on':''}">대리점별</button><button data-s="prod" class="${scope==='prod'?'on':''}">제품별</button></div>
       ${_dateBar('gv', GV, minD, maxD)}
+      <span class="mchips" style="width:100%"><span class="mchips-lbl">집계 날짜</span><select class="dt-select" id="glDateCol" style="max-width:200px">${dateCols.map(c=>`<option value="${escapeHtml(c)}"${c===dcol?' selected':''}>${escapeHtml(c)}</option>`).join('')}</select><span class="cap" style="margin-left:8px">이 컬럼 기준으로 월·기간 집계</span></span>
     </div>
     <div style="margin-top:11px"><div class="cap" style="margin-bottom:6px">제품 필터 (복수 선택 가능)</div>${chips}</div>
   </div>`;
@@ -5218,7 +5219,7 @@ const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[]
 const LWV={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 지부/제품별 발급 카드 자체 기간 필터
 let _lwLine='UL', _lwScope='jibu', _lwSub=[];   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
 let GLASS=null, glassLoaded=false, _glScope='jibu', _glDealerAll=false;   // 글라스케어 가입
-const GV={ from:'', to:'', scope:'all', preset:'all', prodSel:[], _min:'', _max:'' };
+const GV={ from:'', to:'', scope:'all', preset:'all', prodSel:[], dateCol:'', _min:'', _max:'' };
 const DLR={ jibu:'전체', member:'all', status:'all', q:'' };   // 대리점 마스터 필터
 const RD={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // (구) 대시보드 기간 필터
 const RDS={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDW={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDG={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 대시보드 카드별 기간(매출/보증서/글라스)
@@ -6762,6 +6763,7 @@ document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='wvBranch'){ WV.branch=e.target.value; renderWarranty(); }
   if(e.target.id==='wvFrom'){ WV.from=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.to=WV.from; WV.scope='range'; WV.preset='custom'; renderWarranty(); }
   if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; WV.scope='range'; WV.preset='custom'; renderWarranty(); }
+  if(e.target.id==='glDateCol'){ GV.dateCol=e.target.value; renderGlass(); return; }
   if(e.target.id==='gvFrom'){ GV.from=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.to=GV.from; GV.scope='range'; GV.preset='custom'; renderGlass(); return; }
   if(e.target.id==='gvTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; GV.scope='range'; GV.preset='custom'; renderGlass(); return; }
   if(e.target.id==='dlrJibu'){ DLR.jibu=e.target.value; renderDealer(); return; }
