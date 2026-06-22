@@ -228,7 +228,7 @@
   .hdr-search .hs-ico{font-size:13px;opacity:.65}
   .hdr-search input{border:0;background:transparent;outline:none;color:var(--ink);font-family:var(--font);font-size:13px;width:100%}
   .hdr-search input::placeholder{color:var(--ink3)}
-  #appSwitcher .theme-switch{margin-left:12px}
+  #appSwitcher .theme-switch{margin-left:auto}
   @media(max-width:640px){ .hdr-search{min-width:0;flex:1;max-width:none} }
   .theme-switch{display:inline-flex;align-items:center;gap:9px;margin-left:auto;background:var(--card);
     border:1px solid var(--line2);border-radius:980px;padding:8px 14px;cursor:pointer;
@@ -1016,10 +1016,6 @@
     <button class="appsw-btn on" data-ws="cafe"><span data-txt="tabCafe">온라인 모니터링</span></button>
     <button class="appsw-btn" data-ws="rayno"><span data-txt="tabRayno">레이노 데이터</span></button>
     <button class="appsw-btn" data-ws="settings"><span data-txt="tabSettings">설정</span></button>
-    <div class="hdr-search">
-      <span class="hs-ico">🔍</span>
-      <input id="globalSearch" type="text" placeholder="게시글·댓글 검색 (예: 스트라)" autocomplete="off">
-    </div>
     <button id="themeToggle" class="theme-switch" type="button" role="switch" aria-checked="false" aria-label="다크모드 전환" title="라이트/다크 전환">
       <span class="ts-ico">🌙</span><span class="ts-label">다크모드</span>
       <span class="ts-track"><span class="ts-knob"></span></span>
@@ -1062,6 +1058,10 @@
           <input type="date" class="dt-input" id="dateTo">
         </span>
       </div>
+    </div>
+    <div class="hdr-search">
+      <span class="hs-ico">🔍</span>
+      <input id="globalSearch" type="text" placeholder="게시글·댓글 검색 (예: 스트라)" autocomplete="off">
     </div>
   </div>
 
@@ -1491,7 +1491,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 글라스_집계날짜선택';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 검색창_기간바이동';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
