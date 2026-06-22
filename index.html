@@ -977,7 +977,7 @@
   .wv-ftoggle{font-size:12px;color:var(--amber);font-weight:800;cursor:pointer;margin-left:auto}
   .wv-ftoggle:hover{text-decoration:underline}
   .sbar{display:flex;align-items:flex-end;gap:3px;height:30px;margin-top:9px}
-  .sb-bar{flex:1;min-width:3px;border-radius:3px 3px 0 0;transition:opacity .12s;cursor:crosshair}
+  .sb-bar{flex:1;min-width:3px;border-radius:3px 3px 0 0;transition:opacity .12s;cursor:default}
   .sb-bar:hover{opacity:1!important}
 </style>
 </head>
@@ -1491,7 +1491,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 날짜필터_한줄';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 막대툴팁_월표시';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4764,9 +4764,9 @@ function _sparkbar(vals, color, opts){
   const a=(vals||[]).map(x=>+x||0); if(!a.length) return '';
   opts=opts||{}; const lab=opts.label||'';
   const fmt=opts.fmt||(v=>Math.abs(v)>=1e8?(v/1e8).toFixed(1)+'억':Math.abs(v)>=1e4?(v/1e4).toFixed(1)+'만':(Math.round(v*100)/100).toLocaleString());
-  const mx=Math.max(1,...a), n=a.length;
+  const mx=Math.max(1,...a), n=a.length, mos=opts.months||[];
   const bars=a.map((v,i)=>{ const hp=Math.max(8, v/mx*100), last=i===n-1, mom=(i>0&&a[i-1])?((v-a[i-1])/Math.abs(a[i-1])*100):null;
-    return `<div class="sb-bar spark-pt" data-l="${escapeHtml(lab)}" data-v="${escapeHtml(fmt(v))}" data-m="${mom==null?'':mom.toFixed(1)}" style="height:${hp.toFixed(0)}%;background:${color};opacity:${last?1:.38}"></div>`; }).join('');
+    return `<div class="sb-bar spark-pt" data-l="${escapeHtml(lab)}" data-v="${escapeHtml(fmt(v))}" data-m="${mom==null?'':mom.toFixed(1)}" data-mo="${escapeHtml(mos[i]||'')}" style="height:${hp.toFixed(0)}%;background:${color};opacity:${last?1:.38}"></div>`; }).join('');
   return `<div class="sbar">${bars}</div>`;
 }
 function _dcard(t,v,sub,color,spark){ return `<div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;border-top:3px solid ${color}"><div style="font-size:11.5px;color:var(--ink3);font-weight:700;margin-bottom:5px">${t}</div><div style="font-size:24px;font-weight:800;letter-spacing:-.01em;color:var(--ink)">${v}</div>${spark||''}<div style="font-size:11px;color:var(--ink2);margin-top:4px">${sub}</div></div>`; }
@@ -4924,9 +4924,9 @@ function renderRDash(){
     const ch=(c,m)=>(C[c]&&C[c].ma[m])||0, psum=c=>pm.reduce((s,m)=>s+ch(c,m),0);
     const lbl=rng?`${fromS} ~ ${toS}`:'전체 누적';
     const cards=[
-      _dcard('전사 매출', eok(psum('B2C')+psum('B2B')+psum('별도채널'))+'억', lbl,'var(--dv4)',_sparkbar(ms.map(m=>ch('B2C',m)+ch('B2B',m)+ch('별도채널',m)),'var(--dv4)',{label:'전사 매출',fmt:v=>eok(v)+'억'})),
-      _dcard('B2C', eok(psum('B2C'))+'억', lbl,'var(--dv1)',_sparkbar(ms.map(m=>ch('B2C',m)),'var(--dv1)',{label:'B2C',fmt:v=>eok(v)+'억'})),
-      _dcard('B2B', eok(psum('B2B'))+'억', lbl,'var(--dv2)',_sparkbar(ms.map(m=>ch('B2B',m)),'var(--dv2)',{label:'B2B',fmt:v=>eok(v)+'억'}))
+      _dcard('전사 매출', eok(psum('B2C')+psum('B2B')+psum('별도채널'))+'억', lbl,'var(--dv4)',_sparkbar(ms.map(m=>ch('B2C',m)+ch('B2B',m)+ch('별도채널',m)),'var(--dv4)',{label:'전사 매출',fmt:v=>eok(v)+'억',months:ms})),
+      _dcard('B2C', eok(psum('B2C'))+'억', lbl,'var(--dv1)',_sparkbar(ms.map(m=>ch('B2C',m)),'var(--dv1)',{label:'B2C',fmt:v=>eok(v)+'억',months:ms})),
+      _dcard('B2B', eok(psum('B2B'))+'억', lbl,'var(--dv2)',_sparkbar(ms.map(m=>ch('B2B',m)),'var(--dv2)',{label:'B2B',fmt:v=>eok(v)+'억',months:ms}))
     ];
     h+=`<div class="card">${cardHead('매출 핵심', _dateBar('rds',RDS,sMin,sMax))}${grid(cards)}<div class="cap" style="margin-top:8px">매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div></div>`;
     h+=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월별 매출 현황</h3>${salesSummaryTable()}</div>`;
@@ -5024,7 +5024,7 @@ function renderGlass(){
   const mkt=recs.filter(r=>/^(O|Y|예|동의|true|1)$/i.test(String(r['마케팅동의']||'').trim())).length;
   const scope=_glScope;
   const monCnt={}; recs.forEach(r=>{ const d=dstr(r); if(d){ const ym=d.slice(0,7); monCnt[ym]=(monCnt[ym]||0)+1; } });
-  const monKeys=Object.keys(monCnt).sort(); const spark=_sparkbar(monKeys.map(k=>monCnt[k]),'var(--dv1)',{label:'월별 가입',fmt:v=>v.toLocaleString()+'건'});
+  const monKeys=Object.keys(monCnt).sort(); const spark=_sparkbar(monKeys.map(k=>monCnt[k]),'var(--dv1)',{label:'월별 가입',fmt:v=>v.toLocaleString()+'건',months:monKeys});
   const rk=(l,v,m)=>`<div class="rk"><div class="rk-l">${l}</div><div class="rk-v">${v}</div><div class="rk-m">${m}</div></div>`;
   const kpis=`<div class="card"><div class="rep-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px">`
     + rk('총 가입수', total.toLocaleString()+'건', (GV.scope==='range'?`${GV.from||minD} ~ ${GV.to||maxD}`:'전체기간'))
@@ -5882,9 +5882,10 @@ function _spark(vals, color, opts){
   document.addEventListener('mousemove', e=>{
     const r=e.target&&e.target.closest&&e.target.closest('.spark-pt');
     if(!r){ if(tip) tip.style.opacity=0; return; }
-    const t=ensure(), l=r.getAttribute('data-l'), v=r.getAttribute('data-v'), m=r.getAttribute('data-m');
+    const t=ensure(), l=r.getAttribute('data-l'), v=r.getAttribute('data-v'), m=r.getAttribute('data-m'), mo=r.getAttribute('data-mo');
     let mh=''; if(m!==''&&m!=null){ const mn=parseFloat(m), up=mn>=0; mh=`<div style="color:${up?'#7ce2a6':'#f2a6a2'}">${up?'▲':'▼'} ${Math.abs(mn).toFixed(1)}% 전월비</div>`; }
-    t.innerHTML=`${l?`<b style="color:#ffce00">${l}</b><br>`:''}${v}${mh}`;
+    const moL=(mo&&/^\d{4}-\d{2}$/.test(mo))?`${mo.slice(0,4)}년 ${+mo.slice(5,7)}월`:(mo||'');
+    t.innerHTML=`${l?`<b style="color:#ffce00">${l}</b>`:''}${moL?`<span style="color:#9aa0a6">${l?' · ':''}${moL}</span>`:''}${(l||moL)?'<br>':''}${v}${mh}`;
     t.style.opacity=1; t.style.left=Math.min(e.clientX+12, innerWidth-170)+'px'; t.style.top=(e.clientY-8)+'px';
   }, {passive:true});
 })();
@@ -5901,10 +5902,10 @@ function salesKPI(){
   const _km=_salesMonths(), _cc=(typeof C!=='undefined')?C:(SALES&&SALES.channels)||{B2C:{ma:{}},B2B:{ma:{}},'별도채널':{ma:{}}};
   const _rollM=m=>{ let q=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; q+=(SALES.prodAll[p].mq[m]||0); }); return q; };
   const _crM=m=>_sNum((salesCfg().carReg||{})[m]||0);
-  const spEnt=_spark(_km.map(m=>(_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)+((_cc['별도채널']&&_cc['별도채널'].ma[m])||0)),'var(--dv4)');
-  const spBB=_spark(_km.map(m=>(_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)),'var(--dv1)');
-  const spRoll=_spark(_km.map(_rollM),'var(--dv2)');
-  const spShare=_spark(_km.map(m=>{ const cr=_crM(m); return cr>0?_qcNew(m)/cr*100:0; }),'var(--dv6)');
+  const spEnt=_sparkbar(_km.map(m=>(_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)+((_cc['별도채널']&&_cc['별도채널'].ma[m])||0)),'var(--dv4)',{label:'전사 매출액',fmt:v=>eok(v)+'억',months:_km});
+  const spBB=_sparkbar(_km.map(m=>(_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)),'var(--dv1)',{label:'B2C+B2B 합계',fmt:v=>eok(v)+'억',months:_km});
+  const spRoll=_sparkbar(_km.map(_rollM),'var(--dv2)',{label:'롤 판매수량',fmt:v=>won(v)+' 롤',months:_km});
+  const spShare=_sparkbar(_km.map(m=>{ const cr=_crM(m); return cr>0?_qcNew(m)/cr*100:0; }),'var(--dv6)',{label:'신차 장착률',fmt:v=>v.toFixed(1)+'%',months:_km});
   return `<div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:14px">`
     + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도 · 별도채널 포함', spEnt)
     + kpi('B2C+B2B 합계', eok(bbT)+'억', entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'', spBB)
