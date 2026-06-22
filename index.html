@@ -1465,7 +1465,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 글라스재렌더_롤대분류_간격통일';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 지부표_월복수선택탭';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4754,9 +4754,9 @@ function _dateBar(prefix, st, minD, maxD){
 }
 function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; const mx=st._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
 function _dfApply(st, render, fp, tp){ const f=document.getElementById(fp),t=document.getElementById(tp); st.from=f?f.value:''; st.to=t?t.value:''; if(st.from&&st.to&&st.to<st.from){const x=st.from;st.from=st.to;st.to=x;} st.scope='range'; st.preset='custom'; render(); }
-function jibuRollByProductTable(){
+function jibuRollByProductTable(monthsArg){
   if(!SALES||!SALES.jibuProd) return '<div class="empty">매출(ERP) 데이터가 없습니다.</div>';
-  const M=_salesDispMonths(), sm=o=>{let s=0;M.forEach(m=>s+=(o&&o[m])||0);return s;};
+  const M=(monthsArg&&monthsArg.length)?monthsArg:_salesDispMonths(), sm=o=>{let s=0;M.forEach(m=>s+=(o&&o[m])||0);return s;};
   const CATL={MONO:'모노', PRESTO:'프레스토'};
   const catOf=mat=>{ const c=(typeof _midOf==='function'?_midOf(mat):mat)||'기타'; return CATL[c]||c; };
   const catTot={};
@@ -4806,8 +4806,11 @@ function renderRDash(){
     ];
     h+=`<div class="card">${cardHead('매출 핵심', _dateBar('rds',RDS,sMin,sMax))}${grid(cards)}<div class="cap" style="margin-top:8px">매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div></div>`;
     h+=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월별 매출 현황</h3>${salesSummaryTable()}</div>`;
-    const jt=(typeof salesJibuRollTable==='function')&&salesJibuRollTable(); if(jt) h+=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>지부별 매출 현황</h3>${jt}</div>`;
-    const jrt=(typeof jibuRollByProductTable==='function')&&jibuRollByProductTable(); if(jrt) h+=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>지부별 롤 판매 현황 (제품별)</h3>${jrt}</div>`;
+    const _avM=_salesMonths(), _selM=new Set(RDJ.sel||[]);
+    const monthTab=`<div class="seg rdj-month" style="flex-wrap:wrap"><button data-rm="all" class="${_selM.size===0?'on':''}">누적</button>${_avM.map(m=>`<button data-rm="${m}" class="${_selM.has(m)?'on':''}">${m}월</button>`).join('')}</div>`;
+    const rdjMonths=_selM.size?[..._selM].sort((x,y)=>x-y):_avM;
+    const jt=(typeof salesJibuRollTable==='function')&&salesJibuRollTable(rdjMonths); if(jt) h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h3 style="margin:0"><span class="dot"></span>지부별 매출 현황</h3>${monthTab}</div>${jt}</div>`;
+    const jrt=(typeof jibuRollByProductTable==='function')&&jibuRollByProductTable(rdjMonths); if(jrt) h+=`<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h3 style="margin:0"><span class="dot"></span>지부별 롤 판매 현황 (제품별)</h3>${monthTab}</div>${jrt}</div>`;
   }
   if(hasWarr){
     const minD=wDates[0]||'', maxD=wDates[wDates.length-1]||''; RDW._min=minD; RDW._max=maxD;
@@ -5092,6 +5095,7 @@ const GV={ from:'', to:'', scope:'all', preset:'all', prodSel:[], _min:'', _max:
 const DLR={ jibu:'전체', member:'all', status:'all', q:'' };   // 대리점 마스터 필터
 const RD={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // (구) 대시보드 기간 필터
 const RDS={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDW={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDG={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 대시보드 카드별 기간(매출/보증서/글라스)
+const RDJ={ sel:[] };   // 지부별 매출/롤 표 월 선택(빈=누적)
 function weekKey(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d; const off=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-off);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
 function warrBranchCol(){ const c=WARR.columns||[]; return c.includes('담당지부')?'담당지부':(c.includes('대리점구분')?'대리점구분':null); }
@@ -5947,9 +5951,9 @@ function salesRollTable(){
 }
 
 // Table B — 지부 세일즈 데이터(B2C): 월별 롤 판매 수 + 매출액 + 구성비
-function salesJibuRollTable(){
+function salesJibuRollTable(monthsArg){
   if(!SALES||!SALES.jibuProd) return '<div style="color:var(--ink2);font-size:13px">ERP 재업로드 후 표시됩니다.</div>';
-  const M=_salesDispMonths(), JG=SALES_JIBU.concat(['본사']), C=SALES.channels;
+  const M=(monthsArg&&monthsArg.length)?monthsArg:_salesDispMonths(), JG=SALES_JIBU.concat(['본사']), C=SALES.channels;
   const roll=n=>n?Math.round(n).toLocaleString():'0', won=n=>n?Math.round(n).toLocaleString():'0';
   function jr(j){ const q=_sMz(),a=_sMz(); const pm=SALES.jibuProd[j]||{}; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const o=pm[mat]; const oq=o.q||o, oa=o.a||_sMz(); for(let m=1;m<=12;m++){q[m]+=oq[m]||0; a[m]+=oa[m]||0;} }); return {q,a}; }
   const rows=JG.map(j=>({j,...jr(j)}));
@@ -6520,6 +6524,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   if(e.target.id==='rdsApply'){ _dfApply(RDS,renderRDash,'rdsFrom','rdsTo'); return; }
   if(e.target.id==='rdwApply'){ _dfApply(RDW,renderRDash,'rdwFrom','rdwTo'); return; }
   if(e.target.id==='rdgApply'){ _dfApply(RDG,renderRDash,'rdgFrom','rdgTo'); return; }
+  const _rm=e.target.closest('.rdj-month button'); if(_rm){ const v=_rm.dataset.rm; if(v==='all'){ RDJ.sel=[]; } else { const m=+v; const s=new Set(RDJ.sel||[]); s.has(m)?s.delete(m):s.add(m); RDJ.sel=[...s]; } renderRDash(); return; }
   if(e.target.id==='wvApply'){ _dfApply(WV,renderWarranty,'wvFrom','wvTo'); return; }
   if(e.target.id==='gvApply'){ _dfApply(GV,renderGlass,'gvFrom','gvTo'); return; }
   const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
