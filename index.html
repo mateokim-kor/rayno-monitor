@@ -1465,7 +1465,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 대시보드4구역_지부롤판매';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 글라스재렌더_롤대분류_간격통일';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4757,22 +4757,24 @@ function _dfApply(st, render, fp, tp){ const f=document.getElementById(fp),t=doc
 function jibuRollByProductTable(){
   if(!SALES||!SALES.jibuProd) return '<div class="empty">매출(ERP) 데이터가 없습니다.</div>';
   const M=_salesDispMonths(), sm=o=>{let s=0;M.forEach(m=>s+=(o&&o[m])||0);return s;};
-  const prodTot={};
-  Object.values(SALES.jibuProd).forEach(pm=>{ Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const o=pm[mat]; prodTot[mat]=(prodTot[mat]||0)+sm(o.q||o); }); });
-  const prodList=Object.keys(prodTot).filter(p=>prodTot[p]>0).sort((a,b)=>prodTot[b]-prodTot[a]);
-  if(!prodList.length) return '<div class="empty">롤 판매 데이터가 없습니다.</div>';
+  const CATL={MONO:'모노', PRESTO:'프레스토'};
+  const catOf=mat=>{ const c=(typeof _midOf==='function'?_midOf(mat):mat)||'기타'; return CATL[c]||c; };
+  const catTot={};
+  Object.values(SALES.jibuProd).forEach(pm=>{ Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const cat=catOf(mat); catTot[cat]=(catTot[cat]||0)+sm(pm[mat].q||pm[mat]); }); });
+  const catList=Object.keys(catTot).filter(c=>catTot[c]>0).sort((a,b)=>catTot[b]-catTot[a]);
+  if(!catList.length) return '<div class="empty">롤 판매 데이터가 없습니다.</div>';
   const JG=SALES_JIBU.concat(['본사']);
-  const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; const cells={}; let tot=0; prodList.forEach(p=>{ const o=pm[p]; const q=o?sm(o.q||o):0; cells[p]=q; tot+=q; }); return {j,cells,tot}; }).filter(r=>r.tot>0).sort((a,b)=>b.tot-a.tot);
-  const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line);white-space:nowrap"';
-  const th='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line);white-space:nowrap"';
-  const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);white-space:nowrap"';
+  const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; const cells={}; let tot=0; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const cat=catOf(mat); const q=sm(pm[mat].q||pm[mat]); cells[cat]=(cells[cat]||0)+q; tot+=q; }); return {j,cells,tot}; }).filter(r=>r.tot>0).sort((a,b)=>b.tot-a.tot);
+  const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const th='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
   const roll=n=>n?Math.round(n).toLocaleString():'·';
-  let h=`<div class="cap" style="margin-bottom:8px">지부별 롤 제품 판매 수량(롤) · 표시 기간 합계 · 판매 롤 제품명 기준</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>합계</th>${prodList.map(p=>`<th ${th}>${escapeHtml(p)}</th>`).join('')}</tr>`;
-  rows.forEach(r=>{ h+=`<tr><td ${tdl}>${escapeHtml(r.j)}</td><td ${tdt}>${roll(r.tot)}</td>${prodList.map(p=>`<td ${td}>${roll(r.cells[p])}</td>`).join('')}</tr>`; });
-  const colT={}; prodList.forEach(p=>colT[p]=rows.reduce((s,r)=>s+r.cells[p],0)); const gtot=rows.reduce((s,r)=>s+r.tot,0);
-  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}>${roll(gtot)}</td>${prodList.map(p=>`<td ${td}><b>${roll(colT[p])}</b></td>`).join('')}</tr></table></div>`;
+  let h=`<div class="cap" style="margin-bottom:8px">지부별 롤 판매 수량(롤) · 표시 기간 합계 · 제품 큰 카테고리 기준</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:420px"><tr><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>합계</th>${catList.map(c=>`<th ${th}>${escapeHtml(c)}</th>`).join('')}</tr>`;
+  rows.forEach(r=>{ h+=`<tr><td ${tdl}>${escapeHtml(r.j)}</td><td ${tdt}>${roll(r.tot)}</td>${catList.map(c=>`<td ${td}>${roll(r.cells[c])}</td>`).join('')}</tr>`; });
+  const colT={}; catList.forEach(c=>colT[c]=rows.reduce((s,r)=>s+(r.cells[c]||0),0)); const gtot=rows.reduce((s,r)=>s+r.tot,0);
+  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}>${roll(gtot)}</td>${catList.map(c=>`<td ${td}><b>${roll(colT[c])}</b></td>`).join('')}</tr></table></div>`;
   return h;
 }
 function renderRDash(){
@@ -5503,7 +5505,7 @@ function renderRevenue(){
   const th=`style="background:var(--ink);color:var(--bg);padding:8px 10px;font-size:12px;font-weight:800;text-align:right;white-space:nowrap"`;
   const tdl=`style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px"`;
   const td=`style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px"`;
-  const card=s=>`<div class="card" style="margin-bottom:13px">${s}</div>`;
+  const card=s=>`<div class="card">${s}</div>`;
   const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
   const lab=_salesLabel();
   let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
@@ -5746,7 +5748,7 @@ function salesCompareCard(){
   const opt=sel=>ms.map(m=>`<option value="${m}"${sel===m?' selected':''}>${m}월</option>`).join('');
   const thl=`class="l"`, th=``, tdl=`class="l"`, td=``;
   const ss=`style="padding:5px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;font-weight:700"`;
-  let h=`<div class="card" style="margin-bottom:13px"><h3 style="margin:0 0 11px"><span class="dot"></span>📊 월 비교</h3>`
+  let h=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>📊 월 비교</h3>`
    +`<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:13px"><select id="salesCmpA" ${ss}>${opt(A)}</select><b style="color:var(--ink2)">vs</b><select id="salesCmpB" ${ss}>${opt(B)}</select></div>`
    +`<div class="iv-wrap"><table class="iv"><tr><th ${thl}>지표</th><th ${th}>${A}월</th><th ${th}>${B}월</th><th ${th}>증감</th><th ${th}>증감률</th></tr>`;
   rows.forEach(r=>{ const a=r.f(A)||0,b=r.f(B)||0,d=b-a,p=a?(d/a*100):0; const col=d>0?'#16a34a':(d<0?'#dc2626':'var(--ink2)'),sg=d>0?'+':'';
@@ -6300,7 +6302,7 @@ async function openRayno(){
     return;
   }
   lock.style.display='none'; nav.style.display='flex';
-  await ensureBiz(); await ensureWarr(); await ensureSales(); ensureGlass().then(()=>{ if(rview==='glass')renderGlass(); updateUploadDates(); }); setRView(rview);
+  await ensureBiz(); await ensureWarr(); await ensureSales(); ensureGlass().then(()=>{ if(rview==='glass')renderGlass(); else if(rview==='dash')renderRDash(); updateUploadDates(); }); setRView(rview);
 }
 async function setWorkspace(ws){
   workspace=ws;
