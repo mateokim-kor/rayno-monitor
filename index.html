@@ -1246,11 +1246,12 @@
     </div>
     <div class="nav" id="raynoNav">
       <button class="nav-btn on" data-rview="dash"><span>대시보드</span></button>
-      <button class="nav-btn" data-rview="revenue"><span data-txt="tabRevenue">매출</span></button>
-      <button class="nav-btn" data-rview="warranty"><span data-txt="tabWarranty">품질보증서</span></button>
+      <button class="nav-btn" data-rview="revenue"><span data-txt="tabRevenue">매출 현황</span></button>
+      <button class="nav-btn" data-rview="warranty"><span data-txt="tabWarranty">품질보증서 현황</span></button>
+      <button class="nav-btn" data-rview="glass"><span>글라스케어 현황</span></button>
+      <button class="nav-btn" data-rview="dealer"><span>대리점 현황</span></button>
+      <button class="nav-btn" data-rview="search"><span data-txt="tabSearch">브랜드 검색량</span></button>
       <button class="nav-btn" data-rview="warrReport"><span data-txt="tabWarrReport">보증서 리포트</span></button>
-      <button class="nav-btn" data-rview="glass"><span>글라스케어</span></button><button class="nav-btn" data-rview="dealer"><span>대리점</span></button>
-      <button class="nav-btn" data-rview="search"><span data-txt="tabSearch">검색량</span></button>
       <div class="nav-tools">
         <span class="admin-flag" id="raynoAdminFlag" style="display:none">🔓 관리자 모드</span>
         <button class="acc-btn" id="warrAddBtn">＋ 보증서 엑셀</button><span class="upl-date" id="warrUplDate"></span>
@@ -1386,7 +1387,7 @@ const CONFIG = {
     footer2:    '모든 분석은 브라우저 안에서만 처리되며 파일은 외부로 전송되지 않습니다.',
     tabCafe:'온라인 모니터링', tabRayno:'레이노 데이터', tabSettings:'설정',
     tabDash:'대시보드', tabReport:'리포트', tabVerify:'데이터 검증',
-    tabWarranty:'품질보증서', tabWarrReport:'보증서 리포트', tabSearch:'검색량', tabRevenue:'매출',
+    tabWarranty:'품질보증서 현황', tabWarrReport:'보증서 리포트', tabSearch:'브랜드 검색량', tabRevenue:'매출 현황',
     raynoLockTitle:'레이노 데이터', raynoLockSub:'접근하려면 비밀번호를 입력하세요.',
     emptyTitle:'아직 업로드된 데이터가 없습니다.', emptySub:'관리자가 엑셀을 업로드하면 이곳에 대시보드가 표시됩니다.',
     reportTitle:'📑 분석 리포트', reportSub:'누적 데이터 기반 · 감성은 검증값 우선(없으면 AI) 적용 · 기간을 바꾸면 리포트가 갱신됩니다',
@@ -1487,7 +1488,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 라인발급_재배치';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 탭_순서개명';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
