@@ -1260,6 +1260,7 @@
         <button class="acc-btn" id="warrAddBtn">＋ 보증서 엑셀</button><span class="upl-date" id="warrUplDate"></span>
         <button class="acc-btn" id="salesAddBtn" style="display:none">＋ 매출 ERP</button><span class="upl-date" id="salesUplDate" style="display:none"></span>
         <button class="acc-btn" id="glassAddBtn" style="display:none">＋ 글라스케어 엑셀</button><span class="upl-date" id="glassUplDate" style="display:none"></span>
+        <button class="acc-btn admin-only" id="dataCheckBtn">🔎 데이터 점검</button>
         <button class="acc-btn" id="warrCfgBtn">⚙ 표시 설정</button>
         <button class="acc-btn" id="raynoLoginBtn">🔐 관리자 로그인</button>
         <button class="acc-btn" id="raynoLogoutBtn">로그아웃</button>
@@ -1491,7 +1492,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 막대툴팁_월표시';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 데이터점검도구';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5126,6 +5127,73 @@ function ensureWarrCfg(){ const cfg=WARR.config=WARR.config||defaultWarrConfig(W
   if(!cfg.dateColLocked && cfg.dateCol==='시공일자' && (WARR.columns||[]).includes('등록날짜')) cfg.dateCol='등록날짜';
   return cfg; }
 function warrExcludedSet(){ return new Set(((WARR.config&&WARR.config.excluded)||[])); }
+function runDataCheck(){
+  const FROM='2026-01-01', TO='2026-06-22';
+  const VD=s=>/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(s);
+  const inR=d=>VD(d)&&d>=FROM&&d<=TO;
+  const tx=v=>(v||0).toLocaleString();
+  // ===== 보증서 =====
+  let W={raw:0,cert:0,noncert:0,nodate:0,inRange:0,excl:0,kSer:0,kNo:0,kHash:0}, wDateCol='';
+  if(typeof WARR!=='undefined'&&WARR&&WARR.rows){
+    const cfg=WARR.config||(typeof defaultWarrConfig==='function'?defaultWarrConfig(WARR.columns||[]):{dateCol:'시공일자'});
+    wDateCol=cfg.dateCol||''; const exSet=warrExcludedSet(); W.raw=WARR.rows.length;
+    WARR.rows.forEach(r=>{
+      if(!isWarrCertRow(r)){ W.noncert++; return; }
+      W.cert++;
+      const d=String(warrDateStr(r)||'').slice(0,10);
+      if(!VD(d)) W.nodate++; else if(inR(d)){ W.inRange++; if(exSet.has(warrRecKey(r))) W.excl++; }
+      const ser=String(r['시리얼번호']||'').trim(), no=String(r['No']||'').trim();
+      if(ser)W.kSer++; else if(no)W.kNo++; else W.kHash++;
+    });
+  }
+  const wProg=W.inRange-W.excl;
+  // ===== 글라스 =====
+  let G={raw:0,sigong:0,signup:0,noSigong:0,kSer:0,kNo:0,kJson:0}, gSignupCol='';
+  if(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows){
+    const cols=GLASS.columns||[]; gSignupCol=cols.find(c=>/가입.*일|등록.*일|신청.*일/.test(c))||''; G.raw=GLASS.rows.length;
+    GLASS.rows.forEach(r=>{
+      const sd=String(r['시공일자']||'').slice(0,10);
+      if(!VD(sd)) G.noSigong++; else if(inR(sd)) G.sigong++;
+      if(gSignupCol){ const gd=String(r[gSignupCol]||'').slice(0,10); if(inR(gd)) G.signup++; }
+      const ser=String(r['시리얼번호(글라스케어)']||'').trim(), no=String(r['No']||'').trim();
+      if(ser)G.kSer++; else if(no)G.kNo++; else G.kJson++;
+    });
+  }
+  const closerSignup = gSignupCol && Math.abs(G.signup-4408)<Math.abs(G.sigong-4408);
+  // ===== overlay =====
+  const old=document.getElementById('dataCheckOv'); if(old) old.remove();
+  const R=(l,v,c)=>`<div style="display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line)"><span style="color:var(--ink2)">${l}</span><span style="font-weight:800;${c?'color:'+c+';':''}">${v}</span></div>`;
+  const ov=document.createElement('div'); ov.id='dataCheckOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(6,8,11,.7);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:28px 16px';
+  ov.innerHTML=`<div style="background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:16px;max-width:680px;width:100%;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.42)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:16px;font-weight:800">🔎 데이터 점검 <span style="font-size:12px;color:var(--ink3);font-weight:600">2026-01-01 ~ 2026-06-22</span></div>
+      <button id="dcClose" style="border:1px solid var(--line);background:var(--bg2);border-radius:8px;padding:5px 11px;cursor:pointer;color:var(--ink);font-weight:700">닫기 ✕</button>
+    </div>
+    <div style="font-weight:800;color:var(--amber);margin-top:10px">품질보증서</div>
+    <div style="font-size:13px">
+      ${R('원본 행 수', tx(W.raw)+'건')}
+      ${R('보증서 행(식별자 있음)', tx(W.cert)+'건')}
+      ${R('비보증서 제외(합계·헤더·빈행)', tx(W.noncert)+'건')}
+      ${R('날짜 인식 안 됨 ('+(escapeHtml(wDateCol)||'-')+')', tx(W.nodate)+'건', W.nodate?'var(--neg)':'')}
+      ${R('범위 내 집계 = 프로그램 기준', tx(wProg)+'건','var(--amber)')}
+      ${R('└ 제외 설정으로 빠진 건', tx(W.excl)+'건')}
+      ${R('식별자 유형 · 시리얼 / No / 해시', tx(W.kSer)+' / '+tx(W.kNo)+' / '+tx(W.kHash))}
+    </div>
+    <div style="font-size:11.5px;color:var(--ink2);margin-top:6px;line-height:1.6">홈페이지 <b>37,625</b> vs 프로그램 <b>${tx(wProg)}</b> (차이 ${(wProg-37625>=0?'+':'')}${tx(wProg-37625)}건). ${W.kHash?('식별자 없는 행 <b>'+tx(W.kHash)+'</b>건 — 미세 차이로 중복이 안 합쳐져 더 잡혔을 수 있어요(중복 의심). 보증서 화면 🧹 중복 정리로 줄여보세요. '):''}${W.nodate?('날짜 인식 안 된 '+tx(W.nodate)+'건은 집계에서 빠집니다. '):''}날짜 기준 컬럼: <b>${escapeHtml(wDateCol)||'-'}</b>.</div>
+    <div style="font-weight:800;color:var(--amber);margin-top:16px">글라스케어 가입</div>
+    <div style="font-size:13px">
+      ${R('원본 행 수', tx(G.raw)+'건')}
+      ${R('시공일자 기준 범위 내 = 프로그램 기본', tx(G.sigong)+'건','var(--amber)')}
+      ${gSignupCol?R('가입일자 기준 범위 내 ('+escapeHtml(gSignupCol)+')', tx(G.signup)+'건','var(--dv1)'):R('가입일자 컬럼','없음(시공일자만 존재)','var(--ink3)')}
+      ${R('시공일자 빈/비표준(제외됨)', tx(G.noSigong)+'건', G.noSigong?'var(--neg)':'')}
+      ${R('식별자 유형 · 시리얼 / No / JSON', tx(G.kSer)+' / '+tx(G.kNo)+' / '+tx(G.kJson))}
+    </div>
+    <div style="font-size:11.5px;color:var(--ink2);margin-top:6px;line-height:1.6">홈페이지 <b>4,408</b> vs 프로그램(시공일자) <b>${tx(G.sigong)}</b>${gSignupCol?(' · 가입일자 <b>'+tx(G.signup)+'</b>'):''}. ${closerSignup?('→ <b style="color:var(--dv1)">가입일자</b> 기준이 홈페이지와 더 가까워요. 글라스 탭의 <b>집계 날짜</b>를 가입일자로 바꾸면 맞습니다. '):''}${G.noSigong?('시공일자 빈/비표준 <b>'+tx(G.noSigong)+'</b>건은 집계에서 빠져요. '):''}${(G.kNo+G.kJson)?('시리얼 없는 행 <b>'+tx(G.kNo+G.kJson)+'</b>건 — 여러 파일 업로드 시 No/내용 기준이라 중복키 충돌로 일부 누락됐을 수 있어요. '):''}</div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.addEventListener('click',e=>{ if(e.target===ov||(e.target.id==='dcClose')) ov.remove(); });
+}
 function warrRecKey(rec){
   // 보증서 고유키: 시리얼번호(영구 고유) > No(파일 내 순번) > 내용 해시
   if(rec['시리얼번호']) return 'S:'+rec['시리얼번호'];
@@ -6676,6 +6744,7 @@ document.getElementById('warrCfgBtn').addEventListener('click', ()=>{ warrCfgOpe
 document.getElementById('warrFileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleWarrFile(f); e.target.value=''; });
 document.getElementById('glassAddBtn').addEventListener('click', ()=>document.getElementById('glassFileInput').click());
 document.getElementById('glassFileInput').addEventListener('change', e=>{ const f=e.target.files[0]; if(f) handleGlassFile(f); e.target.value=''; });
+  { const _dcb=document.getElementById('dataCheckBtn'); if(_dcb) _dcb.addEventListener('click', runDataCheck); }
 
 // 레이노 영역 위임 (보증서 설정 칩/저장 + 수기 표 추가/삭제/저장)
 document.getElementById('raynoApp').addEventListener('click', async e=>{
