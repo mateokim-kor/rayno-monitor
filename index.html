@@ -1488,7 +1488,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 탭_순서개명';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 매출카드_스파크제거';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4895,9 +4895,9 @@ function renderRDash(){
     const ch=(c,m)=>(C[c]&&C[c].ma[m])||0, psum=c=>pm.reduce((s,m)=>s+ch(c,m),0);
     const lbl=rng?`${fromS} ~ ${toS}`:'전체 누적';
     const cards=[
-      _dcard('전사 매출', eok(psum('B2C')+psum('B2B')+psum('별도채널'))+'억', lbl,'var(--dv4)',_spark(ms.map(m=>ch('B2C',m)+ch('B2B',m)+ch('별도채널',m)),'var(--dv4)')),
-      _dcard('B2C', eok(psum('B2C'))+'억', lbl,'var(--dv1)',_spark(ms.map(m=>ch('B2C',m)),'var(--dv1)')),
-      _dcard('B2B', eok(psum('B2B'))+'억', lbl,'var(--dv2)',_spark(ms.map(m=>ch('B2B',m)),'var(--dv2)'))
+      _dcard('전사 매출', eok(psum('B2C')+psum('B2B')+psum('별도채널'))+'억', lbl,'var(--dv4)',''),
+      _dcard('B2C', eok(psum('B2C'))+'억', lbl,'var(--dv1)',''),
+      _dcard('B2B', eok(psum('B2B'))+'억', lbl,'var(--dv2)','')
     ];
     h+=`<div class="card">${cardHead('매출 핵심', _dateBar('rds',RDS,sMin,sMax))}${grid(cards)}<div class="cap" style="margin-top:8px">매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div></div>`;
     h+=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월별 매출 현황</h3>${salesSummaryTable()}</div>`;
