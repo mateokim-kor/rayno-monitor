@@ -971,6 +971,7 @@
   .lock-mark{width:auto;height:62px;margin:0 auto 18px;display:block;filter:brightness(0) saturate(0);
              filter:drop-shadow(0 6px 18px rgba(232,137,59,.22))}
   .dbar{position:absolute;left:0;top:3px;bottom:3px;border-radius:0 4px 4px 0;background:rgba(244,145,28,.22);z-index:-1;pointer-events:none}
+  .cardctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:6px 9px}
 </style>
 </head>
 <body>
@@ -1482,7 +1483,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · W3_스파크툴팁';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · W4_필터존분리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4873,7 +4874,7 @@ function renderRDash(){
   const won=n=>Math.round(n||0).toLocaleString(), eok=n=>(n/1e8).toFixed(1), pct=(x,y)=>y?(x/y*100).toFixed(1)+'%':'—';
   const grid=cards=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${cards.join('')}</div>`;
   const split=(t1,t2)=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:14px"><div>${t1}</div><div>${t2}</div></div>`;
-  const cardHead=(title,bar)=>`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px"><h3 style="margin:0"><span class="dot"></span>${title}</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${bar}</div></div>`;
+  const cardHead=(title,bar)=>`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px"><h3 style="margin:0"><span class="dot"></span>${title}</h3><div class="cardctrl">${bar}</div></div>`;
   const wDates=hasWarr?WARR.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
   const gDates=hasGlass?GLASS.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
   const yr=((wDates[wDates.length-1]||gDates[gDates.length-1]||'').slice(0,4))||String(new Date().getFullYear());
