@@ -1013,6 +1013,26 @@
   <!-- 도구·필터 접기 토글 -->
   <button id="dashToolToggle" class="tooltgl" type="button">⚙ 도구·필터 펼치기 ▾</button>
 
+  <!-- 기간 설정 (도구·필터와 별개로 항상 표시) -->
+  <div class="controls" id="periodBar" style="margin-bottom:14px">
+    <div class="ctl-group" style="min-width:210px">
+      <span class="ctl-label">기간</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div class="seg" id="dateModeSeg">
+          <button data-dm="all" class="on">전체</button>
+          <button data-dm="month">월별</button>
+          <button data-dm="range">일자</button>
+        </div>
+        <select class="dt-select" id="monthSel" style="display:none"></select>
+        <span class="dt-range" id="dateRange" style="display:none">
+          <input type="date" class="dt-input" id="dateFrom">
+          <span class="dt-tilde">~</span>
+          <input type="date" class="dt-input" id="dateTo">
+        </span>
+      </div>
+    </div>
+  </div>
+
   <!-- 컨트롤 -->
   <div class="controls" id="controls">
     <div class="ctl-group">
@@ -1028,22 +1048,6 @@
         <button data-scope="all" class="on">전체</button>
         <button data-scope="post">게시글만</button>
         <button data-scope="comment">댓글만</button>
-      </div>
-    </div>
-    <div class="ctl-group" style="min-width:210px">
-      <span class="ctl-label">기간</span>
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <div class="seg" id="dateModeSeg">
-          <button data-dm="all" class="on">전체</button>
-          <button data-dm="month">월별</button>
-          <button data-dm="range">일자</button>
-        </div>
-        <select class="dt-select" id="monthSel" style="display:none"></select>
-        <span class="dt-range" id="dateRange" style="display:none">
-          <input type="date" class="dt-input" id="dateFrom">
-          <span class="dt-tilde">~</span>
-          <input type="date" class="dt-input" id="dateTo">
-        </span>
       </div>
     </div>
     <div class="ctl-group">
@@ -1454,7 +1458,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 날짜필터_전페이지통일';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 모니터링_기간바분리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3734,6 +3738,7 @@ function setView(v){
   const dash = (v==='dash');
   document.getElementById('dash').style.display = dash?'block':'none';
   document.getElementById('controls').style.display = dash?'flex':'none';
+  { const pb=document.getElementById('periodBar'); if(pb) pb.style.display = dash?'flex':'none'; }
   document.getElementById('typeBar').style.display = dash?'flex':'none';
   document.getElementById('veriNote').style.display = dash?'block':'none';
   document.getElementById('filterStatus').style.display =
