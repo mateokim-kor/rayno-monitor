@@ -1454,7 +1454,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 대시보드_기간필터';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 날짜필터_전페이지통일';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4732,6 +4732,16 @@ function _miniTable(lc, vc, entries, total){
   entries.forEach(([k,v])=>{ h+=`<tr><td ${tdl}>${escapeHtml(String(k))}</td><td ${td}>${(v||0).toLocaleString()}</td><td ${td}>${total?(v/total*100).toFixed(1)+'%':'—'}</td></tr>`; });
   return h+`</table>`;
 }
+function _dateBar(prefix, st, minD, maxD){
+  const range=st.scope==='range', fromD=range?(st.from||minD):minD, toD=range?(st.to||maxD):maxD;
+  const lbl=range?`${fromD} ~ ${toD}`:'전체';
+  const pb=(v,l)=>`<button data-rp="${v}" class="${st.preset===v?'on':''}">${l}</button>`;
+  return `<div class="seg" id="${prefix}Preset">${pb('all','전체')}${pb('7','최근 7일')}${pb('30','최근 30일')}${pb('90','최근 90일')}</div>`
+    +`<span class="dt-range" style="display:inline-flex"><input type="date" class="dt-input" id="${prefix}From" value="${fromD}" min="${minD}" max="${maxD}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="${prefix}To" value="${toD}" min="${minD}" max="${maxD}"></span>`
+    +`<button class="acc-btn" id="${prefix}Apply">조회</button><span style="font-size:12px;color:var(--ink2);font-weight:700">${lbl}</span>`;
+}
+function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; const mx=st._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
+function _dfApply(st, render, fp, tp){ const f=document.getElementById(fp),t=document.getElementById(tp); st.from=f?f.value:''; st.to=t?t.value:''; if(st.from&&st.to&&st.to<st.from){const x=st.from;st.from=st.to;st.to=x;} st.scope='range'; st.preset='custom'; render(); }
 function renderRDash(){
   const box=document.getElementById('rDash'); if(!box) return;
   const hasSales=!!(SALES&&SALES.channels), hasWarr=!!(WARR&&WARR.rows&&WARR.rows.length), hasGlass=!!(GLASS&&GLASS.rows&&GLASS.rows.length);
@@ -4745,8 +4755,7 @@ function renderRDash(){
   const range=RD.scope==='range', fromD=range?(RD.from||minD):minD, toD=range?(RD.to||maxD):maxD;
   const inDay=d=>{ d=String(d||'').slice(0,10); if(!d) return false; if(fromD&&d<fromD)return false; if(toD&&d>toD)return false; return true; };
   const periodLabel=range?`${fromD} ~ ${toD}`:'전체 누적';
-  const preBtn=(v,l)=>`<button data-rp="${v}" class="${RD.preset===v?'on':''}">${l}</button>`;
-  let h=`<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;color:var(--ink3);font-weight:700">기간</span><div class="seg" id="rdPreset">${preBtn('all','전체')}${preBtn('7','최근 7일')}${preBtn('30','최근 30일')}${preBtn('90','최근 90일')}</div><input type="date" class="dt-input" id="rdFrom" value="${fromD}" min="${minD}" max="${maxD}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="rdTo" value="${toD}" min="${minD}" max="${maxD}"><button class="acc-btn" id="rdApply">조회</button><span style="font-size:12px;color:var(--ink2);font-weight:700;margin-left:auto">${periodLabel}</span></div><div class="cap" style="margin-top:7px">보증서·글라스케어는 시공일자 기준 일별 적용 · 매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div></div>`;
+  let h=`<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;color:var(--ink3);font-weight:700">기간</span>${_dateBar('rd',RD,minD,maxD)}</div><div class="cap" style="margin-top:7px">보증서·글라스케어는 시공일자 기준 일별 적용 · 매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div></div>`;
   if(hasSales){
     const C=SALES.channels, ms=_salesMonths();
     const fm=range?(+fromD.slice(5,7)):0, tm=range?(+toD.slice(5,7)):0;
@@ -4826,7 +4835,7 @@ function renderGlass(){
   const dealerCol = cols.includes('매장명(대리점명)')?'매장명(대리점명)':(cols.includes('매장명')?'매장명':'매장명(대리점명)');
   const dstr=r=>String(r[dcol]||'').slice(0,10);
   const allD=GLASS.rows.map(dstr).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
-  const minD=allD[0]||'', maxD=allD[allD.length-1]||'';
+  const minD=allD[0]||'', maxD=allD[allD.length-1]||''; GV._min=minD; GV._max=maxD;
   if(!GV._min){ GV._min=minD; GV._max=maxD; }
   let recs=GLASS.rows.slice();
   if(GV.scope==='range'&&(GV.from||GV.to)) recs=recs.filter(r=>{ const d=dstr(r); if(!d)return false; if(GV.from&&d<GV.from)return false; if(GV.to&&d>GV.to)return false; return true; });
@@ -4854,8 +4863,7 @@ function renderGlass(){
   const controls=`<div class="card"><div class="rep-head-top"><div><h3 style="margin:0"><span class="dot"></span>글라스케어 가입 — 지부/대리점 · 기간</h3><div class="cap">가입 신청 데이터를 지부별/대리점별로, 기간(일별)으로 좁혀 봅니다. 제품 라인(얼티넘·스트라·팬텀·카본)별 분해 포함.</div></div>
     <div class="rep-period">
       <div class="seg" id="glScope"><button data-s="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-s="dealer" class="${scope==='dealer'?'on':''}">대리점별</button></div>
-      <div class="seg" id="glPeriod"><button data-p="all" class="${GV.scope==='all'?'on':''}">전체기간</button><button data-p="range" class="${GV.scope==='range'?'on':''}">기간지정</button></div>
-      <span class="dt-range" style="display:${GV.scope==='range'?'inline-flex':'none'}"><input type="date" class="dt-input" id="glFrom" value="${GV.from||minD}" min="${minD}" max="${maxD}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="glTo" value="${GV.to||maxD}" min="${minD}" max="${maxD}"></span>
+      ${_dateBar('gv', GV, minD, maxD)}
     </div></div>`;
   // 표
   const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
@@ -5015,10 +5023,10 @@ function autoSuffix(raw){ const p=String(raw).split('-'); return p.length>1?p[p.
 function warrLabelOf(col,raw){ const lm=(WARR.config&&WARR.config.labelMap&&WARR.config.labelMap[col])||{}; return (lm[raw]!=null&&lm[raw]!=='')?lm[raw]:raw; }
 function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(a[0],a[1],0).getDate(); return {from:`${ym}-01`, to:`${ym}-${String(last).padStart(2,'0')}`}; }
 // 품질보증서 뷰 상태: 집계 단위 + 기간 + 지부 필터
-const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, tab:'overview', _min:'', _max:'' };
+const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, tab:'overview', preset:'all', _min:'', _max:'' };
 let _lwLine='UL', _lwScope='jibu';   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
 let GLASS=null, glassLoaded=false, _glScope='jibu';   // 글라스케어 가입
-const GV={ from:'', to:'', scope:'all', _min:'', _max:'' };
+const GV={ from:'', to:'', scope:'all', preset:'all', _min:'', _max:'' };
 const DLR={ jibu:'전체', member:'all', status:'all', q:'' };   // 대리점 마스터 필터
 const RD={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 대시보드 기간 필터
 function weekKey(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d; const off=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-off);
@@ -5142,11 +5150,7 @@ function renderWarranty(){
           <div class="cap">집계 단위·기간을 고르고, 전면 제품(여러 개 선택 가능)·지부로 좁혀 볼 수 있습니다. (제품을 고르면 ‘담당지부 구성’이 선택한 제품 기준으로 바뀌어 어느 지부가 가장 많이 발급했는지 보입니다)</div></div>
         <div class="rep-period">
           <div class="seg" id="wvGran">${granBtn('day','일별')}${granBtn('week','주별')}${granBtn('month','월별')}</div>
-          <div class="seg" id="wvScope"><button data-s="all" class="${WV.scope==='all'?'on':''}">전체기간</button><button data-s="range" class="${WV.scope==='range'?'on':''}">기간지정</button></div>
-          <span class="dt-range" id="wvRange" style="display:${WV.scope==='range'?'inline-flex':'none'}">
-            <input type="date" class="dt-input" id="wvFrom" value="${WV.from||minD}" min="${minD}" max="${maxD}">
-            <span class="dt-tilde">~</span>
-            <input type="date" class="dt-input" id="wvTo" value="${WV.to||maxD}" min="${minD}" max="${maxD}"></span>
+          ${_dateBar('wv', WV, minD, maxD)}
           ${bc?`<select class="dt-select" id="wvBranch">${branchOpts}</select>`:''}
         </div>
       </div>
@@ -6429,11 +6433,14 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; renderWarranty(); return; }
   const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
   const _gsb=e.target.closest('#glScope button'); if(_gsb){ _glScope=_gsb.dataset.s; renderGlass(); return; }
-  const _gpb=e.target.closest('#glPeriod button'); if(_gpb){ GV.scope=_gpb.dataset.p; if(GV.scope==='range'){ if(!GV.from)GV.from=GV._min; if(!GV.to)GV.to=GV._max; } renderGlass(); return; }
   const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; renderDealer(); return; }
   if(e.target.id==='dlrSearchBtn'){ const q=document.getElementById('dlrQ'); DLR.q=q?q.value.trim():''; renderDealer(); return; }
-  const _rp=e.target.closest('#rdPreset button'); if(_rp){ const v=_rp.dataset.rp; if(v==='all'){ RD.scope='all'; RD.preset='all'; } else { RD.preset=v; RD.scope='range'; const mx=RD._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); RD.to=f(to); RD.from=f(from); } } renderRDash(); return; }
-  if(e.target.id==='rdApply'){ const f=document.getElementById('rdFrom'),t=document.getElementById('rdTo'); RD.from=f?f.value:''; RD.to=t?t.value:''; if(RD.from&&RD.to&&RD.to<RD.from){const x=RD.from;RD.from=RD.to;RD.to=x;} RD.scope='range'; RD.preset='custom'; renderRDash(); return; }
+  const _rp=e.target.closest('#rdPreset button'); if(_rp){ _dfPreset(RD,renderRDash,_rp.dataset.rp); return; }
+  const _wprp=e.target.closest('#wvPreset button'); if(_wprp){ _dfPreset(WV,renderWarranty,_wprp.dataset.rp); return; }
+  const _gvrp=e.target.closest('#gvPreset button'); if(_gvrp){ _dfPreset(GV,renderGlass,_gvrp.dataset.rp); return; }
+  if(e.target.id==='rdApply'){ _dfApply(RD,renderRDash,'rdFrom','rdTo'); return; }
+  if(e.target.id==='wvApply'){ _dfApply(WV,renderWarranty,'wvFrom','wvTo'); return; }
+  if(e.target.id==='gvApply'){ _dfApply(GV,renderGlass,'gvFrom','gvTo'); return; }
   const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
   if(e.target.id==='wvClearBranch'){ WV.branch='전체'; renderWarranty(); return; }
   if(e.target.id==='wvClearFront'){ WV.fronts=[]; renderWarranty(); return; }
@@ -6490,8 +6497,8 @@ document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='wvBranch'){ WV.branch=e.target.value; renderWarranty(); }
   if(e.target.id==='wvFrom'){ WV.from=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.to=WV.from; renderWarranty(); }
   if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; renderWarranty(); }
-  if(e.target.id==='glFrom'){ GV.from=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.to=GV.from; renderGlass(); return; }
-  if(e.target.id==='glTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; renderGlass(); return; }
+  if(e.target.id==='gvFrom'){ GV.from=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.to=GV.from; renderGlass(); return; }
+  if(e.target.id==='gvTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; renderGlass(); return; }
   if(e.target.id==='dlrJibu'){ DLR.jibu=e.target.value; renderDealer(); return; }
   if(e.target.id==='dlrMember'){ DLR.member=e.target.value; renderDealer(); return; }
   if(e.target.id==='dlrQ'){ DLR.q=e.target.value.trim(); renderDealer(); return; }
