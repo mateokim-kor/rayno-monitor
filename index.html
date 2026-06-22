@@ -377,7 +377,11 @@
   .srt::-webkit-scrollbar{height:8px}
   .srt::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
   /* 인보이스 스타일 표 */
-  .iv-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--line);box-shadow:0 1px 3px rgba(0,0,0,.05)}
+  .iv-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--line);box-shadow:0 1px 3px rgba(0,0,0,.05);scrollbar-width:auto;scrollbar-color:var(--amber) var(--bg2)}
+  .iv-wrap::-webkit-scrollbar{height:13px}
+  .iv-wrap::-webkit-scrollbar-track{background:var(--bg2);border-radius:0 0 13px 13px}
+  .iv-wrap::-webkit-scrollbar-thumb{background:var(--amber);border-radius:8px;border:3px solid var(--bg2)}
+  .iv-wrap::-webkit-scrollbar-thumb:hover{background:var(--amber-d)}
   .iv-wrap::-webkit-scrollbar{height:8px}
   .iv-wrap::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
   .iv{border-collapse:separate;border-spacing:0;width:100%;min-width:100%;font-variant-numeric:tabular-nums;background:var(--card)}
@@ -1458,7 +1462,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 캘린더_min제약해제';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 가로스크롤바_가시화';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
