@@ -1458,7 +1458,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 모니터링_기간바분리';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 대시보드_카드별기간필터';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4754,47 +4754,58 @@ function renderRDash(){
   const won=n=>Math.round(n||0).toLocaleString(), eok=n=>(n/1e8).toFixed(1), pct=(x,y)=>y?(x/y*100).toFixed(1)+'%':'—';
   const grid=cards=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${cards.join('')}</div>`;
   const split=(t1,t2)=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:14px"><div>${t1}</div><div>${t2}</div></div>`;
-  const ds=[]; if(hasWarr) WARR.rows.forEach(r=>{const d=String(r['시공일자']||'').slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(d))ds.push(d);});
-  if(hasGlass) GLASS.rows.forEach(r=>{const d=String(r['시공일자']||'').slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(d))ds.push(d);});
-  ds.sort(); const minD=ds[0]||'', maxD=ds[ds.length-1]||''; RD._min=minD; RD._max=maxD;
-  const range=RD.scope==='range', fromD=range?(RD.from||minD):minD, toD=range?(RD.to||maxD):maxD;
-  const inDay=d=>{ d=String(d||'').slice(0,10); if(!d) return false; if(fromD&&d<fromD)return false; if(toD&&d>toD)return false; return true; };
-  const periodLabel=range?`${fromD} ~ ${toD}`:'전체 누적';
-  let h=`<div class="card"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-size:12px;color:var(--ink3);font-weight:700">기간</span>${_dateBar('rd',RD,minD,maxD)}</div><div class="cap" style="margin-top:7px">보증서·글라스케어는 시공일자 기준 일별 적용 · 매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div></div>`;
+  const cardHead=(title,bar)=>`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px"><h3 style="margin:0"><span class="dot"></span>${title}</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${bar}</div></div>`;
+  const wDates=hasWarr?WARR.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
+  const gDates=hasGlass?GLASS.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
+  const yr=((wDates[wDates.length-1]||gDates[gDates.length-1]||'').slice(0,4))||String(new Date().getFullYear());
+  let h='';
   if(hasSales){
     const C=SALES.channels, ms=_salesMonths();
-    const fm=range?(+fromD.slice(5,7)):0, tm=range?(+toD.slice(5,7)):0;
-    const pm=range?ms.filter(m=>m>=fm&&m<=tm):ms;
+    const sMin=ms.length?`${yr}-${String(Math.min.apply(null,ms)).padStart(2,'0')}-01`:'';
+    const sMax=ms.length?`${yr}-${String(Math.max.apply(null,ms)).padStart(2,'0')}-28`:'';
+    RDS._min=sMin; RDS._max=sMax;
+    const rng=RDS.scope==='range', fromS=rng?(RDS.from||sMin):sMin, toS=rng?(RDS.to||sMax):sMax;
+    const fM=rng?+String(fromS).slice(5,7):0, tM=rng?+String(toS).slice(5,7):0;
+    const pm=rng?ms.filter(m=>m>=fM&&m<=tM):ms;
     const ch=(c,m)=>(C[c]&&C[c].ma[m])||0, psum=c=>pm.reduce((s,m)=>s+ch(c,m),0);
+    const lbl=rng?`${fromS} ~ ${toS}`:'전체 누적';
     const cards=[
-      _dcard('전사 매출', eok(psum('B2C')+psum('B2B')+psum('별도채널'))+'억', periodLabel, 'var(--dv4)', _spark(ms.map(m=>ch('B2C',m)+ch('B2B',m)+ch('별도채널',m)),'var(--dv4)')),
-      _dcard('B2C', eok(psum('B2C'))+'억', periodLabel,'var(--dv1)', _spark(ms.map(m=>ch('B2C',m)),'var(--dv1)')),
-      _dcard('B2B', eok(psum('B2B'))+'억', periodLabel,'var(--dv2)', _spark(ms.map(m=>ch('B2B',m)),'var(--dv2)'))
+      _dcard('전사 매출', eok(psum('B2C')+psum('B2B')+psum('별도채널'))+'억', lbl,'var(--dv4)',_spark(ms.map(m=>ch('B2C',m)+ch('B2B',m)+ch('별도채널',m)),'var(--dv4)')),
+      _dcard('B2C', eok(psum('B2C'))+'억', lbl,'var(--dv1)',_spark(ms.map(m=>ch('B2C',m)),'var(--dv1)')),
+      _dcard('B2B', eok(psum('B2B'))+'억', lbl,'var(--dv2)',_spark(ms.map(m=>ch('B2B',m)),'var(--dv2)'))
     ];
-    h+=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>매출 핵심</h3>${grid(cards)}</div>`;
+    h+=`<div class="card">${cardHead('매출 핵심', _dateBar('rds',RDS,sMin,sMax))}${grid(cards)}<div class="cap" style="margin-top:8px">매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div></div>`;
     h+=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월별 매출 요약</h3>${salesSummaryTable()}</div>`;
     const jt=(typeof salesJibuRollTable==='function')&&salesJibuRollTable(); if(jt) h+=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>지부별 매출</h3>${jt}</div>`;
   }
   if(hasWarr){
-    const W=range?WARR.rows.filter(r=>inDay(r['시공일자'])):WARR.rows;
+    const minD=wDates[0]||'', maxD=wDates[wDates.length-1]||''; RDW._min=minD; RDW._max=maxD;
+    const rng=RDW.scope==='range', fromD=rng?(RDW.from||minD):minD, toD=rng?(RDW.to||maxD):maxD;
+    const inDay=d=>{ d=String(d||'').slice(0,10); if(!d)return false; if(fromD&&d<fromD)return false; if(toD&&d>toD)return false; return true; };
+    const lbl=rng?`${fromD} ~ ${toD}`:'전체 누적';
+    const W=rng?WARR.rows.filter(r=>inDay(r['시공일자'])):WARR.rows;
     const wTot=W.length, newN=W.filter(_warrIsNew).length;
-    let ul=0,st=0,ph=0,cha=0; W.forEach(r=>{ const L=_rowLines(r); if(L.UL)ul++; if(L.ST)st++; if(L.PH)ph++; if(L.CH)cha++; });
-    const wj={}; W.forEach(r=>{ const j=String(r['담당지부']||'').trim()||'미지정'; wj[j]=(wj[j]||0)+1; }); const wjt=Object.entries(wj).sort((a,b)=>b[1]-a[1]);
-    const cards=[ _dcard('발급', won(wTot)+'건', periodLabel,'var(--dv3)',''), _dcard('신차 비율', pct(newN,wTot), '신차 '+won(newN)+' · 중고 '+won(wTot-newN),'var(--dv3)',''), _dcard('얼티넘 발급', won(ul)+'건','보증서 1건 기준','var(--dv2)',''), _dcard('스트라 발급', won(st)+'건','보증서 1건 기준','var(--dv2)','') ];
+    let ul=0,st=0,ph=0,cha=0; W.forEach(r=>{const L=_rowLines(r); if(L.UL)ul++; if(L.ST)st++; if(L.PH)ph++; if(L.CH)cha++;});
+    const wj={}; W.forEach(r=>{const j=String(r['담당지부']||'').trim()||'미지정'; wj[j]=(wj[j]||0)+1;}); const wjt=Object.entries(wj).sort((a,b)=>b[1]-a[1]);
+    const cards=[ _dcard('발급',won(wTot)+'건',lbl,'var(--dv3)',''), _dcard('신차 비율',pct(newN,wTot),'신차 '+won(newN)+' · 중고 '+won(wTot-newN),'var(--dv3)',''), _dcard('얼티넘 발급',won(ul)+'건','보증서 1건 기준','var(--dv2)',''), _dcard('스트라 발급',won(st)+'건','보증서 1건 기준','var(--dv2)','') ];
     const lineRows=[['얼티넘',ul],['스트라',st],['팬텀',ph],['카본',cha]].filter(x=>x[1]>0);
-    h+=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>품질보증서 핵심</h3>${grid(cards)}${split(_miniTable('지부','발급',wjt,wTot), _miniTable('제품 라인','발급',lineRows,lineRows.reduce((s,x)=>s+x[1],0)||1))}</div>`;
+    h+=`<div class="card">${cardHead('품질보증서 핵심', _dateBar('rdw',RDW,minD,maxD))}${grid(cards)}${split(_miniTable('지부','발급',wjt,wTot),_miniTable('제품 라인','발급',lineRows,lineRows.reduce((s,x)=>s+x[1],0)||1))}</div>`;
   }
   if(hasGlass){
     const dcol=(GLASS.columns||[]).includes('매장명(대리점명)')?'매장명(대리점명)':'매장명';
-    const G=range?GLASS.rows.filter(r=>inDay(r['시공일자'])):GLASS.rows;
+    const minD=gDates[0]||'', maxD=gDates[gDates.length-1]||''; RDG._min=minD; RDG._max=maxD;
+    const rng=RDG.scope==='range', fromD=rng?(RDG.from||minD):minD, toD=rng?(RDG.to||maxD):maxD;
+    const inDay=d=>{ d=String(d||'').slice(0,10); if(!d)return false; if(fromD&&d<fromD)return false; if(toD&&d>toD)return false; return true; };
+    const lbl=rng?`${fromD} ~ ${toD}`:'전체 누적';
+    const G=rng?GLASS.rows.filter(r=>inDay(r['시공일자'])):GLASS.rows;
     const gTot=G.length, dealers=new Set(G.map(r=>String(r[dcol]||'').trim()).filter(Boolean)).size;
     const mkt=G.filter(r=>/^(O|Y|예|동의|true|1)$/i.test(String(r['마케팅동의']||'').trim())).length;
     const gdays=new Set(G.map(r=>String(r['시공일자']||'').slice(0,10)).filter(Boolean)).size;
-    let gul=0,gst=0,gph=0,gch=0; G.forEach(r=>{ const f=_parseFilm(r['썬팅제품(전면)']); if(f){ if(f.line==='UL')gul++; else if(f.line==='ST')gst++; else if(f.line==='PH')gph++; else if(f.line==='CH')gch++; } });
-    const gj={}; G.forEach(r=>{ const j=String(r['담당지부']||'').trim()||'미지정'; gj[j]=(gj[j]||0)+1; }); const gjt=Object.entries(gj).sort((a,b)=>b[1]-a[1]);
-    const cards=[ _dcard('가입', won(gTot)+'건', periodLabel,'var(--dv1)',''), _dcard('가입 대리점', won(dealers)+'곳','가입 발생 매장','var(--dv1)',''), _dcard('마케팅 동의', pct(mkt,gTot), won(mkt)+'건 동의','var(--dv6)',''), _dcard('일평균', (gdays?gTot/gdays:0).toFixed(1)+'건', gdays+'일 기준','var(--dv6)','') ];
+    let gul=0,gst=0,gph=0,gch=0; G.forEach(r=>{const f=_parseFilm(r['썬팅제품(전면)']); if(f){if(f.line==='UL')gul++;else if(f.line==='ST')gst++;else if(f.line==='PH')gph++;else if(f.line==='CH')gch++;}});
+    const gj={}; G.forEach(r=>{const j=String(r['담당지부']||'').trim()||'미지정'; gj[j]=(gj[j]||0)+1;}); const gjt=Object.entries(gj).sort((a,b)=>b[1]-a[1]);
+    const cards=[ _dcard('가입',won(gTot)+'건',lbl,'var(--dv1)',''), _dcard('가입 대리점',won(dealers)+'곳','가입 발생 매장','var(--dv1)',''), _dcard('마케팅 동의',pct(mkt,gTot),won(mkt)+'건 동의','var(--dv6)',''), _dcard('일평균',(gdays?gTot/gdays:0).toFixed(1)+'건',gdays+'일 기준','var(--dv6)','') ];
     const glineRows=[['얼티넘',gul],['스트라',gst],['팬텀',gph],['카본',gch]].filter(x=>x[1]>0);
-    h+=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>글라스케어 가입 핵심</h3>${grid(cards)}${split(_miniTable('지부','가입',gjt,gTot), _miniTable('제품 라인','가입',glineRows,glineRows.reduce((s,x)=>s+x[1],0)||1))}</div>`;
+    h+=`<div class="card">${cardHead('글라스케어 가입 핵심', _dateBar('rdg',RDG,minD,maxD))}${grid(cards)}${split(_miniTable('지부','가입',gjt,gjt.reduce((s,x)=>s+x[1],0)),_miniTable('제품 라인','가입',glineRows,glineRows.reduce((s,x)=>s+x[1],0)||1))}</div>`;
   }
   box.innerHTML=h;
 }
@@ -5033,7 +5044,8 @@ let _lwLine='UL', _lwScope='jibu';   // 제품 라인 발급 카드(얼티넘/�
 let GLASS=null, glassLoaded=false, _glScope='jibu';   // 글라스케어 가입
 const GV={ from:'', to:'', scope:'all', preset:'all', _min:'', _max:'' };
 const DLR={ jibu:'전체', member:'all', status:'all', q:'' };   // 대리점 마스터 필터
-const RD={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 대시보드 기간 필터
+const RD={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // (구) 대시보드 기간 필터
+const RDS={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDW={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDG={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 대시보드 카드별 기간(매출/보증서/글라스)
 function weekKey(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d; const off=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-off);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
 function warrBranchCol(){ const c=WARR.columns||[]; return c.includes('담당지부')?'담당지부':(c.includes('대리점구분')?'대리점구분':null); }
@@ -6440,10 +6452,14 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const _gsb=e.target.closest('#glScope button'); if(_gsb){ _glScope=_gsb.dataset.s; renderGlass(); return; }
   const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; renderDealer(); return; }
   if(e.target.id==='dlrSearchBtn'){ const q=document.getElementById('dlrQ'); DLR.q=q?q.value.trim():''; renderDealer(); return; }
-  const _rp=e.target.closest('#rdPreset button'); if(_rp){ _dfPreset(RD,renderRDash,_rp.dataset.rp); return; }
+  const _rsp=e.target.closest('#rdsPreset button'); if(_rsp){ _dfPreset(RDS,renderRDash,_rsp.dataset.rp); return; }
+  const _rwp=e.target.closest('#rdwPreset button'); if(_rwp){ _dfPreset(RDW,renderRDash,_rwp.dataset.rp); return; }
+  const _rgp=e.target.closest('#rdgPreset button'); if(_rgp){ _dfPreset(RDG,renderRDash,_rgp.dataset.rp); return; }
   const _wprp=e.target.closest('#wvPreset button'); if(_wprp){ _dfPreset(WV,renderWarranty,_wprp.dataset.rp); return; }
   const _gvrp=e.target.closest('#gvPreset button'); if(_gvrp){ _dfPreset(GV,renderGlass,_gvrp.dataset.rp); return; }
-  if(e.target.id==='rdApply'){ _dfApply(RD,renderRDash,'rdFrom','rdTo'); return; }
+  if(e.target.id==='rdsApply'){ _dfApply(RDS,renderRDash,'rdsFrom','rdsTo'); return; }
+  if(e.target.id==='rdwApply'){ _dfApply(RDW,renderRDash,'rdwFrom','rdwTo'); return; }
+  if(e.target.id==='rdgApply'){ _dfApply(RDG,renderRDash,'rdgFrom','rdgTo'); return; }
   if(e.target.id==='wvApply'){ _dfApply(WV,renderWarranty,'wvFrom','wvTo'); return; }
   if(e.target.id==='gvApply'){ _dfApply(GV,renderGlass,'gvFrom','gvTo'); return; }
   const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
