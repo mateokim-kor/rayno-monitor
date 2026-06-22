@@ -981,9 +981,9 @@
 
   <!-- 내비게이션 + 누적 툴바 -->
   <div class="appsw" id="appSwitcher" style="display:none">
-    <button class="appsw-btn on" data-ws="cafe">📡 <span data-txt="tabCafe">온라인 모니터링</span></button>
-    <button class="appsw-btn" data-ws="rayno">📊 <span data-txt="tabRayno">레이노 데이터</span></button>
-    <button class="appsw-btn" data-ws="settings">⚙ <span data-txt="tabSettings">설정</span></button>
+    <button class="appsw-btn on" data-ws="cafe"><span data-txt="tabCafe">온라인 모니터링</span></button>
+    <button class="appsw-btn" data-ws="rayno"><span data-txt="tabRayno">레이노 데이터</span></button>
+    <button class="appsw-btn" data-ws="settings"><span data-txt="tabSettings">설정</span></button>
     <div class="hdr-search">
       <span class="hs-ico">🔍</span>
       <input id="globalSearch" type="text" placeholder="게시글·댓글 검색 (예: 스트라)" autocomplete="off">
@@ -994,11 +994,11 @@
     </button>
   </div>
   <div class="nav" id="nav">
-    <button class="nav-btn on" data-view="dash">📊 <span data-txt="tabDash">대시보드</span></button>
-    <button class="nav-btn" data-view="report">📑 <span data-txt="tabReport">리포트</span></button>
-    <button class="nav-btn" data-view="promo">🎯 <span>경쟁사 프로모션</span> <span class="nav-badge" id="promoBadge" style="display:none">0</span></button>
-    <button class="nav-btn admin-only" data-view="verify">✓ <span data-txt="tabVerify">데이터 검증</span> <span class="nav-badge" id="verifyBadge">0</span></button>
-    <button class="nav-btn admin-only" id="navCrawlBtn" type="button" title="자동 수집(크롤링) 열기">🛰 <span>자동 수집</span></button>
+    <button class="nav-btn on" data-view="dash"><span data-txt="tabDash">대시보드</span></button>
+    <button class="nav-btn" data-view="report"><span data-txt="tabReport">리포트</span></button>
+    <button class="nav-btn" data-view="promo"><span>경쟁사 프로모션</span> <span class="nav-badge" id="promoBadge" style="display:none">0</span></button>
+    <button class="nav-btn admin-only" data-view="verify"><span data-txt="tabVerify">데이터 검증</span> <span class="nav-badge" id="verifyBadge">0</span></button>
+    <button class="nav-btn admin-only" id="navCrawlBtn" type="button" title="자동 수집(크롤링) 열기"><span>자동 수집</span></button>
     <div class="nav-tools">
       <span class="acc-stat" id="accStat"></span>
       <span class="admin-flag" id="adminFlag">🔓 관리자 모드</span>
@@ -1212,12 +1212,12 @@
       </div>
     </div>
     <div class="nav" id="raynoNav">
-      <button class="nav-btn on" data-rview="dash">📊 <span>대시보드</span></button>
-      <button class="nav-btn" data-rview="revenue">💰 <span data-txt="tabRevenue">매출</span></button>
-      <button class="nav-btn" data-rview="warranty">📜 <span data-txt="tabWarranty">품질보증서</span></button>
-      <button class="nav-btn" data-rview="warrReport">📈 <span data-txt="tabWarrReport">보증서 리포트</span></button>
-      <button class="nav-btn" data-rview="glass">🪪 <span>글라스케어</span></button>
-      <button class="nav-btn" data-rview="search">🔎 <span data-txt="tabSearch">검색량</span></button>
+      <button class="nav-btn on" data-rview="dash"><span>대시보드</span></button>
+      <button class="nav-btn" data-rview="revenue"><span data-txt="tabRevenue">매출</span></button>
+      <button class="nav-btn" data-rview="warranty"><span data-txt="tabWarranty">품질보증서</span></button>
+      <button class="nav-btn" data-rview="warrReport"><span data-txt="tabWarrReport">보증서 리포트</span></button>
+      <button class="nav-btn" data-rview="glass"><span>글라스케어</span></button><button class="nav-btn" data-rview="dealer"><span>대리점</span></button>
+      <button class="nav-btn" data-rview="search"><span data-txt="tabSearch">검색량</span></button>
       <div class="nav-tools">
         <span class="admin-flag" id="raynoAdminFlag" style="display:none">🔓 관리자 모드</span>
         <button class="acc-btn" id="warrAddBtn">＋ 보증서 엑셀</button><span class="upl-date" id="warrUplDate"></span>
@@ -1232,6 +1232,7 @@
     <div id="rWarrReport" style="display:none"></div>
     <div id="rSearch" style="display:none"></div>
     <div id="rDash"></div>
+    <div id="rDealer" style="display:none"></div>
     <div id="rGlass" style="display:none"></div>
     <div id="rRevenue"></div>
     <input type="file" id="warrFileInput" accept=".xlsx,.xls" hidden>
@@ -1453,7 +1454,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 대시보드_보증서글라스케어핵심';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 대리점탭_이모지정리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4788,6 +4789,41 @@ function renderRDash(){
   }
   box.innerHTML=h;
 }
+function _dealerAgg(){
+  const M={}, today=Date.now();
+  const ens=n=>M[n]||(M[n]={name:n, jibu:'', code:'', member:false, warr:0, glass:0, last:''});
+  if(typeof WARR!=='undefined'&&WARR&&WARR.rows) WARR.rows.forEach(r=>{ const n=String(r['매장명']||'').trim(); if(!n)return; const d=ens(n); d.warr++; if(!d.jibu){const j=String(r['담당지부']||'').trim(); if(j)d.jibu=j;} if(!d.code){const c=String(r['대리점코드']||'').trim(); if(c)d.code=c;} if(/멤버스/.test(String(r['대리점구분']||''))) d.member=true; const ds=String(r['시공일자']||'').slice(0,10); if(ds&&ds>d.last)d.last=ds; });
+  if(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows){ const dc=(GLASS.columns||[]).includes('매장명(대리점명)')?'매장명(대리점명)':'매장명'; GLASS.rows.forEach(r=>{ const n=String(r[dc]||'').trim(); if(!n)return; const d=ens(n); d.glass++; if(!d.jibu){const j=String(r['담당지부']||'').trim(); if(j)d.jibu=j;} const ds=String(r['시공일자']||'').slice(0,10); if(ds&&ds>d.last)d.last=ds; }); }
+  Object.values(M).forEach(d=>{ d.days = d.last? Math.floor((today-new Date(d.last+'T00:00:00').getTime())/86400000) : null; d.active = d.days!=null && d.days<=60; });
+  return Object.values(M);
+}
+function renderDealer(){
+  const box=document.getElementById('rDealer'); if(!box) return;
+  const all=_dealerAgg();
+  if(!all.length){ box.innerHTML='<div class="card"><div class="empty">품질보증서·글라스케어 데이터가 업로드되면 대리점 목록이 집계됩니다.<br>월평균 롤·GC카드·구매 실적(F/S/U) 등은 추후 ERP 연결 시 표시됩니다.</div></div>'; return; }
+  const won=n=>(n||0).toLocaleString();
+  const total=all.length, members=all.filter(d=>d.member).length, active=all.filter(d=>d.active).length, jibus=new Set(all.map(d=>d.jibu).filter(Boolean)).size;
+  let rows=all.slice();
+  if(DLR.status==='active') rows=rows.filter(d=>d.active); else if(DLR.status==='dormant') rows=rows.filter(d=>!d.active);
+  if(DLR.jibu!=='전체') rows=rows.filter(d=>d.jibu===DLR.jibu);
+  if(DLR.member==='member') rows=rows.filter(d=>d.member); else if(DLR.member==='normal') rows=rows.filter(d=>!d.member);
+  if(DLR.q){ const q=DLR.q.toLowerCase(); rows=rows.filter(d=>d.name.toLowerCase().includes(q)||(d.code||'').toLowerCase().includes(q)); }
+  rows.sort((a,b)=>(b.warr+b.glass)-(a.warr+a.glass));
+  const jibuList=[...new Set(all.map(d=>d.jibu).filter(Boolean))].sort();
+  const kpis=[ _dcard('전체 대리점', won(total)+'곳','보증서·글라스케어 집계','var(--dv1)',''), _dcard('멤버스', won(members)+'곳','글라스케어 멤버스','var(--dv2)',''), _dcard('활성', won(active)+'곳','최근 60일 내 활동','var(--dv6)',''), _dcard('관리 지부', won(jibus)+'개','집계된 지부 수','var(--dv3)','') ];
+  const statusSeg=`<div class="seg" id="dlrStatus"><button data-st="all" class="${DLR.status==='all'?'on':''}">전체</button><button data-st="active" class="${DLR.status==='active'?'on':''}">활성</button><button data-st="dormant" class="${DLR.status==='dormant'?'on':''}">휴면</button></div>`;
+  const jibuOpt=['전체'].concat(jibuList).map(j=>`<option ${DLR.jibu===j?'selected':''}>${escapeHtml(j)}</option>`).join('');
+  const memberOpt=`<option value="all" ${DLR.member==='all'?'selected':''}>멤버스: 전체</option><option value="member" ${DLR.member==='member'?'selected':''}>멤버스</option><option value="normal" ${DLR.member==='normal'?'selected':''}>일반</option>`;
+  const filters=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0">${statusSeg}<select class="dt-select" id="dlrJibu">${jibuOpt}</select><select class="dt-select" id="dlrMember">${memberOpt}</select><input type="text" class="dt-input" id="dlrQ" placeholder="대리점명·코드 검색" value="${escapeHtml(DLR.q)}" style="min-width:170px"><button class="acc-btn" id="dlrSearchBtn">검색</button></div>`;
+  const thl='style="text-align:left;padding:8px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const th='style="text-align:right;padding:8px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const tdl='style="text-align:left;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
+  const td='style="text-align:right;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  let t=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:680px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${th}>보증서</th><th ${th}>글라스케어</th><th ${th}>최근 활동</th><th ${thl}>상태</th></tr>`;
+  rows.forEach((d,i)=>{ const recent=d.days==null?'—':(d.days<=0?'오늘':d.days+'일 전'); const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.active?'<span style="color:var(--dv2);font-weight:700">활성</span>':'<span style="color:var(--amber);font-weight:700">휴면</span>'; t+=`<tr><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${td}>${won(d.warr)}</td><td ${td}>${won(d.glass)}</td><td ${td}>${recent}</td><td ${tdl}>${stat}</td></tr>`; });
+  t+=`</table></div><div class="cap" style="margin-top:8px">${won(rows.length)}곳 표시 (전체 ${won(total)}곳) · 보증서·글라스케어 데이터 기준 집계 · <b>월평균 롤·GC카드·구매 실적(F/S/U) 등은 추후 ERP 연결 시 표시됩니다.</b></div>`;
+  box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
+}
 function renderGlass(){
   const box=document.getElementById('rGlass'); if(!box) return; const admin=(auth==='admin');
   if(!GLASS||!GLASS.rows||!GLASS.rows.length){ box.innerHTML=`<div class="card"><div class="empty">글라스케어 가입 데이터가 없습니다.${admin?' 우측 상단 <b>＋ 글라스케어 엑셀</b>로 업로드하세요.':''}</div></div>`; return; }
@@ -4832,7 +4868,7 @@ function renderGlass(){
   const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
-  let tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>🪪 ${scope==='dealer'?'대리점별':'지부별'} 글라스케어 가입수</h3>`;
+  let tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>${scope==='dealer'?'대리점별':'지부별'} 글라스케어 가입수</h3>`;
   if(!total){ tbl+='<div class="empty">선택한 기간에 가입 데이터가 없습니다.</div></div>'; box.innerHTML=kpis+controls+tbl; return; }
   tbl+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:480px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th><th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>얼티넘</th><th ${th}>스트라</th><th ${th}>팬텀</th><th ${th}>카본</th><th ${th}>기타</th></tr>`;
   top.forEach(([g,o])=>{ tbl+=`<tr><td ${tdl}>${escapeHtml(g)}</td><td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${o.UL?o.UL.toLocaleString():'·'}</td><td ${td}>${o.ST?o.ST.toLocaleString():'·'}</td><td ${td}>${o.PH?o.PH.toLocaleString():'·'}</td><td ${td}>${o.CH?o.CH.toLocaleString():'·'}</td><td ${td}>${o.etc?o.etc.toLocaleString():'·'}</td></tr>`; });
@@ -4988,6 +5024,7 @@ const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[]
 let _lwLine='UL', _lwScope='jibu';   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
 let GLASS=null, glassLoaded=false, _glScope='jibu';   // 글라스케어 가입
 const GV={ from:'', to:'', scope:'all', _min:'', _max:'' };
+const DLR={ jibu:'전체', member:'all', status:'all', q:'' };   // 대리점 마스터 필터
 function weekKey(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d; const off=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-off);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
 function warrBranchCol(){ const c=WARR.columns||[]; return c.includes('담당지부')?'담당지부':(c.includes('대리점구분')?'대리점구분':null); }
@@ -5475,8 +5512,8 @@ function renderRevenue(){
     + card(hh('📈 시장 점유율 · '+lab)+salesShareTable())
     + card(hh('🗺 지역별 시장 점유율 · '+lab)+salesRegionMap())
     + card(hh('🚗 신차 장착 점유율 · '+lab)+newCarShareCard())
-    + card(hh('🎯 지역 화이트스페이스 (확장 타깃) · '+lab)+whiteSpaceCard())
-    + card(hh('🏆 대리점 스코어카드 · '+lab)+dealerScorecard())
+    + card(hh('지역 화이트스페이스 (확장 타깃) · '+lab)+whiteSpaceCard())
+    + card(hh('대리점 스코어카드 · '+lab)+dealerScorecard())
     + card(hh('① 채널 요약 · '+lab)+s1)
     + card(hh('② 롤 / 일반물품 구분 · '+lab)+s2)
     + card(hh('③ 월별 매출 추이')+s3)
@@ -6135,7 +6172,7 @@ function renderWarrReport(){
 
   box.innerHTML = headCard + kpiCard + insightCard + (moverCard?`<div class="biz-grid">${moverCard}${dailyCard}</div>`:dailyCard) + compGrid;
 }
-const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', search:'rSearch', revenue:'rRevenue'};
+const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', dealer:'rDealer', search:'rSearch', revenue:'rRevenue'};
 function setRView(v){
   rview=v;
   document.querySelectorAll('#raynoNav .nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.rview===v));
@@ -6146,6 +6183,7 @@ function setRView(v){
   else if(v==='warrReport') renderWarrReport();
   if(v==='dash') renderRDash();
   else if(v==='glass') renderGlass();
+  else if(v==='dealer') renderDealer();
   else if(v==='search') renderMetric('search');
   else renderRevenue();
 }
@@ -6396,6 +6434,8 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
   const _gsb=e.target.closest('#glScope button'); if(_gsb){ _glScope=_gsb.dataset.s; renderGlass(); return; }
   const _gpb=e.target.closest('#glPeriod button'); if(_gpb){ GV.scope=_gpb.dataset.p; if(GV.scope==='range'){ if(!GV.from)GV.from=GV._min; if(!GV.to)GV.to=GV._max; } renderGlass(); return; }
+  const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; renderDealer(); return; }
+  if(e.target.id==='dlrSearchBtn'){ const q=document.getElementById('dlrQ'); DLR.q=q?q.value.trim():''; renderDealer(); return; }
   const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
   if(e.target.id==='wvClearBranch'){ WV.branch='전체'; renderWarranty(); return; }
   if(e.target.id==='wvClearFront'){ WV.fronts=[]; renderWarranty(); return; }
@@ -6454,6 +6494,9 @@ document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; renderWarranty(); }
   if(e.target.id==='glFrom'){ GV.from=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.to=GV.from; renderGlass(); return; }
   if(e.target.id==='glTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; renderGlass(); return; }
+  if(e.target.id==='dlrJibu'){ DLR.jibu=e.target.value; renderDealer(); return; }
+  if(e.target.id==='dlrMember'){ DLR.member=e.target.value; renderDealer(); return; }
+  if(e.target.id==='dlrQ'){ DLR.q=e.target.value.trim(); renderDealer(); return; }
   if(e.target.id==='wrAnchor'){ WR.anchor=e.target.value; renderWarrReport(); }
 });
 document.getElementById('raynoApp').addEventListener('input', e=>{
