@@ -1462,7 +1462,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 글라스_제품필터_세부품목';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 글라스0건버그_prod기본값';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4864,7 +4864,7 @@ function renderGlass(){
   const prodKey=r=>String(r['썬팅제품(전면)']||'').trim();
   const prodCnt={}; GLASS.rows.forEach(r=>{ const p=prodKey(r); if(p) prodCnt[p]=(prodCnt[p]||0)+1; });
   const prodList=Object.keys(prodCnt).sort((a,b)=>prodCnt[b]-prodCnt[a]);
-  if(GV.prod!=='ALL') recs=recs.filter(r=>prodKey(r)===GV.prod);
+  if(GV.prod && GV.prod!=='ALL') recs=recs.filter(r=>prodKey(r)===GV.prod);
   const total=recs.length;
   const dealerN=new Set(recs.map(r=>String(r[dealerCol]||'').trim()).filter(Boolean)).size;
   const dayN=new Set(recs.map(dstr).filter(Boolean)).size;
@@ -5058,7 +5058,7 @@ function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(
 const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, tab:'overview', preset:'all', _min:'', _max:'' };
 let _lwLine='UL', _lwScope='jibu';   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
 let GLASS=null, glassLoaded=false, _glScope='jibu';   // 글라스케어 가입
-const GV={ from:'', to:'', scope:'all', preset:'all', _min:'', _max:'' };
+const GV={ from:'', to:'', scope:'all', preset:'all', prod:'ALL', _min:'', _max:'' };
 const DLR={ jibu:'전체', member:'all', status:'all', q:'' };   // 대리점 마스터 필터
 const RD={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // (구) 대시보드 기간 필터
 const RDS={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDW={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDG={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 대시보드 카드별 기간(매출/보증서/글라스)
