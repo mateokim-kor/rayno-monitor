@@ -1491,7 +1491,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 가입율_월탭';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 라인카드_날짜VLT';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4799,7 +4799,7 @@ function _dateBar(prefix, st, minD, maxD){
 }
 function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; const mx=st._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
 function _dfApply(st, render, fp, tp){ const f=document.getElementById(fp),t=document.getElementById(tp); st.from=f?f.value:''; st.to=t?t.value:''; if(st.from&&st.to&&st.to<st.from){const x=st.from;st.from=st.to;st.to=x;} st.scope='range'; st.preset='custom'; render(); }
-function _dfReg(px){ if(px==='gv')return{st:GV,render:renderGlass}; if(px==='wv')return{st:WV,render:renderWarranty}; if(px==='rds')return{st:RDS,render:renderRDash}; if(px==='rdw')return{st:RDW,render:renderRDash}; if(px==='rdg')return{st:RDG,render:renderRDash}; return null; }
+function _dfReg(px){ if(px==='gv')return{st:GV,render:renderGlass}; if(px==='wv')return{st:WV,render:renderWarranty}; if(px==='rds')return{st:RDS,render:renderRDash}; if(px==='rdw')return{st:RDW,render:renderRDash}; if(px==='rdg')return{st:RDG,render:renderRDash}; if(px==='lw')return{st:LWV,render:renderWarranty}; return null; }
 function prodRollTable(monthsArg){
   if(!SALES||!SALES.jibuProd) return '<div class="empty">매출(ERP) 데이터가 없습니다.</div>';
   const M=(monthsArg&&monthsArg.length)?monthsArg:_salesDispMonths(), sm=o=>{let s=0;M.forEach(m=>s+=(o&&o[m])||0);return s;};
@@ -5207,6 +5207,7 @@ function warrLabelOf(col,raw){ const lm=(WARR.config&&WARR.config.labelMap&&WARR
 function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(a[0],a[1],0).getDate(); return {from:`${ym}-01`, to:`${ym}-${String(last).padStart(2,'0')}`}; }
 // 품질보증서 뷰 상태: 집계 단위 + 기간 + 지부 필터
 const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, tab:'overview', preset:'all', _min:'', _max:'' };
+const LWV={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 지부/제품별 발급 카드 자체 기간 필터
 let _lwLine='UL', _lwScope='jibu';   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
 let GLASS=null, glassLoaded=false, _glScope='jibu', _glDealerAll=false;   // 글라스케어 가입
 const GV={ from:'', to:'', scope:'all', preset:'all', prodSel:[], _min:'', _max:'' };
@@ -5277,8 +5278,13 @@ function _filmCat(code){  // 코드 → {major 대분류, sub 중분류}
 }
 function lineWarrCard(recs){
   const L=_lwLine, scope=_lwScope;
+  const _ex=(typeof warrExcludedSet==='function')?warrExcludedSet():new Set();
+  const _baseAll=(WARR.rows||[]).filter(r=>!_ex.has(warrRecKey(r)));
+  const _bd=_baseAll.map(r=>String(warrDateStr(r)||'').slice(0,10)).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
+  const lwMin=_bd[0]||'', lwMax=_bd[_bd.length-1]||''; LWV._min=lwMin; LWV._max=lwMax;
+  const base=(LWV.scope==='range'&&(LWV.from||LWV.to))?_baseAll.filter(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(LWV.from&&d<LWV.from)return false; if(LWV.to&&d>LWV.to)return false; return true; }):_baseAll;
   const byG={}; const vltSet=new Set(); const lineTot={UL:0,ST:0,PH:0,CH:0};
-  recs.forEach(r=>{
+  base.forEach(r=>{
     const lines=_rowLines(r); Object.keys(lines).forEach(k=>{ if(k in lineTot) lineTot[k]++; });
     if(!(L in lines)) return;
     const g = scope==='dealer' ? (String(r['매장명']||r['대리점코드']||'').trim()||'미지정') : (String(r['담당지부']||'').trim()||'미지정');
@@ -5286,10 +5292,11 @@ function lineWarrCard(recs){
     vltSet.add(vk);
     const row=byG[g]||(byG[g]={tot:0,vlt:{}}); row.tot++; row.vlt[vk]=(row.vlt[vk]||0)+1;
   });
-  const vlts=[...vltSet].sort((a,b)=>{ if(a==='기타')return 1; if(b==='기타')return -1; return (+a)-(+b); });
+  const vlts=[...vltSet].sort((a,b)=>{ if(a==='기타')return 1; if(b==='기타')return -1; return (+b)-(+a); });
   const lineBtns=['UL','ST','PH','CH'].map(k=>`<button data-l="${k}" class="${L===k?'on':''}">${_LINE_CODE[k]} <span style="opacity:.55">${(lineTot[k]||0).toLocaleString()}</span></button>`).join('');
   const scopeBtns=`<button data-sc="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-sc="dealer" class="${scope==='dealer'?'on':''}">대리점별</button>`;
-  let h=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55"><b>${_LINE_CODE[L]}</b> 보증서 발급 — ${scope==='dealer'?'대리점별':'지부별'} × VLT(썬팅 농도, 제품코드 앞 2자리). <b>보증서 1건 기준</b>(한 보증서에 여러 면이 같은 라인이어도 1건). 기간(일별)·지부는 위 컨트롤을 따릅니다.</div>`;
+  let h=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55"><b>${_LINE_CODE[L]}</b> 보증서 발급 — ${scope==='dealer'?'대리점별':'지부별'} × VLT(썬팅 농도, 제품코드 앞 2자리, 높은 순). <b>보증서 1건 기준</b> · 이 카드는 아래 <b>자체 기간 필터</b>를 사용합니다(상단 필터와 별개).</div>`;
+  h+=`<div class="cardctrl" style="margin-bottom:11px">${_dateBar('lw', LWV, lwMin, lwMax)}</div>`;
   h+=`<div class="seg" id="lwLine" style="margin-bottom:8px;flex-wrap:wrap">${lineBtns}</div><div class="seg" id="lwScope" style="margin-bottom:12px">${scopeBtns}</div>`;
   const total=Object.values(byG).reduce((s,o)=>s+o.tot,0);
   if(!total){ h+=`<div class="empty">선택한 기간·지부에 ${_LINE_CODE[L]} 보증서가 없습니다.</div>`; return h; }
@@ -6648,6 +6655,10 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const wt=e.target.closest('[data-wtab]'); if(wt){ WV.tab=wt.dataset.wtab; renderWarranty(); return; }
   const gb=e.target.closest('#wvGran button'); if(gb){ WV.gran=gb.dataset.g; renderWarranty(); return; }
   const sb=e.target.closest('#wvScope button'); if(sb){ WV.scope=sb.dataset.s; if(WV.scope==='range'){ if(!WV.from)WV.from=WV._min; if(!WV.to)WV.to=WV._max; } renderWarranty(); return; }
+  const _lwrp=e.target.closest('#lwPreset button'); if(_lwrp){ _dfPreset(LWV,renderWarranty,_lwrp.dataset.rp); return; }
+  if(e.target.id==='lwApply'){ _dfApply(LWV,renderWarranty,'lwFrom','lwTo'); return; }
+  if(e.target.id==='lwFrom'){ LWV.from=e.target.value; if(LWV.from&&LWV.to&&LWV.to<LWV.from)LWV.to=LWV.from; LWV.scope='range'; LWV.preset='custom'; renderWarranty(); return; }
+  if(e.target.id==='lwTo'){ LWV.to=e.target.value; if(LWV.from&&LWV.to&&LWV.to<LWV.from)LWV.from=LWV.to; LWV.scope='range'; LWV.preset='custom'; renderWarranty(); return; }
   const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; renderWarranty(); return; }
   const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
   const _gsb=e.target.closest('#glScope button'); if(_gsb){ _glScope=_gsb.dataset.s; _glDealerAll=false; renderGlass(); return; }
