@@ -1446,7 +1446,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 월비교_B2C+B2B합계';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 라인발급_얼티넘스트라_VLT';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4826,6 +4826,7 @@ function warrLabelOf(col,raw){ const lm=(WARR.config&&WARR.config.labelMap&&WARR
 function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(a[0],a[1],0).getDate(); return {from:`${ym}-01`, to:`${ym}-${String(last).padStart(2,'0')}`}; }
 // 품질보증서 뷰 상태: 집계 단위 + 기간 + 지부 필터
 const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, tab:'overview', _min:'', _max:'' };
+let _lwLine='UL', _lwScope='jibu';   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
 function weekKey(d){ const dt=new Date(d+'T00:00:00'); if(isNaN(dt))return d; const off=(dt.getDay()+6)%7; dt.setDate(dt.getDate()-off);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`; }
 function warrBranchCol(){ const c=WARR.columns||[]; return c.includes('담당지부')?'담당지부':(c.includes('대리점구분')?'대리점구분':null); }
@@ -4869,6 +4870,42 @@ function warrDistCard(set, col, title, opts){
   const n=opts.n||10, arr=ent.slice(0,n), mx=Math.max(1,...arr.map(e=>e[1])), tot=filled||1, color=opts.color||'var(--amber)';
   const bars=arr.length?arr.map(([v,c])=>`<div class="rep-trow"><div class="rt-l">${escapeHtml(v)}</div><div class="rt-bar"><i style="width:${(c/mx*100).toFixed(1)}%;background:${color}"></i></div><div class="rt-n">${c.toLocaleString()}건</div><div class="rt-p">${(c/tot*100).toFixed(0)}%</div></div>`).join(''):'<div class="empty">데이터 없음</div>';
   return `<div class="card"><h3><span class="dot"></span>${escapeHtml(title)}${ent.length>n?` <span class="rep-sub2">상위 ${n}</span>`:''}</h3><div class="rep-trend">${bars}</div></div>`;
+}
+const _FILM_POS=['시공내역(전면)','시공내역(측면1열)','시공내역(측면2열)','시공내역(측면3열)','시공내역(후면)','시공내역(썬루프)','시공내역(파노라마 썬루프)','시공내역(기타부분시공)'];
+const _LINE_CODE={UL:'얼티넘',ST:'스트라',PH:'팬텀',CH:'카본'};
+function _parseFilm(code){ if(code==null) return null; const p=String(code).trim().split('-'); if(p.length<3||(p[0]||'').toUpperCase()!=='AU') return null; const line=(p[1]||'').toUpperCase(); const m=/^(\d{2})(\d{2})/.exec(p[2]||''); return {line, vlt:m?parseInt(m[1],10):null}; }
+function _rowLines(r){ const out={}; for(const c of _FILM_POS){ const f=_parseFilm(r[c]); if(f&&_LINE_CODE[f.line]){ if(!(f.line in out)) out[f.line]=f.vlt; } } return out; }  // {UL:30, ST:30} (앞 시공면 우선 = 전면 우선)
+function lineWarrCard(recs){
+  const L=_lwLine, scope=_lwScope;
+  const byG={}; const vltSet=new Set(); const lineTot={UL:0,ST:0,PH:0,CH:0};
+  recs.forEach(r=>{
+    const lines=_rowLines(r); Object.keys(lines).forEach(k=>{ if(k in lineTot) lineTot[k]++; });
+    if(!(L in lines)) return;
+    const g = scope==='dealer' ? (String(r['매장명']||r['대리점코드']||'').trim()||'미지정') : (String(r['담당지부']||'').trim()||'미지정');
+    const v=lines[L], vk=(v==null?'기타':String(v));
+    vltSet.add(vk);
+    const row=byG[g]||(byG[g]={tot:0,vlt:{}}); row.tot++; row.vlt[vk]=(row.vlt[vk]||0)+1;
+  });
+  const vlts=[...vltSet].sort((a,b)=>{ if(a==='기타')return 1; if(b==='기타')return -1; return (+a)-(+b); });
+  const lineBtns=['UL','ST','PH','CH'].map(k=>`<button data-l="${k}" class="${L===k?'on':''}">${_LINE_CODE[k]} <span style="opacity:.55">${(lineTot[k]||0).toLocaleString()}</span></button>`).join('');
+  const scopeBtns=`<button data-sc="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-sc="dealer" class="${scope==='dealer'?'on':''}">대리점별</button>`;
+  let h=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55"><b>${_LINE_CODE[L]}</b> 보증서 발급 — ${scope==='dealer'?'대리점별':'지부별'} × VLT(썬팅 농도, 제품코드 앞 2자리). <b>보증서 1건 기준</b>(한 보증서에 여러 면이 같은 라인이어도 1건). 기간(일별)·지부는 위 컨트롤을 따릅니다.</div>`;
+  h+=`<div class="seg" id="lwLine" style="margin-bottom:8px;flex-wrap:wrap">${lineBtns}</div><div class="seg" id="lwScope" style="margin-bottom:12px">${scopeBtns}</div>`;
+  const total=Object.values(byG).reduce((s,o)=>s+o.tot,0);
+  if(!total){ h+=`<div class="empty">선택한 기간·지부에 ${_LINE_CODE[L]} 보증서가 없습니다.</div>`; return h; }
+  const groups=Object.entries(byG).sort((a,b)=>b[1].tot-a[1].tot); const top=scope==='dealer'?groups.slice(0,30):groups;
+  const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const th='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
+  const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
+  h+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:420px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${vlts.map(v=>`<th ${th}>VLT ${v}</th>`).join('')}<th ${th}>합계</th></tr>`;
+  top.forEach(([g,o])=>{ h+=`<tr><td ${tdl}>${escapeHtml(g)}</td>${vlts.map(v=>`<td ${td}>${o.vlt[v]?o.vlt[v].toLocaleString():'·'}</td>`).join('')}<td ${tdt}>${o.tot.toLocaleString()}</td></tr>`; });
+  const colTot={}; vlts.forEach(v=>colTot[v]=0); top.forEach(([,o])=>vlts.forEach(v=>colTot[v]+=(o.vlt[v]||0)));
+  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td>${vlts.map(v=>`<td ${td}><b>${colTot[v].toLocaleString()}</b></td>`).join('')}<td ${tdt}>${top.reduce((s,[,o])=>s+o.tot,0).toLocaleString()}</td></tr>`;
+  h+=`</table></div>`;
+  if(scope==='dealer'&&groups.length>30) h+=`<div class="cap" style="margin-top:6px">상위 30개 대리점만 표시 (전체 ${groups.length}곳)</div>`;
+  return h;
 }
 function renderWarranty(){
   const box=document.getElementById('rWarranty');
@@ -4991,10 +5028,11 @@ function renderWarranty(){
   const _cR='var(--dv6)';
   const regCards=[ warrDistCard(recsProd,'담당지부','담당지부 구성',{color:_cR,n:12}), warrDistCard(recs,'대리점지역(도)','지역(도) 구성',{color:_cR,n:17}), warrDistCard(recs,'대리점지역(시군구)','시군구 TOP',{color:_cR,n:15}), warrDistCard(recs,'매장명','매장(대리점) TOP',{color:_cR,n:15}), warrDistCard(recs,'대리점구분','대리점 구분',{color:_cR}) ];
   const regBlock=regCards.some(Boolean)?(_sec('지역')+_grid(regCards)):'';
+  const lineBlock=(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)?(_sec('제품 라인 발급 (얼티넘·스트라)')+'<div class="card">'+lineWarrCard(recs)+'</div>'):'';
   const adminRow = admin ? `<div style="margin-bottom:16px;display:flex;justify-content:flex-end"><button class="acc-btn" id="warrExclToggle">집계 제외 관리 (${exRows.length})</button></div>` : '';
   box.innerHTML = cfgCard + controls + kpis + trendCard
     + (breakdownCards?`<div class="biz-grid">${breakdownCards}</div>`:'')
-    + custBlock + vehBlock + prodBlock + regBlock
+    + custBlock + vehBlock + prodBlock + lineBlock + regBlock
     + adminRow + exPanel;
 }
 
@@ -6186,6 +6224,8 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const wt=e.target.closest('[data-wtab]'); if(wt){ WV.tab=wt.dataset.wtab; renderWarranty(); return; }
   const gb=e.target.closest('#wvGran button'); if(gb){ WV.gran=gb.dataset.g; renderWarranty(); return; }
   const sb=e.target.closest('#wvScope button'); if(sb){ WV.scope=sb.dataset.s; if(WV.scope==='range'){ if(!WV.from)WV.from=WV._min; if(!WV.to)WV.to=WV._max; } renderWarranty(); return; }
+  const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; renderWarranty(); return; }
+  const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
   const brow=e.target.closest('.rep-trow[data-branch]'); if(brow){ const b=brow.dataset.branch; WV.branch=(WV.branch===b?'전체':b); renderWarranty(); return; }
   if(e.target.id==='wvClearBranch'){ WV.branch='전체'; renderWarranty(); return; }
   if(e.target.id==='wvClearFront'){ WV.fronts=[]; renderWarranty(); return; }
