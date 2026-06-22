@@ -1491,7 +1491,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 라인카드_다중선택';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 월바로가기_드롭다운';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4789,8 +4789,8 @@ function _dateBar(prefix, st, minD, maxD){
   let mo='';
   if(prefix!=='wv' && /^\d{4}-\d{2}/.test(minD) && /^\d{4}-\d{2}/.test(maxD)){
     const ms=[]; let y=+minD.slice(0,4), m=+minD.slice(5,7); const ey=+maxD.slice(0,4), em=+maxD.slice(5,7); let g=0;
-    while((y<ey||(y===ey&&m<=em))&&g++<60){ ms.push(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
-    if(ms.length) mo=`<div class="mchips" style="width:100%"><span class="mchips-lbl">월 바로가기</span>${ms.map(ym=>{ const a=ym.split('-'), on=(range&&st.preset==='month'&&st.from===ym+'-01'); return `<button class="mchip ${on?'on':''}" data-dmo="${prefix}:${ym}">${a[0]}년 ${+a[1]}월</button>`; }).join('')}<button class="mchip ${st.scope==='all'?'on':''}" data-dmo="${prefix}:__all">전체</button></div>`;
+    while((y<ey||(y===ey&&m<=em))&&g++<600){ ms.push(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
+    mo=_moSelect(prefix, st, ms);
   }
   return `<div class="seg" id="${prefix}Preset">${pb('all','전체')}${pb('7','최근 7일')}${pb('30','최근 30일')}${pb('90','최근 90일')}</div>`
     +`<span class="dt-range" style="display:inline-flex"><input type="date" class="dt-input" id="${prefix}From" value="${fromD}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="${prefix}To" value="${toD}"></span>`
@@ -4800,6 +4800,14 @@ function _dateBar(prefix, st, minD, maxD){
 function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; const mx=st._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
 function _dfApply(st, render, fp, tp){ const f=document.getElementById(fp),t=document.getElementById(tp); st.from=f?f.value:''; st.to=t?t.value:''; if(st.from&&st.to&&st.to<st.from){const x=st.from;st.from=st.to;st.to=x;} st.scope='range'; st.preset='custom'; render(); }
 function _dfReg(px){ if(px==='gv')return{st:GV,render:renderGlass}; if(px==='wv')return{st:WV,render:renderWarranty}; if(px==='rds')return{st:RDS,render:renderRDash}; if(px==='rdw')return{st:RDW,render:renderRDash}; if(px==='rdg')return{st:RDG,render:renderRDash}; if(px==='lw')return{st:LWV,render:renderWarranty}; return null; }
+function _moSelect(px, st, months){
+  const ms=[...new Set((months||[]).filter(Boolean))].sort();
+  if(!ms.length) return '';
+  const cur=(st.preset==='month'&&st.from)?st.from.slice(0,7):(st.scope==='all'?'__all':'');
+  const opts=ms.slice().reverse().map(ym=>{ const a=ym.split('-'); return `<option value="${ym}"${cur===ym?' selected':''}>${a[0]}년 ${+a[1]}월</option>`; }).join('');
+  const ph=(cur==='')?'<option value="" disabled selected hidden>월 바로가기…</option>':'';
+  return `<span class="mchips" style="width:100%"><span class="mchips-lbl">월 바로가기</span><select class="dt-select moSel" data-mopx="${px}" style="max-width:190px">${ph}<option value="__all"${cur==='__all'?' selected':''}>전체</option>${opts}</select></span>`;
+}
 function prodRollTable(monthsArg){
   if(!SALES||!SALES.jibuProd) return '<div class="empty">매출(ERP) 데이터가 없습니다.</div>';
   const M=(monthsArg&&monthsArg.length)?monthsArg:_salesDispMonths(), sm=o=>{let s=0;M.forEach(m=>s+=(o&&o[m])||0);return s;};
@@ -5357,8 +5365,7 @@ function renderWarranty(){
   const frontSum = WV.fronts.length ? (WV.fronts.length===1?escapeHtml(WV.fronts[0]):WV.fronts.length+'개 선택') : '전체';
   const frontRow = fc ? `<div class="wv-frow"><div class="wv-fhead"><span class="wv-flbl">전면 제품</span><span class="wv-fsum">${frontSum}</span><span class="wv-ftoggle" data-fopen="1">${_warrFrontOpen?'접기 ▲':'펼치기 ▾'}</span></div>${_warrFrontOpen?`<div class="wv-fhint">제품을 누르면 선택돼요. <b>여러 개</b> 누르면 모두 포함, 다시 누르면 해제.</div><div class="wv-fchips" id="wvFronts">${frontChips}</div>`:''}</div>` : '';
   const allMonths=[...new Set(all.map(r=>warrDateStr(r).slice(0,7)).filter(s=>/^\d{4}-\d{2}$/.test(s)))].sort().reverse().slice(0,12);
-  const monthChip=ym=>{ const r=monthRange(ym); const on=(WV.scope==='range'&&WV.from===r.from&&WV.to===r.to); const a=ym.split('-'); return `<span class="mchip ${on?'on':''}" data-ym="${ym}">${a[0]}년 ${+a[1]}월</span>`; };
-  const monthChips=allMonths.length?`<div class="mchips"><span class="mchips-lbl">월 바로가기</span>${allMonths.map(monthChip).join('')}<span class="mchip ${WV.scope==='all'?'on':''}" data-ym="__all">전체</span></div>`:'';
+  const monthChips=_moSelect('wv', WV, allMonths);
   const controls=`
     <div class="card">
       <div class="rep-head-top">
@@ -6742,6 +6749,7 @@ document.getElementById('raynoApp').addEventListener('keydown', e=>{
   if(e.target.id==='mtVal' && e.key==='Enter'){ e.preventDefault(); const a=document.getElementById('mtAdd'); if(a)a.click(); }
 });
 document.getElementById('raynoApp').addEventListener('change', e=>{
+  if(e.target.classList && e.target.classList.contains('moSel')){ const px=e.target.dataset.mopx, rg=_dfReg(px); if(rg){ const ym=e.target.value; if(ym==='__all'){ rg.st.scope='all'; rg.st.preset='all'; rg.st.from=''; rg.st.to=''; } else if(ym){ const a=ym.split('-'), last=new Date(+a[0],+a[1],0).getDate(); rg.st.from=ym+'-01'; rg.st.to=ym+'-'+String(last).padStart(2,'0'); rg.st.scope='range'; rg.st.preset='month'; } rg.render(); } return; }
   if(e.target.id==='warrLabelSel'){ warrLabelCol=e.target.value; renderWarranty(); return; }
   if(e.target.id==='wvBranch'){ WV.branch=e.target.value; renderWarranty(); }
   if(e.target.id==='wvFrom'){ WV.from=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.to=WV.from; WV.scope='range'; WV.preset='custom'; renderWarranty(); }
