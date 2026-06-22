@@ -1492,7 +1492,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 데이터점검도구';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 날짜필터_압축정리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4793,9 +4793,9 @@ function _dateBar(prefix, st, minD, maxD){
     while((y<ey||(y===ey&&m<=em))&&g++<600){ ms.push(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
     mo=_moSelect(prefix, st, ms, true);
   }
-  return `<div class="seg" id="${prefix}Preset">${pb('all','전체')}${pb('7','최근 7일')}${pb('30','최근 30일')}${pb('90','최근 90일')}</div>`
+  return `<div class="seg" id="${prefix}Preset">${pb('all','전체')}${pb('7','7일')}${pb('30','30일')}${pb('90','90일')}</div>`
     +`<span class="dt-range" style="display:inline-flex"><input type="date" class="dt-input" id="${prefix}From" value="${fromD}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="${prefix}To" value="${toD}"></span>`
-    +`<button class="acc-btn" id="${prefix}Apply">조회</button><span style="font-size:12px;color:var(--ink2);font-weight:700">${lbl}</span>`
+    +`<button class="acc-btn" id="${prefix}Apply">조회</button>`
     +mo;
 }
 function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; const mx=st._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
@@ -5043,7 +5043,7 @@ function renderGlass(){
     <div class="rep-period" style="margin-top:10px">
       <div class="seg" id="glScope"><button data-s="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-s="dealer" class="${scope==='dealer'?'on':''}">대리점별</button><button data-s="prod" class="${scope==='prod'?'on':''}">제품별</button></div>
       ${_dateBar('gv', GV, minD, maxD)}
-      <span class="mchips" style="width:100%"><span class="mchips-lbl">집계 날짜</span><select class="dt-select" id="glDateCol" style="max-width:200px">${dateCols.map(c=>`<option value="${escapeHtml(c)}"${c===dcol?' selected':''}>${escapeHtml(c)}</option>`).join('')}</select><span class="cap" style="margin-left:8px">이 컬럼 기준으로 월·기간 집계</span></span>
+      <span style="display:inline-flex;align-items:center;gap:7px"><span class="mchips-lbl">집계 날짜</span><select class="dt-select" id="glDateCol" style="max-width:150px">${dateCols.map(c=>`<option value="${escapeHtml(c)}"${c===dcol?' selected':''}>${escapeHtml(c)}</option>`).join('')}</select></span>
     </div>
     <div style="margin-top:11px"><div class="cap" style="margin-bottom:6px">제품 필터 (복수 선택 가능)</div>${chips}</div>
   </div>`;
