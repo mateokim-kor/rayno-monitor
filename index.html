@@ -30,6 +30,9 @@
   .fab-top.on{opacity:1;pointer-events:auto}
   .fab-top:hover{background:var(--bg2)}
   .bk-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center}
+  .pchip{padding:5px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .pchip.on{background:var(--amber);color:#fff;border-color:var(--amber)}
+  .pchip:hover{border-color:var(--amber)}
   /* 색맹 안전 — 감성 버튼에 색 외 모양 단서 */
   .vbtn[data-v="긍정"]::before{content:"\25B2";font-size:9px;margin-right:4px;opacity:.85}
   .vbtn[data-v="부정"]::before{content:"\25BC";font-size:9px;margin-right:4px;opacity:.85}
@@ -1462,7 +1465,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 글라스0건버그_prod기본값';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 글라스_대중분류_복수선택_제품별';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4858,26 +4861,18 @@ function renderGlass(){
   const dstr=r=>String(r[dcol]||'').slice(0,10);
   const allD=GLASS.rows.map(dstr).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
   const minD=allD[0]||'', maxD=allD[allD.length-1]||''; GV._min=minD; GV._max=maxD;
-  if(!GV._min){ GV._min=minD; GV._max=maxD; }
+  const catOf=r=>_filmCat(r['썬팅제품(전면)']);
   let recs=GLASS.rows.slice();
   if(GV.scope==='range'&&(GV.from||GV.to)) recs=recs.filter(r=>{ const d=dstr(r); if(!d)return false; if(GV.from&&d<GV.from)return false; if(GV.to&&d>GV.to)return false; return true; });
-  const prodKey=r=>String(r['썬팅제품(전면)']||'').trim();
-  const prodCnt={}; GLASS.rows.forEach(r=>{ const p=prodKey(r); if(p) prodCnt[p]=(prodCnt[p]||0)+1; });
-  const prodList=Object.keys(prodCnt).sort((a,b)=>prodCnt[b]-prodCnt[a]);
-  if(GV.prod && GV.prod!=='ALL') recs=recs.filter(r=>prodKey(r)===GV.prod);
+  const sel=new Set(GV.prodSel||[]);
+  if(sel.size) recs=recs.filter(r=>sel.has(catOf(r).sub));
   const total=recs.length;
   const dealerN=new Set(recs.map(r=>String(r[dealerCol]||'').trim()).filter(Boolean)).size;
   const dayN=new Set(recs.map(dstr).filter(Boolean)).size;
   const mkt=recs.filter(r=>/^(O|Y|예|동의|true|1)$/i.test(String(r['마케팅동의']||'').trim())).length;
-  const lineOf=r=>{ const f=_parseFilm(r['썬팅제품(전면)']); return f&&_LINE_CODE[f.line]?f.line:null; };
   const scope=_glScope;
-  const gkey=r=> scope==='dealer'?(String(r[dealerCol]||'').trim()||'미지정'):(String(r['담당지부']||'').trim()||'미지정');
-  const byG={}; recs.forEach(r=>{ const g=gkey(r); const o=byG[g]||(byG[g]={tot:0,UL:0,ST:0,PH:0,CH:0,etc:0}); o.tot++; const ln=lineOf(r); if(ln)o[ln]++; else o.etc++; });
-  const groups=Object.entries(byG).sort((a,b)=>b[1].tot-a[1].tot); const top=scope==='dealer'?groups.slice(0,30):groups;
-  // 일별 추이
   const dayCnt={}; recs.forEach(r=>{ const d=dstr(r); if(d) dayCnt[d]=(dayCnt[d]||0)+1; });
   const dayKeys=Object.keys(dayCnt).sort(); const spark=_spark(dayKeys.map(d=>dayCnt[d]),'var(--dv1)');
-  // KPI
   const rk=(l,v,m)=>`<div class="rk"><div class="rk-l">${l}</div><div class="rk-v">${v}</div><div class="rk-m">${m}</div></div>`;
   const kpis=`<div class="card"><div class="rep-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px">`
     + rk('총 가입수', total.toLocaleString()+'건', (GV.scope==='range'?`${GV.from||minD} ~ ${GV.to||maxD}`:'전체기간'))
@@ -4885,36 +4880,47 @@ function renderGlass(){
     + rk('일평균', (dayN?(total/dayN):0).toFixed(1)+'건', `${dayN}일 기준`)
     + rk('마케팅 동의', total?Math.round(mkt/total*100)+'%':'—', `${mkt.toLocaleString()}건 동의`)
     + `</div>${spark?`<div style="margin-top:6px"><div class="cap">일별 가입 추이</div>${spark}</div>`:''}</div>`;
-  // 컨트롤
-  const controls=`<div class="card"><div class="rep-head-top"><div><h3 style="margin:0"><span class="dot"></span>글라스케어 가입 — 지부/대리점 · 기간</h3><div class="cap">가입 신청을 지부별/대리점별 · 기간(일별) · 제품(세부 품목)으로 좁혀 봅니다.</div></div>
-    <div class="rep-period">
-      <div class="seg" id="glScope"><button data-s="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-s="dealer" class="${scope==='dealer'?'on':''}">대리점별</button></div>
+  // 제품 필터 칩 (대분류 → 중분류, 복수 선택)
+  const catMap={}; GLASS.rows.forEach(r=>{ const c=catOf(r); (catMap[c.major]=catMap[c.major]||new Set()).add(c.sub); });
+  const MAJ=['얼티넘','팬텀','스트라','크로마','기타'];
+  let chips=`<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><button class="pchip ${sel.size===0?'on':''}" data-pf="ALL">전체</button>`;
+  MAJ.forEach(maj=>{ if(!catMap[maj])return; chips+=`<span style="font-size:11px;color:var(--ink3);font-weight:700;margin-left:8px">${maj}</span>`; [...catMap[maj]].sort().forEach(sub=>{ chips+=`<button class="pchip ${sel.has(sub)?'on':''}" data-pf="${escapeHtml(sub)}">${escapeHtml(sub)}</button>`; }); });
+  chips+=`</div>`;
+  const controls=`<div class="card"><div><h3 style="margin:0"><span class="dot"></span>글라스케어 가입 — 지부/대리점/제품 · 기간</h3><div class="cap">지부별·대리점별·제품별로 보고, 기간(일별)·제품(대분류/중분류 복수 선택)으로 좁혀 봅니다.</div></div>
+    <div class="rep-period" style="margin-top:10px">
+      <div class="seg" id="glScope"><button data-s="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-s="dealer" class="${scope==='dealer'?'on':''}">대리점별</button><button data-s="prod" class="${scope==='prod'?'on':''}">제품별</button></div>
       ${_dateBar('gv', GV, minD, maxD)}
-      <select class="dt-select" id="glProd"><option value="ALL" ${GV.prod==='ALL'?'selected':''}>제품: 전체</option>${prodList.map(p=>`<option value="${escapeHtml(p)}" ${GV.prod===p?'selected':''}>${escapeHtml(_filmLabel(p))} · ${escapeHtml(p)}</option>`).join('')}</select>
-    </div></div>`;
-  // 표
+    </div>
+    <div style="margin-top:11px"><div class="cap" style="margin-bottom:6px">제품 필터 (복수 선택 가능)</div>${chips}</div>
+  </div>`;
   const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
   const th='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
   const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
-  let tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>${scope==='dealer'?'대리점별':'지부별'} 글라스케어 가입수</h3>`;
-  if(!total){ tbl+='<div class="empty">선택한 기간에 가입 데이터가 없습니다.</div></div>'; box.innerHTML=kpis+controls+tbl; return; }
-  tbl+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:480px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th><th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>얼티넘</th><th ${th}>스트라</th><th ${th}>팬텀</th><th ${th}>카본</th><th ${th}>기타</th></tr>`;
-  top.forEach(([g,o])=>{ tbl+=`<tr><td ${tdl}>${escapeHtml(g)}</td><td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${o.UL?o.UL.toLocaleString():'·'}</td><td ${td}>${o.ST?o.ST.toLocaleString():'·'}</td><td ${td}>${o.PH?o.PH.toLocaleString():'·'}</td><td ${td}>${o.CH?o.CH.toLocaleString():'·'}</td><td ${td}>${o.etc?o.etc.toLocaleString():'·'}</td></tr>`; });
-  const sumc=k=>top.reduce((s,[,o])=>s+o[k],0);
-  tbl+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}>${sumc('tot').toLocaleString()}</td><td ${td}><b>${sumc('UL').toLocaleString()}</b></td><td ${td}><b>${sumc('ST').toLocaleString()}</b></td><td ${td}><b>${sumc('PH').toLocaleString()}</b></td><td ${td}><b>${sumc('CH').toLocaleString()}</b></td><td ${td}><b>${sumc('etc').toLocaleString()}</b></td></tr>`;
-  tbl+=`</table></div>`;
-  if(scope==='dealer'&&groups.length>30) tbl+=`<div class="cap" style="margin-top:6px">상위 30개 대리점만 표시 (전체 ${groups.length}곳)</div>`;
-  tbl+=`</div>`;
-  const detCnt={}; recs.forEach(r=>{ const p=prodKey(r)||'(미입력)'; detCnt[p]=(detCnt[p]||0)+1; });
-  const detList=Object.entries(detCnt).sort((a,b)=>b[1]-a[1]);
-  let detTbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>세부 품목별 가입 (전면 제품)</h3><div class="cap" style="margin-bottom:8px">제품 라인 + 농도(VLT) 단위. 같은 라인·농도라도 코드가 다르면 별도 품목입니다.</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:380px"><tr><th ${thl}>세부 품목</th><th ${thl}>제품코드</th><th ${th}>가입수</th><th ${th}>비율</th></tr>`;
-  detList.forEach(([p,n])=>{ detTbl+=`<tr><td ${tdl}><b>${escapeHtml(_filmLabel(p))}</b></td><td ${tdl} style="color:var(--ink3);font-size:12px">${escapeHtml(p)}</td><td ${td}>${n.toLocaleString()}</td><td ${td}>${total?(n/total*100).toFixed(1)+'%':'—'}</td></tr>`; });
-  detTbl+=`</table></div></div>`;
-  box.innerHTML=kpis+controls+tbl+detTbl;
+  let tbl;
+  if(!total){ tbl=`<div class="card"><div class="empty">선택한 조건에 가입 데이터가 없습니다.</div></div>`; box.innerHTML=kpis+controls+tbl; return; }
+  if(scope==='prod'){
+    const byP={}; recs.forEach(r=>{ const c=catOf(r); const o=byP[c.sub]||(byP[c.sub]={sub:c.sub,major:c.major,tot:0}); o.tot++; });
+    const arr=Object.values(byP).sort((x,y)=>{ const im=MAJ.indexOf(x.major)-MAJ.indexOf(y.major); return im!==0?im:y.tot-x.tot; });
+    tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>제품별 글라스케어 가입수</h3><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:420px"><tr><th ${thl}>대분류</th><th ${thl}>중분류(제품)</th><th ${th}>가입수</th><th ${th}>비율</th></tr>`;
+    arr.forEach(o=>{ tbl+=`<tr><td ${tdl} style="color:var(--ink3)">${escapeHtml(o.major)}</td><td ${tdl}><b>${escapeHtml(o.sub)}</b></td><td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${total?(o.tot/total*100).toFixed(1)+'%':'—'}</td></tr>`; });
+    tbl+=`<tr style="background:var(--bg2)"><td ${tdl} colspan="2"><b>합계</b></td><td ${tdt}>${total.toLocaleString()}</td><td ${td}>100%</td></tr></table></div></div>`;
+  } else {
+    const gkey=r=> scope==='dealer'?(String(r[dealerCol]||'').trim()||'미지정'):(String(r['담당지부']||'').trim()||'미지정');
+    const majOf=r=>{ const m=catOf(r).major; return ['얼티넘','팬텀','스트라','크로마'].includes(m)?m:'기타'; };
+    const byG={}; recs.forEach(r=>{ const g=gkey(r); const o=byG[g]||(byG[g]={tot:0,'얼티넘':0,'팬텀':0,'스트라':0,'크로마':0,'기타':0}); o.tot++; o[majOf(r)]++; });
+    const groups=Object.entries(byG).sort((x,y)=>y[1].tot-x[1].tot); const top=scope==='dealer'?groups.slice(0,30):groups;
+    const MC=['얼티넘','팬텀','스트라','크로마','기타'];
+    tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>${scope==='dealer'?'대리점별':'지부별'} 글라스케어 가입수</h3><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:520px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th><th ${tdt.replace('13px','11.5px')}>가입수</th>${MC.map(c=>`<th ${th}>${c}</th>`).join('')}</tr>`;
+    top.forEach(([g,o])=>{ tbl+=`<tr><td ${tdl}>${escapeHtml(g)}</td><td ${tdt}>${o.tot.toLocaleString()}</td>${MC.map(c=>`<td ${td}>${o[c]?o[c].toLocaleString():'·'}</td>`).join('')}</tr>`; });
+    const sumc=k=>top.reduce((s,[,o])=>s+o[k],0);
+    tbl+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}>${sumc('tot').toLocaleString()}</td>${MC.map(c=>`<td ${td}><b>${sumc(c).toLocaleString()}</b></td>`).join('')}</tr></table></div>`;
+    if(scope==='dealer'&&groups.length>30) tbl+=`<div class="cap" style="margin-top:6px">상위 30개 대리점만 표시 (전체 ${groups.length}곳)</div>`;
+    tbl+=`</div>`;
+  }
+  box.innerHTML=kpis+controls+tbl;
 }
-
 function normYM(s){
   const str=String(s==null?'':s);
   const m=str.match(/(\d{4})\D{0,2}(\d{1,2})/);
@@ -5058,7 +5064,7 @@ function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(
 const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, tab:'overview', preset:'all', _min:'', _max:'' };
 let _lwLine='UL', _lwScope='jibu';   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
 let GLASS=null, glassLoaded=false, _glScope='jibu';   // 글라스케어 가입
-const GV={ from:'', to:'', scope:'all', preset:'all', prod:'ALL', _min:'', _max:'' };
+const GV={ from:'', to:'', scope:'all', preset:'all', prodSel:[], _min:'', _max:'' };
 const DLR={ jibu:'전체', member:'all', status:'all', q:'' };   // 대리점 마스터 필터
 const RD={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // (구) 대시보드 기간 필터
 const RDS={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDW={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDG={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 대시보드 카드별 기간(매출/보증서/글라스)
@@ -5111,6 +5117,18 @@ const _LINE_CODE={UL:'얼티넘',ST:'스트라',PH:'팬텀',CH:'카본'};
 function _parseFilm(code){ if(code==null) return null; const p=String(code).trim().split('-'); if(p.length<3||(p[0]||'').toUpperCase()!=='AU') return null; const line=(p[1]||'').toUpperCase(); const m=/^(\d{2})(\d{2})/.exec(p[2]||''); return {line, vlt:m?parseInt(m[1],10):null}; }
 function _rowLines(r){ const out={}; for(const c of _FILM_POS){ const f=_parseFilm(r[c]); if(f&&_LINE_CODE[f.line]){ if(!(f.line in out)) out[f.line]=f.vlt; } } return out; }  // {UL:30, ST:30} (앞 시공면 우선 = 전면 우선)
 function _filmLabel(code){ const f=_parseFilm(code); if(!f||!_LINE_CODE[f.line]) return String(code||'기타').trim()||'기타'; return _LINE_CODE[f.line]+(f.vlt!=null?' '+f.vlt:''); }  // 'AU-UL-3097-XP' → '얼티넘 30'
+const FILM_MAJOR={UL:'얼티넘', PH:'팬텀', ST:'스트라', CH:'크로마'};
+function _filmCat(code){  // 코드 → {major 대분류, sub 중분류}
+  const raw=String(code||'').trim(); const p=raw.split('-'); const line=(p[1]||'').toUpperCase();
+  if(p.length<3||(p[0]||'').toUpperCase()!=='AU'||!FILM_MAJOR[line]) return {major:'기타', sub: raw||'기타'};
+  const major=FILM_MAJOR[line], suf=(p[3]||'').toUpperCase(); let sub;
+  if(line==='PH'){ const m=suf.match(/F\d+/); sub='팬텀 '+(m?m[0]:suf); }
+  else if(line==='UL'){ sub = suf.indexOf('XP')===0?'얼티넘XP':(suf.indexOf('X')===0?'얼티넘X':'얼티넘 '+suf); }
+  else if(line==='ST'){ const m=suf.match(/^(\d)/); sub='스트라'+(m?m[1]+'00':suf); }
+  else if(line==='CH'){ const m=suf.match(/(\d)/); sub='크로마'+(m?m[1]:suf); }
+  else sub=major;
+  return {major, sub};
+}
 function lineWarrCard(recs){
   const L=_lwLine, scope=_lwScope;
   const byG={}; const vltSet=new Set(); const lineTot={UL:0,ST:0,PH:0,CH:0};
@@ -6467,6 +6485,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; renderWarranty(); return; }
   const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
   const _gsb=e.target.closest('#glScope button'); if(_gsb){ _glScope=_gsb.dataset.s; renderGlass(); return; }
+  const _pf=e.target.closest('[data-pf]'); if(_pf){ const v=_pf.dataset.pf; if(v==='ALL'){ GV.prodSel=[]; } else { const s=new Set(GV.prodSel||[]); s.has(v)?s.delete(v):s.add(v); GV.prodSel=[...s]; } renderGlass(); return; }
   const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; renderDealer(); return; }
   if(e.target.id==='dlrSearchBtn'){ const q=document.getElementById('dlrQ'); DLR.q=q?q.value.trim():''; renderDealer(); return; }
   const _rsp=e.target.closest('#rdsPreset button'); if(_rsp){ _dfPreset(RDS,renderRDash,_rsp.dataset.rp); return; }
@@ -6537,7 +6556,6 @@ document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; renderWarranty(); }
   if(e.target.id==='gvFrom'){ GV.from=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.to=GV.from; renderGlass(); return; }
   if(e.target.id==='gvTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; renderGlass(); return; }
-  if(e.target.id==='glProd'){ GV.prod=e.target.value; renderGlass(); return; }
   if(e.target.id==='dlrJibu'){ DLR.jibu=e.target.value; renderDealer(); return; }
   if(e.target.id==='dlrMember'){ DLR.member=e.target.value; renderDealer(); return; }
   if(e.target.id==='dlrQ'){ DLR.q=e.target.value.trim(); renderDealer(); return; }
