@@ -33,6 +33,22 @@
   .pchip{padding:5px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
   .pchip.on{background:var(--amber);color:#fff;border-color:var(--amber)}
   .pchip:hover{border-color:var(--amber)}
+  .hero-wrap{border-top:3px solid var(--amber)}
+  .hero-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
+  .hero-card{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:13px 15px}
+  .hero-l{font-size:11.5px;color:var(--ink3);font-weight:700;margin-bottom:5px}
+  .hero-v{font-size:25px;font-weight:800;letter-spacing:-.01em;color:var(--ink);font-variant-numeric:tabular-nums}
+  .hero-meta{display:flex;align-items:center;gap:7px;margin-top:8px;flex-wrap:wrap}
+  .hero-sub{font-size:11px;color:var(--ink3);margin-top:5px}
+  .mom{font-size:12.5px;font-weight:800}
+  .mom-up{color:var(--pos)} .mom-down{color:var(--neg)} .mom-na{color:var(--ink3);font-weight:600}
+  .st-badge{font-size:11px;font-weight:800;padding:2px 9px;border-radius:999px;white-space:nowrap}
+  .st-ok,.st-up{background:var(--pos-bg);color:var(--pos)}
+  .st-warn{background:rgba(244,145,28,.15);color:var(--amber-d)}
+  .st-alert{background:var(--neg-bg);color:var(--neg)}
+  .st-na{background:var(--bg2);color:var(--ink3);border:1px solid var(--line)}
+  .hero-insight{margin-top:13px;padding:11px 14px;background:var(--neu-bg);border-radius:10px;font-size:13px;color:var(--ink);line-height:1.55}
+  @media (max-width:640px){ .hero-grid{grid-template-columns:1fr 1fr} }
   /* 색맹 안전 — 감성 버튼에 색 외 모양 단서 */
   .vbtn[data-v="긍정"]::before{content:"\25B2";font-size:9px;margin-right:4px;opacity:.85}
   .vbtn[data-v="부정"]::before{content:"\25BC";font-size:9px;margin-right:4px;opacity:.85}
@@ -1465,7 +1481,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 제품별롤판매현황';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · W1_핵심요약_전월대비_상태배지';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4798,6 +4814,52 @@ function jibuRollByProductTable(monthsArg){
   h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}>${roll(gtot)}</td>${catList.map(c=>`<td ${td}><b>${roll(colT[c])}</b></td>`).join('')}</tr></table></div>`;
   return h;
 }
+const STATUS_RULES = { rise:5, warn:-5, alert:-10 };   // 전월 대비 증감률(%) 기준 — 여기서 수정
+function _statusOf(pct){
+  if(pct==null||isNaN(pct)) return {label:'데이터 부족', cls:'st-na'};
+  if(pct>=STATUS_RULES.rise) return {label:'상승세', cls:'st-up'};
+  if(pct<=STATUS_RULES.alert) return {label:'점검 필요', cls:'st-alert'};
+  if(pct<=STATUS_RULES.warn) return {label:'주의', cls:'st-warn'};
+  return {label:'정상', cls:'st-ok'};
+}
+function _momPct(cur, prev){ if(prev==null||!isFinite(prev)||prev===0) return null; return (cur-prev)/prev*100; }
+function _refMonths(){ let months=[]; if(typeof SALES!=='undefined'&&SALES&&SALES.months) months=_salesMonths(); if(!months.length&&typeof WARR!=='undefined'&&WARR&&WARR.rows){ const s=new Set(); WARR.rows.forEach(r=>{const m=parseInt(String(r['시공일자']||'').slice(5,7),10); if(m)s.add(m);}); months=[...s].sort((a,b)=>a-b); } const cur=months.length?months[months.length-1]:null; return {cur, prev:cur!=null?cur-1:null, months}; }
+function _heroCard(label, valueStr, pct, sub){
+  const st=_statusOf(pct);
+  let mom; if(pct==null) mom=`<span class="mom mom-na">전월 대비 —</span>`; else { const up=pct>=0; mom=`<span class="mom ${up?'mom-up':'mom-down'}">${up?'▲':'▼'} ${Math.abs(pct).toFixed(1)}%</span>`; }
+  return `<div class="hero-card"><div class="hero-l">${label}</div><div class="hero-v">${valueStr}</div><div class="hero-meta">${mom}<span class="st-badge ${st.cls}">${st.label}</span></div>${sub?`<div class="hero-sub">${sub}</div>`:''}</div>`;
+}
+function _summaryHero(){
+  const won=n=>Math.round(n||0).toLocaleString();
+  const {cur, prev}=_refMonths(); const cards=[]; let totPct=null, b2cPct=null, b2bPct=null;
+  if(typeof SALES!=='undefined'&&SALES&&SALES.channels && cur!=null){
+    const C=SALES.channels, ch=(c,m)=>(m!=null&&C[c]&&C[c].ma[m])||0;
+    const ent=m=>ch('B2C',m)+ch('B2B',m)+(C['별도채널']?ch('별도채널',m):0);
+    const tC=ent(cur), tP=ent(prev), bC=ch('B2C',cur), bP=ch('B2C',prev), bbC=ch('B2B',cur), bbP=ch('B2B',prev);
+    totPct=_momPct(tC,tP); b2cPct=_momPct(bC,bP); b2bPct=_momPct(bbC,bbP);
+    cards.push(_heroCard('총 매출', fmtKRW(tC), totPct, cur+'월 · 전월 대비'));
+    cards.push(_heroCard('B2C 매출', fmtKRW(bC), b2cPct, cur+'월 · 전월 대비'));
+    cards.push(_heroCard('B2B 매출', fmtKRW(bbC), b2bPct, cur+'월 · 전월 대비'));
+  }
+  if(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length && cur!=null){
+    const cnt=m=>m==null?0:WARR.rows.filter(r=>parseInt(String(r['시공일자']||'').slice(5,7),10)===m).length;
+    const wC=cnt(cur), wP=cnt(prev);
+    cards.push(_heroCard('인증서 발급', won(wC)+'건', _momPct(wC,wP), cur+'월 · 전월 대비'));
+  }
+  if(typeof RAW!=='undefined' && RAW && RAW.rows && RAW.rows.length){
+    const cnt=m=>m==null?0:RAW.rows.filter(r=>{ const d=normDate(r.date); return d && parseInt(d.slice(5,7),10)===m; }).length;
+    const oC=cur!=null?cnt(cur):0, oP=cnt(prev);
+    const pctO=(cur!=null&&oP>0)?_momPct(oC,oP):null;
+    cards.push(_heroCard('온라인 언급', won(cur!=null?oC:RAW.rows.length)+'건', pctO, cur!=null?cur+'월 · 전월 대비':'누적'));
+  }
+  if(!cards.length) return '';
+  let insight='비교 가능한 데이터가 부족합니다.'; const ip=[];
+  if(totPct!=null) ip.push(`총 매출 전월 대비 <b>${totPct>=0?'+':''}${totPct.toFixed(1)}%</b>`);
+  if(b2cPct!=null) ip.push(`B2C ${b2cPct>=0?'상승세':'하락'}(${b2cPct>=0?'+':''}${b2cPct.toFixed(1)}%)`);
+  if(b2bPct!=null) ip.push(`B2B ${b2bPct>=0?'+':''}${b2bPct.toFixed(1)}%`);
+  if(ip.length) insight='이번 달 '+ip.join(' · ')+'.';
+  return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>이번 달 핵심 요약${cur!=null?` · ${cur}월`:''}</h3><span class="cap">현재값 · 전월 대비 증감 · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div></div>`;
+}
 function renderRDash(){
   const box=document.getElementById('rDash'); if(!box) return;
   const hasSales=!!(SALES&&SALES.channels), hasWarr=!!(WARR&&WARR.rows&&WARR.rows.length), hasGlass=!!(GLASS&&GLASS.rows&&GLASS.rows.length);
@@ -4809,7 +4871,7 @@ function renderRDash(){
   const wDates=hasWarr?WARR.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
   const gDates=hasGlass?GLASS.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
   const yr=((wDates[wDates.length-1]||gDates[gDates.length-1]||'').slice(0,4))||String(new Date().getFullYear());
-  let h='';
+  let h=_summaryHero();
   if(hasSales){
     const C=SALES.channels, ms=_salesMonths();
     const sMin=ms.length?`${yr}-${String(Math.min.apply(null,ms)).padStart(2,'0')}-01`:'';
