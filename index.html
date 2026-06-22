@@ -971,6 +971,11 @@
              filter:drop-shadow(0 6px 18px rgba(232,137,59,.22))}
   .dbar{position:absolute;left:0;top:3px;bottom:3px;border-radius:0 4px 4px 0;background:rgba(244,145,28,.22);z-index:-1;pointer-events:none}
   .cardctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:6px 9px}
+  .wv-fhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .wv-fhead .wv-flbl{margin-bottom:0}
+  .wv-fsum{font-size:12.5px;color:var(--ink2);font-weight:700}
+  .wv-ftoggle{font-size:12px;color:var(--amber);font-weight:800;cursor:pointer;margin-left:auto}
+  .wv-ftoggle:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -1482,7 +1487,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 레이노_기간바숨김';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 보증서필터_정리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5204,7 +5209,7 @@ function warrRangeRecs(){ const ex=warrExcludedSet(); let recs=(WARR.rows||[]).f
 function warrApplyBranch(recs){ const bc=warrBranchCol(); return (bc&&WV.branch!=='전체')?recs.filter(r=>(r[bc]||'')===WV.branch):recs; }
 function warrFrontCol(){ const c=WARR.columns||[]; return c.find(x=>/시공내역.*전면/.test(x))||null; }
 function warrFrontBase(label){ return String(label||'').replace(/\s*\d+\s*%\s*$/,'').trim(); }   // '얼티넘XP 30%' → '얼티넘XP' (농도 묶기)
-let _warrFrontExpand=false;
+let _warrFrontExpand=false, _warrFrontOpen=false;
 function warrApplyFront(recs){ const fc=warrFrontCol(); if(!fc||!WV.fronts.length)return recs; const sel=new Set(WV.fronts); return recs.filter(r=>sel.has(warrFrontBase(warrLabelOf(fc,(r[fc]||'').trim())))); }
 function warrTrend(recs){
   const map={};
@@ -5309,7 +5314,8 @@ function renderWarranty(){
       const chips=shown.map(([v,c])=>`<span class="wv-fchip ${selSet.has(v)?'on':''}" data-front="${escapeHtml(v)}">${escapeHtml(v)}<small>${c.toLocaleString()}</small></span>`).join('');
       const more=ent.length>LIM?`<span class="wv-fmore" data-fexpand="1">${_warrFrontExpand?'접기 ▲':('+'+(ent.length-LIM)+'개 더보기 ▼')}</span>`:'';
       return allChip+chips+more; })() : '';
-  const frontRow = fc ? `<div class="wv-frow"><span class="wv-flbl">전면 제품</span><div class="wv-fhint">제품을 누르면 선택돼요. <b>여러 개</b> 누르면 모두 포함되고, 다시 누르면 해제됩니다.</div><div class="wv-fchips" id="wvFronts">${frontChips}</div></div>` : '';
+  const frontSum = WV.fronts.length ? (WV.fronts.length===1?escapeHtml(WV.fronts[0]):WV.fronts.length+'개 선택') : '전체';
+  const frontRow = fc ? `<div class="wv-frow"><div class="wv-fhead"><span class="wv-flbl">전면 제품</span><span class="wv-fsum">${frontSum}</span><span class="wv-ftoggle" data-fopen="1">${_warrFrontOpen?'접기 ▲':'펼치기 ▾'}</span></div>${_warrFrontOpen?`<div class="wv-fhint">제품을 누르면 선택돼요. <b>여러 개</b> 누르면 모두 포함, 다시 누르면 해제.</div><div class="wv-fchips" id="wvFronts">${frontChips}</div>`:''}</div>` : '';
   const allMonths=[...new Set(all.map(r=>warrDateStr(r).slice(0,7)).filter(s=>/^\d{4}-\d{2}$/.test(s)))].sort().reverse().slice(0,12);
   const monthChip=ym=>{ const r=monthRange(ym); const on=(WV.scope==='range'&&WV.from===r.from&&WV.to===r.to); const a=ym.split('-'); return `<span class="mchip ${on?'on':''}" data-ym="${ym}">${a[0]}년 ${+a[1]}월</span>`; };
   const monthChips=allMonths.length?`<div class="mchips"><span class="mchips-lbl">월 바로가기</span>${allMonths.map(monthChip).join('')}<span class="mchip ${WV.scope==='all'?'on':''}" data-ym="__all">전체</span></div>`:'';
@@ -5317,7 +5323,7 @@ function renderWarranty(){
     <div class="card">
       <div class="rep-head-top">
         <div><h3 style="margin:0"><span class="dot"></span>기간 · 단위 · 지부</h3>
-          <div class="cap">집계 단위·기간을 고르고, 전면 제품(여러 개 선택 가능)·지부로 좁혀 볼 수 있습니다. (제품을 고르면 ‘담당지부 구성’이 선택한 제품 기준으로 바뀌어 어느 지부가 가장 많이 발급했는지 보입니다)</div></div>
+          <div class="cap">단위·기간·지부·제품으로 좁혀 봅니다.</div></div>
         <div class="rep-period">
           <div class="seg" id="wvGran">${granBtn('day','일별')}${granBtn('week','주별')}${granBtn('month','월별')}</div>
           ${_dateBar('wv', WV, minD, maxD)}
@@ -6641,6 +6647,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   if(e.target.id==='wvClearBranch'){ WV.branch='전체'; renderWarranty(); return; }
   if(e.target.id==='wvClearFront'){ WV.fronts=[]; renderWarranty(); return; }
   if(e.target.closest('[data-fexpand]')){ _warrFrontExpand=!_warrFrontExpand; renderWarranty(); return; }
+  if(e.target.closest('[data-fopen]')){ _warrFrontOpen=!_warrFrontOpen; renderWarranty(); return; }
   { const _fchip=e.target.closest('.wv-fchip'); if(_fchip){ const v=_fchip.dataset.front; if(v==='__all'){ WV.fronts=[]; } else { const i=WV.fronts.indexOf(v); if(i>=0) WV.fronts.splice(i,1); else WV.fronts.push(v); } renderWarranty(); return; } }
   const exb=e.target.closest('.warr-exclude');
   if(exb){ const cfg=ensureWarrCfg(); const k=exb.dataset.key; if(!cfg.excluded.includes(k)) cfg.excluded.push(k);
