@@ -1462,7 +1462,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 가로스크롤바_가시화';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 대리점_ERP매출결합';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4815,9 +4815,10 @@ function renderRDash(){
 }
 function _dealerAgg(){
   const M={}, today=Date.now();
-  const ens=n=>M[n]||(M[n]={name:n, jibu:'', code:'', member:false, warr:0, glass:0, last:''});
+  const ens=n=>M[n]||(M[n]={name:n, jibu:'', code:'', member:false, warr:0, glass:0, salesA:0, salesQ:0, last:''});
   if(typeof WARR!=='undefined'&&WARR&&WARR.rows) WARR.rows.forEach(r=>{ const n=String(r['매장명']||'').trim(); if(!n)return; const d=ens(n); d.warr++; if(!d.jibu){const j=String(r['담당지부']||'').trim(); if(j)d.jibu=j;} if(!d.code){const c=String(r['대리점코드']||'').trim(); if(c)d.code=c;} if(/멤버스/.test(String(r['대리점구분']||''))) d.member=true; const ds=String(r['시공일자']||'').slice(0,10); if(ds&&ds>d.last)d.last=ds; });
   if(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows){ const dc=(GLASS.columns||[]).includes('매장명(대리점명)')?'매장명(대리점명)':'매장명'; GLASS.rows.forEach(r=>{ const n=String(r[dc]||'').trim(); if(!n)return; const d=ens(n); d.glass++; if(!d.jibu){const j=String(r['담당지부']||'').trim(); if(j)d.jibu=j;} const ds=String(r['시공일자']||'').slice(0,10); if(ds&&ds>d.last)d.last=ds; }); }
+  if(typeof SALES!=='undefined'&&SALES&&SALES.dealers){ const sm=o=>{let s=0;for(let m=1;m<=12;m++)s+=(o&&o[m])||0;return s;}; Object.keys(SALES.dealers).forEach(n=>{ const nm=String(n||'').trim(); if(!nm)return; const sd=SALES.dealers[n]||{}; const d=ens(nm); d.salesA=(d.salesA||0)+sm(sd.ma); d.salesQ=(d.salesQ||0)+sm(sd.mq); if(!d.jibu&&sd.jibu) d.jibu=String(sd.jibu).trim(); }); }
   Object.values(M).forEach(d=>{ d.days = d.last? Math.floor((today-new Date(d.last+'T00:00:00').getTime())/86400000) : null; d.active = d.days!=null && d.days<=60; });
   return Object.values(M);
 }
@@ -4826,15 +4827,15 @@ function renderDealer(){
   const all=_dealerAgg();
   if(!all.length){ box.innerHTML='<div class="card"><div class="empty">품질보증서·글라스케어 데이터가 업로드되면 대리점 목록이 집계됩니다.<br>월평균 롤·GC카드·구매 실적(F/S/U) 등은 추후 ERP 연결 시 표시됩니다.</div></div>'; return; }
   const won=n=>(n||0).toLocaleString();
-  const total=all.length, members=all.filter(d=>d.member).length, active=all.filter(d=>d.active).length, jibus=new Set(all.map(d=>d.jibu).filter(Boolean)).size;
+  const total=all.length, members=all.filter(d=>d.member).length, active=all.filter(d=>d.active).length, jibus=new Set(all.map(d=>d.jibu).filter(Boolean)).size, salesN=all.filter(d=>d.salesA>0).length;
   let rows=all.slice();
   if(DLR.status==='active') rows=rows.filter(d=>d.active); else if(DLR.status==='dormant') rows=rows.filter(d=>!d.active);
   if(DLR.jibu!=='전체') rows=rows.filter(d=>d.jibu===DLR.jibu);
   if(DLR.member==='member') rows=rows.filter(d=>d.member); else if(DLR.member==='normal') rows=rows.filter(d=>!d.member);
   if(DLR.q){ const q=DLR.q.toLowerCase(); rows=rows.filter(d=>d.name.toLowerCase().includes(q)||(d.code||'').toLowerCase().includes(q)); }
-  rows.sort((a,b)=>(b.warr+b.glass)-(a.warr+a.glass));
+  rows.sort((a,b)=>(b.salesA-a.salesA)||((b.warr+b.glass)-(a.warr+a.glass)));
   const jibuList=[...new Set(all.map(d=>d.jibu).filter(Boolean))].sort();
-  const kpis=[ _dcard('전체 대리점', won(total)+'곳','보증서·글라스케어 집계','var(--dv1)',''), _dcard('멤버스', won(members)+'곳','글라스케어 멤버스','var(--dv2)',''), _dcard('활성', won(active)+'곳','최근 60일 내 활동','var(--dv6)',''), _dcard('관리 지부', won(jibus)+'개','집계된 지부 수','var(--dv3)','') ];
+  const kpis=[ _dcard('전체 대리점', won(total)+'곳','매출·보증서·글라스 집계','var(--dv1)',''), _dcard('매출 대리점', won(salesN)+'곳','ERP 매출 있는 곳','var(--dv4)',''), _dcard('멤버스', won(members)+'곳','글라스케어 멤버스','var(--dv2)',''), _dcard('활성(시공)', won(active)+'곳','최근 60일 내 시공','var(--dv6)','') ];
   const statusSeg=`<div class="seg" id="dlrStatus"><button data-st="all" class="${DLR.status==='all'?'on':''}">전체</button><button data-st="active" class="${DLR.status==='active'?'on':''}">활성</button><button data-st="dormant" class="${DLR.status==='dormant'?'on':''}">휴면</button></div>`;
   const jibuOpt=['전체'].concat(jibuList).map(j=>`<option ${DLR.jibu===j?'selected':''}>${escapeHtml(j)}</option>`).join('');
   const memberOpt=`<option value="all" ${DLR.member==='all'?'selected':''}>멤버스: 전체</option><option value="member" ${DLR.member==='member'?'selected':''}>멤버스</option><option value="normal" ${DLR.member==='normal'?'selected':''}>일반</option>`;
@@ -4843,9 +4844,10 @@ function renderDealer(){
   const th='style="text-align:right;padding:8px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
   const tdl='style="text-align:left;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
-  let t=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:680px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${th}>보증서</th><th ${th}>글라스케어</th><th ${th}>최근 활동</th><th ${thl}>상태</th></tr>`;
-  rows.forEach((d,i)=>{ const recent=d.days==null?'—':(d.days<=0?'오늘':d.days+'일 전'); const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.active?'<span style="color:var(--dv2);font-weight:700">활성</span>':'<span style="color:var(--amber);font-weight:700">휴면</span>'; t+=`<tr><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${td}>${won(d.warr)}</td><td ${td}>${won(d.glass)}</td><td ${td}>${recent}</td><td ${tdl}>${stat}</td></tr>`; });
-  t+=`</table></div><div class="cap" style="margin-top:8px">${won(rows.length)}곳 표시 (전체 ${won(total)}곳) · 보증서·글라스케어 데이터 기준 집계 · <b>월평균 롤·GC카드·구매 실적(F/S/U) 등은 추후 ERP 연결 시 표시됩니다.</b></div>`;
+  const kw=n=>{ n=n||0; return n>=1e8?(n/1e8).toFixed(1)+'억':(n>=1e4?Math.round(n/1e4).toLocaleString()+'만':String(Math.round(n))); };
+  let t=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:780px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${th}>매출</th><th ${th}>롤</th><th ${th}>보증서</th><th ${th}>글라스케어</th><th ${th}>최근 활동</th><th ${thl}>상태</th></tr>`;
+  rows.forEach((d,i)=>{ const recent=d.days==null?'—':(d.days<=0?'오늘':d.days+'일 전'); const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.active?'<span style="color:var(--dv2);font-weight:700">활성</span>':'<span style="color:var(--amber);font-weight:700">휴면</span>'; t+=`<tr><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${td}>${won(d.warr)}</td><td ${td}>${won(d.glass)}</td><td ${td}>${recent}</td><td ${tdl}>${stat}</td></tr>`; });
+  t+=`</table></div><div class="cap" style="margin-top:8px;line-height:1.6">${won(rows.length)}곳 표시 (전체 ${won(total)}곳) · <b>매출·롤</b>=ERP 매출(대리점별), <b>보증서·글라스케어</b>=관리자 홈페이지 데이터를 <b>대리점명으로 매칭</b>해 결합. 이름이 다르면 매칭이 안 될 수 있어 <b>대리점코드 연동 시 더 정확</b>해집니다. 활성/휴면은 시공(보증서·글라스) 최근 60일 기준 · GC카드·구매 실적(F/S/U)은 ERP 추가 연동 시 표시.</div>`;
   box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
 }
 function renderGlass(){
