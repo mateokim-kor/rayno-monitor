@@ -1212,7 +1212,8 @@
       </div>
     </div>
     <div class="nav" id="raynoNav">
-      <button class="nav-btn on" data-rview="revenue">💰 <span data-txt="tabRevenue">매출</span></button>
+      <button class="nav-btn on" data-rview="dash">📊 <span>대시보드</span></button>
+      <button class="nav-btn" data-rview="revenue">💰 <span data-txt="tabRevenue">매출</span></button>
       <button class="nav-btn" data-rview="warranty">📜 <span data-txt="tabWarranty">품질보증서</span></button>
       <button class="nav-btn" data-rview="warrReport">📈 <span data-txt="tabWarrReport">보증서 리포트</span></button>
       <button class="nav-btn" data-rview="glass">🪪 <span>글라스케어</span></button>
@@ -1230,6 +1231,7 @@
     <div id="rWarranty" style="display:none"></div>
     <div id="rWarrReport" style="display:none"></div>
     <div id="rSearch" style="display:none"></div>
+    <div id="rDash"></div>
     <div id="rGlass" style="display:none"></div>
     <div id="rRevenue"></div>
     <input type="file" id="warrFileInput" accept=".xlsx,.xls" hidden>
@@ -1451,7 +1453,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 글라스케어가입_탭신설';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 레이노대시보드_프로모숨김버그';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4498,7 +4500,7 @@ const brandEl=document.querySelector('.brand'); if(brandEl) brandEl.addEventList
 let BIZ={rows:[],version:1};                 // 검색량/매출 (수기): {ym, search, revenue}
 let WARR={rows:[],columns:[],config:null,version:1};   // 품질보증서 (엑셀, 원본 컬럼 보존)
 let bizLoaded=false, warrLoaded=false;
-let workspace='cafe', rview='revenue', raynoUnlocked=false, warrCfgOpen=false;
+let workspace='cafe', rview='dash', raynoUnlocked=false, warrCfgOpen=false;
 
 /* ===== 경쟁사 프로모션 모니터링 (수동 입력 트래커) ===== */
 let PROMO={version:1,items:[]}, promoLoaded=false, _promoWired=false, _promoEdit=null;
@@ -4718,6 +4720,32 @@ function handleGlassFile(file){
     else toast(`⚠ 저장 실패: ${_cloudErr||'원인 미상'} · 누적 ${GLASS.rows.length.toLocaleString()}건 (새로고침하면 사라집니다)`, true);
   }catch(ex){ toast('파일 오류: '+ex.message,true); } };
   rd.readAsArrayBuffer(file);
+}
+function _dcard(t,v,sub,color,spark){ return `<div style="background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px 16px;border-top:3px solid ${color}"><div style="font-size:11.5px;color:var(--ink3);font-weight:700;margin-bottom:5px">${t}</div><div style="font-size:24px;font-weight:800;letter-spacing:-.01em;color:var(--ink)">${v}</div>${spark||''}<div style="font-size:11px;color:var(--ink2);margin-top:4px">${sub}</div></div>`; }
+function renderRDash(){
+  const box=document.getElementById('rDash'); if(!box) return;
+  const hasSales=!!(SALES&&SALES.channels), hasWarr=!!(WARR&&WARR.rows&&WARR.rows.length), hasGlass=!!(GLASS&&GLASS.rows&&GLASS.rows.length);
+  if(!hasSales&&!hasWarr&&!hasGlass){ box.innerHTML='<div class="card"><div class="empty">매출·품질보증서·글라스케어 데이터가 업로드되면 핵심 지표가 여기에 모입니다.</div></div>'; return; }
+  const won=n=>Math.round(n||0).toLocaleString(), eok=n=>(n/1e8).toFixed(1);
+  const cards=[];
+  if(hasSales){
+    const C=SALES.channels, ms=_salesMonths(), cur=ms[ms.length-1], mn=cur?cur+'월':'';
+    const ch=(c,m)=>(C[c]&&C[c].ma[m])||0;
+    const entCur=cur?(ch('B2C',cur)+ch('B2B',cur)+ch('별도채널',cur)):0, b2cCur=cur?ch('B2C',cur):0, b2bCur=cur?ch('B2B',cur):0;
+    const sumCh=c=>ms.reduce((s,m)=>s+ch(c,m),0);
+    cards.push(_dcard('전사 매출 · '+mn, eok(entCur)+'억', '연누적 '+eok(sumCh('B2C')+sumCh('B2B')+sumCh('별도채널'))+'억', 'var(--dv4)', _spark(ms.map(m=>ch('B2C',m)+ch('B2B',m)+ch('별도채널',m)),'var(--dv4)')));
+    cards.push(_dcard('B2C · '+mn, eok(b2cCur)+'억', '연누적 '+eok(sumCh('B2C'))+'억', 'var(--dv1)', _spark(ms.map(m=>ch('B2C',m)),'var(--dv1)')));
+    cards.push(_dcard('B2B · '+mn, eok(b2bCur)+'억', '연누적 '+eok(sumCh('B2B'))+'억', 'var(--dv2)', _spark(ms.map(m=>ch('B2B',m)),'var(--dv2)')));
+    const crT=_natCarRegPick(), wT=_qcNewPick();
+    if(crT) cards.push(_dcard('신차 장착률', (wT/crT*100).toFixed(1)+'%', '신차 시공 '+won(wT)+' ÷ 신차 등록 '+won(crT), 'var(--dv6)',''));
+  }
+  if(hasWarr) cards.push(_dcard('품질보증서(누적)', won(WARR.rows.length)+'건', '발급 전체', 'var(--dv3)',''));
+  if(hasGlass) cards.push(_dcard('글라스케어 가입(누적)', won(GLASS.rows.length)+'건', '가입 신청 전체', 'var(--dv1)',''));
+  let h=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>핵심 지표${hasSales?` · 당월 ${(_salesMonths().slice(-1)[0]||'')}월`:''}</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px">${cards.join('')}</div></div>`;
+  if(hasSales){ h+=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월별 매출 요약</h3>${salesSummaryTable()}</div>`;
+    const jt=salesJibuRollTable&&salesJibuRollTable(); if(jt) h+=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>지부별 매출</h3>${jt}</div>`; }
+  if(hasWarr){ const nc=(typeof newCarShareCard==='function')?newCarShareCard():''; if(nc) h+=`<div class="card"><h3 style="margin:0 0 6px"><span class="dot"></span>신차 장착 점유율</h3>${nc}</div>`; }
+  box.innerHTML=h;
 }
 function renderGlass(){
   const box=document.getElementById('rGlass'); if(!box) return; const admin=(auth==='admin');
@@ -5951,7 +5979,7 @@ function bizUpsert(ym, field, val){ BIZ.rows=BIZ.rows||[]; let r=BIZ.rows.find(x
 async function saveBiz(){ BIZ.version=1; BIZ.rows=(BIZ.rows||[]).filter(r=>r.search!=null||r.revenue!=null); await cloudSaveJSON(SUPA.bizFile,BIZ); }
 
 // ── 워크스페이스 전환 + 잠금 ──
-const CAFE_VIEW_IDS=['nav','dash','controls','typeBar','veriNote','filterStatus','verify','report','emptyState','drop'];
+const CAFE_VIEW_IDS=['nav','dash','controls','typeBar','veriNote','filterStatus','verify','report','promo','emptyState','drop'];
 function hideCafe(){ CAFE_VIEW_IDS.forEach(id=>{const el=document.getElementById(id); if(el)el.style.display='none';}); }
 function showCafe(){ document.getElementById('nav').style.display='flex'; if(RAW && RAW.meta && RAW.meta.total){ setView(state.view||'dash'); } else { applyAuthUI(); } }
 const WR={anchor:'', win:7};
@@ -6066,7 +6094,7 @@ function renderWarrReport(){
 
   box.innerHTML = headCard + kpiCard + insightCard + (moverCard?`<div class="biz-grid">${moverCard}${dailyCard}</div>`:dailyCard) + compGrid;
 }
-const RVIEW_BOX={warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', search:'rSearch', revenue:'rRevenue'};
+const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', search:'rSearch', revenue:'rRevenue'};
 function setRView(v){
   rview=v;
   document.querySelectorAll('#raynoNav .nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.rview===v));
@@ -6075,6 +6103,7 @@ function setRView(v){
   applyRaynoAuth();                      // 편집 버튼은 관리자에게만
   if(v==='warranty') renderWarranty();
   else if(v==='warrReport') renderWarrReport();
+  if(v==='dash') renderRDash();
   else if(v==='glass') renderGlass();
   else if(v==='search') renderMetric('search');
   else renderRevenue();
