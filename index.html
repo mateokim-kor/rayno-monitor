@@ -1487,7 +1487,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 보증서필터_정리';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 라인발급_재배치';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5402,11 +5402,11 @@ function renderWarranty(){
   const _cR='var(--dv6)';
   const regCards=[ warrDistCard(recsProd,'담당지부','담당지부 구성',{color:_cR,n:12}), warrDistCard(recs,'대리점지역(도)','지역(도) 구성',{color:_cR,n:17}), warrDistCard(recs,'대리점지역(시군구)','시군구 TOP',{color:_cR,n:15}), warrDistCard(recs,'매장명','매장(대리점) TOP',{color:_cR,n:15}), warrDistCard(recs,'대리점구분','대리점 구분',{color:_cR}) ];
   const regBlock=regCards.some(Boolean)?(_sec('지역')+_grid(regCards)):'';
-  const lineBlock=(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)?(_sec('제품 라인 발급 (얼티넘·스트라)')+'<div class="card">'+lineWarrCard(recs)+'</div>'):'';
+  const lineBlock=(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)?(_sec('지부/제품별 보증서 발급 현황')+'<div class="card">'+lineWarrCard(recs)+'</div>'):'';
   const adminRow = admin ? `<div style="margin-bottom:16px;display:flex;justify-content:flex-end"><button class="acc-btn" id="warrExclToggle">집계 제외 관리 (${exRows.length})</button></div>` : '';
-  box.innerHTML = cfgCard + controls + kpis + trendCard
+  box.innerHTML = cfgCard + controls + kpis + trendCard + lineBlock
     + (breakdownCards?`<div class="biz-grid">${breakdownCards}</div>`:'')
-    + custBlock + vehBlock + prodBlock + lineBlock + regBlock
+    + custBlock + vehBlock + prodBlock + regBlock
     + adminRow + exPanel;
 }
 
