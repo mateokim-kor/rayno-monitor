@@ -1482,7 +1482,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 메뉴바_프로디자인';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 레이노_기간바숨김';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6423,6 +6423,7 @@ async function setWorkspace(ws){
   document.getElementById('raynoApp').style.display = rayno?'block':'none';
   document.getElementById('settingsApp').style.display = settings?'block':'none';
   const _tgl=document.getElementById('dashToolToggle'); if(_tgl) _tgl.style.display=(ws==='cafe')?'':'none';   // 도구·필터 접기는 모니터링 전용
+  if(ws!=='cafe'){ const pb=document.getElementById('periodBar'); if(pb) pb.style.display='none'; }   // 기간 바는 모니터링 전용
   if(rayno){ hideCafe(); await openRayno(); }
   else if(settings){ hideCafe(); await openSettingsWs(); }
   else { showCafe(); }
