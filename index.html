@@ -1483,7 +1483,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 글라스_대리점더보기';   // 배포 버전 확인용
+const BUILD = '2026-06-22 · 날짜선택_즉시반영';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3752,8 +3752,8 @@ document.getElementById('report').addEventListener('click', e=>{
 });
 document.getElementById('report').addEventListener('change', e=>{
   if(e.target.id==='rpMonth'){ RP.month=e.target.value; renderReport(); }
-  if(e.target.id==='rpFrom'){ RP.from=e.target.value; if(RP.from&&RP.to&&RP.to<RP.from)RP.to=RP.from; renderReport(); }
-  if(e.target.id==='rpTo'){ RP.to=e.target.value; if(RP.from&&RP.to&&RP.to<RP.from)RP.from=RP.to; renderReport(); }
+  if(e.target.id==='rpFrom'){ RP.from=e.target.value; if(RP.from&&RP.to&&RP.to<RP.from)RP.to=RP.from; RP.scope='range'; RP.preset='custom'; renderReport(); }
+  if(e.target.id==='rpTo'){ RP.to=e.target.value; if(RP.from&&RP.to&&RP.to<RP.from)RP.from=RP.to; RP.scope='range'; RP.preset='custom'; renderReport(); }
 });
 
 function setView(v){
@@ -6691,10 +6691,10 @@ document.getElementById('raynoApp').addEventListener('keydown', e=>{
 document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='warrLabelSel'){ warrLabelCol=e.target.value; renderWarranty(); return; }
   if(e.target.id==='wvBranch'){ WV.branch=e.target.value; renderWarranty(); }
-  if(e.target.id==='wvFrom'){ WV.from=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.to=WV.from; renderWarranty(); }
-  if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; renderWarranty(); }
-  if(e.target.id==='gvFrom'){ GV.from=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.to=GV.from; renderGlass(); return; }
-  if(e.target.id==='gvTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; renderGlass(); return; }
+  if(e.target.id==='wvFrom'){ WV.from=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.to=WV.from; WV.scope='range'; WV.preset='custom'; renderWarranty(); }
+  if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; WV.scope='range'; WV.preset='custom'; renderWarranty(); }
+  if(e.target.id==='gvFrom'){ GV.from=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.to=GV.from; GV.scope='range'; GV.preset='custom'; renderGlass(); return; }
+  if(e.target.id==='gvTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; GV.scope='range'; GV.preset='custom'; renderGlass(); return; }
   if(e.target.id==='dlrJibu'){ DLR.jibu=e.target.value; renderDealer(); return; }
   if(e.target.id==='dlrMember'){ DLR.member=e.target.value; renderDealer(); return; }
   if(e.target.id==='dlrQ'){ DLR.q=e.target.value.trim(); renderDealer(); return; }
