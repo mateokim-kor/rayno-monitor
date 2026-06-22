@@ -1458,7 +1458,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-11 · 대시보드_카드별기간필터';   // 배포 버전 확인용
+const BUILD = '2026-06-11 · 캘린더_min제약해제';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3472,9 +3472,9 @@ function _renderReportImpl(){
          </div>
          <select class="dt-select" id="rpMonth" style="display:${RP.mode==='month'?'':'none'}">${monthOpts}</select>
          <span class="dt-range" id="rpRange" style="display:${RP.mode==='range'?'inline-flex':'none'}">
-           <input type="date" class="dt-input" id="rpFrom" value="${RP.from}" min="${dates[0]||''}" max="${dates[dates.length-1]||''}">
+           <input type="date" class="dt-input" id="rpFrom" value="${RP.from}">
            <span class="dt-tilde">~</span>
-           <input type="date" class="dt-input" id="rpTo" value="${RP.to}" min="${dates[0]||''}" max="${dates[dates.length-1]||''}">
+           <input type="date" class="dt-input" id="rpTo" value="${RP.to}">
          </span>
          ${auth==='admin'?`<button class="viewbtn" id="rpMail" title="브랜드 모니터링 리포트로 전사 메일 작성">✉ 전사 메일</button>`:''}
          <button class="viewbtn" id="rpPdf" title="인쇄 창에서 ‘PDF로 저장’을 선택하세요">📄 PDF 저장</button>
@@ -4742,7 +4742,7 @@ function _dateBar(prefix, st, minD, maxD){
   const lbl=range?`${fromD} ~ ${toD}`:'전체';
   const pb=(v,l)=>`<button data-rp="${v}" class="${st.preset===v?'on':''}">${l}</button>`;
   return `<div class="seg" id="${prefix}Preset">${pb('all','전체')}${pb('7','최근 7일')}${pb('30','최근 30일')}${pb('90','최근 90일')}</div>`
-    +`<span class="dt-range" style="display:inline-flex"><input type="date" class="dt-input" id="${prefix}From" value="${fromD}" min="${minD}" max="${maxD}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="${prefix}To" value="${toD}" min="${minD}" max="${maxD}"></span>`
+    +`<span class="dt-range" style="display:inline-flex"><input type="date" class="dt-input" id="${prefix}From" value="${fromD}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="${prefix}To" value="${toD}"></span>`
     +`<button class="acc-btn" id="${prefix}Apply">조회</button><span style="font-size:12px;color:var(--ink2);font-weight:700">${lbl}</span>`;
 }
 function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; const mx=st._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
