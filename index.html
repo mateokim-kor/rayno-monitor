@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 기본값_전체';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 지부순위_월필터';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4868,7 +4868,10 @@ function jibuRollByProductTable(monthsArg){
 }
 function salesJibuProdRankTable(){
   if(!SALES||!SALES.jibuProd) return '<div class="empty">매출(ERP) 데이터가 없습니다.</div>';
-  const M=_salesActive(), sm=o=>{let s=0;M.forEach(m=>s+=(o&&o[m])||0);return s;};
+  const _avM=_salesMonths(); const _selM=_jspMonths.filter(m=>_avM.indexOf(m)>=0).sort((a,b)=>a-b);
+  const M=_selM.length?_selM.slice():_avM.slice(), sm=o=>{let s=0;M.forEach(m=>s+=(o&&o[m])||0);return s;};
+  const _mLabel=_selM.length?(_selM.length===1?_selM[0]+'월':(_selM.every((m,i)=>i===0||m===_selM[i-1]+1)?_selM[0]+'~'+_selM[_selM.length-1]+'월':_selM.join('·')+'월')):'전체';
+  const _jspMonSeg=`<div class="seg" id="jspMonthSeg" style="margin-bottom:8px;flex-wrap:wrap"><button data-m="0" class="${_selM.length===0?'on':''}">전체</button>${_avM.map(m=>`<button data-m="${m}" class="${_selM.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div>`;
   const CATL={MONO:'모노', PRESTO:'프레스토'};
   const catOf=mat=>{ const c=(typeof _midOf==='function'?_midOf(mat):mat)||'기타'; return CATL[c]||c; };
   const catTot={};
@@ -4880,14 +4883,14 @@ function salesJibuProdRankTable(){
   const JG=SALES_JIBU.concat(['본사']);
   const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; let q=0,a=0; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; if(sel!=='__all' && catOf(mat)!==sel)return; const oo=pm[mat]; q+=sm(oo.q||oo); a+=sm(oo.a||{}); }); return {j,q,a}; }).filter(r=>r.q>0).sort((x,y)=>y.q-x.q);
   const totQ=rows.reduce((s,r)=>s+r.q,0)||1, totA=rows.reduce((s,r)=>s+r.a,0);
-  if(!rows.length) return seg+'<div class="empty">선택한 제품의 지부별 판매 데이터가 없습니다.</div>';
+  if(!rows.length) return _jspMonSeg+seg+'<div class="empty">선택한 제품의 지부별 판매 데이터가 없습니다.</div>';
   const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
   const th='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
   const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
   const roll=n=>n?Math.round(n).toLocaleString():'·', kw=n=>n?(n/1e8).toFixed(1)+'억':'·';
-  let h=seg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> ${sel==='__all'?'롤 판매 지부 순위':'를 가장 많이 판매한 지부 순위'} · ${escapeHtml(_salesLabel())} · 롤 판매 수 기준</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
+  let h=_jspMonSeg+seg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> ${sel==='__all'?'롤 판매 지부 순위':'를 가장 많이 판매한 지부 순위'} · ${escapeHtml(_mLabel)} · 롤 판매 수 기준</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
   rows.forEach((r,i)=>{ h+=`<tr><td ${tdl} style="color:var(--ink3);width:38px">${i+1}</td><td ${tdl}>${escapeHtml(r.j)}</td><td ${tdt}>${roll(r.q)}</td><td ${td}>${kw(r.a)}</td><td ${td}>${(r.q/totQ*100).toFixed(1)}%</td></tr>`; });
   h+=`<tr style="background:var(--bg2)"><td ${tdl}></td><td ${tdl}><b>합계</b></td><td ${tdt}><b>${roll(totQ)}</b></td><td ${td}><b>${kw(totA)}</b></td><td ${td}><b>100%</b></td></tr></table></div>`;
   return h;
@@ -5581,7 +5584,7 @@ function renderWarranty(){
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
 // ════════════════ 매출(ERP) 분석 ════════════════
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
-let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _scFrom='', _scTo='', _scAll=false;   // _salesSel: 선택 월 배열(빈 배열=누적)
+let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _scFrom='', _scTo='', _scAll=false;   // _salesSel: 선택 월 배열(빈 배열=누적)
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -5967,6 +5970,8 @@ document.getElementById('rRevenue').addEventListener('click', e=>{
   if(segB){ const mm=parseInt(segB.dataset.m,10)||0; if(mm===0){ _salesSel=[]; } else { const i=_salesSel.indexOf(mm); if(i>=0)_salesSel.splice(i,1); else _salesSel.push(mm); } renderRevenue(); return; }
   const jspB=t.closest&&t.closest('#jspSeg button[data-cat]');
   if(jspB){ _jspSel=jspB.dataset.cat; renderRevenue(); return; }
+  const jspmB=t.closest&&t.closest('#jspMonthSeg button[data-m]');
+  if(jspmB){ const mm=parseInt(jspmB.dataset.m,10)||0; if(mm===0){ _jspMonths=[]; } else { const i=_jspMonths.indexOf(mm); if(i>=0)_jspMonths.splice(i,1); else _jspMonths.push(mm); } renderRevenue(); return; }
   if(t.closest&&t.closest('#scApply')){ const f=document.getElementById('scFrom'),to=document.getElementById('scTo'); _scFrom=f?f.value:''; _scTo=to?to.value:''; if(_scFrom&&_scTo&&_scTo<_scFrom){const x=_scFrom;_scFrom=_scTo;_scTo=x;} renderRevenue(); return; }
   if(t.closest&&t.closest('#scReset')){ _scFrom=''; _scTo=''; renderRevenue(); return; }
   if(t.closest&&t.closest('#scMore')){ _scAll=!_scAll; renderRevenue(); return; }
