@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 채널도넛_금액';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 매출카드_제목변경';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5761,11 +5761,11 @@ function renderRevenue(){
   const _shS=_crp>0? (_rollCarsPick('B2C')+_rollCarsPick('B2B'))/_crp*100 : null;
   let charts=`<div class="sales-charts" style="margin-bottom:13px">`
     + chartCard('cRevTrend','월별 매출 추이','채널별 매출(원)')
-    + chartCard('cChannel','채널 구성 · '+lab,'매출 비중')
-    + chartCard('cProdTop','제품 TOP · '+lab,'롤 중분류별 판매수량')
-    + chartCard('cShareWarr','신차 장착률 · 보증서(실측)',lab+' · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 신차 실시공 ÷ 신차 등록 · 막대=계산식</span>')
-    + chartCard('cShareDealer','출고 추정 · 대리점',lab+' · <b style="color:#f4911c">'+_shFmt(_shD)+'</b> <span style="color:var(--ink3)">· 대리점 롤×시공대수 ÷ 신차 등록</span>')
-    + chartCard('cShareSales','출고 추정 · ERP 판매',lab+' · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· ERP 롤×시공대수 ÷ 신차 등록</span>')
+    + chartCard('cChannel','매출 구성 · '+lab,'매출 비중')
+    + chartCard('cProdTop','판매 롤 TOP · '+lab,'롤 중분류별 판매수량')
+    + chartCard('cShareWarr','시장 점유율 (보증서 기준)',lab+' · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 신차 실시공 ÷ 신차 등록 · 막대=계산식</span>')
+    + chartCard('cShareDealer','시장 점유율 (대리점 판매 기준)',lab+' · <b style="color:#f4911c">'+_shFmt(_shD)+'</b> <span style="color:var(--ink3)">· 대리점 롤×시공대수 ÷ 신차 등록</span>')
+    + chartCard('cShareSales','시장 점유율 (ERP 판매 기준)',lab+' · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· ERP 롤×시공대수 ÷ 신차 등록</span>')
     + `</div>`;
 
   let s1=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>구성비</th></tr>`;
@@ -5985,7 +5985,7 @@ function salesKPI(){
     + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도 · 별도채널 포함', spEnt)
     + kpi('B2C+B2B 합계', eok(bbT)+'억', entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'', spBB)
     + kpi('롤 판매수량', won(rollQ)+' 롤', '제외 항목 미포함', spRoll)
-    + kpi('신차 장착률(보증서)', share, crT?`신차 시공 ${won(wT)} ÷ 신차 등록 ${won(crT)}`:'설정에서 신차 등록 입력', spShare)
+    + kpi('시장 점유율 (보증서 기준)', share, crT?`신차 시공 ${won(wT)} ÷ 신차 등록 ${won(crT)}`:'설정에서 신차 등록 입력', spShare)
     + `</div>`;
 }
 function salesCompareCard(){
