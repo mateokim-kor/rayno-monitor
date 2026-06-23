@@ -1493,7 +1493,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 대표글_기간밖_해제';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 프로모션_카드기본';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4551,7 +4551,7 @@ let workspace='cafe', rview='dash', raynoUnlocked=false, warrCfgOpen=false;
 let PROMO={version:1,items:[]}, promoLoaded=false, _promoWired=false, _promoEdit=null;
 let _promoFilter={comp:'',channel:'',status:''};
 const PROMO_CHANNELS=['홈페이지','이벤트페이지','인스타그램','네이버 블로그·카페','유튜브','기타'];
-let _promoView='calendar';
+let _promoView='card';   // 경쟁사 프로모션 진입 시 카드 보기를 기본으로
 let _promoCalYM=null;
 const _promoMemoExpand=new Set();
 function promoMemoBlock(it){
