@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 지역팝업_연동';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 지역팝업_스크롤off';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5727,7 +5727,7 @@ function _showRegionPop(path, e){
   const px=Math.min((e?e.clientX:160)+14, innerWidth-300), py=Math.min((e?e.clientY:160)+8, innerHeight-170);
   pop.style.left=Math.max(8,px)+'px'; pop.style.top=Math.max(8,py)+'px';
   let wsRow=null; try{ wsRow=document.querySelector('[data-wsregion="'+(window.CSS&&CSS.escape?CSS.escape(k):k)+'"]'); }catch(_){ }
-  if(wsRow){ document.querySelectorAll('[data-wsregion]').forEach(r=>{r.style.outline='';}); wsRow.style.outline='2px solid var(--amber)'; wsRow.style.outlineOffset='-2px'; try{ wsRow.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){ } setTimeout(()=>{ if(wsRow) wsRow.style.outline=''; }, 2800); }
+  if(wsRow){ document.querySelectorAll('[data-wsregion]').forEach(r=>{r.style.outline='';}); wsRow.style.outline='2px solid var(--amber)'; wsRow.style.outlineOffset='-2px'; setTimeout(()=>{ if(wsRow) wsRow.style.outline=''; }, 2800); }
 }
 function salesRegionMap(){
   const st=salesRegionStats();
