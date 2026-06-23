@@ -1493,7 +1493,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 다크모드_완성도';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 대표글_기간밖_해제';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3140,9 +3140,13 @@ function repSection(which,cur){
 let pickState={which:null, sel:[]};
 function pickerHTML(which){
   const sent=which==='pos'?'긍정':'부정';
-  const cands=RP_ROWS.filter(r=>rsent(r)===sent).slice(0,80);
-  const rows=cands.map(r=>{const on=pickState.sel.includes(r.id); const t=escapeHtml(r.title||(r.body||'').slice(0,46));
-    return `<div class="pick-row ${on?'on':''}" data-id="${r.id}"><span class="pick-chk">${on?'✓':''}</span><span class="pick-meta">${escapeHtml(r.cafe)}${r.date?' · '+escapeHtml(r.date):''}</span><span class="pick-t">${t||'(제목 없음)'}</span></div>`;
+  const inPeriod=RP_ROWS.filter(r=>rsent(r)===sent).slice(0,80);
+  const have=new Set(inPeriod.map(r=>r.id));
+  const byId=new Map(RAW.rows.map(r=>[r.id,r]));
+  const extras=pickState.sel.filter(id=>!have.has(id)).map(id=>byId.get(id)).filter(Boolean);  // 기간 밖이라 후보에 없는 선택글도 포함 → 해제 가능
+  const cands=extras.concat(inPeriod);
+  const rows=cands.map(r=>{const on=pickState.sel.includes(r.id); const outP=!have.has(r.id); const t=escapeHtml(r.title||(r.body||'').slice(0,46));
+    return `<div class="pick-row ${on?'on':''}" data-id="${r.id}"><span class="pick-chk">${on?'✓':''}</span><span class="pick-meta">${escapeHtml(r.cafe)}${r.date?' · '+escapeHtml(r.date):''}${outP?' · <span style="color:var(--ink3)">기간 밖</span>':''}</span><span class="pick-t">${t||'(제목 없음)'}</span></div>`;
   }).join('')||'<div class="empty">선택할 게시물이 없습니다.</div>';
   return `<div class="pick-head">대표 게시물 선택 (최대 3개) <b class="pick-cnt">${pickState.sel.length}/3</b><span style="flex:1"></span>
       <button class="viewbtn pick-save" data-which="${which}">저장</button>
