@@ -1493,7 +1493,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 죽은코드정리';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 다크모드_완성도';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4109,7 +4109,7 @@ function vCard(r){
       ${r.date?`<span class="tagm date">${escapeHtml(r.date)}</span>`:''}
       <span class="tagm kind ${r.isPost?'':'c'}">${kind}</span>
       <span class="vc-ai">${ai}</span>
-      ${r.vsrc==='auto'?`<span class="vc-auto" style="background:${(r.vconf||0)>=75?'#e8f5e9':(r.vconf||0)>=55?'#fff8e1':'#ffebee'};color:${(r.vconf||0)>=75?'var(--pos)':(r.vconf||0)>=55?'#b58100':'var(--neg)'};border:1px solid currentColor;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;margin-left:4px">🤖 자동${r.vconf!=null?` · ${r.vconf}%`:''}</span>`:''}
+      ${r.vsrc==='auto'?`<span class="vc-auto" style="background:${(r.vconf||0)>=75?'rgba(31,158,99,.15)':(r.vconf||0)>=55?'rgba(244,145,28,.16)':'rgba(224,56,43,.14)'};color:${(r.vconf||0)>=75?'var(--pos)':(r.vconf||0)>=55?'var(--amber)':'var(--neg)'};border:1px solid currentColor;border-radius:6px;padding:1px 7px;font-size:11px;font-weight:800;margin-left:4px">🤖 자동${r.vconf!=null?` · ${r.vconf}%`:''}</span>`:''}
       ${linkBtn}
     </div>
     ${titleBlock}${parentBlock}
@@ -6201,7 +6201,7 @@ function salesJibuRollTable(monthsArg){
   const b2cTot=M.reduce((s,m)=>s+(C.B2C.ma[m]||0),0), sumM=o=>M.reduce((s,m)=>s+(o[m]||0),0);
   const shrT=a=> b2cTot>0? (a/b2cTot*100).toFixed(2)+'%':'—';
   const tT='style="background:rgba(244,145,28,.10);font-weight:800"', tTL='style="background:rgba(244,145,28,.10);font-weight:800;border-right:2px solid var(--line2)"', brl='style="border-right:2px solid var(--line2)"';
-  const tH='style="background:rgba(244,145,28,.10);font-weight:800;color:#000"', tHL='style="background:rgba(244,145,28,.10);font-weight:800;color:#000;border-right:2px solid var(--line2)"';
+  const tH='style="background:rgba(244,145,28,.10);font-weight:800;color:var(--ink)"', tHL='style="background:rgba(244,145,28,.10);font-weight:800;color:var(--ink);border-right:2px solid var(--line2)"';
   let h=`<div class="iv-wrap"><table class="iv iv-sticky"><tr><th ${thl}>구분</th><th ${th} ${tH}>합계 롤수</th><th ${th} ${tH}>합계 매출액</th><th ${th} ${tHL}>합계 점유율</th>${M.map(m=>`<th ${th}>${m}월 롤수</th><th ${th}>${m}월 매출액</th><th ${th}>${m}월 점유율</th>`).join('')}</tr>`;
   rows.forEach(r=>{ const rq=sumM(r.q), ra=sumM(r.a); h+=`<tr><td ${tdl}>${r.j==='본사'?'<b>본사</b>':r.j}</td><td ${tT}>${roll(rq)}</td><td ${tT}>${won(ra)}</td><td ${tTL}>${shrT(ra)}</td>${M.map(m=>`<td>${roll(r.q[m])}</td><td>${won(r.a[m])}</td><td>${shr(r.a[m],m)}</td>`).join('')}</tr>`; });
   { const ea=sumM(etcA); h+=`<tr><td ${tdl}>기타 자재</td><td ${tT}>0</td><td ${tT}>${won(ea)}</td><td ${tTL}>${shrT(ea)}</td>${M.map(m=>`<td>0</td><td>${won(etcA[m])}</td><td>${shr(etcA[m],m)}</td>`).join('')}</tr>`; }
@@ -7018,7 +7018,11 @@ function toggleTheme(){
   const nx = (document.documentElement.getAttribute('data-theme')==='dark') ? 'light' : 'dark';
   try{ localStorage.setItem('rayno_theme', nx); }catch(e){}
   _applyThemeAttr(nx);
-  if(typeof render==='function'){ try{ render(); }catch(e){} }   // 차트 색 다시 그림
+  // 현재 보고 있는 화면을 다시 그려 캔버스 차트 색까지 테마에 맞춤
+  try{
+    if(typeof workspace!=='undefined' && workspace==='rayno' && typeof setRView==='function' && typeof rview!=='undefined' && rview){ setRView(rview); }
+    else if(typeof render==='function'){ render(); }
+  }catch(e){}
 }
 (function(){
   let t='light'; try{ t = localStorage.getItem('rayno_theme') || 'light'; }catch(e){}
