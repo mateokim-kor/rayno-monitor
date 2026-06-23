@@ -1492,7 +1492,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 상단탭_원복';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 대리점_담당지부';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5063,15 +5063,15 @@ function renderGlass(){
   } else {
     const gkey=r=> scope==='dealer'?(String(r[dealerCol]||'').trim()||'미지정'):(String(r['담당지부']||'').trim()||'미지정');
     const majOf=r=>{ const m=catOf(r).major; return ['얼티넘','팬텀','스트라','크로마'].includes(m)?m:'기타'; };
-    const byG={}; recs.forEach(r=>{ const g=gkey(r); const o=byG[g]||(byG[g]={tot:0,'얼티넘':0,'팬텀':0,'스트라':0,'크로마':0,'기타':0}); o.tot++; o[majOf(r)]++; });
+    const byG={}; recs.forEach(r=>{ const g=gkey(r); const o=byG[g]||(byG[g]={tot:0,'얼티넘':0,'팬텀':0,'스트라':0,'크로마':0,'기타':0,jibu:''}); o.tot++; o[majOf(r)]++; if(!o.jibu){const j=String(r['담당지부']||'').trim(); if(j)o.jibu=j;} });
     const groups=Object.entries(byG).sort((x,y)=>y[1].tot-x[1].tot); const top=(scope==='dealer'&&!_glDealerAll)?groups.slice(0,30):groups;
     const MC=['얼티넘','팬텀','스트라','크로마','기타'];
     const warrByG={}; if(typeof WARR!=='undefined'&&WARR&&WARR.rows){ const _wk=r=> scope==='dealer'?String(r['매장명']||'').trim():String(r['담당지부']||'').trim(); WARR.rows.forEach(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(GV.scope==='range'){ if(GV.from&&d<GV.from)return; if(GV.to&&d>GV.to)return; } if(!_glEligibleFront(r)) return; const k=_wk(r); if(k) warrByG[k]=(warrByG[k]||0)+1; }); }
-    tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>${scope==='dealer'?'대리점별':'지부별'} 글라스케어 가입수</h3><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:660px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th><th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>대상보증서</th><th ${th}>가입율</th>${MC.map(c=>`<th ${th}>${c}</th>`).join('')}</tr>`;
-    top.forEach(([g,o])=>{ tbl+=`<tr><td ${tdl}>${escapeHtml(g)}</td><td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${warrByG[g]?warrByG[g].toLocaleString():'·'}</td><td ${td}>${warrByG[g]?(o.tot/warrByG[g]*100).toFixed(1)+'%':'—'}</td>${MC.map(c=>`<td ${td}>${o[c]?o[c].toLocaleString():'·'}</td>`).join('')}</tr>`; });
+    tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>${scope==='dealer'?'대리점별':'지부별'} 글라스케어 가입수</h3><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:${scope==='dealer'?760:660}px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${scope==='dealer'?`<th ${thl}>담당 지부</th>`:''}<th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>대상보증서</th><th ${th}>가입율</th>${MC.map(c=>`<th ${th}>${c}</th>`).join('')}</tr>`;
+    top.forEach(([g,o])=>{ tbl+=`<tr><td ${tdl}>${escapeHtml(g)}</td>${scope==='dealer'?`<td ${tdl} style="color:var(--ink2);font-size:12px">${escapeHtml(o.jibu||'·')}</td>`:''}<td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${warrByG[g]?warrByG[g].toLocaleString():'·'}</td><td ${td}>${warrByG[g]?(o.tot/warrByG[g]*100).toFixed(1)+'%':'—'}</td>${MC.map(c=>`<td ${td}>${o[c]?o[c].toLocaleString():'·'}</td>`).join('')}</tr>`; });
     const sumc=k=>top.reduce((s,[,o])=>s+o[k],0);
     const sumWarr=top.reduce((s,[g])=>s+(warrByG[g]||0),0);
-    tbl+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}>${sumc('tot').toLocaleString()}</td><td ${td}><b>${sumWarr.toLocaleString()}</b></td><td ${td}><b>${sumWarr?(sumc('tot')/sumWarr*100).toFixed(1)+'%':'—'}</b></td>${MC.map(c=>`<td ${td}><b>${sumc(c).toLocaleString()}</b></td>`).join('')}</tr></table></div><div class="cap" style="margin-top:7px">가입율 = 글라스 가입 ÷ <b>대상 보증서</b> · 대상 = 전면 시공이 얼티넘·팬텀 F95/F85·스트라·크로마9인 보증서</div>`;
+    tbl+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td>${scope==='dealer'?`<td ${tdl}></td>`:''}<td ${tdt}>${sumc('tot').toLocaleString()}</td><td ${td}><b>${sumWarr.toLocaleString()}</b></td><td ${td}><b>${sumWarr?(sumc('tot')/sumWarr*100).toFixed(1)+'%':'—'}</b></td>${MC.map(c=>`<td ${td}><b>${sumc(c).toLocaleString()}</b></td>`).join('')}</tr></table></div><div class="cap" style="margin-top:7px">가입율 = 글라스 가입 ÷ <b>대상 보증서</b> · 대상 = 전면 시공이 얼티넘·팬텀 F95/F85·스트라·크로마9인 보증서</div>`;
     if(scope==='dealer'&&groups.length>30) tbl+=`<div style="margin-top:9px;text-align:center"><button class="acc-btn" id="glMore" style="padding:6px 16px">${_glDealerAll?'접기 ▲':`더보기 · 전체 ${groups.length}곳 ▼`}</button></div>`;
     tbl+=`</div>`;
   }
