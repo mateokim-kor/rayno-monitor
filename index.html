@@ -739,15 +739,15 @@
   footer{margin-top:40px;text-align:center;font-size:11px;color:var(--ink3);line-height:1.8}
 
   /* ── 내비게이션 + 누적 툴바 ── */
-  .nav{display:none;margin:0 0 18px;align-items:center;gap:3px;flex-wrap:wrap;background:transparent;border:none;border-bottom:1px solid var(--line);border-radius:0;padding:0}
-  .nav-btn{display:inline-flex;align-items:center;gap:7px;border:none;background:transparent;color:var(--ink2);font-family:var(--font);font-size:13.5px;font-weight:600;padding:11px 15px;border-radius:7px 7px 0 0;cursor:pointer;transition:.15s;border-bottom:2px solid transparent;margin-bottom:-1px}
+  .nav{display:none;margin:0 0 18px;align-items:center;gap:3px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;background:transparent;border:none;border-bottom:1px solid var(--line);border-radius:0;padding:0;scrollbar-width:thin}
+  .nav-btn{display:inline-flex;align-items:center;gap:7px;border:none;background:transparent;color:var(--ink2);font-family:var(--font);font-size:13.5px;font-weight:600;padding:11px 15px;border-radius:7px 7px 0 0;cursor:pointer;transition:.15s;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;flex:none}
   .nav-btn:hover{color:var(--ink);background:var(--bg2)}
   .nav-btn.on{color:var(--ink);font-weight:700;border-bottom-color:var(--amber);background:transparent}
   .nav-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:20px;
              background:var(--neg);color:#fff;font-size:11px;font-weight:800;font-variant-numeric:tabular-nums}
   /* badge keeps red/green */
   .nav-badge.zero{background:var(--pos)}
-  .nav-tools{margin-left:auto;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .nav-tools{margin-left:auto;display:flex;align-items:center;gap:9px;flex-wrap:nowrap;flex:none}
   .acc-stat{font-size:12px;color:var(--ink3);line-height:1.5}
   .acc-stat b{color:var(--ink);font-weight:700}
   .acc-stat .ok{color:var(--amber)}
@@ -1492,7 +1492,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-22 · 날짜필터_압축정리';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 상단탭_한줄';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
