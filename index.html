@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 지역지도_히트원';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 보증서_대리점지부';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5435,7 +5435,7 @@ function lineWarrCard(recs){
     const _sub=_filmCat(repCode).sub; subCnt[_sub]=(subCnt[_sub]||0)+1;
     if(_lwSub.length && _lwSub.indexOf(_sub)<0) return;
     const g = scope==='dealer' ? (String(r['매장명']||r['대리점코드']||'').trim()||'미지정') : (String(r['담당지부']||'').trim()||'미지정');
-    const row=byG[g]||(byG[g]={tot:0}); row.tot++;
+    const row=byG[g]||(byG[g]={tot:0,jibu:''}); row.tot++; if(scope==='dealer'&&!row.jibu){ const _jb=String(r['담당지부']||'').trim(); if(_jb) row.jibu=_jb; }
   });
   const Llabel = L==='ALL'?'전체':(_LINE_CODE[L]||L);
   const lineBtns=`<button data-l="ALL" class="${L==='ALL'?'on':''}">전체 <span style="opacity:.55">${lineAllTot.toLocaleString()}</span></button>`+['UL','ST','PH','CH'].map(k=>`<button data-l="${k}" class="${L===k?'on':''}">${_LINE_CODE[k]} <span style="opacity:.55">${(lineTot[k]||0).toLocaleString()}</span></button>`).join('');
@@ -5453,9 +5453,9 @@ function lineWarrCard(recs){
   const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
-  h+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:300px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th><th ${th}>발급수</th></tr>`;
-  top.forEach(([g,o])=>{ h+=`<tr><td ${tdl}>${escapeHtml(g)}</td><td ${tdt}>${o.tot.toLocaleString()}</td></tr>`; });
-  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}><b>${top.reduce((s,[,o])=>s+o.tot,0).toLocaleString()}</b></td></tr>`;
+  h+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:300px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${scope==='dealer'?`<th ${thl}>담당 지부</th>`:''}<th ${th}>발급수</th></tr>`;
+  top.forEach(([g,o])=>{ h+=`<tr><td ${tdl}>${escapeHtml(g)}</td>${scope==='dealer'?`<td ${tdl}><span style="color:var(--ink2);font-size:12px">${escapeHtml(o.jibu||'-')}</span></td>`:''}<td ${tdt}>${o.tot.toLocaleString()}</td></tr>`; });
+  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td>${scope==='dealer'?`<td ${tdl}></td>`:''}<td ${tdt}><b>${top.reduce((s,[,o])=>s+o.tot,0).toLocaleString()}</b></td></tr>`;
   h+=`</table></div>`;
   if(scope==='dealer'&&groups.length>30) h+=`<div class="cap" style="margin-top:6px">상위 30개 대리점만 표시 (전체 ${groups.length}곳)</div>`;
   return h;
