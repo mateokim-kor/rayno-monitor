@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 지부순위_전체옵션';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 기본값_전체';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5334,7 +5334,7 @@ function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(
 // 품질보증서 뷰 상태: 집계 단위 + 기간 + 지부 필터
 const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, tab:'overview', preset:'all', _min:'', _max:'' };
 const LWV={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 지부/제품별 발급 카드 자체 기간 필터
-let _lwLine='UL', _lwScope='jibu', _lwSub=[];   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
+let _lwLine='ALL', _lwScope='jibu', _lwSub=[];   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
 let GLASS=null, glassLoaded=false, _glScope='jibu', _glDealerAll=false, _glJibuDrill='';   // 글라스케어 가입
 const GV={ from:'', to:'', scope:'all', preset:'all', prodSel:[], dateCol:'', _min:'', _max:'' };
 const DLR={ jibu:'전체', member:'all', status:'all', q:'' };   // 대리점 마스터 필터
@@ -5581,7 +5581,7 @@ function renderWarranty(){
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
 // ════════════════ 매출(ERP) 분석 ════════════════
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
-let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='스트라', _scFrom='', _scTo='', _scAll=false;   // _salesSel: 선택 월 배열(빈 배열=누적)
+let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _scFrom='', _scTo='', _scAll=false;   // _salesSel: 선택 월 배열(빈 배열=누적)
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
