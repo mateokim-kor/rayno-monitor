@@ -1493,7 +1493,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 업로드날짜_아이콘';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 죽은코드정리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4786,7 +4786,6 @@ function _miniTable(lc, vc, entries, total){
 }
 function _dateBar(prefix, st, minD, maxD){
   const range=st.scope==='range', fromD=range?(st.from||minD):minD, toD=range?(st.to||maxD):maxD;
-  const lbl=range?`${fromD} ~ ${toD}`:'전체';
   const pb=(v,l)=>`<button data-rp="${v}" class="${st.preset===v?'on':''}">${l}</button>`;
   let mo='';
   if(prefix!=='wv' && /^\d{4}-\d{2}/.test(minD) && /^\d{4}-\d{2}/.test(maxD)){
@@ -5354,7 +5353,6 @@ const _FILM_POS=['시공내역(전면)','시공내역(측면1열)','시공내역
 const _LINE_CODE={UL:'얼티넘',ST:'스트라',PH:'팬텀',CH:'크로마'};
 function _parseFilm(code){ if(code==null) return null; const p=String(code).trim().split('-'); if(p.length<3||(p[0]||'').toUpperCase()!=='AU') return null; const line=(p[1]||'').toUpperCase(); const m=/^(\d{2})(\d{2})/.exec(p[2]||''); return {line, vlt:m?parseInt(m[1],10):null}; }
 function _rowLines(r){ const out={}; for(const c of _FILM_POS){ const f=_parseFilm(r[c]); if(f&&_LINE_CODE[f.line]){ if(!(f.line in out)) out[f.line]=f.vlt; } } return out; }  // {UL:30, ST:30} (앞 시공면 우선 = 전면 우선)
-function _rowLineCode(r,L){ for(const c of _FILM_POS){ const f=_parseFilm(r[c]); if(f&&f.line===L) return r[c]; } return null; }  // 라인 L의 첫 시공면 제품코드(전면 우선)
 function _filmLabel(code){ const f=_parseFilm(code); if(!f||!_LINE_CODE[f.line]) return String(code||'기타').trim()||'기타'; return _LINE_CODE[f.line]+(f.vlt!=null?' '+f.vlt:''); }  // 'AU-UL-3097-XP' → '얼티넘 30'
 const FILM_MAJOR={UL:'얼티넘', PH:'팬텀', ST:'스트라', CH:'크로마'};
 function _filmCat(code){  // 코드 → {major 대분류, sub 중분류}
@@ -5383,22 +5381,19 @@ function lineWarrCard(recs){
   const _bd=_baseAll.map(r=>String(warrDateStr(r)||'').slice(0,10)).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
   const lwMin=_bd[0]||'', lwMax=_bd[_bd.length-1]||''; LWV._min=lwMin; LWV._max=lwMax;
   const base=(LWV.scope==='range'&&(LWV.from||LWV.to))?_baseAll.filter(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(LWV.from&&d<LWV.from)return false; if(LWV.to&&d>LWV.to)return false; return true; }):_baseAll;
-  const byG={}; const vltSet=new Set(); const lineTot={UL:0,ST:0,PH:0,CH:0}; const subCnt={};
+  const byG={}; const lineTot={UL:0,ST:0,PH:0,CH:0}; const subCnt={};
   let lineAllTot=0;
   base.forEach(r=>{
     const lines=_rowLines(r); Object.keys(lines).forEach(k=>{ if(k in lineTot) lineTot[k]++; });
     if(Object.keys(lines).some(k=>k in lineTot)) lineAllTot++;
-    let repCode=null, repVlt=null;
-    for(const c of _FILM_POS){ const f=_parseFilm(r[c]); if(!f||!_LINE_CODE[f.line]) continue; if(L!=='ALL' && f.line!==L) continue; repCode=r[c]; repVlt=f.vlt; break; }
+    let repCode=null;
+    for(const c of _FILM_POS){ const f=_parseFilm(r[c]); if(!f||!_LINE_CODE[f.line]) continue; if(L!=='ALL' && f.line!==L) continue; repCode=r[c]; break; }
     if(repCode==null) return;
     const _sub=_filmCat(repCode).sub; subCnt[_sub]=(subCnt[_sub]||0)+1;
     if(_lwSub.length && _lwSub.indexOf(_sub)<0) return;
     const g = scope==='dealer' ? (String(r['매장명']||r['대리점코드']||'').trim()||'미지정') : (String(r['담당지부']||'').trim()||'미지정');
-    const vk=(repVlt==null?'기타':String(repVlt));
-    vltSet.add(vk);
-    const row=byG[g]||(byG[g]={tot:0,vlt:{}}); row.tot++; row.vlt[vk]=(row.vlt[vk]||0)+1;
+    const row=byG[g]||(byG[g]={tot:0}); row.tot++;
   });
-  const vlts=[...vltSet].sort((a,b)=>{ if(a==='기타')return 1; if(b==='기타')return -1; return (+b)-(+a); });
   const Llabel = L==='ALL'?'전체':(_LINE_CODE[L]||L);
   const lineBtns=`<button data-l="ALL" class="${L==='ALL'?'on':''}">전체 <span style="opacity:.55">${lineAllTot.toLocaleString()}</span></button>`+['UL','ST','PH','CH'].map(k=>`<button data-l="${k}" class="${L===k?'on':''}">${_LINE_CODE[k]} <span style="opacity:.55">${(lineTot[k]||0).toLocaleString()}</span></button>`).join('');
   const scopeBtns=`<button data-sc="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-sc="dealer" class="${scope==='dealer'?'on':''}">대리점별</button>`;
@@ -5417,7 +5412,6 @@ function lineWarrCard(recs){
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
   h+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:300px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th><th ${th}>발급수</th></tr>`;
   top.forEach(([g,o])=>{ h+=`<tr><td ${tdl}>${escapeHtml(g)}</td><td ${tdt}>${o.tot.toLocaleString()}</td></tr>`; });
-  const colTot={}; vlts.forEach(v=>colTot[v]=0); top.forEach(([,o])=>vlts.forEach(v=>colTot[v]+=(o.vlt[v]||0)));
   h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}><b>${top.reduce((s,[,o])=>s+o.tot,0).toLocaleString()}</b></td></tr>`;
   h+=`</table></div>`;
   if(scope==='dealer'&&groups.length>30) h+=`<div class="cap" style="margin-top:6px">상위 30개 대리점만 표시 (전체 ${groups.length}곳)</div>`;
@@ -5943,19 +5937,6 @@ function _scSum(o){ let s=0; for(let m=1;m<=12;m++) s+=_sNum((o&&o[m])||0); retu
 function _scTot(o){ let s=0; _salesMonths().forEach(m=>s+=_sNum((o&&o[m])||0)); return s; }
 function _scPick(o){ let s=0; _salesActive().forEach(m=>s+=_sNum((o&&o[m])||0)); return s; }
 
-function _spark(vals, color, opts){
-  const a=(vals||[]).map(x=>+x||0); if(a.length<2) return '';
-  opts=opts||{}; const lab=opts.label||'';
-  const fmt=opts.fmt||(v=>Math.abs(v)>=1e8?(v/1e8).toFixed(1)+'억':Math.abs(v)>=1e4?(v/1e4).toFixed(1)+'만':(Math.round(v*100)/100).toLocaleString());
-  const w=120,hh=26,pad=2, mn=Math.min(...a), mx=Math.max(...a), rng=(mx-mn)||1;
-  const X=i=>pad+i*(w-2*pad)/(a.length-1), Y=v=>hh-pad-((v-mn)/rng)*(hh-2*pad);
-  const pts=a.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ');
-  const c=color||'var(--amber)';
-  const lx=w-pad, ly=Y(a[a.length-1]), seg=(w-2*pad)/(a.length-1);
-  let hot=''; a.forEach((v,i)=>{ const mom=(i>0&&a[i-1])?((v-a[i-1])/Math.abs(a[i-1])*100):null;
-    hot+=`<rect class="spark-pt" x="${Math.max(0,X(i)-seg/2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${hh}" fill="transparent" data-l="${escapeHtml(lab)}" data-v="${escapeHtml(fmt(v))}" data-m="${mom==null?'':mom.toFixed(1)}"/>`; });
-  return `<svg viewBox="0 0 ${w} ${hh}" width="100%" height="22" preserveAspectRatio="none" style="margin-top:6px;display:block;overflow:visible"><polyline points="${pts}" fill="none" stroke="${c}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/><circle cx="${lx.toFixed(1)}" cy="${ly.toFixed(1)}" r="2.4" fill="${c}" vector-effect="non-scaling-stroke"/>${hot}</svg>`;
-}
 (function(){ let tip;
   function ensure(){ if(!tip){ tip=document.createElement('div'); tip.id='sparkTip';
     tip.style.cssText='position:fixed;z-index:9999;pointer-events:none;background:#16171a;color:#fff;font-size:11.5px;line-height:1.4;padding:6px 9px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.28);opacity:0;transition:opacity .08s;white-space:nowrap';
