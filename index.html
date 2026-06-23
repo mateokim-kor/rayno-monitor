@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 레이노_로딩개선';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 지부별제품순위';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4866,6 +4866,32 @@ function jibuRollByProductTable(monthsArg){
   h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}>${roll(gtot)}</td>${catList.map(c=>`<td ${td}><b>${roll(colT[c])}</b></td>`).join('')}</tr></table></div>`;
   return h;
 }
+function salesJibuProdRankTable(){
+  if(!SALES||!SALES.jibuProd) return '<div class="empty">매출(ERP) 데이터가 없습니다.</div>';
+  const M=_salesActive(), sm=o=>{let s=0;M.forEach(m=>s+=(o&&o[m])||0);return s;};
+  const CATL={MONO:'모노', PRESTO:'프레스토'};
+  const catOf=mat=>{ const c=(typeof _midOf==='function'?_midOf(mat):mat)||'기타'; return CATL[c]||c; };
+  const catTot={};
+  Object.values(SALES.jibuProd).forEach(pm=>{ Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const cat=catOf(mat); catTot[cat]=(catTot[cat]||0)+sm(pm[mat].q||pm[mat]); }); });
+  const catList=Object.keys(catTot).filter(c=>catTot[c]>0).sort((a,b)=>catTot[b]-catTot[a]);
+  if(!catList.length) return '<div class="empty">롤 판매 데이터가 없습니다.</div>';
+  let sel=_jspSel; if(catList.indexOf(sel)<0) sel=catList[0];
+  const seg=`<div class="seg" id="jspSeg" style="margin-bottom:10px;flex-wrap:wrap">${catList.map(c=>`<button data-cat="${escapeHtml(c)}" class="${c===sel?'on':''}">${escapeHtml(c)}</button>`).join('')}</div>`;
+  const JG=SALES_JIBU.concat(['본사']);
+  const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; let q=0,a=0; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; if(catOf(mat)!==sel)return; const oo=pm[mat]; q+=sm(oo.q||oo); a+=sm(oo.a||{}); }); return {j,q,a}; }).filter(r=>r.q>0).sort((x,y)=>y.q-x.q);
+  const totQ=rows.reduce((s,r)=>s+r.q,0)||1, totA=rows.reduce((s,r)=>s+r.a,0);
+  if(!rows.length) return seg+'<div class="empty">선택한 제품의 지부별 판매 데이터가 없습니다.</div>';
+  const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const th='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
+  const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
+  const roll=n=>n?Math.round(n).toLocaleString():'·', kw=n=>n?(n/1e8).toFixed(1)+'억':'·';
+  let h=seg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${escapeHtml(sel)}</b> 를 가장 많이 판매한 지부 순위 · ${escapeHtml(_salesLabel())} · 롤 판매 수 기준</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
+  rows.forEach((r,i)=>{ h+=`<tr><td ${tdl} style="color:var(--ink3);width:38px">${i+1}</td><td ${tdl}>${escapeHtml(r.j)}</td><td ${tdt}>${roll(r.q)}</td><td ${td}>${kw(r.a)}</td><td ${td}>${(r.q/totQ*100).toFixed(1)}%</td></tr>`; });
+  h+=`<tr style="background:var(--bg2)"><td ${tdl}></td><td ${tdl}><b>합계</b></td><td ${tdt}><b>${roll(totQ)}</b></td><td ${td}><b>${kw(totA)}</b></td><td ${td}><b>100%</b></td></tr></table></div>`;
+  return h;
+}
 const STATUS_RULES = { rise:5, warn:-5, alert:-10 };   // 전월 대비 증감률(%) 기준 — 여기서 수정
 function _statusOf(pct){
   if(pct==null||isNaN(pct)) return {label:'데이터 부족', cls:'st-na'};
@@ -5555,7 +5581,7 @@ function renderWarranty(){
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
 // ════════════════ 매출(ERP) 분석 ════════════════
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
-let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0;   // _salesSel: 선택 월 배열(빈 배열=누적)
+let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='스트라';   // _salesSel: 선택 월 배열(빈 배열=누적)
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -5827,6 +5853,7 @@ function renderRevenue(){
     + card(hh('📊 세일즈 데이터 · 월별 종합 (단위: 원, VAT 별도)')+salesSummaryTable())
     + card(hh('🎞 롤 판매 수 · 중분류별 (B2C / B2B)')+salesRollTable())
     + card(hh('🏢 지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
+    + card(hh('🏆 지부별 제품 판매 순위 · 롤')+salesJibuProdRankTable())
     + card(hh('📈 시장 점유율 · '+lab)+salesShareTable())
     + card(hh('🗺 지역별 시장 점유율 · '+lab)+salesRegionMap())
     + card(hh('🚗 신차 장착 점유율 · '+lab)+newCarShareCard())
@@ -5931,6 +5958,8 @@ document.getElementById('rRevenue').addEventListener('click', e=>{
   const t=e.target;
   const segB=t.closest&&t.closest('#salesMonthSeg button[data-m]');
   if(segB){ const mm=parseInt(segB.dataset.m,10)||0; if(mm===0){ _salesSel=[]; } else { const i=_salesSel.indexOf(mm); if(i>=0)_salesSel.splice(i,1); else _salesSel.push(mm); } renderRevenue(); return; }
+  const jspB=t.closest&&t.closest('#jspSeg button[data-cat]');
+  if(jspB){ _jspSel=jspB.dataset.cat; renderRevenue(); return; }
   if(t.classList&&t.classList.contains('sales-bulk')){ const mid=decodeURIComponent(t.dataset.mid), val=t.dataset.val;
     salesCfg().midType[mid]=val;                                  // 중분류 영구 규칙(업로드와 무관하게 적용)
     SALES.inputs.itemType=SALES.inputs.itemType||{};
