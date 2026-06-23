@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 용어통일_시장점유율';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 글라스드릴_팝업';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5111,7 +5111,7 @@ function renderGlass(){
     const MC=['얼티넘','팬텀','스트라','크로마','기타'];
     const warrByG={}; if(typeof WARR!=='undefined'&&WARR&&WARR.rows){ const _wk=r=> scope==='dealer'?String(r['매장명']||'').trim():String(r['담당지부']||'').trim(); WARR.rows.forEach(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(GV.scope==='range'){ if(GV.from&&d<GV.from)return; if(GV.to&&d>GV.to)return; } if(!_glEligibleFront(r)) return; const k=_wk(r); if(k) warrByG[k]=(warrByG[k]||0)+1; }); }
     tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>${scope==='dealer'?'대리점별':'지부별'} 글라스케어 가입수</h3><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:${scope==='dealer'?760:660}px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${scope==='dealer'?`<th ${thl}>담당 지부</th>`:''}<th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>대상보증서</th><th ${th}>가입율</th>${MC.map(c=>`<th ${th}>${c}</th>`).join('')}</tr>`;
-    top.forEach(([g,o])=>{ tbl+=`<tr${scope==='jibu'?` data-jdrill="${escapeHtml(g)}" style="cursor:pointer${g===_glJibuDrill?';background:rgba(244,145,28,.10)':''}" title="클릭하면 소속 대리점 상위 10곳"`:''}><td ${tdl}>${escapeHtml(g)}${scope==='jibu'?` <span style="color:var(--ink3);font-size:10px">${g===_glJibuDrill?'▼':'▸'}</span>`:''}</td>${scope==='dealer'?`<td ${tdl} style="color:var(--ink2);font-size:12px">${escapeHtml(o.jibu||'·')}</td>`:''}<td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${warrByG[g]?warrByG[g].toLocaleString():'·'}</td><td ${td}>${warrByG[g]?(o.tot/warrByG[g]*100).toFixed(1)+'%':'—'}</td>${MC.map(c=>`<td ${td}>${o[c]?o[c].toLocaleString():'·'}</td>`).join('')}</tr>`; });
+    top.forEach(([g,o])=>{ tbl+=`<tr${scope==='jibu'?` data-jdrill="${escapeHtml(g)}" style="cursor:pointer${g===_glJibuDrill?';background:rgba(244,145,28,.10)':''}" title="클릭하면 소속 대리점 상위 10곳"`:''}><td ${tdl}>${escapeHtml(g)}${scope==='jibu'?` <span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:6px;background:${g===_glJibuDrill?'var(--amber)':'rgba(244,145,28,.16)'};color:${g===_glJibuDrill?'#fff':'var(--amber)'};font-size:11px;font-weight:900;vertical-align:middle;margin-left:6px">${g===_glJibuDrill?'▾':'▸'}</span>`:''}</td>${scope==='dealer'?`<td ${tdl} style="color:var(--ink2);font-size:12px">${escapeHtml(o.jibu||'·')}</td>`:''}<td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${warrByG[g]?warrByG[g].toLocaleString():'·'}</td><td ${td}>${warrByG[g]?(o.tot/warrByG[g]*100).toFixed(1)+'%':'—'}</td>${MC.map(c=>`<td ${td}>${o[c]?o[c].toLocaleString():'·'}</td>`).join('')}</tr>`; });
     const sumc=k=>top.reduce((s,[,o])=>s+o[k],0);
     const sumWarr=top.reduce((s,[g])=>s+(warrByG[g]||0),0);
     tbl+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td>${scope==='dealer'?`<td ${tdl}></td>`:''}<td ${tdt}>${sumc('tot').toLocaleString()}</td><td ${td}><b>${sumWarr.toLocaleString()}</b></td><td ${td}><b>${sumWarr?(sumc('tot')/sumWarr*100).toFixed(1)+'%':'—'}</b></td>${MC.map(c=>`<td ${td}><b>${sumc(c).toLocaleString()}</b></td>`).join('')}</tr></table></div><div class="cap" style="margin-top:7px">가입율 = 글라스 가입 ÷ <b>대상 보증서</b> · 대상 = 전면 시공이 얼티넘·팬텀 F95/F85·스트라·크로마9인 보증서</div>`;
@@ -5122,7 +5122,8 @@ function renderGlass(){
       const dd={}; recs.forEach(r=>{ if(String(r['담당지부']||'').trim()!==jb) return; const dn=String(r[dealerCol]||'').trim()||'미지정'; (dd[dn]||(dd[dn]={tot:0})).tot++; });
       const arr=Object.entries(dd).sort((x,y)=>y[1].tot-x[1].tot).slice(0,10);
       const wD={}; if(typeof WARR!=='undefined'&&WARR&&WARR.rows){ WARR.rows.forEach(r=>{ if(String(r['담당지부']||'').trim()!==jb) return; const d=String(warrDateStr(r)||'').slice(0,10); if(GV.scope==='range'){ if(GV.from&&d<GV.from)return; if(GV.to&&d>GV.to)return; } if(!_glEligibleFront(r)) return; const dn=String(r['매장명']||'').trim(); if(dn) wD[dn]=(wD[dn]||0)+1; }); }
-      let dr=`<div class="card" id="glDrillCard" style="border:1px solid var(--amber);box-shadow:0 4px 18px rgba(244,145,28,.12)"><div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;gap:10px"><h3 style="margin:0"><span class="dot"></span>${escapeHtml(jb)} · 글라스케어 상위 대리점 ${arr.length}곳</h3><button class="acc-btn" id="glDrillClose" style="padding:4px 12px">닫기 ✕</button></div>`;
+      const _xy=(window._glDrillXY)||{x:innerWidth/2-200,y:140}; const _pw=Math.min(520,innerWidth-24); const _pl=Math.max(12,Math.min(_xy.x,innerWidth-_pw-12)); const _pt=Math.max(12,Math.min((_xy.y||140)+6,innerHeight-340));
+      let dr=`<div id="glDrillBg" style="position:fixed;inset:0;z-index:8999;background:rgba(0,0,0,.06)"></div><div class="card" id="glDrillCard" style="position:fixed;left:${_pl}px;top:${_pt}px;width:${_pw}px;max-height:${innerHeight-_pt-20}px;overflow:auto;z-index:9000;border:1px solid var(--amber);box-shadow:0 16px 44px rgba(0,0,0,.28)"><div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;gap:10px"><h3 style="margin:0"><span class="dot"></span>${escapeHtml(jb)} · 글라스케어 상위 대리점 ${arr.length}곳</h3><button class="acc-btn" id="glDrillClose" style="padding:4px 12px">닫기 ✕</button></div>`;
       if(!arr.length){ dr+=`<div class="empty">이 지부에 글라스케어 가입 대리점이 없습니다.</div></div>`; }
       else { dr+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:460px"><tr><th ${thl}>#</th><th ${thl}>대리점</th><th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>대상보증서</th><th ${th}>가입율</th></tr>`;
         arr.forEach(([dn,o],i)=>{ const w=wD[dn]; dr+=`<tr><td ${tdl} style="color:var(--ink3);width:34px">${i+1}</td><td ${tdl}>${escapeHtml(dn)}</td><td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${w?w.toLocaleString():'·'}</td><td ${td}>${w?(o.tot/w*100).toFixed(1)+'%':'—'}</td></tr>`; });
@@ -6887,8 +6888,9 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; _lwSub=[]; renderWarranty(); return; }
   const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
   const _gsb=e.target.closest('#glScope button'); if(_gsb){ _glScope=_gsb.dataset.s; _glDealerAll=false; _glJibuDrill=''; renderGlass(); return; }
-  const _jd=e.target.closest('[data-jdrill]'); if(_jd){ const v=_jd.dataset.jdrill; _glJibuDrill=(_glJibuDrill===v?'':v); renderGlass(); return; }
+  const _jd=e.target.closest('[data-jdrill]'); if(_jd){ const v=_jd.dataset.jdrill; try{ const _r=_jd.getBoundingClientRect(); window._glDrillXY={x:_r.left+Math.min(_r.width,240), y:_r.bottom}; }catch(_){ } _glJibuDrill=(_glJibuDrill===v?'':v); renderGlass(); return; }
   if(e.target.closest('#glDrillClose')){ _glJibuDrill=''; renderGlass(); return; }
+  if(e.target.id==='glDrillBg'){ _glJibuDrill=''; renderGlass(); return; }
   if(e.target.id==='glMore'){ _glDealerAll=!_glDealerAll; renderGlass(); return; }
   const _pf=e.target.closest('[data-pf]'); if(_pf){ const v=_pf.dataset.pf; if(v==='ALL'){ GV.prodSel=[]; } else { const s=new Set(GV.prodSel||[]); s.has(v)?s.delete(v):s.add(v); GV.prodSel=[...s]; } renderGlass(); return; }
   const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; renderDealer(); return; }
