@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 새로고침_페이지유지';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 레이노_로딩개선';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6551,6 +6551,8 @@ function applyRaynoAuth(){
 }
 function raynoLockOn(){ const c=STORE&&STORE.config&&STORE.config.raynoLock; return c? c.on!==false : true; }
 function raynoPass(){ const c=STORE&&STORE.config&&STORE.config.raynoLock; return (c&&c.pass)?String(c.pass):CONFIG.raynoPassword; }
+let _raynoDataP=null;
+function _loadRaynoData(){ if(!_raynoDataP) _raynoDataP=Promise.all([ensureBiz(),ensureWarr(),ensureSales(),ensureGlass()].map(x=>Promise.resolve(x).catch(()=>{}))); return _raynoDataP; }   // 4종 병렬 로드 + 프로미스 캐싱(중복 fetch 방지)
 async function openRayno(){
   const lock=document.getElementById('raynoLock'), nav=document.getElementById('raynoNav');
   if(!raynoLockOn()) raynoUnlocked=true;   // 잠금이 꺼져 있으면 누구나 통과
@@ -6561,7 +6563,12 @@ async function openRayno(){
     return;
   }
   lock.style.display='none'; nav.style.display='flex';
-  await ensureBiz(); await ensureWarr(); await ensureSales(); ensureGlass().then(()=>{ if(rview==='glass')renderGlass(); else if(rview==='dash')renderRDash(); updateUploadDates(); }); setRView(rview);
+  if(!(bizLoaded&&warrLoaded&&salesLoaded&&glassLoaded)){   // 아직 안 불러왔으면 로딩 표시
+    Object.values(RVIEW_BOX).forEach(id=>{const e=document.getElementById(id); if(e)e.style.display='none';});
+    const _b=document.getElementById(RVIEW_BOX[rview]||'rRevenue'); if(_b){ _b.style.display='block'; _b.innerHTML='<div style="padding:64px 16px;text-align:center;color:var(--ink3);font-size:13px">데이터 불러오는 중…</div>'; }
+  }
+  await _loadRaynoData();
+  setRView(rview);
 }
 async function setWorkspace(ws){
   workspace=ws;
@@ -6750,6 +6757,7 @@ document.getElementById('settingsApp').addEventListener('change', e=>{
 
 // 이벤트 바인딩
 document.getElementById('appSwitcher').addEventListener('click', e=>{ const b=e.target.closest('.appsw-btn'); if(b) setWorkspace(b.dataset.ws); });
+{ const _rb=document.querySelector('.appsw-btn[data-ws="rayno"]'); if(_rb){ const _pf=()=>{ try{ _loadRaynoData(); }catch(e){} }; _rb.addEventListener('mouseenter',_pf,{once:true,passive:true}); _rb.addEventListener('touchstart',_pf,{once:true,passive:true}); } }   // 레이노 탭에 마우스/터치 시 데이터 선로드
 document.getElementById('raynoNav').addEventListener('click', e=>{ const b=e.target.closest('.nav-btn'); if(b&&b.dataset.rview) setRView(b.dataset.rview); });
 document.getElementById('raynoLogoutBtn').addEventListener('click', logout);
 document.getElementById('raynoLoginBtn').addEventListener('click', showLock);
