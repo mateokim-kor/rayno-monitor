@@ -1031,7 +1031,7 @@
   <div class="nav" id="nav">
     <button class="nav-btn on" data-view="dash"><span data-txt="tabDash">대시보드</span></button>
     <button class="nav-btn" data-view="report"><span data-txt="tabReport">리포트</span></button>
-    <button class="nav-btn" data-view="promo"><span>경쟁사 프로모션</span> <span class="nav-badge" id="promoBadge" style="display:none">0</span></button>
+    <button class="nav-btn" data-view="promo"><span data-txt="tabPromo">경쟁사 프로모션</span> <span class="nav-badge" id="promoBadge" style="display:none">0</span></button>
     <button class="nav-btn admin-only" data-view="verify"><span data-txt="tabVerify">데이터 검증</span> <span class="nav-badge" id="verifyBadge">0</span></button>
     <button class="nav-btn admin-only" id="navCrawlBtn" type="button" title="자동 수집(크롤링) 열기"><span>자동 수집</span></button>
     <div class="nav-tools">
@@ -1255,11 +1255,11 @@
       </div>
     </div>
     <div class="nav" id="raynoNav">
-      <button class="nav-btn on" data-rview="dash"><span>대시보드</span></button>
+      <button class="nav-btn on" data-rview="dash"><span data-txt="tabRDash">대시보드</span></button>
       <button class="nav-btn" data-rview="revenue"><span data-txt="tabRevenue">매출 현황</span></button>
       <button class="nav-btn" data-rview="warranty"><span data-txt="tabWarranty">품질보증서 현황</span></button>
-      <button class="nav-btn" data-rview="glass"><span>글라스케어 현황</span></button>
-      <button class="nav-btn" data-rview="dealer"><span>대리점 현황</span></button>
+      <button class="nav-btn" data-rview="glass"><span data-txt="tabGlass">글라스케어 현황</span></button>
+      <button class="nav-btn" data-rview="dealer"><span data-txt="tabDealer">대리점 현황</span></button>
       <button class="nav-btn" data-rview="search"><span data-txt="tabSearch">브랜드 검색량</span></button>
       <button class="nav-btn" data-rview="warrReport"><span data-txt="tabWarrReport">보증서 리포트</span></button>
       <div class="nav-tools">
@@ -1397,8 +1397,8 @@ const CONFIG = {
     footer1:    '레이노 온라인 모니터링 · 검증(verified) 데이터 우선 대시보드',
     footer2:    '모든 분석은 브라우저 안에서만 처리되며 파일은 외부로 전송되지 않습니다.',
     tabCafe:'온라인 모니터링', tabRayno:'레이노 데이터', tabSettings:'설정',
-    tabDash:'대시보드', tabReport:'리포트', tabVerify:'데이터 검증',
-    tabWarranty:'품질보증서 현황', tabWarrReport:'보증서 리포트', tabSearch:'브랜드 검색량', tabRevenue:'매출 현황',
+    tabDash:'대시보드', tabReport:'리포트', tabPromo:'경쟁사 프로모션', tabVerify:'데이터 검증',
+    tabRDash:'대시보드', tabWarranty:'품질보증서 현황', tabWarrReport:'보증서 리포트', tabGlass:'글라스케어 현황', tabDealer:'대리점 현황', tabSearch:'브랜드 검색량', tabRevenue:'매출 현황',
     raynoLockTitle:'레이노 데이터', raynoLockSub:'접근하려면 비밀번호를 입력하세요.',
     emptyTitle:'아직 업로드된 데이터가 없습니다.', emptySub:'관리자가 엑셀을 업로드하면 이곳에 대시보드가 표시됩니다.',
     reportTitle:'📑 분석 리포트', reportSub:'누적 데이터 기반 · 감성은 검증값 우선(없으면 AI) 적용 · 기간을 바꾸면 리포트가 갱신됩니다',
@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 카드헤더_확대';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 설정_탭이름완비';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2779,8 +2779,8 @@ function normDate(s){
 // ════════════════════════════════════════════════════
 let setDraft=null;
 const TEXT_KEYS=['headerTitle','headerSub','docTitle','footer1','footer2',
-  'tabCafe','tabRayno','tabSettings','tabDash','tabReport','tabVerify',
-  'tabWarranty','tabWarrReport','tabSearch','tabRevenue',
+  'tabCafe','tabRayno','tabSettings','tabDash','tabReport','tabPromo','tabVerify',
+  'tabRDash','tabWarranty','tabWarrReport','tabGlass','tabDealer','tabSearch','tabRevenue',
   'raynoLockTitle','raynoLockSub','emptyTitle','emptySub','reportTitle','reportSub'];
 function setDraftInit(){
   setDraft={ ownBrand:effOwnBrand(), competitors:effCompetitors().slice(), postTypes:effPostTypes().slice(),
@@ -2850,14 +2850,18 @@ function renderSettings(){
      <div class="set-grid">
        ${txtField('tabDash','대시보드')}
        ${txtField('tabReport','리포트')}
+       ${txtField('tabPromo','경쟁사 프로모션')}
        ${txtField('tabVerify','데이터 검증')}
      </div>
      <div class="set-sub">레이노 데이터 탭</div>
      <div class="set-grid">
-       ${txtField('tabWarranty','품질보증서')}
-       ${txtField('tabWarrReport','보증서 리포트')}
-       ${txtField('tabSearch','검색량')}
+       ${txtField('tabRDash','대시보드')}
        ${txtField('tabRevenue','매출')}
+       ${txtField('tabWarranty','품질보증서')}
+       ${txtField('tabGlass','글라스케어')}
+       ${txtField('tabDealer','대리점')}
+       ${txtField('tabSearch','검색량')}
+       ${txtField('tabWarrReport','보증서 리포트')}
      </div>
    </div>
    <div class="card set-card" data-setcat="display">
@@ -5822,7 +5826,7 @@ function renderRevenue(){
   let s2=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>구분</th><th ${th}>판매수량</th><th ${th}>금액(원)</th></tr>`
     +`<tr><td ${tdl}><b>롤 품목</b></td><td ${td}><b>${roll(rollQ)}</b> 롤</td><td ${td}>${won(rollA)}</td></tr>`
     +`<tr><td ${tdl}>일반 물품</td><td ${td}>${roll(goodsQ)}</td><td ${td}>${won(goodsA)}</td></tr></table>`
-    +`<div style="font-size:11px;color:var(--ink2);margin-top:6px">품목(MatName) 단위 분류 · 아래 ⑤에서 변경</div>`;
+    +`<div style="font-size:11px;color:var(--ink2);margin-top:6px">품목(MatName) 단위 분류 · 설정 → 매출 설정에서 변경</div>`;
 
   let s3=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
   ['B2C','B2B'].forEach(g=>{ s3+=`<tr><td ${tdl}>${g}</td>${M.map(m=>`<td ${td}>${won(C[g].ma[m])}</td>`).join('')}<td ${td}><b>${won(_sTot(C[g].ma))}</b></td></tr>`; });
@@ -6249,7 +6253,7 @@ function salesRollTable(){
   let h=`<div class="iv-wrap"><table class="iv"><tr><th ${thl} colspan="2">구분</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}${showT?`<th ${th}>합계</th>`:''}</tr>`;
   h+=sec('B2C',b2c,'2.')+sec('B2B',b2b,'3.');
   h+=`<tr class="grand"><td class="l" colspan="2">4. B2C + B2B 합계</td>${M.map(m=>`<td>${roll(st1[m]+st2[m])}</td>`).join('')}${showT?`<td>${roll(_sTotDisp(st1)+_sTotDisp(st2))}</td>`:''}</tr>`;
-  h+=`</table></div><div style="font-size:11px;color:var(--ink2);margin-top:6px">필름 롤 수량만 집계(기타품목·일반·제외 항목 제외) · 롤/일반 분류는 ⑤에서 조정</div>`;
+  h+=`</table></div><div style="font-size:11px;color:var(--ink2);margin-top:6px">필름 롤 수량만 집계(기타품목·일반·제외 항목 제외) · 롤/일반 분류는 설정 → 매출 설정의 ‘품목 분류’에서 조정</div>`;
   return h;
 }
 
@@ -6349,7 +6353,7 @@ function salesSettingsSectionHTML(){
   const _midTable=_mids.length?`<div class="srt" style="overflow-x:auto;max-height:320px;overflow-y:auto;margin-top:6px"><table style="border-collapse:collapse"><tr><th ${thl}>중분류</th><th ${th}>규칙</th></tr>`+_mids.map(mid=>`<tr><td ${tdl}>${mid}</td><td style="padding:4px 10px;text-align:center">${_msel(mid)}</td></tr>`).join('')+`</table></div>`:`<div class="cap" style="margin-top:6px">매출 ERP 업로드 후 중분류 목록이 표시됩니다.</div>`;
   const _chips=_kw.length?_kw.map((k,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--bg2);border:1px solid var(--line);border-radius:980px;padding:3px 6px 3px 11px;margin:3px 3px 0 0;font-size:12px">${escapeHtml(k)}<button class="kw-del" data-i="${i}" style="border:none;background:var(--line);color:var(--ink);border-radius:50%;width:17px;height:17px;cursor:pointer;font-size:12px;line-height:1;padding:0">×</button></span>`).join(''):`<span class="cap">등록된 키워드 없음</span>`;
   const ruleCard=`<div class="card set-card"><h3><span class="dot"></span>🎯 롤 분류 규칙 <span style="font-weight:400;font-size:12px;color:var(--ink2)">· 영구 저장 · 매 업로드 자동 적용</span></h3>
-     <div class="cap">매번 품목을 제외할 필요 없이, <b>중분류 규칙</b>과 <b>제외 키워드</b>를 한 번만 설정하면 모든 업로드에 자동 적용됩니다. 개별 품목 예외는 매출 화면 ⑤에서 지정(규칙보다 우선).</div>
+     <div class="cap">매번 품목을 제외할 필요 없이, <b>중분류 규칙</b>과 <b>제외 키워드</b>를 한 번만 설정하면 모든 업로드에 자동 적용됩니다. 개별 품목 예외는 아래 ‘품목 분류’에서 지정(규칙보다 우선).</div>
      <div style="margin:10px 0 4px"><b style="font-size:13px">제외 키워드</b> <span class="cap">품목명에 포함되면 자동 제외 (예: 증정·샘플·스티커)</span></div>
      <div style="display:flex;gap:6px"><input id="kwInput" type="text" placeholder="키워드 입력 후 추가" style="flex:1;max-width:260px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px"><button id="kwAdd" class="acc-btn" style="padding:6px 14px">추가</button></div>
      <div>${_chips}</div>
@@ -6386,7 +6390,7 @@ function salesSettingsSectionHTML(){
    <div class="card set-card"><h3><span class="dot"></span>롤당 시공가능대수 (시장점유율 계산용)</h3>
      <div class="cap">롤 중분류별 한 롤이 시공 가능한 차량 대수. <b>기본 10대, 모노카본(TBTECH·MONO) 17대</b> — 비워두면 기본값 적용. 판매 기준 시장점유율 계산에 쓰입니다.</div>
      ${capHTML}</div>
-   <div class="card set-card"><h3><span class="dot"></span>⑤ 품목(MatName) 분류 · 롤 / 일반 / 제외</h3>${salesItemClassHTML()}</div>`;
+   <div class="card set-card"><h3><span class="dot"></span>품목(MatName) 분류 · 롤 / 일반 / 제외</h3>${salesItemClassHTML()}</div>`;
 }
 // 매출 설정 입력 자동 저장(위임)
 (function(){ const host=document.getElementById('setSalesHost'); if(!host) return;
