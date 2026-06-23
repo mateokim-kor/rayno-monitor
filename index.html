@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 지역지도_모드토글';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 보증서모드_점유율정렬';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5780,7 +5780,7 @@ function salesRegionMap(){
     const fillV=k=> anyCar ? (by[k]||0) : (warr[k]||0);
     const maxV=Math.max(0.0001,..._REGION_KEYS.map(k=>fillV(k)));
     const svg=_regionSVG(fillV, k=>{ const w=warr[k]||0, c=car[k]||0; return c>0?`${k} · 점유율 ${(by[k]||0).toFixed(2)}% (보증서 ${w.toLocaleString()} / 신차 ${c.toLocaleString()})`:`${k} · 보증서 ${w.toLocaleString()}건`; }, k=>`data-warr="1" data-num="${warr[k]||0}" data-car="${car[k]||0}" data-share="${(by[k]||0).toFixed(2)}"`);
-    const entries=_REGION_KEYS.map(k=>[k, warr[k]||0]).sort((a,b)=>b[1]-a[1]).filter(e=>e[1]>0);
+    const entries=_REGION_KEYS.filter(k=>(warr[k]||0)>0).sort((a,b)=>{ const sa=by[a], sb=by[b]; if(sa==null&&sb==null) return (warr[b]||0)-(warr[a]||0); if(sa==null) return 1; if(sb==null) return -1; return sb-sa; }).map(k=>[k, warr[k]||0]);
     const rowsH=entries.map(([k,w])=>{ const c=car[k]||0, sh=c>0?(w/c*100):null;
       return `<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);font-weight:600">${k}</td>`
         +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${w.toLocaleString()}건</td>`
