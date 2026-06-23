@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 매출카드_정리1';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 지역팝업_연동';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5706,12 +5706,28 @@ function salesRegionStats(){
   rows.forEach(r=>{ if(sel){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(sel.indexOf(mm)<0) return; } const k=_regionKey(r['대리점지역(도)']); if(!k) return; by[k]=(by[k]||0)+1; total++; });
   return {mode:'warr', by, total};
 }
-function _regionSVG(valOf, titleOf){
+function _regionSVG(valOf, titleOf, metaOf){
   const maxV=Math.max(0.0001,..._REGION_KEYS.map(k=>valOf(k)));
   const fillOf=v=>{ if(!v) return 'var(--bg2)'; const a=(0.18+0.74*(v/maxV)).toFixed(2); return `rgba(244,145,28,${a})`; };
   let svg=`<svg viewBox="${KOREA_MAP.viewBox}" style="width:100%;max-width:340px;height:auto;display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">`;
-  _REGION_KEYS.forEach(k=>{ svg+=`<path d="${KOREA_MAP.paths[k]}" style="fill:${fillOf(valOf(k))};stroke:var(--card);stroke-width:0.6;transition:fill .2s"><title>${titleOf(k)}</title></path>`; });
+  _REGION_KEYS.forEach(k=>{ svg+=`<path d="${KOREA_MAP.paths[k]}" data-region="${k}" ${metaOf?metaOf(k):''} style="fill:${fillOf(valOf(k))};stroke:var(--card);stroke-width:0.6;transition:fill .2s;cursor:pointer"><title>${titleOf(k)}</title></path>`; });
   return svg+`</svg><div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:var(--ink2);max-width:340px;margin-left:auto;margin-right:auto"><span>적음</span><span style="flex:1;height:8px;border-radius:5px;background:linear-gradient(90deg,var(--bg2),rgba(244,145,28,.92))"></span><span>많음</span></div>`;
+}
+function _showRegionPop(path, e){
+  const k=path.getAttribute('data-region')||'', roll=+path.getAttribute('data-roll')||0, car=+path.getAttribute('data-car')||0, cap=+path.getAttribute('data-cap')||0, share=path.getAttribute('data-share')||'0';
+  const inst=roll*cap;
+  let pop=document.getElementById('regionPop');
+  if(!pop){ pop=document.createElement('div'); pop.id='regionPop'; pop.style.cssText='position:fixed;z-index:99999;background:var(--card);color:var(--ink);border:1px solid var(--amber);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.28);padding:13px 15px;font-size:12.5px;max-width:290px;line-height:1.65'; (document.body||document.documentElement).appendChild(pop);
+    document.addEventListener('click', ev=>{ if(!pop||pop.style.display==='none') return; if(pop.contains(ev.target)) return; if(ev.target.closest && ev.target.closest('[data-region]')) return; pop.style.display='none'; }, true); }
+  pop.innerHTML=`<div style="font-weight:800;font-size:14px;margin-bottom:7px"><span style="color:var(--amber)">${escapeHtml(k)}</span> 점유율 <span style="color:var(--amber)">${share}%</span></div>`
+    + (car>0
+        ? `<div style="color:var(--ink2)">롤 판매 <b>${roll.toLocaleString()}</b>롤 × 롤당 <b>${cap}</b>대 = 장착 <b>${inst.toLocaleString()}</b>대<br>÷ 신차 등록 <b>${car.toLocaleString()}</b>대 × 100<br>= <b style="color:var(--amber)">${share}%</b></div>`
+        : `<div style="color:var(--ink3)">신차 등록 데이터가 없어 점유율을 계산할 수 없어요. ⚙ 설정 → 매출 설정 → 지역별 세일즈 입력에서 신차 등록을 채워주세요.</div>`);
+  pop.style.display='block';
+  const px=Math.min((e?e.clientX:160)+14, innerWidth-300), py=Math.min((e?e.clientY:160)+8, innerHeight-170);
+  pop.style.left=Math.max(8,px)+'px'; pop.style.top=Math.max(8,py)+'px';
+  let wsRow=null; try{ wsRow=document.querySelector('[data-wsregion="'+(window.CSS&&CSS.escape?CSS.escape(k):k)+'"]'); }catch(_){ }
+  if(wsRow){ document.querySelectorAll('[data-wsregion]').forEach(r=>{r.style.outline='';}); wsRow.style.outline='2px solid var(--amber)'; wsRow.style.outlineOffset='-2px'; try{ wsRow.scrollIntoView({behavior:'smooth',block:'center'}); }catch(_){ } setTimeout(()=>{ if(wsRow) wsRow.style.outline=''; }, 2800); }
 }
 function salesRegionMap(){
   const st=salesRegionStats();
@@ -5722,7 +5738,7 @@ function salesRegionMap(){
     const {by,roll,car,tRoll,tCar,cap}=st;
     if(tRoll<=0&&tCar<=0) return `<div class="empty">지역별 세일즈 데이터가 없습니다. ⚙ 설정 → 매출 설정 → <b>지역별 세일즈 입력</b>에서 입력하세요.</div>`;
     const maxSh=Math.max(0.0001,..._REGION_KEYS.map(k=>by[k]||0));
-    const svg=_regionSVG(k=>by[k]||0, k=>`${k} · 점유율 ${(by[k]||0).toFixed(2)}% (롤 ${(roll[k]||0).toLocaleString()} / 신차 ${(car[k]||0).toLocaleString()})`);
+    const svg=_regionSVG(k=>by[k]||0, k=>`${k} · 점유율 ${(by[k]||0).toFixed(2)}% (롤 ${(roll[k]||0).toLocaleString()} / 신차 ${(car[k]||0).toLocaleString()})`, k=>(roll[k]||car[k])?`data-roll="${roll[k]||0}" data-car="${car[k]||0}" data-cap="${cap}" data-share="${(by[k]||0).toFixed(2)}"`:'');
     const entries=_REGION_KEYS.map(k=>[k, by[k]||0]).sort((a,b)=>b[1]-a[1]).filter(e=>(roll[e[0]]||car[e[0]]));
     const rowsH=entries.map(([k,sh])=>`<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);font-weight:600">${k}</td>`
       +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${(roll[k]||0).toLocaleString()}</td>`
@@ -5955,6 +5971,8 @@ document.getElementById('rRevenue').addEventListener('click', e=>{
   if(t.closest&&t.closest('#scApply')){ const f=document.getElementById('scFrom'),to=document.getElementById('scTo'); _scFrom=f?f.value:''; _scTo=to?to.value:''; if(_scFrom&&_scTo&&_scTo<_scFrom){const x=_scFrom;_scFrom=_scTo;_scTo=x;} renderRevenue(); return; }
   if(t.closest&&t.closest('#scReset')){ _scFrom=''; _scTo=''; renderRevenue(); return; }
   if(t.closest&&t.closest('#scMore')){ _scAll=!_scAll; renderRevenue(); return; }
+  const rgP=t.closest&&t.closest('[data-region]');
+  if(rgP && rgP.hasAttribute('data-share')){ _showRegionPop(rgP, e); return; }
   if(t.classList&&t.classList.contains('sales-bulk')){ const mid=decodeURIComponent(t.dataset.mid), val=t.dataset.val;
     salesCfg().midType[mid]=val;                                  // 중분류 영구 규칙(업로드와 무관하게 적용)
     SALES.inputs.itemType=SALES.inputs.itemType||{};
@@ -6155,7 +6173,7 @@ function whiteSpaceCard(){
     .filter(x=>x.inst>0||x.sh!=null).sort((a,b)=>{ if(a.sh==null&&b.sh==null) return b.inst-a.inst; if(a.sh==null) return 1; if(b.sh==null) return -1; return a.sh-b.sh; });
   html+=`<div style="font-weight:700;margin:4px 0 7px">시·도 침투 (점유율 낮은 순 = 확장 여지)</div>`;
   html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도</th><th ${th}>신차 점유율</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>시군구</th></tr>`;
-  sds.forEach(x=>{ const weak = x.sh!=null && x.sh < 5; html+=`<tr${weak?' style="background:rgba(244,145,28,.08)"':''}><td ${tdl}>${x.k}${weak?' <span style="color:var(--amber);font-size:10px;font-weight:700">확장후보</span>':''}</td><td ${td}>${x.sh!=null?x.sh.toFixed(2)+'%':'<span style="color:var(--ink2)">—</span>'}</td><td ${td}>${x.inst.toLocaleString()}</td><td ${td}>${x.dealers}</td><td ${td}>${x.sgg}</td></tr>`; });
+  sds.forEach(x=>{ const weak = x.sh!=null && x.sh < 5; html+=`<tr data-wsregion="${escapeHtml(x.k)}"${weak?' style="background:rgba(244,145,28,.08)"':''}><td ${tdl}>${x.k}${weak?' <span style="color:var(--amber);font-size:10px;font-weight:700">확장후보</span>':''}</td><td ${td}>${x.sh!=null?x.sh.toFixed(2)+'%':'<span style="color:var(--ink2)">—</span>'}</td><td ${td}>${x.inst.toLocaleString()}</td><td ${td}>${x.dealers}</td><td ${td}>${x.sgg}</td></tr>`; });
   html+=`</table>`;
 
   // 시군구: 대리점당 시공 많은 순(추가 개설 여력) · 시공 3건 이상
