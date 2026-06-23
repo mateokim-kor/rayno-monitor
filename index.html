@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 지부순위_월필터';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 지역카드_월필터';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5584,7 +5584,7 @@ function renderWarranty(){
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
 // ════════════════ 매출(ERP) 분석 ════════════════
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
-let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _scFrom='', _scTo='', _scAll=false;   // _salesSel: 선택 월 배열(빈 배열=누적)
+let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _regMonths=[], _scFrom='', _scTo='', _scAll=false;   // _salesSel: 선택 월 배열(빈 배열=누적)
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -5874,8 +5874,13 @@ function renderRevenue(){
     + card(hh('🏢 지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
     + card(hh('🏆 지부별 제품 판매 순위 · 롤')+salesJibuProdRankTable())
     + card(hh('📈 시장 점유율 · '+lab)+salesShareTable())
-    + card(hh('🗺 지역별 시장 점유율 · '+lab)+salesRegionMap())
-    + card(hh('🎯 확장 기회 지역 · '+lab)+whiteSpaceCard());
+    + (()=>{
+        const _avM=_salesMonths(), _selM=_regMonths.filter(m=>_avM.indexOf(m)>=0).sort((a,b)=>a-b);
+        const _seg=`<div class="seg" id="regMonthSeg" style="margin-bottom:9px;flex-wrap:wrap"><button data-m="0" class="${_selM.length===0?'on':''}">전체</button>${_avM.map(m=>`<button data-m="${m}" class="${_selM.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div>`;
+        const _sv=_salesSel; _salesSel=_selM.slice();
+        let out=''; try{ out = card(hh('🗺 지역별 시장 점유율')+_seg+salesRegionMap()) + card(hh('🎯 확장 기회 지역')+_seg+whiteSpaceCard()); } finally { _salesSel=_sv; }
+        return out;
+      })();
   drawSalesCharts();
 }
 function drawSalesCharts(){
@@ -5972,6 +5977,8 @@ document.getElementById('rRevenue').addEventListener('click', e=>{
   if(jspB){ _jspSel=jspB.dataset.cat; renderRevenue(); return; }
   const jspmB=t.closest&&t.closest('#jspMonthSeg button[data-m]');
   if(jspmB){ const mm=parseInt(jspmB.dataset.m,10)||0; if(mm===0){ _jspMonths=[]; } else { const i=_jspMonths.indexOf(mm); if(i>=0)_jspMonths.splice(i,1); else _jspMonths.push(mm); } renderRevenue(); return; }
+  const rmB=t.closest&&t.closest('#regMonthSeg button[data-m]');
+  if(rmB){ const mm=parseInt(rmB.dataset.m,10)||0; if(mm===0){ _regMonths=[]; } else { const i=_regMonths.indexOf(mm); if(i>=0)_regMonths.splice(i,1); else _regMonths.push(mm); } renderRevenue(); return; }
   if(t.closest&&t.closest('#scApply')){ const f=document.getElementById('scFrom'),to=document.getElementById('scTo'); _scFrom=f?f.value:''; _scTo=to?to.value:''; if(_scFrom&&_scTo&&_scTo<_scFrom){const x=_scFrom;_scFrom=_scTo;_scTo=x;} renderRevenue(); return; }
   if(t.closest&&t.closest('#scReset')){ _scFrom=''; _scTo=''; renderRevenue(); return; }
   if(t.closest&&t.closest('#scMore')){ _scAll=!_scAll; renderRevenue(); return; }
