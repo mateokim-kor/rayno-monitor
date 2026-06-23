@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 보증서모드_점유율정렬';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 용어통일_시장점유율';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2532,7 +2532,7 @@ function shareExplain(kind, m){
   let title, formula, calc, note;
   if(kind==='warr'){
     const inst=_qcNew(m);
-    title='신차 장착률 · 보증서 ('+ml+')';
+    title='시장 점유율 · 보증서 ('+ml+')';
     formula='그 달 <b>신차 보증서 실시공(신차만, 중고 제외)</b> ÷ <b>신차 등록(월 출고 대수)</b> × 100';
     calc = cr>0 ? `${N(inst)}건 ÷ ${N(cr)}대 × 100 = <b style="color:#16a34a">${F(inst/cr*100)}%</b>`
                 : `신차 실시공 ${N(inst)}건 — 신차 등록이 입력되지 않아 계산할 수 없습니다.`;
@@ -6058,7 +6058,7 @@ function salesKPI(){
   const eok=n=>(n/1e8).toFixed(1), won=n=>Math.round(n||0).toLocaleString();
   const entT=_sPick(C.B2C.ma)+_sPick(C.B2B.ma)+_sPick(C['별도채널'].ma);   // 선택 월 기준
   const bbT=_sPick(C.B2C.ma)+_sPick(C.B2B.ma);
-  const wT=_qcNewPick(), crT=_natCarRegPick();   // 신차 장착률(신차 시공 ÷ 신차 등록) · 신차 카드와 동일
+  const wT=_qcNewPick(), crT=_natCarRegPick();   // 시장 점유율(보증서 기준: 신차 시공 ÷ 신차 등록)
   let rollQ=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; rollQ+=_sPick(SALES.prodAll[p].mq); });
   const share= crT>0? (wT/crT*100).toFixed(2)+'%':'—';
   const kpi=(t,v,s,spark)=>`<div style="flex:1;min-width:150px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px"><div style="font-size:11.5px;color:var(--ink3);font-weight:700;margin-bottom:5px">${t}</div><div style="font-size:24px;font-weight:800;color:var(--ink);letter-spacing:-.01em">${v}</div>${spark||''}<div style="font-size:11px;color:var(--ink2);margin-top:3px">${s||''}</div></div>`;
@@ -6068,7 +6068,7 @@ function salesKPI(){
   const spEnt=_sparkbar(_km.map(m=>(_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)+((_cc['별도채널']&&_cc['별도채널'].ma[m])||0)),'var(--dv4)',{label:'전사 매출액',fmt:v=>eok(v)+'억',months:_km});
   const spBB=_sparkbar(_km.map(m=>(_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)),'var(--dv1)',{label:'B2C+B2B 합계',fmt:v=>eok(v)+'억',months:_km});
   const spRoll=_sparkbar(_km.map(_rollM),'var(--dv2)',{label:'롤 판매수량',fmt:v=>won(v)+' 롤',months:_km});
-  const spShare=_sparkbar(_km.map(m=>{ const cr=_crM(m); return cr>0?_qcNew(m)/cr*100:0; }),'var(--dv6)',{label:'신차 장착률',fmt:v=>v.toFixed(1)+'%',months:_km});
+  const spShare=_sparkbar(_km.map(m=>{ const cr=_crM(m); return cr>0?_qcNew(m)/cr*100:0; }),'var(--dv6)',{label:'시장 점유율 (보증서)',fmt:v=>v.toFixed(1)+'%',months:_km});
   return `<div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:14px">`
     + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도 · 별도채널 포함', spEnt)
     + kpi('B2C+B2B 합계', eok(bbT)+'억', entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'', spBB)
@@ -6212,7 +6212,7 @@ function whiteSpaceCard(){
   if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '<div class="empty">품질보증서 데이터가 없습니다.</div>';
   const G=_warrGeoStats();
   const nw=_warrNewByRegion();
-  let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>장착 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
+  let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>시장 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
 
   // 시·도: 점유율 낮은 순(약한 시장 먼저)
   const sds=_REGION_KEYS.map(k=>{ const s=G.sido[k]||{inst:0,dealers:new Set(),sgg:new Set()}; const ni=nw.byRegion[k]||0; const reg=_regionCarRegPick(k); return {k, inst:s.inst, dealers:s.dealers.size, sgg:s.sgg.size, sh: reg>0? ni/reg*100 : null}; })
