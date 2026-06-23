@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 보증서_대리점지부';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 지역지도_모드토글';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5588,7 +5588,7 @@ function renderWarranty(){
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
 // ════════════════ 매출(ERP) 분석 ════════════════
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
-let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _regMonths=[], _scFrom='', _scTo='', _scAll=false;   // _salesSel: 선택 월 배열(빈 배열=누적)
+let SALES=null, salesLoaded=false, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _regMonths=[], _regMode='share', _scFrom='', _scTo='', _scAll=false;   // _salesSel: 선택 월 배열(빈 배열=누적)
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -5702,17 +5702,19 @@ function salesRegionStats(){
   const sc=salesCfg(), reg=sc.region||{}, rcap=(_sNum(sc.regionCap||0)||10);
   const sel=_salesSel.length?_salesActive():null;
   const sumM=o=>{ let s=0; for(const m in (o||{})){ if(sel&&sel.indexOf(+m)<0) continue; s+=_sNum(o[m]); } return s; };
-  const hasReg=_REGION_KEYS.some(k=>reg[k]&&((reg[k].roll&&Object.keys(reg[k].roll).length)||(reg[k].carReg&&Object.keys(reg[k].carReg).length)));
-  if(hasReg){
-    const by={},roll={},car={}; let tRoll=0,tCar=0;
-    _REGION_KEYS.forEach(k=>{ const rr=reg[k]||{}; const r=sumM(rr.roll), c=sumM(rr.carReg); roll[k]=r; car[k]=c; tRoll+=r; tCar+=c; by[k]=c>0?(r*rcap/c*100):0; });
-    return {mode:'share', by, roll, car, tRoll, tCar, cap:rcap, total:tRoll};
+  if(_regMode==='warr'){
+    const warr={}, car={}; let tWarr=0, tCar=0;
+    const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]);
+    rows.forEach(r=>{ if(sel){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(sel.indexOf(mm)<0) return; } const k=_regionKey(r['대리점지역(도)']); if(!k) return; warr[k]=(warr[k]||0)+1; tWarr++; });
+    const by={};
+    _REGION_KEYS.forEach(k=>{ const c=sumM((reg[k]||{}).carReg); car[k]=c; tCar+=c; by[k]= c>0 ? ((warr[k]||0)/c*100) : null; });
+    return {mode:'warr', warr, car, by, tWarr, tCar, cap:rcap};
   }
-  const by={}; let total=0;
-  const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]);
-  rows.forEach(r=>{ if(sel){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(sel.indexOf(mm)<0) return; } const k=_regionKey(r['대리점지역(도)']); if(!k) return; by[k]=(by[k]||0)+1; total++; });
-  return {mode:'warr', by, total};
+  const by={},roll={},car={}; let tRoll=0,tCar=0;
+  _REGION_KEYS.forEach(k=>{ const rr=reg[k]||{}; const r=sumM(rr.roll), c=sumM(rr.carReg); roll[k]=r; car[k]=c; tRoll+=r; tCar+=c; by[k]=c>0?(r*rcap/c*100):0; });
+  return {mode:'share', by, roll, car, tRoll, tCar, cap:rcap, total:tRoll};
 }
+
 function _pathCenter(d){ const n=(String(d).match(/-?\d+\.?\d*/g)||[]).map(Number); let sx=0,sy=0,c=0; for(let i=0;i+1<n.length;i+=2){ sx+=n[i]; sy+=n[i+1]; c++; } return c?{x:sx/c,y:sy/c}:{x:0,y:0}; }
 function _regionSVG(valOf, titleOf, metaOf){
   const maxV=Math.max(0.0001,..._REGION_KEYS.map(k=>valOf(k)));
@@ -5724,14 +5726,20 @@ function _regionSVG(valOf, titleOf, metaOf){
 }
 function _showRegionPop(path, e, hover){
   const k=path.getAttribute('data-region')||'', roll=+path.getAttribute('data-roll')||0, car=+path.getAttribute('data-car')||0, cap=+path.getAttribute('data-cap')||0, share=path.getAttribute('data-share')||'0';
+  const warrMode=path.getAttribute('data-warr')==='1', num=+path.getAttribute('data-num')||0;
   const inst=roll*cap;
   let pop=document.getElementById('regionPop');
   if(!pop){ pop=document.createElement('div'); pop.id='regionPop'; pop.style.cssText='position:fixed;z-index:99999;background:var(--card);color:var(--ink);border:1px solid var(--amber);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.28);padding:13px 15px;font-size:12.5px;max-width:290px;line-height:1.65'; (document.body||document.documentElement).appendChild(pop);
     document.addEventListener('click', ev=>{ if(!pop||pop.style.display==='none') return; if(pop.contains(ev.target)) return; if(ev.target.closest && (ev.target.closest('[data-region]')||ev.target.closest('.shc'))) return; pop.style.display='none'; }, true); }
-  pop.innerHTML=`<div style="font-weight:800;font-size:14px;margin-bottom:7px"><span style="color:var(--amber)">${escapeHtml(k)}</span> 점유율 <span style="color:var(--amber)">${share}%</span></div>`
-    + (car>0
-        ? `<div style="color:var(--ink2)">롤 판매 <b>${roll.toLocaleString()}</b>롤 × 롤당 <b>${cap}</b>대 = 장착 <b>${inst.toLocaleString()}</b>대<br>÷ 신차 등록 <b>${car.toLocaleString()}</b>대 × 100<br>= <b style="color:var(--amber)">${share}%</b></div>`
-        : `<div style="color:var(--ink3)">신차 등록 데이터가 없어 점유율을 계산할 수 없어요. ⚙ 설정 → 매출 설정 → 지역별 세일즈 입력에서 신차 등록을 채워주세요.</div>`);
+  pop.innerHTML = warrMode
+    ? (`<div style="font-weight:800;font-size:14px;margin-bottom:7px"><span style="color:var(--amber)">${escapeHtml(k)}</span> ${car>0?`점유율 <span style="color:var(--amber)">${share}%</span>`:`보증서 <span style="color:var(--amber)">${num.toLocaleString()}건</span>`}</div>`
+        + (car>0
+            ? `<div style="color:var(--ink2)">품질보증서 실시공 <b>${num.toLocaleString()}</b>건 <span style="color:var(--ink3)">(1건=1대)</span><br>÷ 신차 등록 <b>${car.toLocaleString()}</b>대 × 100<br>= <b style="color:var(--amber)">${share}%</b></div>`
+            : `<div style="color:var(--ink3)">보증서 실시공 <b>${num.toLocaleString()}건</b> · 신차 등록이 없어 점유율은 계산할 수 없어요. ⚙ 설정 → 매출 설정 → 지역별 세일즈 입력에서 신차 등록을 채워주세요.</div>`))
+    : (`<div style="font-weight:800;font-size:14px;margin-bottom:7px"><span style="color:var(--amber)">${escapeHtml(k)}</span> 점유율 <span style="color:var(--amber)">${share}%</span></div>`
+        + (car>0
+            ? `<div style="color:var(--ink2)">롤 판매 <b>${roll.toLocaleString()}</b>롤 × 롤당 <b>${cap}</b>대 = 장착 <b>${inst.toLocaleString()}</b>대<br>÷ 신차 등록 <b>${car.toLocaleString()}</b>대 × 100<br>= <b style="color:var(--amber)">${share}%</b></div>`
+            : `<div style="color:var(--ink3)">신차 등록 데이터가 없어 점유율을 계산할 수 없어요. ⚙ 설정 → 매출 설정 → 지역별 세일즈 입력에서 신차 등록을 채워주세요.</div>`));
   pop.style.display='block';
   const px=Math.min((e?e.clientX:160)+14, innerWidth-300), py=Math.min((e?e.clientY:160)+8, innerHeight-170);
   pop.style.left=Math.max(8,px)+'px'; pop.style.top=Math.max(8,py)+'px';
@@ -5740,44 +5748,54 @@ function _showRegionPop(path, e, hover){
   if(wsRow){ document.querySelectorAll('[data-wsregion]').forEach(r=>{r.style.outline='';}); wsRow.style.outline='2px solid var(--amber)'; wsRow.style.outlineOffset='-2px'; setTimeout(()=>{ if(wsRow) wsRow.style.outline=''; }, 2800); }
 }
 function salesRegionMap(){
-  const st=salesRegionStats();
+  const modeSeg=`<div class="seg" id="regModeSeg" style="margin-bottom:9px;flex-wrap:wrap"><button data-rm="share" class="${_regMode!=='warr'?'on':''}">대리점 롤 판매 기준</button><button data-rm="warr" class="${_regMode==='warr'?'on':''}">품질보증서 기준</button></div>`;
   const thl=`style="text-align:left;padding:6px 9px;color:var(--ink3);font-size:11px;font-weight:700"`;
   const thr=`style="text-align:right;padding:6px 9px;color:var(--ink3);font-size:11px;font-weight:700"`;
   const bar=(v,mx)=>`<td style="padding:7px 9px;border-bottom:1px solid var(--line);width:24%"><span style="display:block;height:8px;border-radius:5px;background:var(--bg2);overflow:hidden"><i style="display:block;height:100%;width:${mx>0?(v/mx*100).toFixed(0):0}%;background:var(--amber);border-radius:5px"></i></span></td>`;
-  if(st.mode==='share'){
-    const {by,roll,car,tRoll,tCar,cap}=st;
-    if(tRoll<=0&&tCar<=0) return `<div class="empty">지역별 세일즈 데이터가 없습니다. ⚙ 설정 → 매출 설정 → <b>지역별 세일즈 입력</b>에서 입력하세요.</div>`;
-    const maxSh=Math.max(0.0001,..._REGION_KEYS.map(k=>by[k]||0));
-    const svg=_regionSVG(k=>by[k]||0, k=>`${k} · 점유율 ${(by[k]||0).toFixed(2)}% (롤 ${(roll[k]||0).toLocaleString()} / 신차 ${(car[k]||0).toLocaleString()})`, k=>`data-roll="${roll[k]||0}" data-car="${car[k]||0}" data-cap="${cap}" data-share="${(by[k]||0).toFixed(2)}"`);
-    const entries=_REGION_KEYS.map(k=>[k, by[k]||0]).sort((a,b)=>b[1]-a[1]).filter(e=>(roll[e[0]]||car[e[0]]));
-    const rowsH=entries.map(([k,sh])=>`<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);font-weight:600">${k}</td>`
-      +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${(roll[k]||0).toLocaleString()}</td>`
-      +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${(car[k]||0).toLocaleString()}</td>`
-      +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;font-weight:800;color:var(--amber)">${sh.toFixed(2)}%</td>`
-      +bar(sh,maxSh)+`</tr>`).join('');
-    const totSh=tCar>0?(tRoll*cap/tCar*100):0;
-    const table=`<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>롤 판매</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}`
-      +`<tr><td style="padding:7px 9px;font-weight:800;background:var(--bg2)">총합계</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tRoll.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tCar.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2);color:var(--amber)">${totSh.toFixed(2)}%</td><td style="background:var(--bg2)"></td></tr></table>`;
-    return `<div class="cap" style="margin-bottom:10px">롤 판매 × 롤당 <b>${cap}대</b> ÷ 신차 등록 기준 · 전국 점유율 <b style="color:var(--amber)">${totSh.toFixed(2)}%</b> · 지도에 마우스를 올리면 상세 (데이터는 ⚙설정에서 입력)</div>`
+  const body=(()=>{
+    const st=salesRegionStats();
+    if(st.mode==='share'){
+      const {by,roll,car,tRoll,tCar,cap}=st;
+      if(tRoll<=0&&tCar<=0) return `<div class="empty">지역별 세일즈 데이터가 없습니다. ⚙ 설정 → 매출 설정 → <b>지역별 세일즈 입력</b>에서 입력하세요.</div>`;
+      const maxSh=Math.max(0.0001,..._REGION_KEYS.map(k=>by[k]||0));
+      const svg=_regionSVG(k=>by[k]||0, k=>`${k} · 점유율 ${(by[k]||0).toFixed(2)}% (롤 ${(roll[k]||0).toLocaleString()} / 신차 ${(car[k]||0).toLocaleString()})`, k=>`data-roll="${roll[k]||0}" data-car="${car[k]||0}" data-cap="${cap}" data-share="${(by[k]||0).toFixed(2)}"`);
+      const entries=_REGION_KEYS.map(k=>[k, by[k]||0]).sort((a,b)=>b[1]-a[1]).filter(e=>(roll[e[0]]||car[e[0]]));
+      const rowsH=entries.map(([k,sh])=>`<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);font-weight:600">${k}</td>`
+        +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${(roll[k]||0).toLocaleString()}</td>`
+        +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${(car[k]||0).toLocaleString()}</td>`
+        +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;font-weight:800;color:var(--amber)">${sh.toFixed(2)}%</td>`
+        +bar(sh,maxSh)+`</tr>`).join('');
+      const totSh=tCar>0?(tRoll*cap/tCar*100):0;
+      const table=`<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>롤 판매</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}`
+        +`<tr><td style="padding:7px 9px;font-weight:800;background:var(--bg2)">총합계</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tRoll.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tCar.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2);color:var(--amber)">${totSh.toFixed(2)}%</td><td style="background:var(--bg2)"></td></tr></table>`;
+      return `<div class="cap" style="margin-bottom:10px">롤 판매 × 롤당 <b>${cap}대</b> ÷ 신차 등록 기준 · 전국 점유율 <b style="color:var(--amber)">${totSh.toFixed(2)}%</b> · 지도에 마우스를 올리면 상세 (데이터는 ⚙설정에서 입력)</div>`
+        + `<div class="hm-region"><div class="hm-region-map">${svg}</div><div class="hm-region-tbl">${table}</div></div>`;
+    }
+    // 품질보증서 기준 (보증서 실시공 ÷ 지역 신차등록)
+    const {warr, car, by, tWarr, tCar}=st;
+    const hasCol=(typeof WARR!=='undefined'&&WARR&&WARR.columns&&WARR.columns.includes('대리점지역(도)'));
+    if(!hasCol) return `<div class="empty">품질보증서에 ‘대리점지역(도)’ 정보가 없어 지역별로 표시할 수 없습니다.</div>`;
+    if(!tWarr) return `<div class="empty">선택한 기간에 보증서 시공 데이터가 없습니다.</div>`;
+    const anyCar=tCar>0;
+    const fillV=k=> anyCar ? (by[k]||0) : (warr[k]||0);
+    const maxV=Math.max(0.0001,..._REGION_KEYS.map(k=>fillV(k)));
+    const svg=_regionSVG(fillV, k=>{ const w=warr[k]||0, c=car[k]||0; return c>0?`${k} · 점유율 ${(by[k]||0).toFixed(2)}% (보증서 ${w.toLocaleString()} / 신차 ${c.toLocaleString()})`:`${k} · 보증서 ${w.toLocaleString()}건`; }, k=>`data-warr="1" data-num="${warr[k]||0}" data-car="${car[k]||0}" data-share="${(by[k]||0).toFixed(2)}"`);
+    const entries=_REGION_KEYS.map(k=>[k, warr[k]||0]).sort((a,b)=>b[1]-a[1]).filter(e=>e[1]>0);
+    const rowsH=entries.map(([k,w])=>{ const c=car[k]||0, sh=c>0?(w/c*100):null;
+      return `<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);font-weight:600">${k}</td>`
+        +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${w.toLocaleString()}건</td>`
+        +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${c?c.toLocaleString():'<span style="color:var(--ink3)">—</span>'}</td>`
+        +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;font-weight:800;color:var(--amber)">${sh!=null?sh.toFixed(2)+'%':'—'}</td>`
+        +bar(c>0?sh:w, maxV)+`</tr>`; }).join('');
+    const totSh=tCar>0?(tWarr/tCar*100):null;
+    const table=`<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>보증서</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}`
+      +`<tr><td style="padding:7px 9px;font-weight:800;background:var(--bg2)">총합계</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tWarr.toLocaleString()}건</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tCar?tCar.toLocaleString():'—'}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2);color:var(--amber)">${totSh!=null?totSh.toFixed(2)+'%':'—'}</td><td style="background:var(--bg2)"></td></tr></table>`;
+    return `<div class="cap" style="margin-bottom:10px">품질보증서 <b>실시공 건수</b> ÷ 지역 <b>신차 등록</b> 기준${anyCar?` · 전국 점유율 <b style="color:var(--amber)">${(totSh||0).toFixed(2)}%</b>`:` · 신차 등록 미입력 — 시공 건수만 표시(설정에서 신차등록 입력 시 점유율)`} · 지도에 마우스를 올리면 상세</div>`
       + `<div class="hm-region"><div class="hm-region-map">${svg}</div><div class="hm-region-tbl">${table}</div></div>`;
-  }
-  // 폴백: 품질보증서 시공 분포
-  const hasCol=(typeof WARR!=='undefined'&&WARR&&WARR.columns&&WARR.columns.includes('대리점지역(도)'));
-  const {by,total}=st;
-  if(!hasCol && !total) return `<div class="empty">지역 데이터가 없습니다. ⚙ 설정 → 매출 설정 → <b>지역별 세일즈 입력</b>에서 롤 판매·신차 등록을 입력하면 지역별 점유율이 표시됩니다.</div>`;
-  if(!total) return `<div class="empty">선택한 기간에 시공(품질보증서) 데이터가 없습니다.</div>`;
-  const maxV=Math.max(1,..._REGION_KEYS.map(k=>by[k]||0));
-  const svg=_regionSVG(k=>by[k]||0, k=>`${k} · ${(by[k]||0).toLocaleString()}건 (${total?(((by[k]||0)/total*100).toFixed(1)):0}%)`);
-  const entries=_REGION_KEYS.map(k=>[k, by[k]||0]).sort((a,b)=>b[1]-a[1]).filter(e=>e[1]>0);
-  const rowsH=entries.map(([k,v])=>{ const pct=total?(v/total*100):0;
-    return `<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);font-weight:600">${k}</td>`
-      +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${v.toLocaleString()}건</td>`
-      +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;font-weight:800;color:var(--amber)">${pct.toFixed(1)}%</td>`
-      +bar(v,maxV)+`</tr>`; }).join('');
-  const table=`<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>시공</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}</table>`;
-  return `<div class="cap" style="margin-bottom:10px">품질보증서 <b>시공 분포</b> 기준 · 전국 시공 <b style="color:var(--amber)">${total.toLocaleString()}건</b> 중 지역 비중 · 정확한 점유율은 ⚙설정 → <b>지역별 세일즈 입력</b>에서 신차 등록을 넣어주세요</div>`
-    + `<div class="hm-region"><div class="hm-region-map">${svg}</div><div class="hm-region-tbl">${table}</div></div>`;
+  })();
+  return modeSeg+body;
 }
+
 function renderRevenue(){
   const box=document.getElementById('rRevenue'); if(!box) return;
   const admin=(auth==='admin');
@@ -5992,6 +6010,8 @@ document.getElementById('rRevenue').addEventListener('click', e=>{
   if(jspmB){ const mm=parseInt(jspmB.dataset.m,10)||0; if(mm===0){ _jspMonths=[]; } else { const i=_jspMonths.indexOf(mm); if(i>=0)_jspMonths.splice(i,1); else _jspMonths.push(mm); } renderRevenue(); return; }
   const rmB=t.closest&&t.closest('#regMonthSeg button[data-m]');
   if(rmB){ const mm=parseInt(rmB.dataset.m,10)||0; if(mm===0){ _regMonths=[]; } else { const i=_regMonths.indexOf(mm); if(i>=0)_regMonths.splice(i,1); else _regMonths.push(mm); } renderRevenue(); return; }
+  const rmModeB=t.closest&&t.closest('#regModeSeg button[data-rm]');
+  if(rmModeB){ _regMode=rmModeB.dataset.rm; renderRevenue(); return; }
   if(t.closest&&t.closest('#scApply')){ const f=document.getElementById('scFrom'),to=document.getElementById('scTo'); _scFrom=f?f.value:''; _scTo=to?to.value:''; if(_scFrom&&_scTo&&_scTo<_scFrom){const x=_scFrom;_scFrom=_scTo;_scTo=x;} renderRevenue(); return; }
   if(t.closest&&t.closest('#scReset')){ _scFrom=''; _scTo=''; renderRevenue(); return; }
   if(t.closest&&t.closest('#scMore')){ _scAll=!_scAll; renderRevenue(); return; }
