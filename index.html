@@ -68,7 +68,7 @@
     .iv-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
     .acc-btn,.vc-save{min-height:40px}
     .wtab{min-width:56px;font-size:12.5px}
-    .upl-date{display:block;margin-left:0;margin-top:4px}
+    .upl-date{display:inline-block;margin-left:6px;margin-top:0}
   }
   html[data-theme="dark"]{
     --bg:#121417; --bg2:#1a1e24; --card:#1a1e24; --card2:#22272f;
@@ -330,7 +330,8 @@
   .lv-chip small{font-size:10.5px;opacity:.6;font-weight:600}
   .lv-foot{font-size:11.5px;color:var(--ink3);line-height:1.6;border-top:1px solid var(--line);padding-top:11px;margin-top:6px}
 
-  .upl-date{font-size:11px;color:var(--ink3);margin-left:8px;white-space:nowrap;vertical-align:middle}
+  .upl-date{font-size:13px;color:var(--ink3);margin-left:6px;white-space:nowrap;vertical-align:middle;cursor:help;opacity:.55;transition:opacity .15s}
+  .upl-date:hover{opacity:1}
   .modal-title{font-size:16px;font-weight:800;letter-spacing:-.02em}
   .modal-title .badge{display:inline-block;margin-left:8px;font-size:12px;padding:2px 10px;border-radius:20px;
                       background:var(--amber);color:#1a1208;font-weight:800;vertical-align:middle}
@@ -1492,7 +1493,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 라인카드_VLT제거_달력수정';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 업로드날짜_아이콘';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6520,7 +6521,7 @@ function setRView(v){
   else renderRevenue();
 }
 function _fmtUpl(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d.getTime())) return ''; const p=n=>String(n).padStart(2,'0'); const rel=_relDays(v); return `최근 업로드 ${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${rel?' · '+rel:''}`; }
-function _setUpl(id,v){ const el=document.getElementById(id); if(el) el.textContent=v?_fmtUpl(v):''; }
+function _setUpl(id,v){ const el=document.getElementById(id); if(!el) return; if(v){ el.textContent='🕒'; el.title=_fmtUpl(v); } else { el.textContent=''; el.title=''; } }
 async function _cloudFileMtime(file){ if(!SB) return null; try{ const {data,error}=await SB.storage.from(SUPA.bucket).list('',{limit:100}); if(error||!data) return null; const f=data.find(x=>x.name===file); return f? (f.updated_at||f.created_at||(f.metadata&&f.metadata.lastModified)||null) : null; }catch(e){ return null; } }
 function updateUploadDates(){
   const wv=(typeof WARR!=='undefined'&&WARR&&WARR.updatedAt)||null;
