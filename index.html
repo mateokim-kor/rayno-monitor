@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 지역팝업_스크롤off';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 스코어삭제_명칭변경';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5872,8 +5872,7 @@ function renderRevenue(){
     + card(hh('🏆 지부별 제품 판매 순위 · 롤')+salesJibuProdRankTable())
     + card(hh('📈 시장 점유율 · '+lab)+salesShareTable())
     + card(hh('🗺 지역별 시장 점유율 · '+lab)+salesRegionMap())
-    + card(hh('지역 화이트스페이스 (확장 타깃) · '+lab)+whiteSpaceCard())
-    + card(hh('대리점 스코어카드 · '+lab)+dealerScorecard());
+    + card(hh('🎯 확장 기회 지역 · '+lab)+whiteSpaceCard());
   drawSalesCharts();
 }
 function drawSalesCharts(){
