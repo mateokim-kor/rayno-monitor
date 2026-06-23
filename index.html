@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 표헤더_주황통일';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 지역지도_hover';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5720,7 +5720,7 @@ function _regionSVG(valOf, titleOf, metaOf){
   _REGION_KEYS.forEach(k=>{ svg+=`<path d="${KOREA_MAP.paths[k]}" data-region="${k}" ${metaOf?metaOf(k):''} style="fill:${fillOf(valOf(k))};stroke:var(--card);stroke-width:0.6;transition:fill .2s;cursor:pointer"><title>${titleOf(k)}</title></path>`; });
   return svg+`</svg><div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:var(--ink2);max-width:340px;margin-left:auto;margin-right:auto"><span>적음</span><span style="flex:1;height:8px;border-radius:5px;background:linear-gradient(90deg,var(--bg2),rgba(244,145,28,.92))"></span><span>많음</span></div>`;
 }
-function _showRegionPop(path, e){
+function _showRegionPop(path, e, hover){
   const k=path.getAttribute('data-region')||'', roll=+path.getAttribute('data-roll')||0, car=+path.getAttribute('data-car')||0, cap=+path.getAttribute('data-cap')||0, share=path.getAttribute('data-share')||'0';
   const inst=roll*cap;
   let pop=document.getElementById('regionPop');
@@ -5733,6 +5733,7 @@ function _showRegionPop(path, e){
   pop.style.display='block';
   const px=Math.min((e?e.clientX:160)+14, innerWidth-300), py=Math.min((e?e.clientY:160)+8, innerHeight-170);
   pop.style.left=Math.max(8,px)+'px'; pop.style.top=Math.max(8,py)+'px';
+  if(hover) return;
   let wsRow=null; try{ wsRow=document.querySelector('[data-wsregion="'+(window.CSS&&CSS.escape?CSS.escape(k):k)+'"]'); }catch(_){ }
   if(wsRow){ document.querySelectorAll('[data-wsregion]').forEach(r=>{r.style.outline='';}); wsRow.style.outline='2px solid var(--amber)'; wsRow.style.outlineOffset='-2px'; setTimeout(()=>{ if(wsRow) wsRow.style.outline=''; }, 2800); }
 }
@@ -5973,6 +5974,12 @@ document.getElementById('rRevenue').addEventListener('change', e=>{
   else return;
   renderRevenue(); _salesSave();
 });
+(()=>{ const _rv=document.getElementById('rRevenue'); if(!_rv) return;
+  const _hp=e=>{ const rp=e.target.closest&&e.target.closest('[data-region]'); return (rp&&rp.hasAttribute('data-share'))?rp:null; };
+  _rv.addEventListener('mouseover', e=>{ const rp=_hp(e); if(rp) _showRegionPop(rp, e, true); });
+  _rv.addEventListener('mousemove', e=>{ const rp=_hp(e); if(!rp) return; const pop=document.getElementById('regionPop'); if(pop&&pop.style.display!=='none'){ const px=Math.min(e.clientX+14, innerWidth-300), py=Math.min(e.clientY+8, innerHeight-160); pop.style.left=Math.max(8,px)+'px'; pop.style.top=Math.max(8,py)+'px'; } });
+  _rv.addEventListener('mouseout', e=>{ const rp=e.target.closest&&e.target.closest('[data-region]'); if(!rp) return; const to=e.relatedTarget; if(to&&to.closest&&to.closest('[data-region]')) return; const pop=document.getElementById('regionPop'); if(pop) pop.style.display='none'; });
+})();
 document.getElementById('rRevenue').addEventListener('click', e=>{
   const t=e.target;
   const segB=t.closest&&t.closest('#salesMonthSeg button[data-m]');
