@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 매출카드_제목변경';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 새로고침_페이지유지';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3778,7 +3778,7 @@ document.getElementById('report').addEventListener('change', e=>{
 
 function setView(v){
   if(state.view==='verify' && v!=='verify') flushCloudSave();  // 검증 화면을 떠날 때 클라우드 반영
-  state.view=v;
+  state.view=v; _saveNav();
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.view===v));
   const dash = (v==='dash');
   document.getElementById('dash').style.display = dash?'block':'none';
@@ -6500,8 +6500,16 @@ function renderWarrReport(){
   box.innerHTML = headCard + kpiCard + insightCard + (moverCard?`<div class="biz-grid">${moverCard}${dailyCard}</div>`:dailyCard) + compGrid;
 }
 const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', dealer:'rDealer', search:'rSearch', revenue:'rRevenue'};
+function _saveNav(){ try{ localStorage.setItem('rayno_nav', JSON.stringify({ ws:workspace, cv:(typeof state!=='undefined'&&state&&state.view)||'dash', rv:rview })); }catch(e){} }
+function _restoreNav(nav){
+  if(!nav||!nav.ws) return;
+  if(nav.rv && RVIEW_BOX[nav.rv]) rview=nav.rv;            // 레이노 열릴 때 이 뷰로
+  if(nav.ws==='rayno'){ setWorkspace('rayno'); }
+  else if(nav.ws==='settings'){ setWorkspace('settings'); }
+  else { let cv=nav.cv; const ok={dash:1,report:1,promo:1,verify:1}; if(cv==='verify'&&auth!=='admin')cv='dash'; if(cv&&ok[cv]&&cv!=='dash') setView(cv); }
+}
 function setRView(v){
-  rview=v;
+  rview=v; _saveNav();
   document.querySelectorAll('#raynoNav .nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.rview===v));
   Object.values(RVIEW_BOX).forEach(id=>{const el=document.getElementById(id); if(el)el.style.display='none';});
   const el=document.getElementById(RVIEW_BOX[v]); if(el) el.style.display='block';
@@ -6566,6 +6574,7 @@ async function setWorkspace(ws){
   if(rayno){ hideCafe(); await openRayno(); }
   else if(settings){ hideCafe(); await openSettingsWs(); }
   else { showCafe(); }
+  _saveNav();
   window.scrollTo({top:0,behavior:'smooth'});
 }
 async function openSettingsWs(){
@@ -7085,6 +7094,7 @@ document.addEventListener('keydown', e=>{ if(e.key==='Escape' && _crawlModalOpen
 (function(){ const b=document.getElementById('dashToolToggle');
   if(b) b.addEventListener('click', ()=>{ _dashToolsOpen=!_dashToolsOpen; applyDashTools(); }); })();
 async function boot(){
+  let _pendingNav=null; try{ _pendingNav=JSON.parse(localStorage.getItem('rayno_nav')||'null'); }catch(e){}
   let _bootSkel=null;
   try{ if(document.body){ _bootSkel=document.createElement('div'); _bootSkel.id='bootSkel'; _bootSkel.setAttribute('aria-hidden','true');
     _bootSkel.innerHTML='<div class="boot-skel-inner"><div class="skeleton skel-row" style="width:38%;height:24px;margin-bottom:18px"></div><div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:14px"><div class="skeleton" style="flex:1;min-width:150px;height:84px;border-radius:14px"></div><div class="skeleton" style="flex:1;min-width:150px;height:84px;border-radius:14px"></div><div class="skeleton" style="flex:1;min-width:150px;height:84px;border-radius:14px"></div><div class="skeleton" style="flex:1;min-width:150px;height:84px;border-radius:14px"></div></div><div class="skeleton" style="height:230px;border-radius:14px"></div></div>';
@@ -7120,6 +7130,7 @@ async function boot(){
   ensurePromo().then(updatePromoBadge).catch(()=>{});   // 경쟁사 프로모션 선로드 + 신규 뱃지
   const n = (STORE.rows||[]).length;
   if(n) setTimeout(()=>toast(`데이터 ${n.toLocaleString()}건 불러옴${auth==='admin'?' · 관리자 모드':''}`), 400);
+  _restoreNav(_pendingNav);   // 새로고침 시 이전 페이지 복원
 
   // 5) 로그인 상태 변화 감지 (토큰 갱신·로그아웃 등 동기화)
   if(SB) SB.auth.onAuthStateChange((event, session)=>{
