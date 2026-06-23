@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 지역지도_전지역반응';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 지역지도_히트원';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5713,11 +5713,13 @@ function salesRegionStats(){
   rows.forEach(r=>{ if(sel){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(sel.indexOf(mm)<0) return; } const k=_regionKey(r['대리점지역(도)']); if(!k) return; by[k]=(by[k]||0)+1; total++; });
   return {mode:'warr', by, total};
 }
+function _pathCenter(d){ const n=(String(d).match(/-?\d+\.?\d*/g)||[]).map(Number); let sx=0,sy=0,c=0; for(let i=0;i+1<n.length;i+=2){ sx+=n[i]; sy+=n[i+1]; c++; } return c?{x:sx/c,y:sy/c}:{x:0,y:0}; }
 function _regionSVG(valOf, titleOf, metaOf){
   const maxV=Math.max(0.0001,..._REGION_KEYS.map(k=>valOf(k)));
   const fillOf=v=>{ if(!v) return 'var(--bg2)'; const a=(0.18+0.74*(v/maxV)).toFixed(2); return `rgba(244,145,28,${a})`; };
   let svg=`<svg viewBox="${KOREA_MAP.viewBox}" style="width:100%;max-width:340px;height:auto;display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">`;
   _REGION_KEYS.forEach(k=>{ svg+=`<path d="${KOREA_MAP.paths[k]}" data-region="${k}" ${metaOf?metaOf(k):''} style="fill:${fillOf(valOf(k))};stroke:var(--card);stroke-width:0.6;transition:fill .2s;cursor:pointer"><title>${titleOf(k)}</title></path>`; });
+  _REGION_KEYS.forEach(k=>{ const _c=_pathCenter(KOREA_MAP.paths[k]); svg+=`<circle cx="${_c.x.toFixed(1)}" cy="${_c.y.toFixed(1)}" r="8" data-region="${k}" ${metaOf?metaOf(k):''} fill="transparent" style="pointer-events:all;cursor:pointer"></circle>`; });
   return svg+`</svg><div style="display:flex;align-items:center;gap:8px;margin-top:6px;font-size:11px;color:var(--ink2);max-width:340px;margin-left:auto;margin-right:auto"><span>적음</span><span style="flex:1;height:8px;border-radius:5px;background:linear-gradient(90deg,var(--bg2),rgba(244,145,28,.92))"></span><span>많음</span></div>`;
 }
 function _showRegionPop(path, e, hover){
