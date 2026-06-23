@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 다크_알림글씨';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 툴팁_월표기';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5956,7 +5956,7 @@ function _scPick(o){ let s=0; _salesActive().forEach(m=>s+=_sNum((o&&o[m])||0));
     if(!r){ if(tip) tip.style.opacity=0; return; }
     const t=ensure(), l=r.getAttribute('data-l'), v=r.getAttribute('data-v'), m=r.getAttribute('data-m'), mo=r.getAttribute('data-mo');
     let mh=''; if(m!==''&&m!=null){ const mn=parseFloat(m), up=mn>=0; mh=`<div style="color:${up?'#7ce2a6':'#f2a6a2'}">${up?'▲':'▼'} ${Math.abs(mn).toFixed(1)}% 전월비</div>`; }
-    const moL=(mo&&/^\d{4}-\d{2}$/.test(mo))?`${mo.slice(0,4)}년 ${+mo.slice(5,7)}월`:(mo||'');
+    const moL=(function(){ if(!mo) return ''; if(mo.length===7 && mo.charAt(4)==='-') return mo.slice(0,4)+'년 '+(+mo.slice(5,7))+'월'; if(/^[0-9]{1,2}$/.test(mo)) return (+mo)+'월'; return mo; })();
     t.innerHTML=`${l?`<b style="color:#ffce00">${l}</b>`:''}${moL?`<span style="color:#9aa0a6">${l?' · ':''}${moL}</span>`:''}${(l||moL)?'<br>':''}${v}${mh}`;
     t.style.opacity=1; t.style.left=Math.min(e.clientX+12, innerWidth-170)+'px'; t.style.top=(e.clientY-8)+'px';
   }, {passive:true});
