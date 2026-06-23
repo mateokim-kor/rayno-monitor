@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 점유율_산출팝업';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · TEST_권역점유율';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5878,6 +5878,7 @@ function renderRevenue(){
     + card(hh('🏢 지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
     + card(hh('🏆 지부별 제품 판매 순위 · 롤')+salesJibuProdRankTable())
     + card(hh('📈 시장 점유율 · '+lab)+salesShareTable())
+    + card(hh('TEST · 권역별 점유율 (대리점 판매 기준)')+testJibuRegionShare())
     + (()=>{
         const _avM=_salesMonths(), _selM=_regMonths.filter(m=>_avM.indexOf(m)>=0).sort((a,b)=>a-b);
         const _seg=`<div class="seg" id="regMonthSeg" style="margin-bottom:9px;flex-wrap:wrap"><button data-m="0" class="${_selM.length===0?'on':''}">전체</button>${_avM.map(m=>`<button data-m="${m}" class="${_selM.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div>`;
@@ -6322,6 +6323,31 @@ function _showShareCalc(td, e){
   const px=Math.min((e?e.clientX:160)+14, innerWidth-320), py=Math.min((e?e.clientY:160)+8, innerHeight-190);
   pop.style.left=Math.max(8,px)+'px'; pop.style.top=Math.max(8,py)+'px';
 }
+function testJibuRegionShare(){
+  if(!SALES||!SALES.jibu) return '<div class="empty">매출(ERP) 데이터가 없습니다.</div>';
+  const sc=salesCfg(), jr=sc.jibuRegion||{}, cap=_sNum(sc.regionCap||0)||10, reg=sc.region||{};
+  const M=_salesDispMonths(); const sm=o=>{ let s=0; M.forEach(m=>s+=_sNum((o||{})[m])); return s; };
+  const byReg={};
+  SALES_JIBU.forEach(j=>{ const rg=jr[j]; if(!rg) return; const rolls=sm((SALES.jibu[j]||{}).mq); byReg[rg]=byReg[rg]||{rolls:0,jibus:[]}; byReg[rg].rolls+=rolls; byReg[rg].jibus.push(j); });
+  const regKeys=_REGION_KEYS.filter(k=>byReg[k]);
+  if(!regKeys.length) return '<div class="cap" style="line-height:1.6">설정 → <b>매출 설정</b>의 <b>‘TEST · 지부 → 권역 매핑’</b>에서 지부를 권역에 지정하면, 대리점(지부) 판매를 권역으로 합쳐 점유율을 계산해 보여줍니다.</div>';
+  const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const th='style="text-align:right;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
+  const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
+  const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  let html=`<div class="cap" style="margin-bottom:9px;line-height:1.6">대리점(지부) 롤 판매를 <b>권역(시도)</b>으로 합쳐 ÷ 권역 신차등록. 한 시도에 지부가 여러 개여도 <b>묶어서</b> 계산해 분모(신차등록)와 단위가 맞습니다. <b>B2B·본사직속 등 미지정분은 제외</b>. 환산 대수 = 롤 판매 × 롤당 ${cap}대. (${_salesLabel()})</div>`;
+  html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>권역</th><th ${thl}>지부</th><th ${th}>롤 판매</th><th ${th}>환산 대수(분자)</th><th ${th}>신차등록(분모)</th><th ${th}>점유율</th></tr>`;
+  let tn=0, tdn=0;
+  regKeys.sort((a,b)=>byReg[b].rolls-byReg[a].rolls).forEach(k=>{
+    const rolls=byReg[k].rolls, num=rolls*cap, den=sm((reg[k]||{}).carReg);
+    const sh=den>0?(num/den*100):null; tn+=num; tdn+=den;
+    const denC=den>0?den.toLocaleString():'<span style="color:var(--ink2)">미입력</span>';
+    html+=`<tr class="shc" data-sb="${escapeHtml(k)} 권역" data-sd="${escapeHtml(byReg[k].jibus.join(', '))} 대리점 롤 판매 × 롤당 ${cap}대" data-sn="${Math.round(num)}" data-sden="${Math.round(den)}" data-sp="${escapeHtml(_salesLabel())}"${den>0?' style="cursor:pointer"':''}><td ${tdl}><b>${escapeHtml(k)}</b></td><td ${tdl} style="font-size:11.5px;color:var(--ink2)">${escapeHtml(byReg[k].jibus.join(', '))}</td><td ${td}>${rolls.toLocaleString()}</td><td ${td}>${Math.round(num).toLocaleString()}</td><td ${td}>${denC}</td><td ${td} style="font-weight:800;color:var(--amber)">${sh!=null?sh.toFixed(2)+'%':'—'}</td></tr>`;
+  });
+  const tsh=tdn>0?(tn/tdn*100):null;
+  html+=`<tr><td ${tdl} colspan="3" style="font-weight:800;background:var(--bg2)">합계 (매핑된 권역)</td><td ${td} style="font-weight:800;background:var(--bg2)">${Math.round(tn).toLocaleString()}</td><td ${td} style="font-weight:800;background:var(--bg2)">${tdn>0?tdn.toLocaleString():'—'}</td><td ${td} style="font-weight:800;background:var(--bg2);color:var(--amber)">${tsh!=null?tsh.toFixed(2)+'%':'—'}</td></tr></table>`;
+  return html;
+}
 function salesShareTable(){
   if(!SALES||!SALES.channels) return '<div class="cap">매출 ERP 업로드 후 표시됩니다.</div>';
   const M=_salesDispMonths(), sc=salesCfg(), showT=M.length>1;
@@ -6392,6 +6418,9 @@ function salesSettingsSectionHTML(){
      <tr><td ${tdl} style="background:var(--bg2);font-weight:800;position:sticky;left:0">총합계</td><td style="padding:5px 9px;text-align:right;font-weight:800;font-size:12px;background:var(--bg2)">${rTotR.toLocaleString()}</td><td style="padding:5px 9px;text-align:right;font-weight:800;font-size:12px;background:var(--bg2)">${rTotC.toLocaleString()}</td><td style="padding:5px 9px;text-align:right;font-weight:800;font-size:12px;background:var(--bg2);color:var(--amber)">${rTotSh}</td></tr>
      </table></div></div>
    `;
+  const _jrCfg=(sc.jibuRegion||{});
+  const _jrRows=SALES_JIBU.map(j=>{ const cur=_jrCfg[j]||''; const opts=`<option value="">(미지정)</option>`+_REGION_KEYS.map(r=>`<option value="${r}"${cur===r?' selected':''}>${r}</option>`).join(''); return `<tr><td ${tdl}>${escapeHtml(j)}</td><td style="padding:4px 8px">${cur?'<span style=\'color:var(--amber);font-weight:700;margin-right:6px\'>●</span>':''}<select class="scjr-in set-text" data-jibu="${escapeHtml(j)}" style="max-width:150px">${opts}</select></td></tr>`; }).join('');
+  const mapCard=`<div class="card set-card"><h3><span class="dot"></span>TEST · 지부 → 권역(시도) 매핑</h3><div class="cap">각 지부가 담당하는 <b>권역(시도)</b>을 지정하면 매출 화면의 <b>TEST · 권역별 점유율</b>이 계산됩니다. 한 시도에 지부가 여러 개(예: 서울 3~4개)면 <b>합쳐서</b> 권역 점유율을 냅니다. 본사직속 등 권역이 모호하면 비워두세요(점유율 계산에서 제외).</div><div style="overflow-x:auto"><table style="border-collapse:collapse"><tr><th ${thl}>지부</th><th ${thl}>담당 권역</th></tr>${_jrRows}</table></div></div>`;
   return `<div class="set-app-sec"><h2 class="set-app-h">💰 매출 설정</h2></div>
    ${ruleCard}
    <div class="card set-card"><h3><span class="dot"></span>표시 기간 (마감 월)</h3>
@@ -6403,6 +6432,7 @@ function salesSettingsSectionHTML(){
      <div class="cap"><b>월 차량 출고 대수(신차등록)</b>와 <b>대리점 판매 롤 수</b>를 월별로 입력하면(롤당 대수로 환산해 점유율 계산)(품질보증서는 품질보증서 탭에서 자동 집계) 매출 종합표·KPI·시장점유율에 반영됩니다. 입력칸을 벗어나면 자동 저장됩니다.</div>
      ${grid}</div>
    ${regionCard}
+   ${mapCard}
    <div class="card set-card"><h3><span class="dot"></span>롤당 시공가능대수 (시장점유율 계산용)</h3>
      <div class="cap">롤 중분류별 한 롤이 시공 가능한 차량 대수. <b>기본 10대, 모노카본(TBTECH·MONO) 17대</b> — 비워두면 기본값 적용. 판매 기준 시장점유율 계산에 쓰입니다.</div>
      ${capHTML}</div>
@@ -6415,6 +6445,7 @@ function salesSettingsSectionHTML(){
     if(t.classList&&t.classList.contains('sc-in')){ const sc=salesCfg(); sc[t.dataset.metric][parseInt(t.dataset.month,10)]=_sNum(t.value); saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave(); const sh=document.getElementById('setSalesHost'); if(sh) sh.innerHTML=salesSettingsSectionHTML(); toast('저장됨'); }
     else if(t.classList&&t.classList.contains('scr-in')){ const sc=salesCfg(); sc.region=sc.region||{}; const k=t.dataset.region, met=t.dataset.metric, mo=parseInt(t.dataset.month,10); sc.region[k]=sc.region[k]||{}; sc.region[k][met]=sc.region[k][met]||{}; sc.region[k][met][mo]=_sNum(t.value); saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave(); const sh=document.getElementById('setSalesHost'); if(sh) sh.innerHTML=salesSettingsSectionHTML(); toast('저장됨'); }
     else if(t.id==='scRegionMonth'){ _regionEditMonth=parseInt(t.value,10)||1; const sh=document.getElementById('setSalesHost'); if(sh) sh.innerHTML=salesSettingsSectionHTML(); }
+    else if(t.classList&&t.classList.contains('scjr-in')){ const sc2=salesCfg(); sc2.jibuRegion=sc2.jibuRegion||{}; if(t.value) sc2.jibuRegion[t.dataset.jibu]=t.value; else delete sc2.jibuRegion[t.dataset.jibu]; saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave(); const sh=document.getElementById('setSalesHost'); if(sh) sh.innerHTML=salesSettingsSectionHTML(); renderRevenue(); toast('지부 권역 저장됨'); }
     else if(t.id==='scRegionCap'){ salesCfg().regionCap=_sNum(t.value); saveStore(STORE); if(typeof flushCloudSave==='function') flushCloudSave(); const sh=document.getElementById('setSalesHost'); if(sh) sh.innerHTML=salesSettingsSectionHTML(); toast('저장됨'); }
     else if(t.classList&&t.classList.contains('sc-cap')){ if(SALES){ SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.cap[decodeURIComponent(t.dataset.mid)]=_sNum(t.value); cloudSaveJSON(SUPA.salesFile,SALES); toast('저장됨'); } }
     else if(t.classList&&t.classList.contains('sc-mid')){ const mid=decodeURIComponent(t.dataset.mid), sc=salesCfg(); if(t.value) sc.midType[mid]=t.value; else delete sc.midType[mid]; saveStore(STORE); if(typeof flushCloudSave==='function')flushCloudSave(); toast('중분류 ‘'+mid+'’ 규칙 저장'); }
