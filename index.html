@@ -1499,7 +1499,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 스코어삭제_명칭변경';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 지부순위_전체옵션';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4875,10 +4875,10 @@ function salesJibuProdRankTable(){
   Object.values(SALES.jibuProd).forEach(pm=>{ Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const cat=catOf(mat); catTot[cat]=(catTot[cat]||0)+sm(pm[mat].q||pm[mat]); }); });
   const catList=Object.keys(catTot).filter(c=>catTot[c]>0).sort((a,b)=>catTot[b]-catTot[a]);
   if(!catList.length) return '<div class="empty">롤 판매 데이터가 없습니다.</div>';
-  let sel=_jspSel; if(catList.indexOf(sel)<0) sel=catList[0];
-  const seg=`<div class="seg" id="jspSeg" style="margin-bottom:10px;flex-wrap:wrap">${catList.map(c=>`<button data-cat="${escapeHtml(c)}" class="${c===sel?'on':''}">${escapeHtml(c)}</button>`).join('')}</div>`;
+  let sel=_jspSel; if(sel!=='__all' && catList.indexOf(sel)<0) sel=catList[0];
+  const seg=`<div class="seg" id="jspSeg" style="margin-bottom:10px;flex-wrap:wrap"><button data-cat="__all" class="${sel==='__all'?'on':''}">전체</button>${catList.map(c=>`<button data-cat="${escapeHtml(c)}" class="${c===sel?'on':''}">${escapeHtml(c)}</button>`).join('')}</div>`;
   const JG=SALES_JIBU.concat(['본사']);
-  const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; let q=0,a=0; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; if(catOf(mat)!==sel)return; const oo=pm[mat]; q+=sm(oo.q||oo); a+=sm(oo.a||{}); }); return {j,q,a}; }).filter(r=>r.q>0).sort((x,y)=>y.q-x.q);
+  const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; let q=0,a=0; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; if(sel!=='__all' && catOf(mat)!==sel)return; const oo=pm[mat]; q+=sm(oo.q||oo); a+=sm(oo.a||{}); }); return {j,q,a}; }).filter(r=>r.q>0).sort((x,y)=>y.q-x.q);
   const totQ=rows.reduce((s,r)=>s+r.q,0)||1, totA=rows.reduce((s,r)=>s+r.a,0);
   if(!rows.length) return seg+'<div class="empty">선택한 제품의 지부별 판매 데이터가 없습니다.</div>';
   const thl='style="text-align:left;padding:7px 9px;font-size:11.5px;color:var(--ink3);border-bottom:1px solid var(--line)"';
@@ -4887,7 +4887,7 @@ function salesJibuProdRankTable(){
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
   const roll=n=>n?Math.round(n).toLocaleString():'·', kw=n=>n?(n/1e8).toFixed(1)+'억':'·';
-  let h=seg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${escapeHtml(sel)}</b> 를 가장 많이 판매한 지부 순위 · ${escapeHtml(_salesLabel())} · 롤 판매 수 기준</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
+  let h=seg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> ${sel==='__all'?'롤 판매 지부 순위':'를 가장 많이 판매한 지부 순위'} · ${escapeHtml(_salesLabel())} · 롤 판매 수 기준</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
   rows.forEach((r,i)=>{ h+=`<tr><td ${tdl} style="color:var(--ink3);width:38px">${i+1}</td><td ${tdl}>${escapeHtml(r.j)}</td><td ${tdt}>${roll(r.q)}</td><td ${td}>${kw(r.a)}</td><td ${td}>${(r.q/totQ*100).toFixed(1)}%</td></tr>`; });
   h+=`<tr style="background:var(--bg2)"><td ${tdl}></td><td ${tdl}><b>합계</b></td><td ${tdt}><b>${roll(totQ)}</b></td><td ${td}><b>${kw(totA)}</b></td><td ${td}><b>100%</b></td></tr></table></div>`;
   return h;
