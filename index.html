@@ -1492,7 +1492,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 지부드릴다운';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 라인카드_VLT제거_달력수정';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5401,7 +5401,7 @@ function lineWarrCard(recs){
   const Llabel = L==='ALL'?'전체':(_LINE_CODE[L]||L);
   const lineBtns=`<button data-l="ALL" class="${L==='ALL'?'on':''}">전체 <span style="opacity:.55">${lineAllTot.toLocaleString()}</span></button>`+['UL','ST','PH','CH'].map(k=>`<button data-l="${k}" class="${L===k?'on':''}">${_LINE_CODE[k]} <span style="opacity:.55">${(lineTot[k]||0).toLocaleString()}</span></button>`).join('');
   const scopeBtns=`<button data-sc="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-sc="dealer" class="${scope==='dealer'?'on':''}">대리점별</button>`;
-  let h=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55"><b>${Llabel}</b> 보증서 발급 — ${scope==='dealer'?'대리점별':'지부별'} × VLT(썬팅 농도, 제품코드 앞 2자리, 높은 순). <b>보증서 1건 기준</b> · 이 카드는 아래 <b>자체 기간 필터</b>를 사용합니다(상단 필터와 별개).</div>`;
+  let h=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55"><b>${Llabel}</b> 보증서 발급 — ${scope==='dealer'?'대리점별':'지부별'} 발급 건수. <b>보증서 1건 기준</b> · 이 카드는 아래 <b>자체 기간 필터</b>를 사용합니다(상단 필터와 별개).</div>`;
   h+=`<div class="cardctrl" style="margin-bottom:11px">${_dateBar('lw', LWV, lwMin, lwMax)}</div>`;
   h+=`<div class="seg" id="lwLine" style="margin-bottom:8px;flex-wrap:wrap">${lineBtns}</div><div class="seg" id="lwScope" style="margin-bottom:12px">${scopeBtns}</div>`;
   { const subs=Object.keys(subCnt).sort((a,b)=>subCnt[b]-subCnt[a]); const lineAll=Object.values(subCnt).reduce((s,n)=>s+n,0);
@@ -5414,10 +5414,10 @@ function lineWarrCard(recs){
   const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
-  h+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:420px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${vlts.map(v=>`<th ${th}>VLT ${v}</th>`).join('')}<th ${th}>합계</th></tr>`;
-  top.forEach(([g,o])=>{ h+=`<tr><td ${tdl}>${escapeHtml(g)}</td>${vlts.map(v=>`<td ${td}>${o.vlt[v]?o.vlt[v].toLocaleString():'·'}</td>`).join('')}<td ${tdt}>${o.tot.toLocaleString()}</td></tr>`; });
+  h+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:300px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th><th ${th}>발급수</th></tr>`;
+  top.forEach(([g,o])=>{ h+=`<tr><td ${tdl}>${escapeHtml(g)}</td><td ${tdt}>${o.tot.toLocaleString()}</td></tr>`; });
   const colTot={}; vlts.forEach(v=>colTot[v]=0); top.forEach(([,o])=>vlts.forEach(v=>colTot[v]+=(o.vlt[v]||0)));
-  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td>${vlts.map(v=>`<td ${td}><b>${colTot[v].toLocaleString()}</b></td>`).join('')}<td ${tdt}>${top.reduce((s,[,o])=>s+o.tot,0).toLocaleString()}</td></tr>`;
+  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}><b>${top.reduce((s,[,o])=>s+o.tot,0).toLocaleString()}</b></td></tr>`;
   h+=`</table></div>`;
   if(scope==='dealer'&&groups.length>30) h+=`<div class="cap" style="margin-top:6px">상위 30개 대리점만 표시 (전체 ${groups.length}곳)</div>`;
   return h;
@@ -6766,8 +6766,6 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const sb=e.target.closest('#wvScope button'); if(sb){ WV.scope=sb.dataset.s; if(WV.scope==='range'){ if(!WV.from)WV.from=WV._min; if(!WV.to)WV.to=WV._max; } renderWarranty(); return; }
   const _lwrp=e.target.closest('#lwPreset button'); if(_lwrp){ _dfPreset(LWV,renderWarranty,_lwrp.dataset.rp); return; }
   if(e.target.id==='lwApply'){ _dfApply(LWV,renderWarranty,'lwFrom','lwTo'); return; }
-  if(e.target.id==='lwFrom'){ LWV.from=e.target.value; if(LWV.from&&LWV.to&&LWV.to<LWV.from)LWV.to=LWV.from; LWV.scope='range'; LWV.preset='custom'; renderWarranty(); return; }
-  if(e.target.id==='lwTo'){ LWV.to=e.target.value; if(LWV.from&&LWV.to&&LWV.to<LWV.from)LWV.from=LWV.to; LWV.scope='range'; LWV.preset='custom'; renderWarranty(); return; }
   const _lsub=e.target.closest('#lwSub button'); if(_lsub){ const _sv=_lsub.dataset.lwsub; if(_sv==='__all'){ _lwSub=[]; } else { const _i=_lwSub.indexOf(_sv); if(_i>=0) _lwSub.splice(_i,1); else _lwSub.push(_sv); } renderWarranty(); return; }
   const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; _lwSub=[]; renderWarranty(); return; }
   const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
@@ -6850,6 +6848,8 @@ document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='wvTo'){ WV.to=e.target.value; if(WV.from&&WV.to&&WV.to<WV.from)WV.from=WV.to; WV.scope='range'; WV.preset='custom'; renderWarranty(); }
   if(e.target.id==='glDateCol'){ GV.dateCol=e.target.value; renderGlass(); return; }
   if(e.target.id==='gvFrom'){ GV.from=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.to=GV.from; GV.scope='range'; GV.preset='custom'; renderGlass(); return; }
+  if(e.target.id==='lwFrom'){ LWV.from=e.target.value; if(LWV.from&&LWV.to&&LWV.to<LWV.from)LWV.to=LWV.from; LWV.scope='range'; LWV.preset='custom'; renderWarranty(); return; }
+  if(e.target.id==='lwTo'){ LWV.to=e.target.value; if(LWV.from&&LWV.to&&LWV.to<LWV.from)LWV.from=LWV.to; LWV.scope='range'; LWV.preset='custom'; renderWarranty(); return; }
   if(e.target.id==='gvTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; GV.scope='range'; GV.preset='custom'; renderGlass(); return; }
   if(e.target.id==='dlrJibu'){ DLR.jibu=e.target.value; renderDealer(); return; }
   if(e.target.id==='dlrMember'){ DLR.member=e.target.value; renderDealer(); return; }
