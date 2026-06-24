@@ -986,6 +986,14 @@
   .sbar{display:flex;align-items:flex-end;gap:3px;height:30px;margin-top:9px}
   .sb-bar{flex:1;min-width:3px;border-radius:3px 3px 0 0;transition:opacity .12s;cursor:default}
   .sb-bar:hover{opacity:1!important}
+  .warr-acc{margin:0 0 8px}
+  summary.warr-sec{cursor:pointer;user-select:none;list-style:none;margin:10px 0 0;padding:9px 13px;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+  summary.warr-sec::-webkit-details-marker{display:none}
+  summary.warr-sec::marker{content:""}
+  summary.warr-sec:hover{border-color:var(--amber)}
+  .warr-acc[open]>summary.warr-sec{border-color:var(--amber);margin-bottom:12px}
+  .warr-chev{margin-left:auto;color:var(--ink3);font-size:12px;font-weight:800;transition:transform .15s}
+  .warr-acc:not([open])>summary .warr-chev{transform:rotate(-90deg)}
 </style>
 </head>
 <body>
@@ -1499,7 +1507,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 글라스드릴_팝업';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 보증서_분석접기';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5557,14 +5565,15 @@ function renderWarranty(){
   const _cC='var(--dv1)';
   const custCards=[ warrDistCard(recs,'고객 성별','성별 분포',{color:_cC}), warrDistCard(recs,'고객 연령대/나이','연령대 분포',{color:_cC,n:12,orderFn:(a,b)=>(parseInt(a[0])||999)-(parseInt(b[0])||999)}), warrDistCard(recs,'고객 거주 지역','고객 거주 지역(도)',{color:_cC,n:17}), warrDistCard(recs,'고객 거주 시군구','고객 거주 시군구 TOP',{color:_cC,n:12}) ];
   const custKpi=(mkt||pii)? warrKpiCard('고객 동의 · 규모', [{l:'총 고객(건)',v:recs.length.toLocaleString(),m:'시공 건수'}].concat(mkt?[{l:'마케팅 동의',v:mkt.pct.toFixed(0)+'%',m:mkt.y.toLocaleString()+'명 · CRM 활용 가능'}]:[]).concat(pii?[{l:'개인정보 동의',v:pii.pct.toFixed(0)+'%',m:pii.y.toLocaleString()+'명'}]:[])) : '';
-  const custBlock=(custKpi||custCards.some(Boolean))?(_sec('고객')+custKpi+_grid(custCards)):'';
+  const _acc=(t,c)=>`<details class="warr-acc"><summary class="warr-sec"><span class="dot"></span>${t}<span class="warr-chev">▾</span></summary>${c}</details>`;
+  const custBlock=(custKpi||custCards.some(Boolean))?_acc('고객',custKpi+_grid(custCards)):'';
   // 차량
   const newR=_warrHas('신차/중고차')?_warrRatio(recs,'신차/중고차',v=>v.indexOf('신차')===0):null;
   const impR=_warrHas('수입/국산')?_warrRatio(recs,'수입/국산',v=>/수입/.test(v)):null;
   const _cV='var(--dv3)';
   const vehCards=[ warrDistCard(recs,'제조사','제조사 TOP',{color:_cV,n:12}), warrDistCard(recs,'모델명','모델 TOP',{color:_cV,n:12}), warrDistCard(recs,'차종','차종 구성',{color:_cV}), warrDistCard(recs,'수입/국산','수입/국산',{color:_cV}), warrDistCard(recs,'신차/중고차','신차/중고',{color:_cV}) ];
   const vehKpi=vehCards.some(Boolean)? warrKpiCard('차량 구성', (newR?[{l:'신차 비율',v:newR.pct.toFixed(0)+'%',m:'신차 '+newR.y.toLocaleString()+'대'}]:[]).concat(impR?[{l:'수입차 비율',v:impR.pct.toFixed(0)+'%',m:'수입 '+impR.y.toLocaleString()+'대'}]:[]).concat(_warrHas('제조사')?[{l:'제조사 수',v:distinct(recs,'제조사').toLocaleString(),m:'브랜드'}]:[]).concat(_warrHas('모델명')?[{l:'모델 수',v:distinct(recs,'모델명').toLocaleString(),m:'모델'}]:[])) : '';
-  const vehBlock=vehCards.some(Boolean)?(_sec('차량')+vehKpi+_grid(vehCards)):'';
+  const vehBlock=vehCards.some(Boolean)?_acc('차량',vehKpi+_grid(vehCards)):'';
   // 제품
   const pc=['시공내역(전면)','시공내역(측면1열)','시공내역(측면2열)','시공내역(측면3열)','시공내역(후면)','시공내역(썬루프)','시공내역(파노라마 썬루프)'].filter(_warrHas);
   let _full=0,_part=0,_ps=0,_pn=0;
@@ -5573,11 +5582,11 @@ function renderWarranty(){
   const _cP='var(--dv2)';
   const prodCards=[ warrDistCard(recs,'시공내역(전면)','전면 제품 TOP',{label:true,color:_cP,n:12}), warrDistCard(recs,'시공내역(측면1열)','측면 제품 TOP',{label:true,color:_cP,n:12}), warrDistCard(recs,'시공내역(후면)','후면 제품 TOP',{label:true,color:_cP,n:12}), warrDistCard(recs,'시공내역(썬루프)','썬루프 제품',{label:true,color:_cP,n:10}) ];
   const prodKpi=pc.length? warrKpiCard('시공 형태', [{l:'전체 시공',v:(_full/_tt*100).toFixed(0)+'%',m:'전·측·후 모두 '+_full.toLocaleString()+'대'},{l:'부분 시공',v:(_part/_tt*100).toFixed(0)+'%',m:_part.toLocaleString()+'대'},{l:'평균 시공 면',v:(_pn?_ps/_pn:0).toFixed(1),m:'대당 패널 수'}]) : '';
-  const prodBlock=prodCards.some(Boolean)?(_sec('제품')+prodKpi+_grid(prodCards)):'';
+  const prodBlock=prodCards.some(Boolean)?_acc('제품',prodKpi+_grid(prodCards)):'';
   // 지역
   const _cR='var(--dv6)';
   const regCards=[ warrDistCard(recsProd,'담당지부','담당지부 구성',{color:_cR,n:12}), warrDistCard(recs,'대리점지역(도)','지역(도) 구성',{color:_cR,n:17}), warrDistCard(recs,'대리점지역(시군구)','시군구 TOP',{color:_cR,n:15}), warrDistCard(recs,'매장명','매장(대리점) TOP',{color:_cR,n:15}), warrDistCard(recs,'대리점구분','대리점 구분',{color:_cR}) ];
-  const regBlock=regCards.some(Boolean)?(_sec('지역')+_grid(regCards)):'';
+  const regBlock=regCards.some(Boolean)?_acc('지역',_grid(regCards)):'';
   const lineBlock=(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)?(_sec('지부/제품별 보증서 발급 현황')+'<div class="card">'+lineWarrCard(recs)+'</div>'):'';
   const adminRow = admin ? `<div style="margin-bottom:16px;display:flex;justify-content:flex-end"><button class="acc-btn" id="warrExclToggle">집계 제외 관리 (${exRows.length})</button></div>` : '';
   box.innerHTML = cfgCard + controls + kpis + trendCard + lineBlock
