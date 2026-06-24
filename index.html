@@ -994,6 +994,8 @@
   .warr-acc[open]>summary.warr-sec{border-color:var(--amber);margin-bottom:12px}
   .warr-chev{margin-left:auto;color:var(--ink3);font-size:12px;font-weight:800;transition:transform .15s}
   .warr-acc:not([open])>summary .warr-chev{transform:rotate(-90deg)}
+  .up-hist-scroll{max-height:300px}
+  .up-hist-scroll .up-tbl thead th{position:sticky;top:0;z-index:1}
 </style>
 </head>
 <body>
@@ -1507,7 +1509,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 보증서_섹션명변경';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 업로드이력_스크롤';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2819,7 +2821,7 @@ function chipRow(grp,arr){
 function uploadHistoryHTML(){
   const ups=((STORE.config&&STORE.config.uploads)||[]).slice().sort((a,b)=>(b.at||'').localeCompare(a.at||''));
   if(!ups.length) return '<div class="empty">아직 업로드 이력이 없습니다. (이 기능 적용 후 올린 파일부터 기록됩니다)</div>';
-  return `<div class="tbl-wrap"><table class="up-tbl"><thead><tr><th>업로드 일시</th><th>파일명</th><th>추가 건수</th><th></th></tr></thead><tbody>`+
+  return `<div class="tbl-wrap up-hist-scroll"><table class="up-tbl"><thead><tr><th>업로드 일시</th><th>파일명</th><th>추가 건수</th><th></th></tr></thead><tbody>`+
     ups.map(u=>{const dt=u.at?new Date(u.at):null;
       const ds=dt?`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`:'-';
       return `<tr><td>${ds}</td><td>${escapeHtml(u.name||'-')}</td><td style="text-align:center">${(u.added||0).toLocaleString()}</td>
@@ -2964,7 +2966,7 @@ function renderSettings(){
      <span style="margin-left:auto;font-size:11px;color:var(--ink3)">빌드 ${BUILD}</span>
    </div>
    <div class="card set-card" data-setcat="data">
-     <h3><span class="dot"></span>업로드 파일 이력</h3>
+     <h3><span class="dot"></span>업로드 파일 이력${(()=>{const _n=((STORE.config&&STORE.config.uploads)||[]).length;return _n?` <span style="color:var(--ink3);font-weight:600;font-size:13px">(${_n}건)</span>`:'';})()}</h3>
      <div class="cap">일자별로 올린 엑셀 목록입니다. <b>교체</b>는 그 회차로 추가된 데이터를 새 엑셀로 바꾸고, <b>삭제</b>는 그 회차 데이터를 제거합니다. (다른 회차에서 중복으로 들어온 글은 유지됩니다.)</div>
      ${uploadHistoryHTML()}
    </div>`;
