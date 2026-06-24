@@ -1509,7 +1509,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-23 · 업로드이력_스크롤';   // 배포 버전 확인용
+const BUILD = '2026-06-23 · 대리점마스터_지부제외';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5025,9 +5025,10 @@ function renderRDash(){
 function _dealerAgg(){
   const M={}, today=Date.now();
   const ens=n=>M[n]||(M[n]={name:n, jibu:'', code:'', member:false, warr:0, glass:0, salesA:0, salesQ:0, last:''});
-  if(typeof WARR!=='undefined'&&WARR&&WARR.rows) WARR.rows.forEach(r=>{ const n=String(r['매장명']||'').trim(); if(!n)return; const d=ens(n); d.warr++; if(!d.jibu){const j=String(r['담당지부']||'').trim(); if(j)d.jibu=j;} if(!d.code){const c=String(r['대리점코드']||'').trim(); if(c)d.code=c;} if(/멤버스/.test(String(r['대리점구분']||''))) d.member=true; const ds=String(r['시공일자']||'').slice(0,10); if(ds&&ds>d.last)d.last=ds; });
-  if(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows){ const dc=(GLASS.columns||[]).includes('매장명(대리점명)')?'매장명(대리점명)':'매장명'; GLASS.rows.forEach(r=>{ const n=String(r[dc]||'').trim(); if(!n)return; const d=ens(n); d.glass++; if(!d.jibu){const j=String(r['담당지부']||'').trim(); if(j)d.jibu=j;} const ds=String(r['시공일자']||'').slice(0,10); if(ds&&ds>d.last)d.last=ds; }); }
-  if(typeof SALES!=='undefined'&&SALES&&SALES.dealers){ const sm=o=>{let s=0;for(let m=1;m<=12;m++)s+=(o&&o[m])||0;return s;}; Object.keys(SALES.dealers).forEach(n=>{ const nm=String(n||'').trim(); if(!nm)return; const sd=SALES.dealers[n]||{}; const d=ens(nm); d.salesA=(d.salesA||0)+sm(sd.ma); d.salesQ=(d.salesQ||0)+sm(sd.mq); if(!d.jibu&&sd.jibu) d.jibu=String(sd.jibu).trim(); }); }
+  const _isJibuName=n=>{ const s=String(n||''); if(/지부|본사/.test(s)) return true; if(typeof _sToJibu==='function' && _sToJibu(s)) return true; return false; };
+  if(typeof WARR!=='undefined'&&WARR&&WARR.rows) WARR.rows.forEach(r=>{ const n=String(r['매장명']||'').trim(); if(!n||_isJibuName(n))return; const d=ens(n); d.warr++; if(!d.jibu){const j=String(r['담당지부']||'').trim(); if(j)d.jibu=j;} if(!d.code){const c=String(r['대리점코드']||'').trim(); if(c)d.code=c;} if(/멤버스/.test(String(r['대리점구분']||''))) d.member=true; const ds=String(r['시공일자']||'').slice(0,10); if(ds&&ds>d.last)d.last=ds; });
+  if(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows){ const dc=(GLASS.columns||[]).includes('매장명(대리점명)')?'매장명(대리점명)':'매장명'; GLASS.rows.forEach(r=>{ const n=String(r[dc]||'').trim(); if(!n||_isJibuName(n))return; const d=ens(n); d.glass++; if(!d.jibu){const j=String(r['담당지부']||'').trim(); if(j)d.jibu=j;} const ds=String(r['시공일자']||'').slice(0,10); if(ds&&ds>d.last)d.last=ds; }); }
+  if(typeof SALES!=='undefined'&&SALES&&SALES.dealers){ const sm=o=>{let s=0;for(let m=1;m<=12;m++)s+=(o&&o[m])||0;return s;}; Object.keys(SALES.dealers).forEach(n=>{ const nm=String(n||'').trim(); if(!nm||_isJibuName(nm))return; const sd=SALES.dealers[n]||{}; const d=ens(nm); d.salesA=(d.salesA||0)+sm(sd.ma); d.salesQ=(d.salesQ||0)+sm(sd.mq); if(!d.jibu&&sd.jibu) d.jibu=String(sd.jibu).trim(); }); }
   Object.values(M).forEach(d=>{ d.days = d.last? Math.floor((today-new Date(d.last+'T00:00:00').getTime())/86400000) : null; d.active = d.days!=null && d.days<=60; });
   return Object.values(M);
 }
