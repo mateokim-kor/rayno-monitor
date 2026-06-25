@@ -1006,16 +1006,25 @@
   .kpi.clickable:hover .kpi-ic{opacity:0}
   .kpi .val{font-size:32px}
   .dot{border-radius:3px}
-  .brief{position:relative;overflow:hidden;background:linear-gradient(120deg,#fff7ee 0%,#ffedd8 55%,#ffe6c8 100%);border:1px solid #ffdcae;border-radius:var(--r);padding:19px 22px;margin-bottom:16px;box-shadow:var(--shadow-sm)}
-  html[data-theme="dark"] .brief{background:linear-gradient(120deg,#251b10,#2c1e0d);border-color:#5a3d17}
-  .brief-head .bh-t{font-size:15px}
-  .brief .ai-badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;color:#fff;background:var(--amber);padding:2px 7px;border-radius:980px;margin-left:7px;letter-spacing:.04em;vertical-align:middle}
-  .brief-line{position:relative;padding-left:15px}
-  .brief-line::before{content:"";position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:2px;background:var(--amber)}
-  .brief-wave{position:absolute;right:0;top:0;bottom:0;width:42%;max-width:360px;height:100%;pointer-events:none}
-  .brief-head,.brief-lines,.brief-alerts{position:relative;z-index:1}
-  .brief-alerts{border-top-color:rgba(180,120,40,.28)}
-  @media(max-width:680px){.brief-wave{display:none}}
+  .brief{position:relative;overflow:hidden;border-radius:22px;padding:32px 36px;min-height:200px;display:flex;align-items:center;margin-bottom:16px;background:linear-gradient(120deg,#fffaf4 0%,#fff4e7 55%,#ffeede 100%);border:1px solid #ffe2c2;box-shadow:0 8px 24px rgba(20,25,35,.05)}
+  html[data-theme="dark"] .brief{background:linear-gradient(120deg,#241a0f,#2a1d0e);border-color:#5a3d17}
+  .brief-orb{position:absolute;right:0;top:0;height:100%;width:50%;max-width:580px;pointer-events:none}
+  .brief-main{position:relative;z-index:1;max-width:60%}
+  .brief-eyebrow{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .be-t{font-size:13px;font-weight:800;color:var(--ink)}
+  .be-badge{font-size:9px;font-weight:800;letter-spacing:.12em;color:#e07d0a;background:rgba(244,145,28,.13);padding:3px 9px;border-radius:980px}
+  html[data-theme="dark"] .be-badge{color:#f4a948}
+  .brief-head{margin:0;font-size:26px;font-weight:800;line-height:1.34;letter-spacing:-.02em;color:var(--ink)}
+  .brief-desc{margin:12px 0 18px;font-size:13px;line-height:1.65;color:var(--ink2);max-width:92%}
+  .brief-cta{display:inline-flex;align-items:center;gap:8px;background:#16181d;color:#fff;border:none;border-radius:12px;padding:11px 18px;font-size:12.5px;font-weight:700;cursor:pointer}
+  .brief-cta:hover{background:#23262e}
+  .brief-cta .ar{color:#ffb967}
+  .brief-pager{position:absolute;right:24px;bottom:20px;display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.72);border:1px solid #ffe2c2;border-radius:980px;padding:4px 6px;font-size:11.5px;font-weight:700;color:var(--ink2);z-index:2}
+  html[data-theme="dark"] .brief-pager{background:rgba(40,30,18,.6);border-color:#5a3d17;color:#e8d6bf}
+  .brief-pager button{border:none;background:none;width:24px;height:24px;border-radius:50%;color:var(--ink3);cursor:pointer;font-size:16px;line-height:1}
+  .brief-pager button:hover{background:#fff;color:var(--amber)}
+  html[data-theme="dark"] .brief-pager button:hover{background:#3a2c18}
+  @media(max-width:900px){.brief-orb{opacity:.35}.brief-main{max-width:100%}.brief-head{font-size:21px}.brief{padding:24px 24px}}
   /* ── 다크 사이드바 (리디자인 1단계) ── */
   body.sidebar-on{padding:0 !important}
   .wrap.has-sidebar{display:grid;grid-template-columns:236px minmax(0,1fr);grid-template-rows:auto 1fr;grid-template-areas:"side head" "side main";max-width:none;margin:0;min-height:100vh}
@@ -1630,7 +1639,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 상단바_레이노인사이트_기간검색';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 주간인사이트_배너_캐러셀';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2100,37 +2109,105 @@ function briefStats(rows){
   const cl=pos+neg+neu; const pr=cl?pos/cl*100:0, nr=cl?neg/cl*100:0;
   return {total:rows.length,posts,cmts,pos,neg,neu,posRate:pr,negRate:nr,net:pr-nr};
 }
+function _briefOrbSvg(){
+  let dots='';
+  function grid(ox,oy,c,r,op){ let s=''; for(let i=0;i<c;i++)for(let j=0;j<r;j++){ s+='<circle cx="'+(ox+i*11)+'" cy="'+(oy+j*11)+'" r="1.4"/>'; } return '<g opacity="'+op+'" fill="#c9a37a">'+s+'</g>'; }
+  dots = grid(470,40,5,4,.5) + grid(486,238,4,4,.45);
+  return '<svg class="brief-orb" viewBox="0 0 560 320" preserveAspectRatio="xMaxYMid slice" xmlns="http://www.w3.org/2000/svg">'
+   +'<defs>'
+   +'<radialGradient id="bfGlow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#ffb55a" stop-opacity=".95"/><stop offset="32%" stop-color="#f4801a" stop-opacity=".5"/><stop offset="66%" stop-color="#e07d0a" stop-opacity=".12"/><stop offset="100%" stop-color="#e07d0a" stop-opacity="0"/></radialGradient>'
+   +'<radialGradient id="bfCore" cx="42%" cy="36%" r="64%"><stop offset="0%" stop-color="#fff3df"/><stop offset="30%" stop-color="#ffb44c"/><stop offset="66%" stop-color="#f47a12"/><stop offset="100%" stop-color="#c25c08"/></radialGradient>'
+   +'</defs>'
+   +'<g fill="none">'
+   +'<circle cx="398" cy="158" r="78" stroke="#e7c6a3" stroke-width="1.4" opacity=".55"/>'
+   +'<circle cx="398" cy="158" r="116" stroke="#ecd0b0" stroke-width="1.3" opacity=".4"/>'
+   +'<circle cx="398" cy="158" r="158" stroke="#efd8bd" stroke-width="1.2" opacity=".28"/>'
+   +'<circle cx="398" cy="158" r="206" stroke="#f1ddc6" stroke-width="1.1" opacity=".18"/>'
+   +'<circle cx="398" cy="158" r="92" stroke="#f4a64a" stroke-width="1" opacity=".5"/>' 
+   +'</g>'
+   +dots
+   +'<g stroke="#ffba6a" stroke-width="1" opacity=".55"><line x1="398" y1="158" x2="250" y2="250"/></g>'
+   +'<g fill="#f4911c"><circle cx="250" cy="250" r="3"/><circle cx="300" cy="120" r="2"/><circle cx="330" cy="220" r="2.4"/></g>'
+   +'<g fill="#ffe6c2" opacity=".9"><path d="M470 120l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6z"/><path d="M300 250l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2z"/></g>'
+   +'<circle cx="398" cy="158" r="96" fill="url(#bfGlow)"/>'
+   +'<circle cx="398" cy="158" r="44" fill="url(#bfCore)"/>'
+   +'<circle cx="384" cy="142" r="15" fill="#fff" opacity=".32"/>'
+   +'</svg>';
+}
+function _weeklyInsights(){
+  const ISSUE={
+    '제품 품질':['품질','하자','불량','들뜸','기포','버블','변색','벗겨','헤이즈','뿌옇','김서림','내구성','우글','벗겨짐'],
+    '성능':['열차단','단열','시야','시인성','반사','눈부심','자외선'],
+    '시공':['시공','기사','마감','재시공','작업'],
+    '가격':['가격','견적','비싸','할인','비용'],
+    '고객 응대':['환불','보증','연락','예약','응대','as','a/s']
+  };
+  const dated=((typeof RAW!=='undefined'&&RAW&&RAW.rows)||[]).map(r=>({r,d:normDate(r.date)})).filter(x=>x.d);
+  let maxD=''; dated.forEach(x=>{ if(x.d>maxD)maxD=x.d; });
+  let recN=0,prevN=0,recPos=0,recNeg=0,recNeu=0,prevPos=0,prevNeg=0; const recNegTxt=[],prevNegTxt=[]; const kwAll={};
+  const ALLKW=Object.values(ISSUE).reduce((a,b)=>a.concat(b),[]);
+  if(maxD && dated.length>=8){
+    const rs=_dayShift(maxD,-6), ps=_dayShift(maxD,-13), pe=_dayShift(maxD,-7);
+    dated.forEach(x=>{ const t=((x.r.title||'')+' '+(x.r.body||'')).toLowerCase(); const sv=sentOf(x.r);
+      if(x.d>=rs&&x.d<=maxD){ recN++; if(sv==='긍정')recPos++; else if(sv==='부정'){recNeg++; recNegTxt.push(t);} else if(sv==='중립')recNeu++;
+        ALLKW.forEach(k=>{ if(t.indexOf(k.toLowerCase())>=0) kwAll[k]=(kwAll[k]||0)+1; });
+      } else if(x.d>=ps&&x.d<=pe){ prevN++; if(sv==='긍정')prevPos++; else if(sv==='부정'){prevNeg++; prevNegTxt.push(t);} }
+    });
+  }
+  let line1;
+  if(prevN>0){ const r=recN/prevN; line1=(r>=0.85&&r<=1.15)?'브랜드 언급은 안정적,':(r>1.15?'브랜드 언급이 늘었고,':'브랜드 언급은 줄었지만,'); }
+  else { const cl=recPos+recNeg+recNeu||1; const pr=recPos/cl*100; line1=pr>=55?'브랜드 여론은 우호적이고,':pr<=35?'부정 여론이 우세하지만,':'브랜드 여론은 중립적이고,'; }
+  function themeNeg(txts){ const c={}; for(const th in ISSUE){ c[th]=0; txts.forEach(t=>{ if(ISSUE[th].some(k=>t.indexOf(k.toLowerCase())>=0)) c[th]++; }); } return c; }
+  const rc=themeNeg(recNegTxt), pc=themeNeg(prevNegTxt);
+  let topTheme=null,topDelta=0;
+  for(const th in ISSUE){ const d=(rc[th]||0)-(pc[th]||0); if(d>topDelta && (rc[th]||0)>=2){ topDelta=d; topTheme=th; } }
+  let line2, kwForDesc='';
+  if(topTheme){ line2=topTheme+' 이슈가 증가했어요.';
+    let best='',bn=0; ISSUE[topTheme].forEach(k=>{ let n=0; recNegTxt.forEach(t=>{ if(t.indexOf(k.toLowerCase())>=0)n++; }); if(n>bn){bn=n;best=k;} }); kwForDesc=best;
+  } else line2='큰 이슈 없이 안정적이에요.';
+  const cl=recPos+recNeg+recNeu||1; const pr=Math.round(recPos/cl*100);
+  const desc = topTheme
+    ? `긍정 반응은 유지되고 있으나, ${topTheme}${kwForDesc?` ‘${escapeHtml(kwForDesc)}’`:''} 관련 언급이 확산되고 있습니다. 주요 이슈를 확인하고 선제 대응을 권장합니다.`
+    : `최근 7일 특별한 리스크 신호는 보이지 않습니다. 긍정 비중 ${pr}%로 안정적인 흐름이에요.`;
+  const slides=[{eb:'이번 주 인사이트', badge:'WEEKLY SUMMARY', head:escapeHtml(line1)+'<br>'+escapeHtml(line2), desc}];
+  if(recN>0){
+    const cl2=recPos+recNeg+recNeu||1, pr2=Math.round(recPos/cl2*100);
+    let s2;
+    if(prevN>0){ const ppr=Math.round(prevPos/((prevPos+prevNeg)||1)*100); const dp=pr2-Math.round(recPos/cl2*100)+0; const diff=pr2-ppr; s2=Math.abs(diff)<3?'전주와 비슷한 수준이에요.':(diff>0?`전주 대비 +${diff}%p 올랐어요.`:`전주 대비 ${diff}%p 내렸어요.`); }
+    else s2='이번 주 여론 흐름이에요.';
+    slides.push({eb:'여론 동향', badge:'SENTIMENT', head:`긍정 비중은 ${pr2}%,<br>${escapeHtml(s2)}`, desc:`최근 7일 긍정 ${recPos} · 부정 ${recNeg} · 중립 ${recNeu}건이 집계됐어요.`});
+  }
+  const kwTop=Object.entries(kwAll).sort((a,b)=>b[1]-a[1])[0];
+  if(kwTop && kwTop[1]>=2){
+    slides.push({eb:'주목 키워드', badge:'KEYWORDS', head:`가장 많이 거론된 건<br>‘${escapeHtml(kwTop[0])}’ 였어요.`, desc:`최근 7일 ‘${escapeHtml(kwTop[0])}’ 관련 대화가 ${kwTop[1]}건 있었어요. 연관 키워드를 함께 살펴보세요.`});
+  }
+  if(!slides.length) slides.push({eb:'이번 주 인사이트', badge:'WEEKLY SUMMARY', head:'데이터를 분석하고 있어요.', desc:'모니터링 데이터가 쌓이면 주간 인사이트를 보여드릴게요.'});
+  try{ _briefPlain='[RAYNO 주간 인사이트]\n'+slides.map(s=>s.head.replace(/<br>/g,' ').replace(/<[^>]+>/g,'')+' — '+s.desc).join('\n'); }catch(_){}
+  return slides;
+}
 function renderBrief(rows){
   const el=document.getElementById('dashBrief'); if(!el) return;
   const m=briefStats(rows);
   if(!m.total){ el.innerHTML=''; return; }
-  const stance = m.net>=20?'<span class="pos">매우 우호적</span>':m.net>=5?'<span class="pos">대체로 긍정적</span>':m.net<=-20?'<span class="neg">부정 우위</span>':m.net<=-5?'<span class="neg">다소 부정적</span>':'중립적';
-  const stanceTxt = m.net>=20?'매우 우호적':m.net>=5?'대체로 긍정적':m.net<=-20?'부정 우위':m.net<=-5?'다소 부정적':'중립적';
-  const negByCafe={}; let priceN=0;
-  rows.forEach(r=>{ if(sentOf(r)==='부정') negByCafe[r.cafe]=(negByCafe[r.cafe]||0)+1;
-    const t=(r.title||'')+(r.body||''); if(/가격|견적|얼마|비용|할인|프로모/.test(t)) priceN++; });
-  const negTop=Object.entries(negByCafe).sort((a,b)=>b[1]-a[1])[0];
-  let signal, signalTxt;
-  if(negTop && negTop[1]>=3){ signal=`부정 언급이 ‘<b>${escapeHtml(negTop[0])}</b>’에 집중(<span class="neg">${negTop[1]}건</span>)`; signalTxt=`부정 언급 집중: ${negTop[0]} (${negTop[1]}건)`; }
-  else if(priceN>=3){ signal=`가격·견적 관심 <span class="amber">${priceN}건</span> 감지 — 구매 의향 신호`; signalTxt=`가격·견적 관심 ${priceN}건`; }
-  else { signal='특별히 두드러지는 신호는 없습니다'; signalTxt='특이 신호 없음'; }
-  const period=_activePeriodLabel();
-  const l1=`📌 <b>${escapeHtml(period)}</b> · 누적 <b>${m.total.toLocaleString()}건</b> (게시글 ${m.posts.toLocaleString()} · 댓글 ${m.cmts.toLocaleString()})`;
-  const l2=`🗣 여론 ${stance} (긍정 ${m.posRate.toFixed(0)}% · 부정 ${m.negRate.toFixed(0)}%)`;
-  const l3=`🔎 ${signal}`;
-  _briefPlain=`[RAYNO 온라인 모니터링 요약]\n· ${period} · 누적 ${m.total.toLocaleString()}건 (게시글 ${m.posts}·댓글 ${m.cmts})\n· 여론 ${stanceTxt} (긍정 ${m.posRate.toFixed(0)}% / 부정 ${m.negRate.toFixed(0)}%)\n· ${signalTxt}`;
-  const al=computeAlerts();
-  let alertHtml='';
-  if(al.enough){
-    const rows2 = al.A.length ? al.A : [['ok','✅',`최근 7일간 특이 징후가 없습니다. <span style="opacity:.6">(기준일 ${al.maxD})</span>`]];
-    alertHtml=`<div class="brief-alerts">`+rows2.map(a=>`<div class="ba-row ${a[0]}"><span class="ba-ic">${a[1]}</span><div>${a[2]}</div></div>`).join('')+`</div>`;
-  }
-  el.innerHTML=`<div class="brief">
-    <svg class="brief-wave" viewBox="0 0 360 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bwg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f4911c" stop-opacity="0"/><stop offset="1" stop-color="#f4911c" stop-opacity=".5"/></linearGradient></defs><path d="M0,82 C38,72 60,98 95,74 C132,50 152,86 190,56 C230,28 250,62 290,40 C322,22 342,34 360,18" fill="none" stroke="url(#bwg)" stroke-width="3" stroke-linecap="round"/><circle cx="354" cy="20" r="4" fill="#f4911c"/></svg>
-    <div class="brief-head"><span class="bh-t">✨ 이번 주 인사이트<span class="ai-badge">AI</span></span><button class="brief-copy" id="briefCopyBtn">📋 복사</button></div>
-    <div class="brief-lines"><div class="brief-line">${l1}</div><div class="brief-line">${l2}</div><div class="brief-line">${l3}</div></div>
-    ${alertHtml}
-  </div>`;
+  let slides; try{ slides=_weeklyInsights(); }catch(e){ slides=[{eb:'이번 주 인사이트',badge:'WEEKLY SUMMARY',head:'브랜드 언급 동향을 분석했어요.',desc:''}]; }
+  el.innerHTML = '<div class="brief">'
+    + _briefOrbSvg()
+    + '<div class="brief-main">'
+    +   '<div class="brief-eyebrow"><span class="be-t" id="briefEb"></span><span class="be-badge" id="briefBadge"></span></div>'
+    +   '<h2 class="brief-head" id="briefHead"></h2>'
+    +   '<p class="brief-desc" id="briefDesc"></p>'
+    +   '<button class="brief-cta" id="briefCta" type="button">AI 인사이트 보기 <span class="ar">\u2192</span></button>'
+    + '</div>'
+    + '<div class="brief-pager"><button id="briefPrev" type="button" aria-label="이전">\u2039</button><span id="briefPage"></span><button id="briefNext" type="button" aria-label="다음">\u203A</button></div>'
+    + '</div>';
+  const eb=el.querySelector('#briefEb'), bd=el.querySelector('#briefBadge'), hd=el.querySelector('#briefHead'), ds=el.querySelector('#briefDesc'), pg=el.querySelector('#briefPage');
+  let idx=0;
+  function show(i){ idx=(i%slides.length+slides.length)%slides.length; const s=slides[idx]; eb.textContent=s.eb; bd.textContent=s.badge; hd.innerHTML=s.head; ds.textContent=s.desc; pg.textContent=(idx+1)+' / '+slides.length; }
+  show(0);
+  const pv=el.querySelector('#briefPrev'), nx=el.querySelector('#briefNext');
+  if(pv) pv.addEventListener('click',()=>show(idx-1));
+  if(nx) nx.addEventListener('click',()=>show(idx+1));
+  const cta=el.querySelector('#briefCta'); if(cta) cta.addEventListener('click',()=>{ try{_aiChatOpen();}catch(_){}} );
 }
 function computeAlerts(){
   const dated=(RAW.rows||[]).map(r=>({r,d:normDate(r.date)})).filter(x=>x.d);
