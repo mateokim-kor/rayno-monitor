@@ -1022,9 +1022,17 @@
   .wrap.has-sidebar>header{grid-area:head;margin:22px 30px 4px}
   .wrap.has-sidebar>#rMain{grid-area:main;padding:6px 30px 44px;min-width:0}
   .wrap.has-sidebar>#rSidebar{grid-area:side;position:sticky;top:0;height:100vh;background:#13151a;color:#c7ccd6;display:flex;flex-direction:column;padding:20px 14px;overflow-y:auto;z-index:6}
-  .rsb-brand{display:flex;align-items:center;gap:9px;padding:2px 8px 18px;border-bottom:1px solid #262a32;margin-bottom:12px}
-  .rsb-mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#ffb24d,#f4801a);display:grid;place-items:center;font-weight:900;color:#1a1205;font-size:15px}
+  .rsb-brand{display:flex;align-items:center;gap:9px;padding:4px 8px 16px;margin-bottom:8px;border-bottom:1px solid #262a32;background:none;border-left:none;border-right:none;border-top:none;width:100%;cursor:pointer}
+  .rsb-brand:hover{opacity:.85}
+  .rsb-logo{height:28px;width:auto;display:block;filter:brightness(0) invert(1)}
   .rsb-nm{font-weight:800;font-size:18px;letter-spacing:.04em;color:#fff}
+  /* 그룹 네비 */
+  .rsb-nav{display:flex;flex-direction:column;gap:1px}
+  .rsb-sec{font-size:10.5px;font-weight:800;color:#6b7180;letter-spacing:.03em;padding:15px 12px 6px}
+  .rsb-item{display:flex;align-items:center;width:100%;border:none;background:transparent;color:#9aa0ad;font-size:13px;font-weight:600;padding:9px 12px;border-radius:10px;cursor:pointer;text-align:left;font-family:inherit}
+  .rsb-item:hover{background:#1b1e25;color:#cfd3db}
+  .rsb-item.on{background:linear-gradient(135deg,rgba(244,145,28,.18),rgba(244,145,28,.06));color:#ffb967;font-weight:800}
+  .rsb-item .rsb-lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #rSidebar #appSwitcher,#rSidebar #nav,#rSidebar #raynoNav{flex-direction:column;gap:3px;background:transparent;border:none;padding:0;margin:0;box-shadow:none}
   #rSidebar #appSwitcher{padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid #262a32}
   #rSidebar .nav-btn,#rSidebar .appsw-btn{display:flex !important;width:100%;justify-content:flex-start;border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;color:#8b91a0;background:transparent;border:none !important}
@@ -1571,7 +1579,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 사이드바_정리_아이콘';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 사이드바_그룹메뉴_로고';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7342,47 +7350,75 @@ async function boot(){
     if(now!==auth){ auth=now; applyAuthUI(); refreshVerify(); }
   });
 }
-function _sbIco(t){ t=(t||'').replace(/\s+/g,'');
-  const M={'대시보드':'\uD83C\uDFE0','온라인모니터링':'\uD83D\uDCE1','레이노데이터':'\uD83D\uDDC4\uFE0F','설정':'\u2699\uFE0F','리포트':'\uD83D\uDCC4','경쟁사프로모션':'\u2694\uFE0F','경쟁사분석':'\u2694\uFE0F','데이터검증':'\u2705','채널분석':'\uD83D\uDCCA','채널분석':'\uD83D\uDCCA','키워드분석':'\uD83D\uDD11','이슈':'\uD83D\uDD11','매출':'\uD83D\uDCB0','품질보증서':'\uD83D\uDEE1\uFE0F','글라스케어':'\u2728','대리점':'\uD83C\uDFEC','검색량':'\uD83D\uDD0D','보증서리포트':'\uD83D\uDCD1','알림센터':'\uD83D\uDD14'};
-  for(const k in M){ if(t.indexOf(k)>=0) return M[k]; } return '\u2022';
-}
-function _sbInject(btn){ if(!btn||btn.querySelector('.sb-ic'))return; const s=document.createElement('span'); s.className='sb-ic'; s.textContent=_sbIco(btn.textContent); btn.insertBefore(s, btn.firstChild); }
 function _applySidebarLayout(){
   try{
     const wrap=document.querySelector('.wrap'); if(!wrap||document.getElementById('rSidebar')) return;
     if(window.innerWidth < 980) return;
     const header=wrap.querySelector('header'); if(!header) return;
-    const nav=document.getElementById('nav'); if(!nav) return;
+    const navOld=document.getElementById('nav'); if(!navOld) return;
     const sw=document.getElementById('appSwitcher'), rnav=document.getElementById('raynoNav');
-    const theme=document.getElementById('themeToggle');     // 다크모드 → 맨 아래로 이동
-    const adminBtn=document.getElementById('adminBtn');      // 로그인 → 사이드바 하단 1개로 통합
+    const theme=document.getElementById('themeToggle');
+    const adminBtn=document.getElementById('adminBtn');
+    const logoSrc=(document.querySelector('.brand-logo')||{}).src||'';
     const aside=document.createElement('aside'); aside.id='rSidebar';
     const main=document.createElement('div'); main.id='rMain';
     header.after(aside); aside.after(main);
-    const brand=document.createElement('div'); brand.className='rsb-brand';
-    brand.innerHTML='<span class="rsb-mk">R</span><span class="rsb-nm">RAYNO</span>';
+    // 워크스페이스+뷰 디스패치
+    function goCafe(v){ try{ const r=setWorkspace('cafe'); (r&&r.then)?r.then(()=>setView(v)):setView(v); }catch(e){ try{setView(v);}catch(_){}} }
+    function goRayno(v){ try{ const r=setWorkspace('rayno'); (r&&r.then)?r.then(()=>setRView(v)):setRView(v); }catch(e){ try{setRView(v);}catch(_){}} }
+    function goSettings(){ try{ setWorkspace('settings'); }catch(e){} }
+    function goCrawl(){ try{ const r=setWorkspace('cafe'); (r&&r.then)?r.then(()=>{try{openCrawlPanel();}catch(_){}}):(function(){try{openCrawlPanel();}catch(_){}})(); }catch(e){ try{openCrawlPanel();}catch(_){}} }
+    const NAVCFG=[
+      {h:'온라인 모니터링', items:[
+        {t:'모니터링 대시보드', ic:'\uD83C\uDFE0', go:()=>goCafe('dash')},
+        {t:'온라인 리포트', ic:'\uD83D\uDCC4', go:()=>goCafe('report')},
+        {t:'경쟁사 프로모션', ic:'\u2694\uFE0F', go:()=>goCafe('promo')},
+      ]},
+      {h:'레이노 데이터', items:[
+        {t:'데이터 대시보드', ic:'\uD83C\uDFE0', go:()=>goRayno('dash')},
+        {t:'매출 분석', ic:'\uD83D\uDCB0', go:()=>goRayno('revenue')},
+        {t:'품질보증서', ic:'\uD83D\uDEE1\uFE0F', go:()=>goRayno('warranty')},
+        {t:'글라스케어 현황', ic:'\u2728', go:()=>goRayno('glass')},
+        {t:'대리점 현황', ic:'\uD83C\uDFEC', go:()=>goRayno('dealer')},
+        {t:'검색량 분석', ic:'\uD83D\uDD0D', go:()=>goRayno('search')},
+        {t:'보증서 리포트', ic:'\uD83D\uDCD1', go:()=>goRayno('warrReport')},
+      ]},
+      {h:'관리자', items:[
+        {t:'데이터 검증', ic:'\u2705', go:()=>goCafe('verify')},
+        {t:'자동 수집 관리', ic:'\uD83E\uDD16', go:goCrawl},
+        {t:'설정', ic:'\u2699\uFE0F', go:goSettings},
+      ]},
+    ];
+    // 로고(클릭 → 홈)
+    const brand=document.createElement('button'); brand.type='button'; brand.className='rsb-brand';
+    brand.innerHTML = logoSrc ? '<img class="rsb-logo" src="'+logoSrc+'" alt="RAYNO">' : '<span class="rsb-nm">RAYNO</span>';
     aside.appendChild(brand);
-    if(sw) aside.appendChild(sw);
-    aside.appendChild(nav);
-    if(rnav) aside.appendChild(rnav);
-    // 아이콘 주입(라벨 기준)
-    aside.querySelectorAll('.appsw-btn').forEach(_sbInject);
-    if(nav) nav.querySelectorAll('.nav-btn').forEach(_sbInject);
-    if(rnav) rnav.querySelectorAll('.nav-btn').forEach(_sbInject);
-    // 활성 워크스페이스의 뷰만 보이기 (data-ws 스코프)
-    const syncWs=()=>{ const on=aside.querySelector('.appsw-btn.on'); aside.setAttribute('data-ws', on?on.dataset.ws:'cafe'); };
-    syncWs();
-    try{ const _mo=new MutationObserver(syncWs); aside.querySelectorAll('.appsw-btn').forEach(b=>_mo.observe(b,{attributes:true,attributeFilter:['class']})); }
-    catch(_){ aside.querySelectorAll('.appsw-btn').forEach(b=>b.addEventListener('click',()=>setTimeout(syncWs,0))); }
+    // 그룹 네비
+    const navWrap=document.createElement('div'); navWrap.className='rsb-nav'; aside.appendChild(navWrap);
+    const allItems=[];
+    NAVCFG.forEach(sec=>{
+      const hd=document.createElement('div'); hd.className='rsb-sec'; hd.textContent=sec.h; navWrap.appendChild(hd);
+      sec.items.forEach(it=>{
+        const btn=document.createElement('button'); btn.type='button'; btn.className='rsb-item';
+        btn.innerHTML='<span class="sb-ic">'+it.ic+'</span><span class="rsb-lbl">'+it.t+'</span>';
+        btn.addEventListener('click',()=>{ allItems.forEach(b=>b.classList.remove('on')); btn.classList.add('on'); it.go(); });
+        navWrap.appendChild(btn); allItems.push(btn);
+      });
+    });
+    if(allItems[0]) allItems[0].classList.add('on');
+    brand.addEventListener('click',()=>{ allItems.forEach(b=>b.classList.remove('on')); if(allItems[0])allItems[0].classList.add('on'); goCafe('dash'); });
+    // 기존 네비 컨테이너는 숨김(앱 함수 참조 유지 위해 DOM엔 남김)
+    [sw,navOld,rnav].forEach(el=>{ if(el) el.style.display='none'; });
+    // 하단
     const spacer=document.createElement('div'); spacer.className='rsb-spacer'; aside.appendChild(spacer);
     const ai=document.createElement('div'); ai.className='rsb-ai';
     ai.innerHTML='<div class="rsb-orb"></div><div class="rsb-ai-t">RAYNO AI 어시스턴트</div><div class="rsb-ai-d">데이터에 관한 인사이트를 물어보세요</div><button class="rsb-ai-b" type="button">AI에게 질문하기</button>';
     aside.appendChild(ai);
-    if(adminBtn){ adminBtn.classList.add('rsb-login'); aside.appendChild(adminBtn); }   // 단일 로그인(핸들러 유지)
+    if(adminBtn){ adminBtn.classList.add('rsb-login'); aside.appendChild(adminBtn); }
     const col=document.createElement('button'); col.className='rsb-collapse'; col.type='button'; col.textContent='\u2190 사이드바 접기';
     col.addEventListener('click',()=>wrap.classList.toggle('collapsed'));
     aside.appendChild(col);
-    if(theme) aside.appendChild(theme);     // 다크모드 토글 = 제일 아래
+    if(theme) aside.appendChild(theme);
     Array.from(wrap.children).forEach(ch=>{ if(ch!==header&&ch!==aside&&ch!==main) main.appendChild(ch); });
     wrap.classList.add('has-sidebar'); document.body.classList.add('sidebar-on');
   }catch(e){ console.warn('sidebar layout skipped', e); }
