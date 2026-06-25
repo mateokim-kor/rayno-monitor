@@ -1647,7 +1647,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 이모지변환_옵저버_전체스캔';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 매출ERP_헤더자동탐색_오류안내';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5847,10 +5847,18 @@ function _salesRows(buf){
 function _sGuessType(mat,mid){ const GD=/스티커|타월|TOWEL|TAPE|테이프|PAPER|인증패|세트|SQZ|습지|커버|charge|불스원|냅킨|장갑|칼|블레이드/i; const RS=/UNI-|-PH-|-UL-|롤|ROLL/i;
   if(GD.test(mat)&&!RS.test(mat)) return 'goods'; if(mid==='기타품목'&&!RS.test(mat)) return 'goods'; return 'roll'; }
 function aggregateSales(rows){
-  if(!rows||rows.length<2) return null;
-  const H=rows[0].map(c=>String(c||'').trim());
+  window.__salesErr='';
+  if(!rows||rows.length<2){ window.__salesErr='행이 비어 있습니다'; return null; }
+  // 헤더 행 자동 탐색(상단에 제목/머리글 행이 있어도 OK): '부서'+'MatName' 포함 행
+  let hdrIdx=-1;
+  for(let k=0;k<Math.min(rows.length,30);k++){
+    const rr=(rows[k]||[]).map(c=>String(c||'').trim());
+    if(rr.indexOf('부서')>=0 && rr.indexOf('MatName')>=0){ hdrIdx=k; break; }
+  }
+  if(hdrIdx<0){ window.__salesErr="헤더 행에서 '부서'·'MatName' 열을 찾지 못했습니다 (ERP 원본 시트인지 확인)"; return null; }
+  const H=rows[hdrIdx].map(c=>String(c||'').trim());
   const iDept=H.indexOf('부서'),iCust=H.indexOf('거래처'),iMid=H.indexOf('중분류'),iSub=H.indexOf('소분류'),iMat=H.indexOf('MatName'),iOrd=H.indexOf('오더담당자');
-  if(iMat<0||iDept<0) return null;
+  if(iMat<0||iDept<0){ window.__salesErr='필수 열(부서/MatName) 누락'; return null; }
   const qc=[],ac=[]; for(let m=1;m<=12;m++){const qi=H.indexOf(m+'월'); qc[m]=qi; ac[m]=qi>=0?qi+1:-1;}
   const grp=d=>d==='B2C'?'B2C':(d==='B2B'?'B2B':'별도채널');
   const ch={B2C:{mq:_sMz(),ma:_sMz()},B2B:{mq:_sMz(),ma:_sMz()},'별도채널':{mq:_sMz(),ma:_sMz()}};
@@ -5863,7 +5871,7 @@ function aggregateSales(rows){
   //  · 채널/전사  = 부서 합계 행 (부서✓ 거래처✗ 품목✗)
   //  · 지부/대리점 = 거래처 합계 행 (부서✓ 거래처✓ 중분류✗ 소분류✗ 품목✗) — B2C
   //  · 제품/롤    = 최하위 잎 행 (품목✓ 오더담당자✓) — B2C+B2B
-  for(let i=1;i<rows.length;i++){
+  for(let i=hdrIdx+1;i<rows.length;i++){
     const r=rows[i]; if(!r) continue;
     const dept=V(r,iDept); if(!dept) continue;
     const cust=V(r,iCust), mid0=V(r,iMid), sub=V(r,iSub), mat=V(r,iMat), ord=V(r,iOrd), g=grp(dept);
@@ -5881,6 +5889,7 @@ function aggregateSales(rows){
     }
   }
   const months=[]; for(let m=1;m<=12;m++) if(act.has(m)) months.push(m);
+  if(!months.length){ window.__salesErr="월별 매출 열('1월'~'12월')을 찾지 못했거나 값이 0입니다"; return null; }
   const prodList=Object.keys(prodAll).sort((a,b)=>_sSum(prodAll[b].mq)-_sSum(prodAll[a].mq));
   const itemType={};  // 개별 override만 저장(기본 분류는 규칙·자동 추정)
   return {ver:7,updatedAt:new Date().toISOString(),months,channels:ch,extra,jibu,dealers,prodAll,jibuProd,chMat,prodList,inputs:{carSales:{},cap:{},itemType}};
@@ -5890,7 +5899,7 @@ function handleSalesFile(file){
   const rd=new FileReader();
   rd.onload=async e=>{ try{
     const agg=aggregateSales(_salesRows(e.target.result));
-    if(!agg){ toast('매출 데이터를 인식하지 못했습니다. ERP 원본 파일인지 확인하세요.',true); return; }
+    if(!agg){ toast('매출 데이터를 인식하지 못했습니다 — '+(window.__salesErr||'ERP 원본 파일인지 확인하세요'),true); return; }
     if(SALES&&SALES.inputs){ agg.inputs.cap=SALES.inputs.cap||{}; agg.inputs.carSales=SALES.inputs.carSales||{};
       Object.keys(SALES.inputs.itemType||{}).forEach(p=>{ if(agg.inputs.itemType[p]!==undefined) agg.inputs.itemType[p]=SALES.inputs.itemType[p]; }); }
     SALES=agg; salesLoaded=true; await cloudSaveJSON(SUPA.salesFile,SALES); renderRevenue(); updateUploadDates();
