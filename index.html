@@ -1016,6 +1016,30 @@
   .brief-head,.brief-lines,.brief-alerts{position:relative;z-index:1}
   .brief-alerts{border-top-color:rgba(180,120,40,.28)}
   @media(max-width:680px){.brief-wave{display:none}}
+  /* ── 다크 사이드바 (리디자인 1단계) ── */
+  body.sidebar-on{padding:0 !important}
+  .wrap.has-sidebar{display:grid;grid-template-columns:236px minmax(0,1fr);grid-template-rows:auto 1fr;grid-template-areas:"side head" "side main";max-width:none;margin:0;min-height:100vh}
+  .wrap.has-sidebar>header{grid-area:head;margin:22px 30px 4px}
+  .wrap.has-sidebar>#rMain{grid-area:main;padding:6px 30px 44px;min-width:0}
+  .wrap.has-sidebar>#rSidebar{grid-area:side;position:sticky;top:0;height:100vh;background:#13151a;color:#c7ccd6;display:flex;flex-direction:column;padding:20px 14px;overflow-y:auto;z-index:6}
+  .rsb-brand{display:flex;align-items:center;gap:9px;padding:2px 8px 18px;border-bottom:1px solid #262a32;margin-bottom:12px}
+  .rsb-mk{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#ffb24d,#f4801a);display:grid;place-items:center;font-weight:900;color:#1a1205;font-size:15px}
+  .rsb-nm{font-weight:800;font-size:18px;letter-spacing:.04em;color:#fff}
+  #rSidebar #appSwitcher,#rSidebar #nav,#rSidebar #raynoNav{flex-direction:column;gap:3px;background:transparent;border:none;padding:0;margin:0;box-shadow:none}
+  #rSidebar #appSwitcher{padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid #262a32}
+  #rSidebar .nav-btn,#rSidebar .appsw-btn{display:flex !important;width:100%;justify-content:flex-start;border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;color:#8b91a0;background:transparent;border:none !important}
+  #rSidebar .nav-btn:hover,#rSidebar .appsw-btn:hover{background:#1b1e25;color:#c7ccd6}
+  #rSidebar .nav-btn.on,#rSidebar .appsw-btn.on{background:linear-gradient(135deg,rgba(244,145,28,.18),rgba(244,145,28,.06));color:#ffb967;font-weight:800}
+  #rSidebar #themeToggle{margin:8px 4px 0;align-self:flex-start}
+  .rsb-spacer{flex:1;min-height:14px}
+  .rsb-ai{background:linear-gradient(180deg,#1c1f27,#15171d);border:1px solid #262a32;border-radius:16px;padding:15px 13px 14px;text-align:center;margin-top:14px}
+  .rsb-orb{width:58px;height:58px;margin:0 auto 10px;border-radius:50%;background:radial-gradient(circle at 38% 34%,#ffd9a0,#ff9d2e 33%,#f4801a 56%,#b8500a 80%);box-shadow:0 0 22px 5px rgba(244,145,28,.45),inset -5px -7px 12px rgba(120,50,0,.5)}
+  .rsb-ai-t{font-size:12.5px;font-weight:800;color:#fff}
+  .rsb-ai-d{font-size:10.5px;color:#8b91a0;margin:3px 0 11px;line-height:1.5}
+  .rsb-ai-b{display:block;width:100%;background:linear-gradient(135deg,#ffb24d,#f4801a);color:#241402;border:none;border-radius:10px;padding:9px;font-size:12px;font-weight:800;cursor:pointer}
+  .rsb-collapse{margin-top:11px;color:#8b91a0;font-size:12px;background:none;border:none;text-align:left;padding:6px 8px;cursor:pointer}
+  .wrap.has-sidebar.collapsed{grid-template-columns:0 1fr}
+  .wrap.has-sidebar.collapsed>#rSidebar{width:0;padding:0;overflow:hidden;border:none}
 </style>
 </head>
 <body>
@@ -1529,7 +1553,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 감성도넛_카드꽉채움';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 리디자인_다크사이드바_1단계';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7300,6 +7324,34 @@ async function boot(){
     if(now!==auth){ auth=now; applyAuthUI(); refreshVerify(); }
   });
 }
+function _applySidebarLayout(){
+  try{
+    const wrap=document.querySelector('.wrap'); if(!wrap||document.getElementById('rSidebar')) return;
+    if(window.innerWidth < 980) return;
+    const header=wrap.querySelector('header'); if(!header) return;
+    const nav=document.getElementById('nav'); if(!nav) return;
+    const sw=document.getElementById('appSwitcher'), rnav=document.getElementById('raynoNav');
+    const aside=document.createElement('aside'); aside.id='rSidebar';
+    const main=document.createElement('div'); main.id='rMain';
+    header.after(aside); aside.after(main);
+    const brand=document.createElement('div'); brand.className='rsb-brand';
+    brand.innerHTML='<span class="rsb-mk">R</span><span class="rsb-nm">RAYNO</span>';
+    aside.appendChild(brand);
+    if(sw) aside.appendChild(sw);
+    aside.appendChild(nav);
+    if(rnav) aside.appendChild(rnav);
+    const spacer=document.createElement('div'); spacer.className='rsb-spacer'; aside.appendChild(spacer);
+    const ai=document.createElement('div'); ai.className='rsb-ai';
+    ai.innerHTML='<div class="rsb-orb"></div><div class="rsb-ai-t">RAYNO AI 어시스턴트</div><div class="rsb-ai-d">데이터에 관한 인사이트를 물어보세요</div><button class="rsb-ai-b" type="button">AI에게 질문하기</button>';
+    aside.appendChild(ai);
+    const col=document.createElement('button'); col.className='rsb-collapse'; col.type='button'; col.textContent='\u2190 사이드바 접기';
+    col.addEventListener('click',()=>wrap.classList.toggle('collapsed'));
+    aside.appendChild(col);
+    Array.from(wrap.children).forEach(ch=>{ if(ch!==header&&ch!==aside&&ch!==main) main.appendChild(ch); });
+    wrap.classList.add('has-sidebar'); document.body.classList.add('sidebar-on');
+  }catch(e){ console.warn('sidebar layout skipped', e); }
+}
+try{ _applySidebarLayout(); }catch(e){}
 boot();
 </script>
 </body>
