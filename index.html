@@ -596,7 +596,7 @@
   .up-tbl td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:middle}
 
   /* ── 리포트 탭 ── */
-  .rep-head-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .rep-head-top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
   .rep-period{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .rep-badge{margin-top:12px;font-size:12.5px;color:var(--ink2);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:7px 12px;display:inline-block}
   .rep-sec{margin-top:16px}
@@ -1644,7 +1644,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 사이드바_active_복원동기화';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 헤더_탭별제목_리포트박스정리';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3740,8 +3740,7 @@ function _renderReportImpl(){
   const head=`
    <div class="card rep-head">
      <div class="rep-head-top">
-       <div><h2 style="margin:0">${escapeHtml(effText('reportTitle'))}</h2>
-         <div class="cap" style="margin-top:4px">${escapeHtml(effText('reportSub'))}</div></div>
+       <div class="rep-badge" style="margin:0">분석 기간: <b>${rpLabel(RP)}</b>${prevP?` · 비교: ${rpLabel(prevP)}`:''}</div>
        <div class="rep-period">
          <div class="seg" id="rpSeg">
            <button data-rpm="all" class="${RP.mode==='all'?'on':''}">전체</button>
@@ -3758,7 +3757,6 @@ function _renderReportImpl(){
          <button class="viewbtn" id="rpPdf" title="인쇄 창에서 ‘PDF로 저장’을 선택하세요">📄 PDF 저장</button>
        </div>
      </div>
-     <div class="rep-badge">분석 기간: <b>${rpLabel(RP)}</b>${prevP?` · 비교: ${rpLabel(prevP)}`:''}</div>
    </div>`;
 
   if(!cur.length){ box.innerHTML=head+'<div class="card"><div class="empty">선택한 기간에 데이터가 없습니다.</div></div>'; bindReport(); return; }
@@ -6839,12 +6837,27 @@ function renderWarrReport(){
 }
 const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', dealer:'rDealer', search:'rSearch', revenue:'rRevenue'};
 function _saveNav(){ try{ localStorage.setItem('rayno_nav', JSON.stringify({ ws:workspace, cv:(typeof state!=='undefined'&&state&&state.view)||'dash', rv:rview })); }catch(e){} }
+function _sbSyncActive(){
+  try{
+    let key;
+    const ws=(typeof workspace!=='undefined')?workspace:'cafe';
+    if(ws==='rayno') key='rayno:'+((typeof rview!=='undefined'&&rview)?rview:'dash');
+    else if(ws==='settings') key='settings';
+    else key='cafe:'+((typeof state!=='undefined'&&state.view)?state.view:'dash');
+    const items=document.querySelectorAll('.rsb-item'); if(!items.length) return;
+    let act=null;
+    items.forEach(b=>{ const on=(b.dataset.k===key); b.classList.toggle('on',on); if(on)act=b; });
+    const ht=document.getElementById('headerTitle'), hs=document.getElementById('headerSub');
+    if(act && ht){ if(act.dataset.title) ht.textContent=act.dataset.title; if(hs) hs.textContent=act.dataset.desc||''; }
+  }catch(_){}
+}
 function _restoreNav(nav){
   if(!nav||!nav.ws) return;
   if(nav.rv && RVIEW_BOX[nav.rv]) rview=nav.rv;            // 레이노 열릴 때 이 뷰로
   if(nav.ws==='rayno'){ setWorkspace('rayno'); }
   else if(nav.ws==='settings'){ setWorkspace('settings'); }
   else { let cv=nav.cv; const ok={dash:1,report:1,promo:1,verify:1}; if(cv==='verify'&&auth!=='admin')cv='dash'; if(cv&&ok[cv]&&cv!=='dash') setView(cv); }
+  try{_sbSyncActive();}catch(_){}
 }
 function setRView(v){
   rview=v; _saveNav(); try{_sbSyncActive();}catch(_){}
@@ -7618,36 +7631,26 @@ function _applySidebarLayout(){
     function goCrawl(){ try{ const r=setWorkspace('cafe'); (r&&r.then)?r.then(()=>{try{openCrawlPanel();}catch(_){}}):(function(){try{openCrawlPanel();}catch(_){}})(); }catch(e){ try{openCrawlPanel();}catch(_){}} }
     const NAVCFG=[
       {h:'온라인 모니터링', items:[
-        {t:'모니터링 대시보드', ic:'home', k:'cafe:dash', go:()=>goCafe('dash')},
-        {t:'온라인 리포트', ic:'report', k:'cafe:report', go:()=>goCafe('report')},
-        {t:'경쟁사 프로모션', ic:'promo', k:'cafe:promo', go:()=>goCafe('promo')},
+        {t:'모니터링 대시보드', ic:'home', k:'cafe:dash', d:'브랜드 언급을 실시간으로 모니터링하고 분석합니다', go:()=>goCafe('dash')},
+        {t:'온라인 리포트', ic:'report', k:'cafe:report', d:'누적 데이터 기반 · 감성·이슈 분석 리포트', go:()=>goCafe('report')},
+        {t:'경쟁사 프로모션', ic:'promo', k:'cafe:promo', d:'경쟁사 프로모션·이벤트 동향을 추적합니다', go:()=>goCafe('promo')},
       ]},
       {h:'레이노 데이터', items:[
-        {t:'데이터 대시보드', ic:'data', k:'rayno:dash', go:()=>goRayno('dash')},
-        {t:'매출 분석', ic:'chart', k:'rayno:revenue', go:()=>goRayno('revenue')},
-        {t:'품질보증서', ic:'shield', k:'rayno:warranty', go:()=>goRayno('warranty')},
-        {t:'글라스케어 현황', ic:'sparkle', k:'rayno:glass', go:()=>goRayno('glass')},
-        {t:'대리점 현황', ic:'store', k:'rayno:dealer', go:()=>goRayno('dealer')},
-        {t:'검색량 분석', ic:'search', k:'rayno:search', go:()=>goRayno('search')},
-        {t:'보증서 리포트', ic:'report', k:'rayno:warrReport', go:()=>goRayno('warrReport')},
+        {t:'데이터 대시보드', ic:'data', k:'rayno:dash', d:'레이노 영업·품질 데이터를 한눈에 봅니다', go:()=>goRayno('dash')},
+        {t:'매출 분석', ic:'chart', k:'rayno:revenue', d:'채널·지부·대리점별 매출을 분석합니다', go:()=>goRayno('revenue')},
+        {t:'품질보증서', ic:'shield', k:'rayno:warranty', d:'보증서 발급 현황과 시공 데이터를 분석합니다', go:()=>goRayno('warranty')},
+        {t:'글라스케어 현황', ic:'sparkle', k:'rayno:glass', d:'글라스케어 시공·판매 현황을 분석합니다', go:()=>goRayno('glass')},
+        {t:'대리점 현황', ic:'store', k:'rayno:dealer', d:'대리점별 실적과 담당 지부를 관리합니다', go:()=>goRayno('dealer')},
+        {t:'검색량 분석', ic:'search', k:'rayno:search', d:'브랜드·제품 검색량 추이를 분석합니다', go:()=>goRayno('search')},
+        {t:'보증서 리포트', ic:'report', k:'rayno:warrReport', d:'보증서 데이터 기반 분석 리포트', go:()=>goRayno('warrReport')},
       ]},
       {h:'관리자', admin:true, items:[
-        {t:'데이터 검증', ic:'verify', k:'cafe:verify', go:()=>goCafe('verify')},
-        {t:'자동 수집 관리', ic:'refresh', k:'crawl', go:goCrawl},
-        {t:'설정', ic:'gear', k:'settings', go:goSettings},
+        {t:'데이터 검증', ic:'verify', k:'cafe:verify', d:'수집 데이터의 감성·분류를 검증합니다', go:()=>goCafe('verify')},
+        {t:'자동 수집 관리', ic:'refresh', k:'crawl', d:'자동 수집 작업을 관리합니다', go:goCrawl},
+        {t:'설정', ic:'gear', k:'settings', d:'대시보드 설정과 데이터 업로드를 관리합니다', go:goSettings},
       ]},
     ];
-    function _sbSyncActive(){
-      try{
-        let key;
-        const ws=(typeof workspace!=='undefined')?workspace:'cafe';
-        if(ws==='rayno') key='rayno:'+((typeof rview!=='undefined'&&rview)?rview:'dash');
-        else if(ws==='settings') key='settings';
-        else key='cafe:'+((typeof state!=='undefined'&&state.view)?state.view:'dash');
-        const items=document.querySelectorAll('.rsb-item'); if(!items.length) return;
-        items.forEach(b=>b.classList.toggle('on', b.dataset.k===key));
-      }catch(_){}
-    }
+    /* _sbSyncActive 는 전역으로 이동됨 */
     const brand=document.createElement('button'); brand.type='button'; brand.className='rsb-brand';
     brand.innerHTML = logoSrc ? '<img class="rsb-logo" src="'+logoSrc+'" alt="RAYNO">' : '<span class="rsb-nm">RAYNO</span>';
     aside.appendChild(brand);
@@ -7658,14 +7661,14 @@ function _applySidebarLayout(){
       const hd=document.createElement('div'); hd.className='rsb-sec'; hd.textContent=sec.h; grp.appendChild(hd);
       sec.items.forEach(it=>{
         const btn=document.createElement('button'); btn.type='button'; btn.className='rsb-item';
-        btn.innerHTML='<span class="sb-ic">'+_sbSvg(it.ic)+'</span><span class="rsb-lbl">'+it.t+'</span>'; if(it.k) btn.dataset.k=it.k;
+        btn.innerHTML='<span class="sb-ic">'+_sbSvg(it.ic)+'</span><span class="rsb-lbl">'+it.t+'</span>'; if(it.k) btn.dataset.k=it.k; btn.dataset.title=it.t; if(it.d) btn.dataset.desc=it.d;
         btn.addEventListener('click',()=>{ allItems.forEach(b=>b.classList.remove('on')); btn.classList.add('on'); it.go(); });
         grp.appendChild(btn); allItems.push(btn);
       });
       navWrap.appendChild(grp);
       if(sec.admin) adminGrp=grp;
     });
-    if(allItems[0]) allItems[0].classList.add('on');
+    if(allItems[0]) allItems[0].classList.add('on'); try{ if(typeof _sbSyncActive==='function') _sbSyncActive(); }catch(_){}
     brand.addEventListener('click',()=>{ allItems.forEach(b=>b.classList.remove('on')); if(allItems[0])allItems[0].classList.add('on'); goCafe('dash'); });
     // 관리자 그룹: 관리자 로그인 시에만 표시 (로그인 버튼 표시상태로 판별)
     function syncAdmin(){ if(!adminGrp) return; var isAdmin=false; try{ isAdmin=(auth==='admin'); }catch(_){ isAdmin = !!(adminBtn && adminBtn.style.display==='none'); } adminGrp.style.display = isAdmin ? '' : 'none'; }
