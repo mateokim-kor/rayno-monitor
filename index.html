@@ -1038,6 +1038,26 @@
   /* 사이드바 다시 열기 버튼 */
   #rSbReopen{display:none;position:fixed;left:12px;top:14px;z-index:30;width:38px;height:38px;border-radius:10px;background:#13151a;color:#e8c9a0;border:1px solid #2f3744;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35)}
   #rSbReopen:hover{color:#ffb967;border-color:var(--amber)}
+  /* AI 대화창 */
+  #aiChat{display:none;position:fixed;right:22px;bottom:22px;width:368px;max-width:calc(100vw - 24px);height:540px;max-height:calc(100vh - 44px);background:var(--card);border:1px solid var(--line2);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);z-index:95;flex-direction:column;overflow:hidden}
+  .aic-head{display:flex;align-items:center;gap:11px;padding:14px 16px;background:#13151a;color:#fff;flex:none}
+  .aic-orb{width:32px;height:32px;border-radius:50%;flex:none;background:radial-gradient(circle at 38% 34%,#ffd9a0,#ff9d2e 33%,#f4801a 56%,#b8500a 80%);box-shadow:0 0 14px 3px rgba(244,145,28,.5)}
+  .aic-ti{font-size:14px;font-weight:800;line-height:1.2;flex:1}
+  .aic-ti span{display:block;font-size:10.5px;font-weight:600;color:#8b91a0;margin-top:2px}
+  .aic-x{background:none;border:none;color:#8b91a0;font-size:14px;cursor:pointer;padding:4px}
+  .aic-x:hover{color:#fff}
+  .aic-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:9px;background:var(--page)}
+  .aic-msg{max-width:84%;padding:10px 13px;border-radius:13px;font-size:13px;line-height:1.55;white-space:pre-line;word-break:break-word}
+  .aic-msg.bot{background:var(--card);border:1px solid var(--line);color:var(--ink);align-self:flex-start;border-bottom-left-radius:4px}
+  .aic-msg.user{background:var(--amber);color:#241402;align-self:flex-end;font-weight:600;border-bottom-right-radius:4px}
+  .aic-typing{color:var(--ink3);letter-spacing:2px}
+  .aic-chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px 0;background:var(--card)}
+  .aic-chip{background:var(--page);border:1px solid var(--line2);color:var(--ink2);border-radius:980px;padding:6px 11px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit}
+  .aic-chip:hover{border-color:var(--amber);color:var(--amber)}
+  .aic-input{display:flex;gap:8px;padding:12px;background:var(--card);flex:none}
+  .aic-input input{flex:1;border:1px solid var(--line2);border-radius:10px;padding:10px 12px;font-size:13px;font-family:inherit;outline:none;background:var(--card);color:var(--ink)}
+  .aic-input input:focus{border-color:var(--amber)}
+  .aic-input button{background:var(--amber);color:#241402;border:none;border-radius:10px;padding:0 16px;font-size:13px;font-weight:800;cursor:pointer}
   #rSidebar #appSwitcher,#rSidebar #nav,#rSidebar #raynoNav{flex-direction:column;gap:3px;background:transparent;border:none;padding:0;margin:0;box-shadow:none}
   #rSidebar #appSwitcher{padding-bottom:10px;margin-bottom:6px;border-bottom:1px solid #262a32}
   #rSidebar .nav-btn,#rSidebar .appsw-btn{display:flex !important;width:100%;justify-content:flex-start;border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;color:#8b91a0;background:transparent;border:none !important}
@@ -1593,7 +1613,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 가로탭숨김_KPI아이콘SVG';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · AI어시스턴트_로컬질의응답';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7389,6 +7409,74 @@ function _sbSvg(k){
   const d=P[k]||P.home;
   return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+d.split('M').filter(Boolean).map(s=>'<path d="M'+s+'"/>').join('')+'</svg>';
 }
+/* ===== 로컬 AI 어시스턴트 (LLM 없이 데이터 기반 응답) ===== */
+function _aiFmtWon(v){ v=Math.round(+v||0); const sg=v<0?'-':''; v=Math.abs(v);
+  if(v>=1e8) return sg+(v/1e8).toFixed(v>=1e9?0:1).replace(/\.0$/,'')+'억원';
+  if(v>=1e4) return sg+Math.round(v/1e4).toLocaleString()+'만원';
+  return sg+v.toLocaleString()+'원'; }
+function _aiSalesOK(){ return (typeof SALES!=='undefined') && SALES && SALES.channels; }
+function _aiMonthRev(m){ if(!_aiSalesOK())return null; const C=SALES.channels; let t=0; ['B2C','B2B','별도채널'].forEach(k=>{ const ma=(C[k]&&C[k].ma)||[]; t+=(+ma[m]||0); }); return t; }
+function _aiTotalRev(){ if(!_aiSalesOK())return null; let t=0; for(let m=1;m<=12;m++){ t+=(_aiMonthRev(m)||0); } return t; }
+function _aiDealerTop(n){ if(!_aiSalesOK()||!SALES.dealers)return null;
+  const arr=Object.entries(SALES.dealers).filter(([,o])=>!o.jibu).map(([nm,o])=>[nm,(typeof _sSum==='function')?_sSum(o.ma):0]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]); return arr.slice(0,n||5); }
+function _aiJibuRev(j){ if(!_aiSalesOK()||!SALES.jibu||!SALES.jibu[j])return null; return (typeof _sSum==='function')?_sSum(SALES.jibu[j].ma):0; }
+function _aiAnswer(q){
+  const s=(q||'').trim(); if(!s) return '궁금한 내용을 입력해 주세요.';
+  const t=s.replace(/\s+/g,'');
+  const mM=s.match(/(\d{1,2})\s*월/); const month=mM?+mM[1]:0;
+  if(/매출|매상|판매액|실적|얼마|매출액/.test(t)){
+    if(!_aiSalesOK()) return '아직 매출(ERP) 데이터가 없어요.\n[레이노 데이터 → 매출 분석]에서 ERP 파일을 올리면 바로 답해드릴게요.';
+    if(/대리점/.test(t) && /(top|탑|상위|1위|순위|많은|best)/i.test(t)){
+      const top=_aiDealerTop(5); if(!top||!top.length) return '대리점 매출 데이터가 없어요.';
+      return '매출 상위 대리점 TOP5\n'+top.map((x,i)=>(i+1)+'. '+x[0]+' — '+_aiFmtWon(x[1])).join('\n');
+    }
+    if(typeof SALES_JIBU!=='undefined' && Array.isArray(SALES_JIBU)){
+      const jb=SALES_JIBU.find(j=>t.indexOf(String(j).replace(/\s+/g,''))>=0);
+      if(jb){ const v=_aiJibuRev(jb); if(v!=null){ if(month){ const C=SALES.channels; /* 지부 월별은 jibu.ma */ const ma=(SALES.jibu[jb]&&SALES.jibu[jb].ma)||[]; return jb+' '+month+'월 매출은 약 '+_aiFmtWon(+ma[month]||0)+' 입니다.'; } return jb+' 누적 매출은 약 '+_aiFmtWon(v)+' 입니다.'; } }
+    }
+    if(month){ if(month<1||month>12) return '월은 1~12 사이로 물어봐 주세요.';
+      const has=(SALES.months||[]).indexOf(month)>=0; const v=_aiMonthRev(month);
+      if(!has) return month+'월 매출 데이터가 없어요.\n(데이터에 있는 월: '+((SALES.months||[]).join('월, ')||'-')+'월)';
+      return month+'월 매출은 약 '+_aiFmtWon(v)+' 입니다.\n(정확히 '+Math.round(v).toLocaleString()+'원)';
+    }
+    const tot=_aiTotalRev(); const ms=(SALES.months||[]);
+    return '전체 누적 매출은 약 '+_aiFmtWon(tot)+' 입니다.\n(데이터 월: '+(ms.join('월, ')||'-')+'월 · 정확히 '+Math.round(tot).toLocaleString()+'원)\n"5월 매출 얼마야?"처럼 월을 콕 집어 물어봐도 돼요.';
+  }
+  if(/보증서|시공건|시공\s*건|warranty/i.test(t)){
+    if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '아직 품질보증서 데이터가 없어요.';
+    return '발급된 품질보증서는 총 '+WARR.rows.length.toLocaleString()+'건이에요.';
+  }
+  if(/언급|감성|긍정|부정|중립|여론|버즈|모니터링/.test(t)){
+    if(typeof RAW==='undefined'||!RAW||!RAW.rows||!RAW.rows.length) return '아직 온라인 모니터링 데이터가 없어요.';
+    let pos=0,neg=0,neu=0; RAW.rows.forEach(r=>{ const sv=(typeof sentOf==='function')?sentOf(r):''; if(sv==='긍정')pos++; else if(sv==='부정')neg++; else if(sv==='중립')neu++; });
+    const tot=RAW.rows.length, cl=pos+neg+neu, rate=cl?(pos/cl*100).toFixed(1):'0';
+    return '총 언급량은 '+tot.toLocaleString()+'건이에요.\n· 긍정 '+pos.toLocaleString()+' · 부정 '+neg.toLocaleString()+' · 중립 '+neu.toLocaleString()+'\n· 긍정률 '+rate+'%';
+  }
+  return '데이터를 바탕으로 이런 걸 물어볼 수 있어요:\n· "5월 매출 얼마야?" / "전체 매출은?"\n· "매출 상위 대리점 TOP은?"\n· "○○ 지부 매출은?"\n· "보증서 몇 건이야?"\n· "언급량/감성 어때?"\n(원하시면 더 다양한 질문에 답하도록 늘려드릴게요.)';
+}
+function _aiChatOpen(){
+  let p=document.getElementById('aiChat');
+  if(!p){
+    p=document.createElement('div'); p.id='aiChat';
+    p.innerHTML='<div class="aic-head"><div class="aic-orb"></div><div class="aic-ti">RAYNO AI 어시스턴트<span>데이터 기반 응답 · 로컬 계산</span></div><button class="aic-x" type="button" aria-label="닫기">\u2715</button></div>'
+      +'<div class="aic-body" id="aicBody"></div>'
+      +'<div class="aic-chips" id="aicChips"></div>'
+      +'<div class="aic-input"><input id="aicInput" type="text" placeholder="예) 5월 매출 얼마야?" autocomplete="off"><button id="aicSend" type="button">보내기</button></div>';
+    document.body.appendChild(p);
+    const body=p.querySelector('#aicBody'), inp=p.querySelector('#aicInput'), send=p.querySelector('#aicSend'), chips=p.querySelector('#aicChips');
+    function add(role,text){ const b=document.createElement('div'); b.className='aic-msg '+role; b.textContent=text; body.appendChild(b); body.scrollTop=body.scrollHeight; return b; }
+    function ask(q){ q=(q==null?inp.value:q).trim(); if(!q)return; add('user',q); inp.value='';
+      const tp=add('bot',' '); tp.classList.add('aic-typing'); tp.textContent='…';
+      setTimeout(()=>{ tp.remove(); add('bot', _aiAnswer(q)); },180); }
+    send.addEventListener('click',()=>ask());
+    inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ask(); }});
+    p.querySelector('.aic-x').addEventListener('click',()=>{ p.style.display='none'; });
+    ['5월 매출 얼마야?','전체 매출은?','매출 상위 대리점','보증서 몇 건?','언급량/감성 어때?'].forEach(qx=>{ const c=document.createElement('button'); c.type='button'; c.className='aic-chip'; c.textContent=qx; c.addEventListener('click',()=>ask(qx)); chips.appendChild(c); });
+    add('bot','안녕하세요! 레이노 데이터에 대해 물어보세요. 아래 예시를 눌러도 돼요.');
+  }
+  p.style.display='flex'; setTimeout(()=>{ try{document.getElementById('aicInput').focus();}catch(_){}} ,60);
+}
+
 function _applySidebarLayout(){
   try{
     const wrap=document.querySelector('.wrap'); if(!wrap||document.getElementById('rSidebar')) return;
@@ -7456,6 +7544,7 @@ function _applySidebarLayout(){
     const ai=document.createElement('div'); ai.className='rsb-ai';
     ai.innerHTML='<div class="rsb-orb"></div><div class="rsb-ai-t">RAYNO AI 어시스턴트</div><div class="rsb-ai-d">데이터에 관한 인사이트를 물어보세요</div><button class="rsb-ai-b" type="button">AI에게 질문하기</button>';
     aside.appendChild(ai);
+    try{ const _aib=ai.querySelector('.rsb-ai-b'); if(_aib) _aib.addEventListener('click',()=>{ try{_aiChatOpen();}catch(e){console.warn(e);} }); }catch(_){}
     if(adminBtn){ adminBtn.classList.add('rsb-login'); adminBtn.innerHTML=_sbSvg('lock')+'<span>관리자 로그인</span>'; aside.appendChild(adminBtn); }
     const col=document.createElement('button'); col.className='rsb-collapse'; col.type='button'; col.textContent='\u2190 사이드바 접기';
     aside.appendChild(col);
