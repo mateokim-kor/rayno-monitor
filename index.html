@@ -1016,6 +1016,19 @@
   .brief-head,.brief-lines,.brief-alerts{position:relative;z-index:1}
   .brief-alerts{border-top-color:rgba(180,120,40,.28)}
   @media(max-width:680px){.brief-wave{display:none}}
+  /* ── 좌측 사이드바 레이아웃 ── */
+  .wrap.has-sidebar{display:grid;grid-template-columns:208px minmax(0,1fr);grid-template-areas:"head head" "side main";column-gap:22px;align-items:start;max-width:1340px}
+  .wrap.has-sidebar>header{grid-area:head}
+  .wrap.has-sidebar>#rSidebar{grid-area:side;position:sticky;top:22px;align-self:start;background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow-sm);padding:11px 9px;display:flex;flex-direction:column;gap:4px}
+  .wrap.has-sidebar>#rMain{grid-area:main;min-width:0}
+  #rSidebar #appSwitcher{display:flex;flex-direction:column;gap:4px;background:transparent;border:none;padding:0 0 8px;margin:0 0 4px;border-bottom:1px solid var(--line)}
+  #rSidebar #nav,#rSidebar #raynoNav{flex-direction:column;gap:3px;border:none;padding:0;margin:0;background:transparent}
+  #rSidebar .nav-btn,#rSidebar .appsw-btn{display:flex !important;width:100%;justify-content:flex-start;border-radius:10px;padding:9px 12px;font-size:13.5px;font-weight:600;border-bottom:none !important;background:transparent}
+  #rSidebar .nav-btn:hover,#rSidebar .appsw-btn:hover{background:var(--bg2)}
+  #rSidebar .nav-btn.on,#rSidebar .appsw-btn.on{background:rgba(244,145,28,.13);color:var(--amber);font-weight:800}
+  #rSidebar #themeToggle{margin:8px auto 0}
+  #rSidebar .appsw-sub,#rSidebar .nav-sub{display:none}
+  @media(max-width:860px){ .wrap.has-sidebar{display:block} .wrap.has-sidebar>#rSidebar{position:static;flex-direction:row;flex-wrap:wrap;margin-bottom:14px} }
 </style>
 </head>
 <body>
@@ -1529,7 +1542,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · UIUX_3차_인사이트배너';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · UIUX_4차_사이드바(실험)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7286,6 +7299,24 @@ async function boot(){
     if(now!==auth){ auth=now; applyAuthUI(); refreshVerify(); }
   });
 }
+function _applySidebarLayout(){
+  try{
+    const wrap=document.querySelector('.wrap'); if(!wrap||document.getElementById('rSidebar')) return;
+    if(window.innerWidth < 860) return;            // 좁은 화면은 기존 가로 레이아웃 유지
+    const header=wrap.querySelector('header'); if(!header) return;
+    const nav=document.getElementById('nav'); if(!nav) return;
+    const sw=document.getElementById('appSwitcher'), rnav=document.getElementById('raynoNav');
+    const aside=document.createElement('aside'); aside.id='rSidebar';
+    const main=document.createElement('div'); main.id='rMain';
+    header.after(aside); aside.after(main);
+    if(sw) aside.appendChild(sw);
+    aside.appendChild(nav);
+    if(rnav) aside.appendChild(rnav);
+    Array.from(wrap.children).forEach(ch=>{ if(ch!==header&&ch!==aside&&ch!==main) main.appendChild(ch); });
+    wrap.classList.add('has-sidebar');
+  }catch(e){ console.warn('sidebar layout skipped', e); }
+}
+try{ _applySidebarLayout(); }catch(e){}
 boot();
 </script>
 </body>
