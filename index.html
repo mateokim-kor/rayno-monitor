@@ -1159,7 +1159,7 @@
       <div class="card">
         <h3><span class="dot"></span>감성 분포</h3>
         <div class="cap">긍정 · 부정 · 중립 비율</div>
-        <div class="chart-box"><canvas id="cSent"></canvas></div>
+        <div class="chart-box" style="height:270px"><canvas id="cSent"></canvas></div>
       </div>
       <div class="card">
         <h3><span class="dot"></span>게시글 유형</h3>
@@ -1529,7 +1529,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 감성도넛_경쟁사색';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 감성도넛_카드꽉채움';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2312,7 +2312,7 @@ function renderSentiment(rows){
     type:'doughnut',
     data:{labels:dlabels,datasets:[{data,backgroundColor:bg,borderColor:_ck().donut,borderWidth:3,offset:off}]},
     plugins:[pctDonutPlugin, sentCenterPlugin],
-    options:{cutout:'62%',onClick:(e,el)=>{
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',onClick:(e,el)=>{
         if(el.length){ const lab=labels[el[0].index];
           state.sentFilter=(state.sentFilter===lab)?null:lab; render(); }
       },
