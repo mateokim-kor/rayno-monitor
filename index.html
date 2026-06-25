@@ -1040,6 +1040,10 @@
   .rsb-collapse{margin-top:11px;color:#8b91a0;font-size:12px;background:none;border:none;text-align:left;padding:6px 8px;cursor:pointer}
   .wrap.has-sidebar.collapsed{grid-template-columns:0 1fr}
   .wrap.has-sidebar.collapsed>#rSidebar{width:0;padding:0;overflow:hidden;border:none}
+  /* 2단계: 상단바 — 로고는 사이드바에 있으니 헤더에선 숨기고 제목만 */
+  .wrap.has-sidebar .brand-logo,.wrap.has-sidebar .brand-div{display:none}
+  .wrap.has-sidebar header h1{font-size:22px;font-weight:800}
+  .wrap.has-sidebar .brand{gap:0}
 </style>
 </head>
 <body>
@@ -1553,7 +1557,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 리디자인_다크사이드바_1단계';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 리디자인_2단계_상단바';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
