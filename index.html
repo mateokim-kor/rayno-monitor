@@ -1030,8 +1030,22 @@
   #rSidebar .nav-btn,#rSidebar .appsw-btn{display:flex !important;width:100%;justify-content:flex-start;border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;color:#8b91a0;background:transparent;border:none !important}
   #rSidebar .nav-btn:hover,#rSidebar .appsw-btn:hover{background:#1b1e25;color:#c7ccd6}
   #rSidebar .nav-btn.on,#rSidebar .appsw-btn.on{background:linear-gradient(135deg,rgba(244,145,28,.18),rgba(244,145,28,.06));color:#ffb967;font-weight:800}
-  #rSidebar #themeToggle{margin:8px 4px 0;align-self:flex-start}
   .rsb-spacer{flex:1;min-height:14px}
+  /* 활성 워크스페이스 뷰만 표시 */
+  #rSidebar[data-ws="cafe"] #raynoNav{display:none !important}
+  #rSidebar[data-ws="rayno"] #nav{display:none !important}
+  #rSidebar[data-ws="settings"] #nav,#rSidebar[data-ws="settings"] #raynoNav{display:none !important}
+  /* 메뉴 아이콘 */
+  #rSidebar .sb-ic{width:20px;display:inline-grid;place-items:center;font-size:15px;margin-right:11px;flex:none;opacity:.92}
+  /* 중복 로그인 제거 */
+  #raynoLoginBtn,#setAdminLogin{display:none !important}
+  /* 단일 로그인(사이드바 하단) */
+  #rSidebar #adminBtn.rsb-login{width:100%;justify-content:center;gap:7px;background:#1b1e25;border:1px solid #2f3744;color:#e8c9a0;border-radius:11px;padding:10px;font-size:12.5px;font-weight:800;margin-top:4px}
+  #rSidebar #adminBtn.rsb-login:hover{border-color:var(--amber);color:#ffb967}
+  /* 다크모드 토글 = 사이드바 맨 아래 */
+  #rSidebar #themeToggle{display:flex;align-items:center;gap:9px;width:100%;background:#1b1e25;border:1px solid #262a32;border-radius:11px;padding:10px 12px;margin-top:10px;color:#aeb4c0;font-size:12.5px;font-weight:600}
+  #rSidebar #themeToggle .ts-label{margin-right:auto}
+  #rSidebar #themeToggle .ts-ico{font-size:14px}
   .rsb-ai{background:linear-gradient(180deg,#1c1f27,#15171d);border:1px solid #262a32;border-radius:16px;padding:15px 13px 14px;text-align:center;margin-top:14px}
   .rsb-orb{width:58px;height:58px;margin:0 auto 10px;border-radius:50%;background:radial-gradient(circle at 38% 34%,#ffd9a0,#ff9d2e 33%,#f4801a 56%,#b8500a 80%);box-shadow:0 0 22px 5px rgba(244,145,28,.45),inset -5px -7px 12px rgba(120,50,0,.5)}
   .rsb-ai-t{font-size:12.5px;font-weight:800;color:#fff}
@@ -1557,7 +1571,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 리디자인_2단계_상단바';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 사이드바_정리_아이콘';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7328,6 +7342,11 @@ async function boot(){
     if(now!==auth){ auth=now; applyAuthUI(); refreshVerify(); }
   });
 }
+function _sbIco(t){ t=(t||'').replace(/\s+/g,'');
+  const M={'대시보드':'\uD83C\uDFE0','온라인모니터링':'\uD83D\uDCE1','레이노데이터':'\uD83D\uDDC4\uFE0F','설정':'\u2699\uFE0F','리포트':'\uD83D\uDCC4','경쟁사프로모션':'\u2694\uFE0F','경쟁사분석':'\u2694\uFE0F','데이터검증':'\u2705','채널분석':'\uD83D\uDCCA','채널분석':'\uD83D\uDCCA','키워드분석':'\uD83D\uDD11','이슈':'\uD83D\uDD11','매출':'\uD83D\uDCB0','품질보증서':'\uD83D\uDEE1\uFE0F','글라스케어':'\u2728','대리점':'\uD83C\uDFEC','검색량':'\uD83D\uDD0D','보증서리포트':'\uD83D\uDCD1','알림센터':'\uD83D\uDD14'};
+  for(const k in M){ if(t.indexOf(k)>=0) return M[k]; } return '\u2022';
+}
+function _sbInject(btn){ if(!btn||btn.querySelector('.sb-ic'))return; const s=document.createElement('span'); s.className='sb-ic'; s.textContent=_sbIco(btn.textContent); btn.insertBefore(s, btn.firstChild); }
 function _applySidebarLayout(){
   try{
     const wrap=document.querySelector('.wrap'); if(!wrap||document.getElementById('rSidebar')) return;
@@ -7335,6 +7354,8 @@ function _applySidebarLayout(){
     const header=wrap.querySelector('header'); if(!header) return;
     const nav=document.getElementById('nav'); if(!nav) return;
     const sw=document.getElementById('appSwitcher'), rnav=document.getElementById('raynoNav');
+    const theme=document.getElementById('themeToggle');     // 다크모드 → 맨 아래로 이동
+    const adminBtn=document.getElementById('adminBtn');      // 로그인 → 사이드바 하단 1개로 통합
     const aside=document.createElement('aside'); aside.id='rSidebar';
     const main=document.createElement('div'); main.id='rMain';
     header.after(aside); aside.after(main);
@@ -7344,17 +7365,29 @@ function _applySidebarLayout(){
     if(sw) aside.appendChild(sw);
     aside.appendChild(nav);
     if(rnav) aside.appendChild(rnav);
+    // 아이콘 주입(라벨 기준)
+    aside.querySelectorAll('.appsw-btn').forEach(_sbInject);
+    if(nav) nav.querySelectorAll('.nav-btn').forEach(_sbInject);
+    if(rnav) rnav.querySelectorAll('.nav-btn').forEach(_sbInject);
+    // 활성 워크스페이스의 뷰만 보이기 (data-ws 스코프)
+    const syncWs=()=>{ const on=aside.querySelector('.appsw-btn.on'); aside.setAttribute('data-ws', on?on.dataset.ws:'cafe'); };
+    syncWs();
+    try{ const _mo=new MutationObserver(syncWs); aside.querySelectorAll('.appsw-btn').forEach(b=>_mo.observe(b,{attributes:true,attributeFilter:['class']})); }
+    catch(_){ aside.querySelectorAll('.appsw-btn').forEach(b=>b.addEventListener('click',()=>setTimeout(syncWs,0))); }
     const spacer=document.createElement('div'); spacer.className='rsb-spacer'; aside.appendChild(spacer);
     const ai=document.createElement('div'); ai.className='rsb-ai';
     ai.innerHTML='<div class="rsb-orb"></div><div class="rsb-ai-t">RAYNO AI 어시스턴트</div><div class="rsb-ai-d">데이터에 관한 인사이트를 물어보세요</div><button class="rsb-ai-b" type="button">AI에게 질문하기</button>';
     aside.appendChild(ai);
+    if(adminBtn){ adminBtn.classList.add('rsb-login'); aside.appendChild(adminBtn); }   // 단일 로그인(핸들러 유지)
     const col=document.createElement('button'); col.className='rsb-collapse'; col.type='button'; col.textContent='\u2190 사이드바 접기';
     col.addEventListener('click',()=>wrap.classList.toggle('collapsed'));
     aside.appendChild(col);
+    if(theme) aside.appendChild(theme);     // 다크모드 토글 = 제일 아래
     Array.from(wrap.children).forEach(ch=>{ if(ch!==header&&ch!==aside&&ch!==main) main.appendChild(ch); });
     wrap.classList.add('has-sidebar'); document.body.classList.add('sidebar-on');
   }catch(e){ console.warn('sidebar layout skipped', e); }
 }
+
 try{ _applySidebarLayout(); }catch(e){}
 boot();
 </script>
