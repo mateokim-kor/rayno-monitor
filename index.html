@@ -1021,15 +1021,17 @@
   .wrap.has-sidebar{display:grid;grid-template-columns:236px minmax(0,1fr);grid-template-rows:auto 1fr;grid-template-areas:"side head" "side main";max-width:none;margin:0;min-height:100vh}
   .wrap.has-sidebar>header{grid-area:head;margin:22px 30px 4px}
   .wrap.has-sidebar>#rMain{grid-area:main;padding:6px 30px 44px;min-width:0}
-  .wrap.has-sidebar>#rSidebar{grid-area:side;position:sticky;top:0;height:100vh;background:#13151a;color:#c7ccd6;display:flex;flex-direction:column;padding:20px 14px;overflow-y:auto;z-index:6}
-  .rsb-brand{display:flex;align-items:center;gap:9px;padding:4px 8px 16px;margin-bottom:8px;border-bottom:1px solid #262a32;background:none;border-left:none;border-right:none;border-top:none;width:100%;cursor:pointer}
+  .wrap.has-sidebar>#rSidebar{grid-area:side;position:sticky;top:0;height:100vh;background:#13151a;color:#c7ccd6;display:flex;flex-direction:column;padding:16px 13px 12px;overflow:hidden;z-index:6}
+  .rsb-brand{display:flex;align-items:center;gap:9px;padding:2px 8px 12px;margin-bottom:6px;border-bottom:1px solid #262a32;background:none;border-left:none;border-right:none;border-top:none;width:100%;cursor:pointer}
   .rsb-brand:hover{opacity:.85}
   .rsb-logo{height:28px;width:auto;display:block;filter:brightness(0) invert(1)}
   .rsb-nm{font-weight:800;font-size:18px;letter-spacing:.04em;color:#fff}
   /* 그룹 네비 */
-  .rsb-nav{display:flex;flex-direction:column;gap:1px}
-  .rsb-sec{font-size:10.5px;font-weight:800;color:#6b7180;letter-spacing:.03em;padding:15px 12px 6px}
-  .rsb-item{display:flex;align-items:center;width:100%;border:none;background:transparent;color:#9aa0ad;font-size:13px;font-weight:600;padding:9px 12px;border-radius:10px;cursor:pointer;text-align:left;font-family:inherit}
+  .rsb-nav{display:flex;flex-direction:column;gap:1px;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#33363d transparent}
+  .rsb-nav::-webkit-scrollbar{width:5px}
+  .rsb-nav::-webkit-scrollbar-thumb{background:#33363d;border-radius:3px}
+  .rsb-sec{font-size:10px;font-weight:800;color:#6b7180;letter-spacing:.03em;padding:11px 12px 4px}
+  .rsb-item{display:flex;align-items:center;width:100%;border:none;background:transparent;color:#9aa0ad;font-size:12.5px;font-weight:600;padding:7px 12px;border-radius:9px;cursor:pointer;text-align:left;font-family:inherit}
   .rsb-item:hover{background:#1b1e25;color:#cfd3db}
   .rsb-item.on{background:linear-gradient(135deg,rgba(244,145,28,.18),rgba(244,145,28,.06));color:#ffb967;font-weight:800}
   .rsb-item .rsb-lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1063,7 +1065,7 @@
   #rSidebar .nav-btn,#rSidebar .appsw-btn{display:flex !important;width:100%;justify-content:flex-start;border-radius:11px;padding:11px 13px;font-size:13.5px;font-weight:600;color:#8b91a0;background:transparent;border:none !important}
   #rSidebar .nav-btn:hover,#rSidebar .appsw-btn:hover{background:#1b1e25;color:#c7ccd6}
   #rSidebar .nav-btn.on,#rSidebar .appsw-btn.on{background:linear-gradient(135deg,rgba(244,145,28,.18),rgba(244,145,28,.06));color:#ffb967;font-weight:800}
-  .rsb-spacer{flex:1;min-height:14px}
+  .rsb-spacer{display:none}
   /* 활성 워크스페이스 뷰만 표시 */
   #rSidebar[data-ws="cafe"] #raynoNav{display:none !important}
   #rSidebar[data-ws="rayno"] #nav{display:none !important}
@@ -1073,26 +1075,26 @@
   /* 중복 로그인 제거 */
   #raynoLoginBtn,#setAdminLogin{display:none !important}
   /* 단일 로그인(사이드바 하단) */
-  #rSidebar #adminBtn.rsb-login{width:100%;justify-content:center;gap:7px;background:#1b1e25;border:1px solid #2f3744;color:#e8c9a0;border-radius:11px;padding:10px;font-size:12.5px;font-weight:800;margin-top:4px}
+  #rSidebar #adminBtn.rsb-login{flex:none;width:100%;justify-content:center;gap:7px;background:#1b1e25;border:1px solid #2f3744;color:#e8c9a0;border-radius:10px;padding:9px;font-size:12px;font-weight:800;margin-top:8px}
   #rSidebar #adminBtn.rsb-login:hover{border-color:var(--amber);color:#ffb967}
   #rSidebar #adminBtn.rsb-login svg{width:15px;height:15px;stroke-width:1.9}
   /* 다크모드 토글 = 사이드바 맨 아래 */
-  #rSidebar #themeToggle{display:flex;align-items:center;gap:9px;width:100%;background:#1b1e25;border:1px solid #262a32;border-radius:11px;padding:10px 12px;margin-top:10px;color:#aeb4c0;font-size:12.5px;font-weight:600}
+  #rSidebar #themeToggle{flex:none;display:flex;align-items:center;gap:9px;width:100%;background:#1b1e25;border:1px solid #262a32;border-radius:10px;padding:8px 12px;margin-top:8px;color:#aeb4c0;font-size:12px;font-weight:600}
   #rSidebar #themeToggle .ts-label{margin-right:auto}
   #rSidebar #themeToggle .ts-ico{font-size:14px}
-  .rsb-ai{background:radial-gradient(120% 80% at 50% 40%,#1d1a18 0%,#161618 55%,#121214 100%);border:1px solid #2a2722;border-radius:18px;padding:17px 14px 15px;text-align:center;margin-top:14px;position:relative;overflow:hidden}
+  .rsb-ai{background:radial-gradient(120% 80% at 50% 40%,#1d1a18 0%,#161618 55%,#121214 100%);border:1px solid #2a2722;border-radius:16px;padding:12px 12px 11px;text-align:center;margin-top:10px;flex:none;position:relative;overflow:hidden}
   .rsb-ai-t{font-size:13.5px;font-weight:800;color:#fff;letter-spacing:-.01em}
-  .rsb-ai-d{font-size:10.5px;color:#8a8f99;margin:4px 0 4px;line-height:1.5}
-  .rsb-orb-wrap{display:flex;justify-content:center;margin:0 0 8px;filter:drop-shadow(0 4px 22px rgba(244,145,28,.4))}
-  .rsb-orb-svg{width:148px;height:auto;display:block}
+  .rsb-ai-d{font-size:10px;color:#8a8f99;margin:3px 0 2px;line-height:1.45}
+  .rsb-orb-wrap{display:flex;justify-content:center;margin:0 0 6px;filter:drop-shadow(0 4px 18px rgba(244,145,28,.4))}
+  .rsb-orb-svg{width:108px;height:auto;display:block}
   .rsb-orb-core{transform-origin:center;animation:rsbPulse 3.4s ease-in-out infinite}
   .rsb-orb-glow{animation:rsbGlow 3.4s ease-in-out infinite}
   @keyframes rsbPulse{0%,100%{opacity:.92}50%{opacity:1}}
   @keyframes rsbGlow{0%,100%{opacity:.8}50%{opacity:1}}
   @media(prefers-reduced-motion:reduce){.rsb-orb-core,.rsb-orb-glow{animation:none}}
-  .rsb-ai-b{display:block;width:100%;background:#1c1d22;border:1px solid #3b3326;color:#ffce8e;border-radius:11px;padding:11px;font-size:12.5px;font-weight:800;cursor:pointer;transition:.15s;position:relative;z-index:1}
+  .rsb-ai-b{display:block;width:100%;background:#1c1d22;border:1px solid #3b3326;color:#ffce8e;border-radius:10px;padding:9px;font-size:12px;font-weight:800;cursor:pointer;transition:.15s;position:relative;z-index:1}
   .rsb-ai-b:hover{border-color:var(--amber);color:#ffb967;background:#23242b}
-  .rsb-collapse{margin-top:11px;color:#8b91a0;font-size:12px;background:none;border:none;text-align:left;padding:6px 8px;cursor:pointer}
+  .rsb-collapse{flex:none;margin-top:8px;color:#8b91a0;font-size:11.5px;background:none;border:none;text-align:left;padding:4px 8px;cursor:pointer}
   .wrap.has-sidebar.collapsed{grid-template-columns:0 1fr}
   .wrap.has-sidebar.collapsed>#rSidebar{width:0;padding:0;overflow:hidden;border:none}
   /* 2단계: 상단바 — 로고는 사이드바에 있으니 헤더에선 숨기고 제목만 */
@@ -1620,7 +1622,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · AI카드_글로우오브';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 사이드바_무스크롤_컴팩트';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
