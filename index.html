@@ -1647,7 +1647,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 레이노업로드버튼_복구';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 이모지변환_옵저버_전체스캔';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7812,14 +7812,11 @@ try{ _applySidebarLayout(); }catch(e){}
   var obs=null, scheduled=false;
   function start(){ try{ obs=new MutationObserver(onMut); obs.observe(document.body,{childList:true,subtree:true}); }catch(e){} }
   function onMut(muts){
-    var roots=[];
-    muts.forEach(function(mu){ if(mu.addedNodes) mu.addedNodes.forEach(function(nd){
-      if(nd.nodeType===1) roots.push(nd);
-      else if(nd.nodeType===3 && nd.parentNode) roots.push(nd.parentNode);
-    }); });
-    if(!roots.length) return;
-    if(scheduled) return; scheduled=true;
-    setTimeout(function(){ scheduled=false; if(obs) obs.disconnect(); roots.forEach(function(r){ emojify(r); }); if(obs) try{obs.observe(document.body,{childList:true,subtree:true});}catch(e){} }, 60);
+    var has=false;
+    for(var i=0;i<muts.length;i++){ if(muts[i].addedNodes && muts[i].addedNodes.length){ has=true; break; } }
+    if(!has || scheduled) return;
+    scheduled=true;
+    setTimeout(function(){ scheduled=false; if(obs) obs.disconnect(); try{ emojify(document.body); }catch(e){} if(obs) try{obs.observe(document.body,{childList:true,subtree:true});}catch(e){} }, 90);
   }
   function init(){ try{ emojify(document.body); }catch(e){} start(); setTimeout(function(){ emojify(document.body); },600); setTimeout(function(){ emojify(document.body); },1800); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
