@@ -1006,6 +1006,16 @@
   .kpi.clickable:hover .kpi-ic{opacity:0}
   .kpi .val{font-size:32px}
   .dot{border-radius:3px}
+  .brief{position:relative;overflow:hidden;background:linear-gradient(120deg,#fff7ee 0%,#ffedd8 55%,#ffe6c8 100%);border:1px solid #ffdcae;border-radius:var(--r);padding:19px 22px;margin-bottom:16px;box-shadow:var(--shadow-sm)}
+  html[data-theme="dark"] .brief{background:linear-gradient(120deg,#251b10,#2c1e0d);border-color:#5a3d17}
+  .brief-head .bh-t{font-size:15px}
+  .brief .ai-badge{display:inline-flex;align-items:center;font-size:9.5px;font-weight:800;color:#fff;background:var(--amber);padding:2px 7px;border-radius:980px;margin-left:7px;letter-spacing:.04em;vertical-align:middle}
+  .brief-line{position:relative;padding-left:15px}
+  .brief-line::before{content:"";position:absolute;left:0;top:7px;width:6px;height:6px;border-radius:2px;background:var(--amber)}
+  .brief-wave{position:absolute;right:0;top:0;bottom:0;width:42%;max-width:360px;height:100%;pointer-events:none}
+  .brief-head,.brief-lines,.brief-alerts{position:relative;z-index:1}
+  .brief-alerts{border-top-color:rgba(180,120,40,.28)}
+  @media(max-width:680px){.brief-wave{display:none}}
 </style>
 </head>
 <body>
@@ -1519,7 +1529,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · UIUX_2차_KPI아이콘';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · UIUX_3차_인사이트배너';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2015,7 +2025,8 @@ function renderBrief(rows){
     alertHtml=`<div class="brief-alerts">`+rows2.map(a=>`<div class="ba-row ${a[0]}"><span class="ba-ic">${a[1]}</span><div>${a[2]}</div></div>`).join('')+`</div>`;
   }
   el.innerHTML=`<div class="brief">
-    <div class="brief-head"><span class="bh-t">📋 한 줄 브리핑</span><button class="brief-copy" id="briefCopyBtn">📋 복사</button></div>
+    <svg class="brief-wave" viewBox="0 0 360 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="bwg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#f4911c" stop-opacity="0"/><stop offset="1" stop-color="#f4911c" stop-opacity=".5"/></linearGradient></defs><path d="M0,82 C38,72 60,98 95,74 C132,50 152,86 190,56 C230,28 250,62 290,40 C322,22 342,34 360,18" fill="none" stroke="url(#bwg)" stroke-width="3" stroke-linecap="round"/><circle cx="354" cy="20" r="4" fill="#f4911c"/></svg>
+    <div class="brief-head"><span class="bh-t">✨ 이번 주 인사이트<span class="ai-badge">AI</span></span><button class="brief-copy" id="briefCopyBtn">📋 복사</button></div>
     <div class="brief-lines"><div class="brief-line">${l1}</div><div class="brief-line">${l2}</div><div class="brief-line">${l3}</div></div>
     ${alertHtml}
   </div>`;
