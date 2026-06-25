@@ -1055,6 +1055,7 @@
   /* 단일 로그인(사이드바 하단) */
   #rSidebar #adminBtn.rsb-login{width:100%;justify-content:center;gap:7px;background:#1b1e25;border:1px solid #2f3744;color:#e8c9a0;border-radius:11px;padding:10px;font-size:12.5px;font-weight:800;margin-top:4px}
   #rSidebar #adminBtn.rsb-login:hover{border-color:var(--amber);color:#ffb967}
+  #rSidebar #adminBtn.rsb-login svg{width:15px;height:15px;stroke-width:1.9}
   /* 다크모드 토글 = 사이드바 맨 아래 */
   #rSidebar #themeToggle{display:flex;align-items:center;gap:9px;width:100%;background:#1b1e25;border:1px solid #262a32;border-radius:11px;padding:10px 12px;margin-top:10px;color:#aeb4c0;font-size:12.5px;font-weight:600}
   #rSidebar #themeToggle .ts-label{margin-right:auto}
@@ -1071,6 +1072,14 @@
   .wrap.has-sidebar .brand-logo,.wrap.has-sidebar .brand-div{display:none}
   .wrap.has-sidebar header h1{font-size:22px;font-weight:800}
   .wrap.has-sidebar .brand{gap:0}
+  /* 사이드바가 있으니 가로 워크스페이스 탭/네비는 숨김(중복 제거) */
+  .wrap.has-sidebar #appSwitcher,.wrap.has-sidebar #nav,.wrap.has-sidebar #raynoNav{display:none !important}
+  /* KPI 아이콘 SVG */
+  .kpi-ic svg{width:18px;height:18px;stroke:var(--ink3)}
+  .kpi.k-pos .kpi-ic svg{stroke:var(--pos)}
+  .kpi.k-neg .kpi-ic svg{stroke:var(--neg)}
+  .kpi.k-neu .kpi-ic svg{stroke:#6b7280}
+  .kpi.k-plain .kpi-ic svg{stroke:var(--amber)}
 </style>
 </head>
 <body>
@@ -1584,7 +1593,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 사이드바_아이콘_관리자_재오픈';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 가로탭숨김_KPI아이콘SVG';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2261,11 +2270,11 @@ function renderKPIs(rows){
 
   const cards=[
     {lab: isStrict?'총 수집 (검증)':'총 수집',  val:total.toLocaleString(),
-       meta:`게시글 ${posts.toLocaleString()} · 댓글 ${cmts.toLocaleString()}`, cls:'', sent:null, seeAll:true, icon:'💬'},
-    {lab:'긍정',    val:pos,  meta:classified?`${(pos/classified*100).toFixed(1)}%`:'-', cls:'k-pos', sent:'긍정', icon:'🙂'},
-    {lab:'부정',    val:neg,  meta:classified?`${(neg/classified*100).toFixed(1)}%`:'-', cls:'k-neg', sent:'부정', icon:'🙁'},
-    {lab:'중립',    val:neu,  meta:classified?`${(neu/classified*100).toFixed(1)}%`:'-', cls:'k-neu', sent:'중립', icon:'😐'},
-    {lab:'긍정률',  val:rate+'%', meta:`분류 ${classified.toLocaleString()}건 · ${cafes}개 카페`, cls:'k-plain', sent:null, icon:'📈'},
+       meta:`게시글 ${posts.toLocaleString()} · 댓글 ${cmts.toLocaleString()}`, cls:'', sent:null, seeAll:true, icon:'chat'},
+    {lab:'긍정',    val:pos,  meta:classified?`${(pos/classified*100).toFixed(1)}%`:'-', cls:'k-pos', sent:'긍정', icon:'smile'},
+    {lab:'부정',    val:neg,  meta:classified?`${(neg/classified*100).toFixed(1)}%`:'-', cls:'k-neg', sent:'부정', icon:'frown'},
+    {lab:'중립',    val:neu,  meta:classified?`${(neu/classified*100).toFixed(1)}%`:'-', cls:'k-neu', sent:'중립', icon:'meh'},
+    {lab:'긍정률',  val:rate+'%', meta:`분류 ${classified.toLocaleString()}건 · ${cafes}개 카페`, cls:'k-plain', sent:null, icon:'trend'},
   ];
   document.getElementById('kpis').innerHTML = cards.map(c=>{
     const clickable = !!c.sent;
@@ -2275,7 +2284,7 @@ function renderKPIs(rows){
               : (c.seeAll ? `<button class="seebtn" data-see="__total__">자세히 보기</button>` : '');
     return `<div class="kpi ${c.cls} ${clickable?'clickable':''} ${active?'active':''}"
               ${c.sent?`data-sent="${c.sent}"`:''}>
-       ${tag}${c.icon?`<span class="kpi-ic">${c.icon}</span>`:''}<div class="lab">${c.lab}</div>
+       ${tag}${c.icon?`<span class="kpi-ic">${_sbSvg(c.icon)}</span>`:''}<div class="lab">${c.lab}</div>
        <div class="val">${c.val}</div><div class="meta">${c.meta}</div>${see}</div>`;
   }).join('');
   // 감성 카드 클릭 → 드릴다운 토글 (자세히 보기 버튼 클릭은 제외)
@@ -7369,7 +7378,13 @@ function _sbSvg(k){
     verify:'M12 3a9 9 0 100 18 9 9 0 000-18zM8 12l3 3 5-5',
     refresh:'M20 11a8 8 0 00-14-4.5L4 8M4 4v4h4M4 13a8 8 0 0014 4.5L20 16M20 20v-4h-4',
     gear:'M12 9.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM12 3v2.5M12 18.5V21M5 5l1.8 1.8M17.2 17.2L19 19M3 12h2.5M18.5 12H21M5 19l1.8-1.8M17.2 6.8L19 5',
-    menu:'M4 6h16M4 12h16M4 18h16'
+    menu:'M4 6h16M4 12h16M4 18h16',
+    chat:'M21 11.5a8.5 8.5 0 01-12.8 7.3L3 21l2.2-5.2A8.5 8.5 0 1121 11.5z',
+    smile:'M12 3a9 9 0 100 18 9 9 0 000-18zM8.5 14a4 4 0 007 0M9 10h.01M15 10h.01',
+    frown:'M12 3a9 9 0 100 18 9 9 0 000-18zM8.5 15a4 4 0 017 0M9 10h.01M15 10h.01',
+    meh:'M12 3a9 9 0 100 18 9 9 0 000-18zM8.5 14.5h7M9 10h.01M15 10h.01',
+    trend:'M3 17l6-6 4 3 8-9M15 5h6v6',
+    lock:'M6 10V8a6 6 0 0112 0v2M5 10h14v10H5zM12 14v3'
   };
   const d=P[k]||P.home;
   return '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+d.split('M').filter(Boolean).map(s=>'<path d="M'+s+'"/>').join('')+'</svg>';
@@ -7441,7 +7456,7 @@ function _applySidebarLayout(){
     const ai=document.createElement('div'); ai.className='rsb-ai';
     ai.innerHTML='<div class="rsb-orb"></div><div class="rsb-ai-t">RAYNO AI 어시스턴트</div><div class="rsb-ai-d">데이터에 관한 인사이트를 물어보세요</div><button class="rsb-ai-b" type="button">AI에게 질문하기</button>';
     aside.appendChild(ai);
-    if(adminBtn){ adminBtn.classList.add('rsb-login'); aside.appendChild(adminBtn); }
+    if(adminBtn){ adminBtn.classList.add('rsb-login'); adminBtn.innerHTML=_sbSvg('lock')+'<span>관리자 로그인</span>'; aside.appendChild(adminBtn); }
     const col=document.createElement('button'); col.className='rsb-collapse'; col.type='button'; col.textContent='\u2190 사이드바 접기';
     aside.appendChild(col);
     if(theme) aside.appendChild(theme);
