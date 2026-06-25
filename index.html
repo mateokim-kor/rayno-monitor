@@ -1644,7 +1644,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 기간검색_대시보드툴바_헤더투명';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 사이드바_active_복원동기화';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4010,7 +4010,8 @@ document.getElementById('report').addEventListener('change', e=>{
 });
 
 function setView(v){
-  if(state.view==='verify' && v!=='verify') flushCloudSave();  // 검증 화면을 떠날 때 클라우드 반영
+  if(state.view==='verify' && v!=='verify') flushCloudSave();
+  if(typeof _sbSyncActive==='function'){ Promise.resolve().then(()=>{try{_sbSyncActive();}catch(_){}}); }  // 검증 화면을 떠날 때 클라우드 반영
   state.view=v; _saveNav();
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.view===v));
   const dash = (v==='dash');
@@ -6846,7 +6847,7 @@ function _restoreNav(nav){
   else { let cv=nav.cv; const ok={dash:1,report:1,promo:1,verify:1}; if(cv==='verify'&&auth!=='admin')cv='dash'; if(cv&&ok[cv]&&cv!=='dash') setView(cv); }
 }
 function setRView(v){
-  rview=v; _saveNav();
+  rview=v; _saveNav(); try{_sbSyncActive();}catch(_){}
   document.querySelectorAll('#raynoNav .nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.rview===v));
   Object.values(RVIEW_BOX).forEach(id=>{const el=document.getElementById(id); if(el)el.style.display='none';});
   const el=document.getElementById(RVIEW_BOX[v]); if(el) el.style.display='block';
@@ -6908,7 +6909,7 @@ async function openRayno(){
   setRView(rview);
 }
 async function setWorkspace(ws){
-  workspace=ws;
+  workspace=ws; try{_sbSyncActive();}catch(_){}
   document.querySelectorAll('.appsw-btn').forEach(b=>b.classList.toggle('on', b.dataset.ws===ws));
   const rayno=(ws==='rayno'), settings=(ws==='settings');
   document.getElementById('raynoApp').style.display = rayno?'block':'none';
@@ -7617,25 +7618,36 @@ function _applySidebarLayout(){
     function goCrawl(){ try{ const r=setWorkspace('cafe'); (r&&r.then)?r.then(()=>{try{openCrawlPanel();}catch(_){}}):(function(){try{openCrawlPanel();}catch(_){}})(); }catch(e){ try{openCrawlPanel();}catch(_){}} }
     const NAVCFG=[
       {h:'온라인 모니터링', items:[
-        {t:'모니터링 대시보드', ic:'home', go:()=>goCafe('dash')},
-        {t:'온라인 리포트', ic:'report', go:()=>goCafe('report')},
-        {t:'경쟁사 프로모션', ic:'promo', go:()=>goCafe('promo')},
+        {t:'모니터링 대시보드', ic:'home', k:'cafe:dash', go:()=>goCafe('dash')},
+        {t:'온라인 리포트', ic:'report', k:'cafe:report', go:()=>goCafe('report')},
+        {t:'경쟁사 프로모션', ic:'promo', k:'cafe:promo', go:()=>goCafe('promo')},
       ]},
       {h:'레이노 데이터', items:[
-        {t:'데이터 대시보드', ic:'data', go:()=>goRayno('dash')},
-        {t:'매출 분석', ic:'chart', go:()=>goRayno('revenue')},
-        {t:'품질보증서', ic:'shield', go:()=>goRayno('warranty')},
-        {t:'글라스케어 현황', ic:'sparkle', go:()=>goRayno('glass')},
-        {t:'대리점 현황', ic:'store', go:()=>goRayno('dealer')},
-        {t:'검색량 분석', ic:'search', go:()=>goRayno('search')},
-        {t:'보증서 리포트', ic:'report', go:()=>goRayno('warrReport')},
+        {t:'데이터 대시보드', ic:'data', k:'rayno:dash', go:()=>goRayno('dash')},
+        {t:'매출 분석', ic:'chart', k:'rayno:revenue', go:()=>goRayno('revenue')},
+        {t:'품질보증서', ic:'shield', k:'rayno:warranty', go:()=>goRayno('warranty')},
+        {t:'글라스케어 현황', ic:'sparkle', k:'rayno:glass', go:()=>goRayno('glass')},
+        {t:'대리점 현황', ic:'store', k:'rayno:dealer', go:()=>goRayno('dealer')},
+        {t:'검색량 분석', ic:'search', k:'rayno:search', go:()=>goRayno('search')},
+        {t:'보증서 리포트', ic:'report', k:'rayno:warrReport', go:()=>goRayno('warrReport')},
       ]},
       {h:'관리자', admin:true, items:[
-        {t:'데이터 검증', ic:'verify', go:()=>goCafe('verify')},
-        {t:'자동 수집 관리', ic:'refresh', go:goCrawl},
-        {t:'설정', ic:'gear', go:goSettings},
+        {t:'데이터 검증', ic:'verify', k:'cafe:verify', go:()=>goCafe('verify')},
+        {t:'자동 수집 관리', ic:'refresh', k:'crawl', go:goCrawl},
+        {t:'설정', ic:'gear', k:'settings', go:goSettings},
       ]},
     ];
+    function _sbSyncActive(){
+      try{
+        let key;
+        const ws=(typeof workspace!=='undefined')?workspace:'cafe';
+        if(ws==='rayno') key='rayno:'+((typeof rview!=='undefined'&&rview)?rview:'dash');
+        else if(ws==='settings') key='settings';
+        else key='cafe:'+((typeof state!=='undefined'&&state.view)?state.view:'dash');
+        const items=document.querySelectorAll('.rsb-item'); if(!items.length) return;
+        items.forEach(b=>b.classList.toggle('on', b.dataset.k===key));
+      }catch(_){}
+    }
     const brand=document.createElement('button'); brand.type='button'; brand.className='rsb-brand';
     brand.innerHTML = logoSrc ? '<img class="rsb-logo" src="'+logoSrc+'" alt="RAYNO">' : '<span class="rsb-nm">RAYNO</span>';
     aside.appendChild(brand);
@@ -7646,7 +7658,7 @@ function _applySidebarLayout(){
       const hd=document.createElement('div'); hd.className='rsb-sec'; hd.textContent=sec.h; grp.appendChild(hd);
       sec.items.forEach(it=>{
         const btn=document.createElement('button'); btn.type='button'; btn.className='rsb-item';
-        btn.innerHTML='<span class="sb-ic">'+_sbSvg(it.ic)+'</span><span class="rsb-lbl">'+it.t+'</span>';
+        btn.innerHTML='<span class="sb-ic">'+_sbSvg(it.ic)+'</span><span class="rsb-lbl">'+it.t+'</span>'; if(it.k) btn.dataset.k=it.k;
         btn.addEventListener('click',()=>{ allItems.forEach(b=>b.classList.remove('on')); btn.classList.add('on'); it.go(); });
         grp.appendChild(btn); allItems.push(btn);
       });
