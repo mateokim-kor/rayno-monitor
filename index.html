@@ -1529,7 +1529,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · UIUX_사이드바원복';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 감성도넛_경쟁사색';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2269,6 +2269,20 @@ const pctDonutPlugin = {
     ctx.restore();
   }
 };
+const sentCenterPlugin = {
+  id:'sentCenter',
+  afterDatasetsDraw(chart){
+    const {ctx,chartArea}=chart; if(!chartArea) return;
+    const data=chart.data.datasets[0].data, tot=data.reduce((a,b)=>a+(+b||0),0); if(!tot) return;
+    const cx=(chartArea.left+chartArea.right)/2, cy=(chartArea.top+chartArea.bottom)/2;
+    ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle=_ck().text; ctx.font='800 26px "Pretendard Variable",Pretendard,sans-serif';
+    ctx.fillText(tot.toLocaleString(), cx, cy-7);
+    ctx.fillStyle=(_ck().sub||'#86868b'); ctx.font='600 11px "Pretendard Variable",Pretendard,sans-serif';
+    ctx.fillText('총 언급량', cx, cy+13);
+    ctx.restore();
+  }
+};
 const pctBarPlugin = {
   id:'pctBar',
   afterDatasetsDraw(chart){
@@ -2297,13 +2311,13 @@ function renderSentiment(rows){
   makeChart('cSent',{
     type:'doughnut',
     data:{labels:dlabels,datasets:[{data,backgroundColor:bg,borderColor:_ck().donut,borderWidth:3,offset:off}]},
-    plugins:[pctDonutPlugin],
-    options:{cutout:'60%',onClick:(e,el)=>{
+    plugins:[pctDonutPlugin, sentCenterPlugin],
+    options:{cutout:'62%',onClick:(e,el)=>{
         if(el.length){ const lab=labels[el[0].index];
           state.sentFilter=(state.sentFilter===lab)?null:lab; render(); }
       },
       plugins:{
-        legend:{position:'bottom',labels:{padding:16,usePointStyle:true,pointStyle:'circle',color:_ck().text,
+        legend:{position:'right',labels:{padding:14,usePointStyle:true,pointStyle:'circle',color:_ck().text,
           font:{size:13,weight:'600'},
           generateLabels(chart){
             const ds=chart.data.datasets[0];
@@ -2385,7 +2399,7 @@ function renderComp(rows){
   const labels=ent.map(e=>e[0]);
   makeChart('cComp',{
     type:'bar',
-    data:{labels,datasets:[{data:ent.map(e=>e[1]),backgroundColor:'#7f8a96',borderRadius:6,maxBarThickness:34}]},
+    data:{labels,datasets:[{data:ent.map(e=>e[1]),backgroundColor:(c)=>{const a=c.chart.chartArea;if(!a)return '#f4911c';const g=c.chart.ctx.createLinearGradient(a.left,0,a.right,0);g.addColorStop(0,'#ffd089');g.addColorStop(1,'#f4911c');return g;},borderRadius:6,maxBarThickness:34}]},
     options:{indexAxis:'y',onClick:(e,el)=>{
         if(!el.length)return;
         const b=labels[el[0].index];
