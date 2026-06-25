@@ -999,6 +999,13 @@
   .warr-acc:not([open])>summary .warr-chev{transform:rotate(-90deg)}
   .up-hist-scroll{max-height:300px}
   .up-hist-scroll .up-tbl thead th{position:sticky;top:0;z-index:1}
+  .kpi-ic{position:absolute;top:13px;right:13px;width:34px;height:34px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;background:var(--bg2);transition:opacity .15s}
+  .kpi.k-pos .kpi-ic{background:var(--pos-bg)} .kpi.k-neg .kpi-ic{background:var(--neg-bg)} .kpi.k-neu .kpi-ic{background:var(--neu-bg)} .kpi.k-plain .kpi-ic{background:rgba(244,145,28,.12)}
+  .kpi{transition:transform .15s, box-shadow .15s, border-color .15s}
+  .kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .kpi.clickable:hover .kpi-ic{opacity:0}
+  .kpi .val{font-size:32px}
+  .dot{border-radius:3px}
 </style>
 </head>
 <body>
@@ -1512,7 +1519,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · UIUX_1차_배경상단바';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · UIUX_2차_KPI아이콘';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2188,11 +2195,11 @@ function renderKPIs(rows){
 
   const cards=[
     {lab: isStrict?'총 수집 (검증)':'총 수집',  val:total.toLocaleString(),
-       meta:`게시글 ${posts.toLocaleString()} · 댓글 ${cmts.toLocaleString()}`, cls:'', sent:null, seeAll:true},
-    {lab:'긍정',    val:pos,  meta:classified?`${(pos/classified*100).toFixed(1)}%`:'-', cls:'k-pos', sent:'긍정'},
-    {lab:'부정',    val:neg,  meta:classified?`${(neg/classified*100).toFixed(1)}%`:'-', cls:'k-neg', sent:'부정'},
-    {lab:'중립',    val:neu,  meta:classified?`${(neu/classified*100).toFixed(1)}%`:'-', cls:'k-neu', sent:'중립'},
-    {lab:'긍정률',  val:rate+'%', meta:`분류 ${classified.toLocaleString()}건 · ${cafes}개 카페`, cls:'k-plain', sent:null},
+       meta:`게시글 ${posts.toLocaleString()} · 댓글 ${cmts.toLocaleString()}`, cls:'', sent:null, seeAll:true, icon:'💬'},
+    {lab:'긍정',    val:pos,  meta:classified?`${(pos/classified*100).toFixed(1)}%`:'-', cls:'k-pos', sent:'긍정', icon:'🙂'},
+    {lab:'부정',    val:neg,  meta:classified?`${(neg/classified*100).toFixed(1)}%`:'-', cls:'k-neg', sent:'부정', icon:'🙁'},
+    {lab:'중립',    val:neu,  meta:classified?`${(neu/classified*100).toFixed(1)}%`:'-', cls:'k-neu', sent:'중립', icon:'😐'},
+    {lab:'긍정률',  val:rate+'%', meta:`분류 ${classified.toLocaleString()}건 · ${cafes}개 카페`, cls:'k-plain', sent:null, icon:'📈'},
   ];
   document.getElementById('kpis').innerHTML = cards.map(c=>{
     const clickable = !!c.sent;
@@ -2202,7 +2209,7 @@ function renderKPIs(rows){
               : (c.seeAll ? `<button class="seebtn" data-see="__total__">자세히 보기</button>` : '');
     return `<div class="kpi ${c.cls} ${clickable?'clickable':''} ${active?'active':''}"
               ${c.sent?`data-sent="${c.sent}"`:''}>
-       ${tag}<div class="lab">${c.lab}</div>
+       ${tag}${c.icon?`<span class="kpi-ic">${c.icon}</span>`:''}<div class="lab">${c.lab}</div>
        <div class="val">${c.val}</div><div class="meta">${c.meta}</div>${see}</div>`;
   }).join('');
   // 감성 카드 클릭 → 드릴다운 토글 (자세히 보기 버튼 클릭은 제외)
