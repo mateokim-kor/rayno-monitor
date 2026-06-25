@@ -1028,7 +1028,7 @@
   /* ── 다크 사이드바 (리디자인 1단계) ── */
   body.sidebar-on{padding:0 !important}
   .wrap.has-sidebar{display:grid;grid-template-columns:236px minmax(0,1fr);grid-template-rows:auto 1fr;grid-template-areas:"side head" "side main";max-width:none;margin:0;min-height:100vh}
-  .wrap.has-sidebar>header{grid-area:head;margin:22px 30px 4px}
+  .wrap.has-sidebar>header{grid-area:head;margin:24px 30px 2px;background:transparent;border:none;box-shadow:none;padding:0}
   .wrap.has-sidebar>#rMain{grid-area:main;padding:6px 30px 44px;min-width:0}
   .wrap.has-sidebar>#rSidebar{grid-area:side;position:sticky;top:0;height:100vh;background:#13151a;color:#c7ccd6;display:flex;flex-direction:column;padding:16px 13px 12px;overflow:hidden;z-index:6}
   .rsb-brand{display:flex;align-items:center;gap:9px;padding:2px 8px 12px;margin-bottom:6px;border-bottom:1px solid #262a32;background:none;border-left:none;border-right:none;border-top:none;width:100%;cursor:pointer}
@@ -1118,6 +1118,11 @@
   .hdr-datepill svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   .wrap.has-sidebar .hdr-search{margin-left:0;border-radius:11px}
   #periodBar.pb-hidden{display:none !important}
+  .mon-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+  .mt-left{display:flex;align-items:center;gap:10px}
+  .mt-right{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
+  .mon-toolbar .tooltgl{margin:0}
+  .mon-toolbar .hdr-search{margin:0}
   /* 사이드바가 있으니 가로 워크스페이스 탭/네비는 숨김(중복 제거) */
   .wrap.has-sidebar #appSwitcher,.wrap.has-sidebar #nav,.wrap.has-sidebar #raynoNav{display:none !important}
   /* KPI 아이콘 SVG */
@@ -1639,7 +1644,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 주간인사이트_배너_캐러셀';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 기간검색_대시보드툴바_헤더투명';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7577,17 +7582,21 @@ function _updPeriodPill(){ try{ const el=document.getElementById('hdrDateLbl'); 
 }
 function _buildMonTopbar(){
   try{
-    const header=document.querySelector('.wrap header'); if(!header||header.querySelector('.hdr-right')) return;
-    const right=document.createElement('div'); right.className='hdr-right';
+    const dash=document.getElementById('dash'); if(!dash || dash.querySelector('.mon-toolbar')) return;
+    const bar=document.createElement('div'); bar.className='mon-toolbar';
+    const left=document.createElement('div'); left.className='mt-left';
+    const tgl=document.getElementById('dashToolToggle'); if(tgl) left.appendChild(tgl);
+    const right=document.createElement('div'); right.className='mt-right';
     const pill=document.createElement('button'); pill.type='button'; pill.className='hdr-datepill';
     pill.innerHTML='<span id="hdrDateLbl">전체 기간</span>'+_sbSvg('cal');
     pill.addEventListener('click',()=>{ const pb=document.getElementById('periodBar'); if(pb){ pb.classList.toggle('pb-hidden'); if(!pb.classList.contains('pb-hidden')) try{pb.scrollIntoView({behavior:'smooth',block:'nearest'});}catch(_){}}});
-    right.appendChild(pill);
-    const search=document.querySelector('.hdr-search'); if(search) right.appendChild(search);
-    header.appendChild(right);
-    const pb=document.getElementById('periodBar'); if(pb) pb.classList.add('pb-hidden');
+    const search=document.querySelector('.hdr-search');
+    right.appendChild(pill); if(search) right.appendChild(search);
+    bar.appendChild(left); bar.appendChild(right);
+    dash.insertBefore(bar, dash.firstChild);
+    const pb=document.getElementById('periodBar'); if(pb){ dash.insertBefore(pb, bar.nextSibling); pb.classList.add('pb-hidden'); }
     _updPeriodPill();
-  }catch(e){ console.warn('topbar', e); }
+  }catch(e){ console.warn('mon toolbar', e); }
 }
 function _applySidebarLayout(){
   try{
