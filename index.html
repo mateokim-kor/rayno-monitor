@@ -1124,6 +1124,8 @@
   .mon-toolbar .tooltgl{margin:0}
   .mon-toolbar .hdr-search{margin:0}
   .emi{width:1em;height:1em;display:inline-block;vertical-align:-.14em;flex:none}
+  .ws-toolbar{display:flex;align-items:center;margin:0 0 16px;flex-wrap:wrap;gap:8px}
+  .ws-toolbar .nav-tools{margin-left:auto}
   /* 사이드바가 있으니 가로 워크스페이스 탭/네비는 숨김(중복 제거) */
   .wrap.has-sidebar #appSwitcher,.wrap.has-sidebar #nav,.wrap.has-sidebar #raynoNav{display:none !important}
   /* KPI 아이콘 SVG */
@@ -1645,7 +1647,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 이모지_SVG아이콘_전환';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 레이노업로드버튼_복구';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7595,6 +7597,18 @@ function _aiChatOpen(){
 
 function _updPeriodPill(){ try{ const el=document.getElementById('hdrDateLbl'); if(el && typeof _activePeriodLabel==='function') el.textContent=_activePeriodLabel(); }catch(_){}
 }
+function _relocateNavTools(){
+  try{
+    const rApp=document.getElementById('raynoApp'), rNav=document.getElementById('raynoNav');
+    if(rApp && rNav){
+      const tools=rNav.querySelector('.nav-tools');
+      if(tools && !tools.dataset.reloc){
+        const bar=document.createElement('div'); bar.className='ws-toolbar';
+        bar.appendChild(tools); rApp.insertBefore(bar, rNav.nextSibling); tools.dataset.reloc='1';
+      }
+    }
+  }catch(e){ console.warn('relocate navtools', e); }
+}
 function _buildMonTopbar(){
   try{
     const dash=document.getElementById('dash'); if(!dash || dash.querySelector('.mon-toolbar')) return;
@@ -7695,6 +7709,7 @@ function _applySidebarLayout(){
     Array.from(wrap.children).forEach(ch=>{ if(ch!==header&&ch!==aside&&ch!==main) main.appendChild(ch); });
     wrap.classList.add('has-sidebar'); document.body.classList.add('sidebar-on');
     try{ _buildMonTopbar(); }catch(_){}
+    try{ _relocateNavTools(); }catch(_){}
   }catch(e){ console.warn('sidebar layout skipped', e); }
 }
 
