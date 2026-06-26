@@ -1701,7 +1701,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-26 · egress_폴링+조건부로딩';   // 배포 버전 확인용
+const BUILD = '2026-06-26 · AI닫기버그수정_전반점검';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7886,7 +7886,7 @@ function _aiChatOpen(){
       _aiRespond(q).then(a=>{ tp.remove(); add('bot', a); }).catch(()=>{ tp.remove(); add('bot', _aiAnswer(q)); }); }
     send.addEventListener('click',()=>ask());
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ask(); }});
-    p.querySelector('.aic-x').addEventListener('click',()=>{ p.style.display='none'; });
+    p.querySelector('.aic-x[aria-label="닫기"]').addEventListener('click',()=>{ p.style.display='none'; });
     ['5월 매출 얼마야?','전체 매출은?','매출 상위 지부','보증서 몇 건?','언급량/감성 어때?'].forEach(qx=>{ const c=document.createElement('button'); c.type='button'; c.className='aic-chip'; c.textContent=qx; c.addEventListener('click',()=>ask(qx)); chips.appendChild(c); });
     add('bot','안녕하세요! 레이노 데이터에 대해 물어보세요. 아래 예시를 눌러도 돼요.');
   }
