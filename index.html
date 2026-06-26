@@ -1701,7 +1701,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-26 · ChartJS인라인번들';   // 배포 버전 확인용
+const BUILD = '2026-06-26 · egress_폴링+조건부로딩';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -1889,7 +1889,10 @@ let STORE = { rows:[], version:1 };
 let cloudReady = false;
 /* ── 오프라인 캐시 폴백 ── */
 var _offlineMode=false;
-function _cacheSet(file,obj){ try{ localStorage.setItem('rayno_cache_'+file, JSON.stringify(obj)); localStorage.setItem('rayno_cache_'+file+'_t', String(Date.now())); }catch(e){ try{ localStorage.removeItem('rayno_cache_'+file); localStorage.removeItem('rayno_cache_'+file+'_t'); }catch(_){} } }
+function _cacheSet(file,obj,mtime){ try{ localStorage.setItem('rayno_cache_'+file, JSON.stringify(obj)); localStorage.setItem('rayno_cache_'+file+'_t', String(Date.now())); if(mtime) localStorage.setItem('rayno_cache_'+file+'_m', String(mtime)); }catch(e){ try{ localStorage.removeItem('rayno_cache_'+file); localStorage.removeItem('rayno_cache_'+file+'_t'); localStorage.removeItem('rayno_cache_'+file+'_m'); }catch(_){} } }
+function _cacheMtime(file){ try{ return localStorage.getItem('rayno_cache_'+file+'_m')||''; }catch(_){ return ''; } }
+var _cloudMtMap=null, _cloudMtAt=0;
+async function _cloudMtimes(){ if(!SB) return null; if(_cloudMtMap && (Date.now()-_cloudMtAt)<15000) return _cloudMtMap; try{ const {data,error}=await SB.storage.from(SUPA.bucket).list('',{limit:100}); if(error||!data) return _cloudMtMap; const map={}; data.forEach(f=>{ map[f.name]=f.updated_at||f.created_at||(f.metadata&&f.metadata.lastModified)||''; }); _cloudMtMap=map; _cloudMtAt=Date.now(); return map; }catch(e){ return _cloudMtMap; } }
 function _cacheGet(file){ try{ const s=localStorage.getItem('rayno_cache_'+file); return s?JSON.parse(s):null; }catch(_){ return null; } }
 function _cacheTime(file){ try{ return +(localStorage.getItem('rayno_cache_'+file+'_t')||0)||0; }catch(_){ return 0; } }
 function _markOffline(file){ _offlineMode=true; try{ _showOfflineBadge(); }catch(_){} setTimeout(function(){ try{ _showOfflineBadge(); }catch(_){} },1500); }
@@ -1913,10 +1916,11 @@ function saveStore(store){
 // 클라우드에서 데이터 불러오기 (모든 방문자, 로그인 불필요)
 async function cloudLoadData(){
   if(!SB){ const _c=_cacheGet(SUPA.dataFile); if(_c&&_c.rows){ STORE=_c; _markOffline(SUPA.dataFile); } else { STORE={rows:[],version:1}; } cloudReady=true; return; }
+  try{ const _mt=await _cloudMtimes(); const _curM=_mt?_mt[SUPA.dataFile]:null; if(_curM){ const _cc=_cacheGet(SUPA.dataFile); if(_cc&&_cc.rows && _cacheMtime(SUPA.dataFile)===String(_curM)){ STORE=_cc; cloudReady=true; return; } } }catch(_){}
   try{
     const { data, error } = await SB.storage.from(SUPA.bucket).download(SUPA.dataFile+'?cb='+Date.now());
     if(error || !data){ const _c=_cacheGet(SUPA.dataFile); if(_c&&_c.rows){ STORE=_c; _markOffline(SUPA.dataFile); } else { STORE = { rows:[], version:1 }; } }
-    else{ const txt = await data.text(); const j = JSON.parse(txt); STORE = (j&&j.rows)?j:{rows:[],version:1}; _cacheSet(SUPA.dataFile, STORE); }
+    else{ const txt = await data.text(); const j = JSON.parse(txt); STORE = (j&&j.rows)?j:{rows:[],version:1}; try{ const _mt2=await _cloudMtimes(); _cacheSet(SUPA.dataFile, STORE, _mt2?_mt2[SUPA.dataFile]:null); }catch(_){ _cacheSet(SUPA.dataFile, STORE); } }
   }catch(e){ const _c=_cacheGet(SUPA.dataFile); if(_c&&_c.rows){ STORE=_c; _markOffline(SUPA.dataFile); } else { STORE = { rows:[], version:1 }; } }
   cloudReady = true;
 }
@@ -5008,12 +5012,14 @@ const WARR_PII=['고객 이름','고객 연락처','차량(차대)번호','시�
 function _gzAvail(){ return typeof CompressionStream!=='undefined' && typeof DecompressionStream!=='undefined'; }
 async function _gzipBlob(str){ const cs=new CompressionStream('gzip'); const w=cs.writable.getWriter(); w.write(new TextEncoder().encode(str)); w.close(); const buf=await new Response(cs.readable).arrayBuffer(); return new Blob([buf],{type:'application/gzip'}); }
 async function _gunzipText(u8){ const ds=new DecompressionStream('gzip'); const w=ds.writable.getWriter(); w.write(u8); w.close(); return await new Response(ds.readable).text(); }
-async function cloudLoadJSON(file){ if(!SB){ const _c=_cacheGet(file); if(_c){ _markOffline(file); return _c; } return null; } try{ const {data,error}=await SB.storage.from(SUPA.bucket).download(file+'?cb='+Date.now()); if(error||!data){ const _c=_cacheGet(file); if(_c){ _markOffline(file); return _c; } return null; }
+async function cloudLoadJSON(file){ if(!SB){ const _c=_cacheGet(file); if(_c){ _markOffline(file); return _c; } return null; }
+  let _curM=null; try{ const _mt=await _cloudMtimes(); _curM=_mt?_mt[file]:null; if(_curM){ const _cc=_cacheGet(file); if(_cc && _cacheMtime(file)===String(_curM)){ return _cc; } } }catch(_){}
+  try{ const {data,error}=await SB.storage.from(SUPA.bucket).download(file+'?cb='+Date.now()); if(error||!data){ const _c=_cacheGet(file); if(_c){ _markOffline(file); return _c; } return null; }
   const u8=new Uint8Array(await data.arrayBuffer());
   let text;
   if(u8.length>=2 && u8[0]===0x1f && u8[1]===0x8b && _gzAvail()){ text=await _gunzipText(u8); }   // gzip 압축 파일
   else { text=new TextDecoder().decode(u8); }                                                       // 기존 비압축 파일 호환
-  const _p=JSON.parse(text); _cacheSet(file,_p); try{ _cloudFileMtime(file).then(m=>{ if(m) _cloudMtime[file]=m; }); }catch(_){} return _p; }catch(e){ const _c=_cacheGet(file); if(_c){ _markOffline(file); return _c; } return null; } }
+  const _p=JSON.parse(text); _cacheSet(file,_p,_curM); try{ _cloudFileMtime(file).then(m=>{ if(m) _cloudMtime[file]=m; }); }catch(_){} return _p; }catch(e){ const _c=_cacheGet(file); if(_c){ _markOffline(file); return _c; } return null; } }
 let _cloudErr='';
 const _cloudMtime={};   // file -> 마지막으로 확인한 서버 수정시각(충돌 감지)
 async function cloudSaveJSON(file,obj){
@@ -7526,6 +7532,7 @@ document.addEventListener('change', e=>{
   else if(e.target.id==='crawlTo'){ _crawlTo=e.target.value; }
 });
 async function pollCrawlStatus(){
+  if(typeof document!=='undefined' && document.hidden){ clearTimeout(_crawlPollTimer); _crawlPollTimer=setTimeout(pollCrawlStatus, 60000); return; }
   const s=await fetchCrawlStatus();
   const sAt=(s&&s.at)?new Date(s.at).getTime():0;
   // 요청 직후, 아직 PC가 상태를 못 올린 구간엔 '대기' 표시 유지(깜빡임 방지, 최대 30초)
@@ -7537,6 +7544,7 @@ async function pollCrawlStatus(){
   if(s && s.state==='done' && s.at){
     if(!_crawlInit){ _crawlRefreshedAt=s.at; }
     else if(s.at!==_crawlRefreshedAt){ _crawlRefreshedAt=s.at;
+      _cloudMtMap=null;
       await cloudLoadData(); rebuildRAW(); applyAutoKeywords();
       if(state.view==='dash'){ buildTypeChips(); render(); } else dashStale=true;
       if(typeof refreshVerify==='function') refreshVerify();
@@ -7544,9 +7552,10 @@ async function pollCrawlStatus(){
     }
   }
   _crawlInit=true;
-  const next=(s && (s.state==='running'||s.state==='await_auth'))?2500:8000;
+  const next=(s && (s.state==='running'||s.state==='await_auth'))?2500:30000;
   clearTimeout(_crawlPollTimer); _crawlPollTimer=setTimeout(pollCrawlStatus, next);
 }
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ clearTimeout(_crawlPollTimer); pollCrawlStatus(); } });
 // ── 라이트/다크 테마 (기본 라이트, 선택 시 localStorage 기억) ──
 function _applyThemeAttr(t){
   const dark = (t==='dark');
