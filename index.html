@@ -1146,21 +1146,21 @@
   .mon-toolbar .hdr-search{margin:0}
   .rev-hero-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
   .rev-hero-ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .rev-legend{display:flex;gap:18px;margin:14px 0 4px}
+  .rev-legend{display:flex;gap:16px;margin:10px 0 2px}
   .rev-legend .rl-i{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)}
   .rev-legend .rl-d{width:9px;height:9px;border-radius:3px}
   .rev-hero-body{display:flex;gap:18px;align-items:stretch;flex-wrap:wrap}
-  .rev-chart{flex:1 1 360px;min-width:280px;display:flex;align-items:center}
-  .rev-svg{width:100%;height:auto;display:block}
-  .rev-side{flex:0 0 248px;display:flex;flex-direction:column;gap:10px}
+  .rev-chart{flex:1 1 340px;min-width:260px;max-width:560px;display:flex;align-items:center}
+  .rev-svg{width:100%;height:auto;display:block;max-height:200px}
+  .rev-side{flex:0 0 230px;display:flex;flex-direction:column;gap:8px}
   @media(max-width:780px){.rev-side{flex-basis:100%}}
   .rev-side-h{font-size:12px;font-weight:800;color:var(--ink)}
   .rev-side-rng{color:var(--ink3);font-weight:600}
-  .rev-sc{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+  .rev-sc{background:var(--bg2);border:1px solid var(--line);border-radius:11px;padding:9px 12px}
   .rev-sc-head{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:6px}
   .rev-sc-dot{width:8px;height:8px;border-radius:50%;flex:none}
   .rev-sc-main{display:flex;justify-content:space-between;align-items:center;gap:10px}
-  .rev-sc-val{font-size:21px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.05}
+  .rev-sc-val{font-size:18px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.05}
   .rev-sc-delta{font-size:11px;font-weight:700;margin-top:3px;white-space:nowrap}
   .rev-sc-spark{width:84px;height:30px;flex:none}
   .rev-sc-spark .mspk{width:84px;height:30px;display:block}
@@ -5061,7 +5061,7 @@ function _smoothPath(pts){
   return d;
 }
 function _revTrendSvg(months, series){
-  const W=580,H=240,padL=46,padR=14,padT=12,padB=28;
+  const W=620,H=196,padL=46,padR=14,padT=10,padB=24;
   const ptW=W-padL-padR, ptH=H-padT-padB, n=months.length;
   if(!n) return '<div class="empty">표시할 매출 데이터가 없습니다.</div>';
   const allV=series.reduce((a,s)=>a.concat(s.vals),[]);
