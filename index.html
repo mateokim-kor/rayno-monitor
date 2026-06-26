@@ -5595,7 +5595,7 @@ function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(
 // 품질보증서 뷰 상태: 집계 단위 + 기간 + 지부 필터
 const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, tab:'overview', preset:'all', _min:'', _max:'' };
 const LWV={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 지부/제품별 발급 카드 자체 기간 필터
-let _lwLine='ALL', _lwScope='jibu', _lwSub=[];   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
+let _lwLine='ALL', _lwScope='jibu', _lwSub=[], _lwFrontOnly=false;   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
 let GLASS=null, glassLoaded=false, _glScope='jibu', _glDealerAll=false, _glJibuDrill='';   // 글라스케어 가입
 const GV={ from:'', to:'', scope:'all', preset:'all', prodSel:[], dateCol:'', _min:'', _max:'' };
 const DLR={ jibu:'전체', member:'all', status:'all', q:'' };   // 대리점 마스터 필터
@@ -5677,7 +5677,8 @@ function lineWarrCard(recs){
   const _baseAll=(WARR.rows||[]).filter(r=>!_ex.has(warrRecKey(r)));
   const _bd=_baseAll.map(r=>String(warrDateStr(r)||'').slice(0,10)).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
   const lwMin=_bd[0]||'', lwMax=_bd[_bd.length-1]||''; LWV._min=lwMin; LWV._max=lwMax;
-  const base=(LWV.scope==='range'&&(LWV.from||LWV.to))?_baseAll.filter(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(LWV.from&&d<LWV.from)return false; if(LWV.to&&d>LWV.to)return false; return true; }):_baseAll;
+  let base=(LWV.scope==='range'&&(LWV.from||LWV.to))?_baseAll.filter(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(LWV.from&&d<LWV.from)return false; if(LWV.to&&d>LWV.to)return false; return true; }):_baseAll;
+  if(_lwFrontOnly){ const _fcCol=warrFrontCol(); if(_fcCol) base=base.filter(r=>String(r[_fcCol]||'').trim()!==''); }
   const byG={}; const lineTot={UL:0,ST:0,PH:0,CH:0}; const subCnt={};
   let lineAllTot=0;
   base.forEach(r=>{
@@ -5696,7 +5697,7 @@ function lineWarrCard(recs){
   const scopeBtns=`<button data-sc="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-sc="dealer" class="${scope==='dealer'?'on':''}">대리점별</button>`;
   let h=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55"><b>${Llabel}</b> 보증서 발급 — ${scope==='dealer'?'대리점별':'지부별'} 발급 건수. <b>보증서 1건 기준</b> · 이 카드는 아래 <b>자체 기간 필터</b>를 사용합니다(상단 필터와 별개).</div>`;
   h+=`<div class="cardctrl" style="margin-bottom:11px">${_dateBar('lw', LWV, lwMin, lwMax)}</div>`;
-  h+=`<div class="seg" id="lwLine" style="margin-bottom:8px;flex-wrap:wrap">${lineBtns}</div><div class="seg" id="lwScope" style="margin-bottom:12px">${scopeBtns}</div>`;
+  h+=`<div class="seg" id="lwLine" style="margin-bottom:8px;flex-wrap:wrap">${lineBtns}</div><div class="seg" id="lwScope" style="margin-bottom:12px">${scopeBtns}</div>${warrFrontCol()?`<div class="seg" id="lwFront" style="margin-bottom:12px"><button data-fo="1" class="${_lwFrontOnly?'on':''}" title="앞유리(전면) 시공 보증서만 보기">전면만</button></div>`:''}`;
   { const subs=Object.keys(subCnt).sort((a,b)=>subCnt[b]-subCnt[a]); const lineAll=Object.values(subCnt).reduce((s,n)=>s+n,0);
     if(subs.length>1){ h+=`<div style="font-size:11px;color:var(--ink3);margin:-4px 0 5px;font-weight:700">세부 제품 <span style="font-weight:600;opacity:.7">· 여러 개 선택 가능</span></div><div class="seg" id="lwSub" style="margin-bottom:12px;flex-wrap:wrap"><button data-lwsub="__all" class="${_lwSub.length===0?'on':''}">전체 <span style="opacity:.55">${lineAll.toLocaleString()}</span></button>${subs.map(s=>`<button data-lwsub="${escapeHtml(s)}" class="${_lwSub.indexOf(s)>=0?'on':''}">${escapeHtml(s)} <span style="opacity:.55">${subCnt[s].toLocaleString()}</span></button>`).join('')}</div>`; } }
   const total=Object.values(byG).reduce((s,o)=>s+o.tot,0);
@@ -7176,7 +7177,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   if(e.target.id==='lwApply'){ _dfApply(LWV,renderWarranty,'lwFrom','lwTo'); return; }
   const _lsub=e.target.closest('#lwSub button'); if(_lsub){ const _sv=_lsub.dataset.lwsub; if(_sv==='__all'){ _lwSub=[]; } else { const _i=_lwSub.indexOf(_sv); if(_i>=0) _lwSub.splice(_i,1); else _lwSub.push(_sv); } renderWarranty(); return; }
   const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; _lwSub=[]; renderWarranty(); return; }
-  const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
+  const _fo=e.target.closest('#lwFront button'); if(_fo){ _lwFrontOnly=!_lwFrontOnly; renderWarranty(); return; } const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
   const _gsb=e.target.closest('#glScope button'); if(_gsb){ _glScope=_gsb.dataset.s; _glDealerAll=false; _glJibuDrill=''; renderGlass(); return; }
   const _jd=e.target.closest('[data-jdrill]'); if(_jd){ const v=_jd.dataset.jdrill; try{ const _r=_jd.getBoundingClientRect(); window._glDrillXY={x:_r.left+Math.min(_r.width,240), y:_r.bottom}; }catch(_){ } _glJibuDrill=(_glJibuDrill===v?'':v); renderGlass(); return; }
   if(e.target.closest('#glDrillClose')){ _glJibuDrill=''; renderGlass(); return; }
