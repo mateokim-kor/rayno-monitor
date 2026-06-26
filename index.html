@@ -5714,8 +5714,9 @@ function lineWarrCard(recs){
   const byG={}; const lineTot={UL:0,ST:0,PH:0,CH:0,SP:0}; const subCnt={}, subGrp={};
   let lineAllTot=0;
   base.forEach(r=>{
-    const lines=_frontMode?(()=>{const o={};const _ff=_parseFilm(r[_fcCol]);if(_ff&&_LINE_CODE[_ff.line])o[_ff.line]=_ff.vlt;return o;})():_rowLines(r); Object.keys(lines).forEach(k=>{ if(k in lineTot) lineTot[k]++; });
-    if(Object.keys(lines).some(k=>k in lineTot)) lineAllTot++;
+    const _scanL=_frontMode?[_fcCol]:_FILM_POS; let _repLine=null;
+    for(const _c of _scanL){ const _lf=_parseFilm(r[_c]); if(_lf&&_LINE_CODE[_lf.line]){ _repLine=_lf.line; break; } }
+    if(_repLine){ if(_repLine in lineTot) lineTot[_repLine]++; lineAllTot++; }
     let repCode=null;
     const _scan=_frontMode?[_fcCol]:_FILM_POS; for(const c of _scan){ const f=_parseFilm(r[c]); if(!f||!_LINE_CODE[f.line]) continue; if(L!=='ALL' && f.line!==L) continue; repCode=r[c]; break; }
     if(repCode==null) return;
