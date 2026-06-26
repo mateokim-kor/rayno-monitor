@@ -1144,6 +1144,17 @@
   .mt-right{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
   .mon-toolbar .tooltgl{margin:0}
   .mon-toolbar .hdr-search{margin:0}
+  .wv-fall-row{margin-bottom:9px}
+  .wv-fgrps{display:flex;flex-direction:column;gap:8px}
+  .wv-fgrp{padding:9px 11px;background:var(--bg2);border:1px solid var(--line);border-radius:11px}
+  .wv-fgrp-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .wv-fgrp-h b{font-size:12.5px;color:var(--ink)}
+  .wv-fgrp-h>small{color:var(--ink3);font-size:11px;font-variant-numeric:tabular-nums}
+  .wv-fgall{cursor:pointer;font-size:11px;font-weight:700;padding:3px 11px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--ink2);user-select:none;white-space:nowrap}
+  .wv-fgall:hover{border-color:var(--amber)}
+  .wv-fgall.on{background:var(--amber);color:#fff;border-color:var(--amber)}
+  .wv-fgall.part{border-color:var(--amber);color:var(--amber);background:rgba(244,145,28,.08)}
+  .wv-fgrp-items{display:flex;flex-wrap:wrap;gap:6px}
   .emi{width:1em;height:1em;display:inline-block;vertical-align:-.14em;flex:none}
   .ws-toolbar{display:flex;align-items:center;margin:0 0 16px;flex-wrap:wrap;gap:8px}
   .ws-toolbar .nav-tools{margin-left:auto}
@@ -5649,6 +5660,23 @@ function warrDistCard(set, col, title, opts){
 const _FILM_POS=['시공내역(전면)','시공내역(측면1열)','시공내역(측면2열)','시공내역(측면3열)','시공내역(후면)','시공내역(썬루프)','시공내역(파노라마 썬루프)','시공내역(기타부분시공)'];
 const _LINE_CODE={UL:'얼티넘',ST:'스트라',PH:'팬텀',CH:'크로마',SP:'스페셜'};
 function _parseFilm(code){ if(code==null) return null; const s=String(code).trim(); const p=s.split('-'); if(/^SP/i.test(s)){ const _sm=/(\d{2})/.exec(p[p.length-1]||''); return {line:'SP', vlt:_sm?parseInt(_sm[1],10):null}; } if(p.length<3||(p[0]||'').toUpperCase()!=='AU') return null; const line=(p[1]||'').toUpperCase(); const m=/^(\d{2})(\d{2})/.exec(p[2]||''); return {line, vlt:m?parseInt(m[1],10):null}; }
+function _frontGroup(raw){
+  const f=_parseFilm(raw);
+  if(f){
+    if(f.line==='SP') return '스페셜';
+    if(f.line==='UL') return '얼티넘';
+    if(f.line==='ST') return '스트라';
+    if(f.line==='CH') return /-R-/i.test(raw)?'크로마 R':'크로마';
+    if(f.line==='PH'){ const last=(String(raw).split('-').pop()||'').toUpperCase(); return /^F/.test(last)?'팬텀 II':'팬텀'; }
+  }
+  const s=String(raw).toUpperCase();
+  if(/CARBON\s*RW/.test(s)) return '얼티넘 BACK';
+  if(/CARBON\s*RS/.test(s)) return '얼티넘 SIDE';
+  if(/PANORAMA/.test(s)) return '파노라마';
+  if(/CENTUM/.test(s)) return '센텀';
+  return '기타';
+}
+
 function _rowLines(r){ const out={}; for(const c of _FILM_POS){ const f=_parseFilm(r[c]); if(f&&_LINE_CODE[f.line]){ if(!(f.line in out)) out[f.line]=f.vlt; } } return out; }  // {UL:30, ST:30} (앞 시공면 우선 = 전면 우선)
 function _filmLabel(code){ const f=_parseFilm(code); if(!f||!_LINE_CODE[f.line]) return String(code||'기타').trim()||'기타'; return _LINE_CODE[f.line]+(f.vlt!=null?' '+f.vlt:''); }  // 'AU-UL-3097-XP' → '얼티넘 30'
 const FILM_MAJOR={UL:'얼티넘', PH:'팬텀', ST:'스트라', CH:'크로마'};
@@ -5679,7 +5707,7 @@ function lineWarrCard(recs){
   const lwMin=_bd[0]||'', lwMax=_bd[_bd.length-1]||''; LWV._min=lwMin; LWV._max=lwMax;
   let base=(LWV.scope==='range'&&(LWV.from||LWV.to))?_baseAll.filter(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(LWV.from&&d<LWV.from)return false; if(LWV.to&&d>LWV.to)return false; return true; }):_baseAll;
   if(_lwFrontOnly){ const _fcCol=warrFrontCol(); if(_fcCol) base=base.filter(r=>String(r[_fcCol]||'').trim()!==''); }
-  const byG={}; const lineTot={UL:0,ST:0,PH:0,CH:0,SP:0}; const subCnt={};
+  const byG={}; const lineTot={UL:0,ST:0,PH:0,CH:0,SP:0}; const subCnt={}, subGrp={};
   let lineAllTot=0;
   base.forEach(r=>{
     const lines=_rowLines(r); Object.keys(lines).forEach(k=>{ if(k in lineTot) lineTot[k]++; });
@@ -5687,7 +5715,7 @@ function lineWarrCard(recs){
     let repCode=null;
     for(const c of _FILM_POS){ const f=_parseFilm(r[c]); if(!f||!_LINE_CODE[f.line]) continue; if(L!=='ALL' && f.line!==L) continue; repCode=r[c]; break; }
     if(repCode==null) return;
-    const _sub=_filmCat(repCode).sub; subCnt[_sub]=(subCnt[_sub]||0)+1;
+    const _sub=_filmCat(repCode).sub; subCnt[_sub]=(subCnt[_sub]||0)+1; if(!subGrp[_sub]) subGrp[_sub]=_frontGroup(repCode);
     if(_lwSub.length && _lwSub.indexOf(_sub)<0) return;
     const g = scope==='dealer' ? (String(r['매장명']||r['대리점코드']||'').trim()||'미지정') : (String(r['담당지부']||'').trim()||'미지정');
     const row=byG[g]||(byG[g]={tot:0,jibu:''}); row.tot++; if(scope==='dealer'&&!row.jibu){ const _jb=String(r['담당지부']||'').trim(); if(_jb) row.jibu=_jb; }
@@ -5699,7 +5727,7 @@ function lineWarrCard(recs){
   h+=`<div class="cardctrl" style="margin-bottom:11px">${_dateBar('lw', LWV, lwMin, lwMax)}</div>`;
   h+=`<div class="seg" id="lwLine" style="margin-bottom:8px;flex-wrap:wrap">${lineBtns}</div><div class="seg" id="lwScope" style="margin-bottom:12px">${scopeBtns}</div>${warrFrontCol()?`<div class="seg" id="lwFront" style="margin-bottom:12px"><button data-fo="1" class="${_lwFrontOnly?'on':''}" title="앞유리(전면) 시공 보증서만 보기">전면만</button></div>`:''}`;
   { const subs=Object.keys(subCnt).sort((a,b)=>subCnt[b]-subCnt[a]); const lineAll=Object.values(subCnt).reduce((s,n)=>s+n,0);
-    if(subs.length>1){ h+=`<div style="font-size:11px;color:var(--ink3);margin:-4px 0 5px;font-weight:700">세부 제품 <span style="font-weight:600;opacity:.7">· 여러 개 선택 가능</span></div><div class="seg" id="lwSub" style="margin-bottom:12px;flex-wrap:wrap"><button data-lwsub="__all" class="${_lwSub.length===0?'on':''}">전체 <span style="opacity:.55">${lineAll.toLocaleString()}</span></button>${subs.map(s=>`<button data-lwsub="${escapeHtml(s)}" class="${_lwSub.indexOf(s)>=0?'on':''}">${escapeHtml(s)} <span style="opacity:.55">${subCnt[s].toLocaleString()}</span></button>`).join('')}</div>`; } }
+    if(subs.length>1){ h+=`<div style="font-size:11px;color:var(--ink3);margin:-4px 0 5px;font-weight:700">세부 제품 <span style="font-weight:600;opacity:.7">· 여러 개 선택 가능</span></div><div class="seg" style="margin-bottom:8px"><button data-lwsub="__all" class="${_lwSub.length===0?'on':''}">전체 <span style="opacity:.55">${lineAll.toLocaleString()}</span></button></div><div class="wv-fgrps" style="margin-bottom:12px">${(()=>{ const GO=['얼티넘','얼티넘 BACK','얼티넘 SIDE','팬텀 II','스트라','팬텀','크로마','크로마 R','스페셜','파노라마','센텀','기타']; const gg={}; subs.forEach(s=>{ const g=subGrp[s]||'기타'; (gg[g]=gg[g]||[]).push(s); }); const gk=Object.keys(gg).sort((a,b)=>{const ia=GO.indexOf(a),ib=GO.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib)||a.localeCompare(b);}); return gk.map(g=>{ const it=gg[g]; const gt=it.reduce((s2,k)=>s2+(subCnt[k]||0),0); const allSel=it.length>0&&it.every(k=>_lwSub.indexOf(k)>=0); const someSel=it.some(k=>_lwSub.indexOf(k)>=0); const gc=allSel?'on':(someSel?'part':''); const btns=it.map(s=>`<button data-lwsub="${escapeHtml(s)}" class="${_lwSub.indexOf(s)>=0?'on':''}">${escapeHtml(s)} <span style="opacity:.55">${subCnt[s].toLocaleString()}</span></button>`).join(''); return `<div class="wv-fgrp"><div class="wv-fgrp-h"><span class="wv-fgall ${gc}" data-subgvals="${escapeHtml(it.join('||'))}">전체</span><b>${escapeHtml(g)}</b><small>${gt.toLocaleString()}</small></div><div class="seg" style="flex-wrap:wrap">${btns}</div></div>`; }).join(''); })()}</div>`; } }
   const total=Object.values(byG).reduce((s,o)=>s+o.tot,0);
   if(!total){ h+=`<div class="empty">선택한 기간·지부에 ${Llabel} 보증서가 없습니다.</div>`; return h; }
   const groups=Object.entries(byG).sort((a,b)=>b[1].tot-a[1].tot); const top=scope==='dealer'?groups.slice(0,30):groups;
@@ -5739,14 +5767,15 @@ function renderWarranty(){
       return `<option value="전체" ${WV.branch==='전체'?'selected':''}>전체 지부 (${recsProd.length.toLocaleString()})</option>`+
         ent.map(([v,c])=>`<option value="${escapeHtml(v)}" ${WV.branch===v?'selected':''}>${escapeHtml(v)} (${c.toLocaleString()})</option>`).join(''); })() : '';
   const frontChips = fc ? (()=>{
-      const m={}; recsRange.forEach(r=>{const raw=(r[fc]||'').trim(); if(!raw)return; const b=warrFrontBase(warrLabelOf(fc,raw)); if(!b)return; m[b]=(m[b]||0)+1;});
+      const m={}, grpOf={}; recsRange.forEach(r=>{const raw=(r[fc]||'').trim(); if(!raw)return; const b=warrFrontBase(warrLabelOf(fc,raw)); if(!b)return; m[b]=(m[b]||0)+1; if(!grpOf[b]) grpOf[b]=_frontGroup(raw);});
       const selSet=new Set(WV.fronts);
-      const ent=Object.entries(m).sort((a,b)=>(selSet.has(b[0])?1:0)-(selSet.has(a[0])?1:0) || b[1]-a[1]);
-      const LIM=14, shown=_warrFrontExpand?ent:ent.slice(0,LIM);
       const allChip=`<span class="wv-fchip wv-fall ${WV.fronts.length===0?'on':''}" data-front="__all">전체 (${recsRange.length.toLocaleString()})</span>`;
-      const chips=shown.map(([v,c])=>`<span class="wv-fchip ${selSet.has(v)?'on':''}" data-front="${escapeHtml(v)}">${escapeHtml(v)}<small>${c.toLocaleString()}</small></span>`).join('');
-      const more=ent.length>LIM?`<span class="wv-fmore" data-fexpand="1">${_warrFrontExpand?'접기 ▲':('+'+(ent.length-LIM)+'개 더보기 ▼')}</span>`:'';
-      return allChip+chips+more; })() : '';
+      const GORDER=['얼티넘','얼티넘 BACK','얼티넘 SIDE','팬텀 II','스트라','팬텀','크로마','크로마 R','스페셜','파노라마','센텀','기타'];
+      const groups={}; Object.entries(m).forEach(([v,c])=>{ const g=grpOf[v]||'기타'; (groups[g]=groups[g]||[]).push([v,c]); });
+      Object.values(groups).forEach(a=>a.sort((x,y)=>y[1]-x[1]));
+      const gkeys=Object.keys(groups).sort((a,b)=>{const ia=GORDER.indexOf(a),ib=GORDER.indexOf(b); return (ia<0?99:ia)-(ib<0?99:ib) || a.localeCompare(b);});
+      const groupsHtml=gkeys.map(g=>{ const items=groups[g]; const gtot=items.reduce((s,[,c])=>s+c,0); const gvals=items.map(([v])=>v); const allSel=gvals.length>0&&gvals.every(v=>selSet.has(v)); const someSel=gvals.some(v=>selSet.has(v)); const gcls=allSel?'on':(someSel?'part':''); const chips=items.map(([v,c])=>`<span class="wv-fchip ${selSet.has(v)?'on':''}" data-front="${escapeHtml(v)}">${escapeHtml(v)}<small>${c.toLocaleString()}</small></span>`).join(''); return `<div class="wv-fgrp"><div class="wv-fgrp-h"><span class="wv-fgall ${gcls}" data-fvals="${escapeHtml(gvals.join('||'))}">전체</span><b>${escapeHtml(g)}</b><small>${gtot.toLocaleString()}</small></div><div class="wv-fgrp-items">${chips}</div></div>`; }).join('');
+      return `<div class="wv-fall-row">${allChip}</div><div class="wv-fgrps">${groupsHtml}</div>`; })() : '';
   const frontSum = WV.fronts.length ? (WV.fronts.length===1?escapeHtml(WV.fronts[0]):WV.fronts.length+'개 선택') : '전체';
   const frontRow = fc ? `<div class="wv-frow"><div class="wv-fhead"><span class="wv-flbl">전면 제품</span><span class="wv-fsum">${frontSum}</span><span class="wv-ftoggle" data-fopen="1">${_warrFrontOpen?'접기 ▲':'펼치기 ▾'}</span></div>${_warrFrontOpen?`<div class="wv-fhint">제품을 누르면 선택돼요. <b>여러 개</b> 누르면 모두 포함, 다시 누르면 해제.</div><div class="wv-fchips" id="wvFronts">${frontChips}</div>`:''}</div>` : '';
   const allMonths=[...new Set(all.map(r=>warrDateStr(r).slice(0,7)).filter(s=>/^\d{4}-\d{2}$/.test(s)))].sort().reverse().slice(0,12);
@@ -7175,7 +7204,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const sb=e.target.closest('#wvScope button'); if(sb){ WV.scope=sb.dataset.s; if(WV.scope==='range'){ if(!WV.from)WV.from=WV._min; if(!WV.to)WV.to=WV._max; } renderWarranty(); return; }
   const _lwrp=e.target.closest('#lwPreset button'); if(_lwrp){ _dfPreset(LWV,renderWarranty,_lwrp.dataset.rp); return; }
   if(e.target.id==='lwApply'){ _dfApply(LWV,renderWarranty,'lwFrom','lwTo'); return; }
-  const _lsub=e.target.closest('#lwSub button'); if(_lsub){ const _sv=_lsub.dataset.lwsub; if(_sv==='__all'){ _lwSub=[]; } else { const _i=_lwSub.indexOf(_sv); if(_i>=0) _lwSub.splice(_i,1); else _lwSub.push(_sv); } renderWarranty(); return; }
+  const _lsub=e.target.closest('button[data-lwsub]'); if(_lsub){ const _sv=_lsub.dataset.lwsub; if(_sv==='__all'){ _lwSub=[]; } else { const _i=_lwSub.indexOf(_sv); if(_i>=0) _lwSub.splice(_i,1); else _lwSub.push(_sv); } renderWarranty(); return; }
   const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; _lwSub=[]; renderWarranty(); return; }
   const _fo=e.target.closest('#lwFront button'); if(_fo){ _lwFrontOnly=!_lwFrontOnly; renderWarranty(); return; } const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
   const _gsb=e.target.closest('#glScope button'); if(_gsb){ _glScope=_gsb.dataset.s; _glDealerAll=false; _glJibuDrill=''; renderGlass(); return; }
@@ -7203,7 +7232,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   if(e.target.id==='wvClearFront'){ WV.fronts=[]; renderWarranty(); return; }
   if(e.target.closest('[data-fexpand]')){ _warrFrontExpand=!_warrFrontExpand; renderWarranty(); return; }
   if(e.target.closest('[data-fopen]')){ _warrFrontOpen=!_warrFrontOpen; renderWarranty(); return; }
-  { const _fchip=e.target.closest('.wv-fchip'); if(_fchip){ const v=_fchip.dataset.front; if(v==='__all'){ WV.fronts=[]; } else { const i=WV.fronts.indexOf(v); if(i>=0) WV.fronts.splice(i,1); else WV.fronts.push(v); } renderWarranty(); return; } }
+  { const _fg=e.target.closest('.wv-fgall[data-fvals]'); if(_fg){ const vals=(_fg.dataset.fvals||'').split('||').filter(Boolean); const set=new Set(WV.fronts); const allSel=vals.length>0&&vals.every(v=>set.has(v)); if(allSel){ WV.fronts=WV.fronts.filter(v=>!vals.includes(v)); } else { vals.forEach(v=>{ if(!set.has(v)){ WV.fronts.push(v); } }); } renderWarranty(); return; } } { const _sg=e.target.closest('.wv-fgall[data-subgvals]'); if(_sg){ const vals=(_sg.dataset.subgvals||'').split('||').filter(Boolean); const allSel=vals.length>0&&vals.every(v=>_lwSub.indexOf(v)>=0); if(allSel){ _lwSub=_lwSub.filter(v=>!vals.includes(v)); } else { vals.forEach(v=>{ if(_lwSub.indexOf(v)<0) _lwSub.push(v); }); } renderWarranty(); return; } } { const _fchip=e.target.closest('.wv-fchip'); if(_fchip){ const v=_fchip.dataset.front; if(v==='__all'){ WV.fronts=[]; } else { const i=WV.fronts.indexOf(v); if(i>=0) WV.fronts.splice(i,1); else WV.fronts.push(v); } renderWarranty(); return; } }
   const exb=e.target.closest('.warr-exclude');
   if(exb){ const cfg=ensureWarrCfg(); const k=exb.dataset.key; if(!cfg.excluded.includes(k)) cfg.excluded.push(k);
     await cloudSaveJSON(SUPA.warrFile,WARR); renderWarranty(); toast('1건을 집계에서 제외했습니다'); return; }
