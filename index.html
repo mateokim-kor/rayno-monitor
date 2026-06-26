@@ -7732,6 +7732,7 @@ function _aiAnswer(q){
   return '데이터 기반으로 이런 걸 물어볼 수 있어요:\n\n【매출】\n· "5월 매출 얼마야?" · "전체 매출은?"\n· "엔드리스 지부 매출은?" · "B2C 매출은?"\n· "매출 상위 대리점 TOP은?"\n\n【품질보증서】\n· "보증서 총 몇 건?" · "스페셜 보증서 몇 건?"\n· "지난주 팬텀II 전면 기준 보증서 몇 건?"\n· "6월 크로마 보증서 건수" · "전면 기준 제품별로 보여줘"\n\n【모니터링】\n· "언급량/감성 어때?"';
 }
 
+var _aiHistory=[];
 /* --- 구조화 쿼리 실행기 (LLM이 해석한 query → 검증된 집계로 정확 응답) --- */
 function _aiExecQuery(qy){
   qy=qy||{}; const domain=qy.domain; const per=qy.period||{};
@@ -7762,14 +7763,16 @@ function _aiExecQuery(qy){
 }
 function _aiProxyUrl(){ try{ return (localStorage.getItem('rayno_ai_proxy')||'').trim(); }catch(_){ return ''; } }
 async function _aiAskLLM(q, url){
+  const hist=(typeof _aiHistory!=='undefined'?_aiHistory:[]).slice(-6);
   const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),12000);
   let data;
-  try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q}),signal:ctrl.signal}); clearTimeout(to); if(!res.ok) throw new Error('proxy '+res.status); data=await res.json(); }
+  try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q, history:hist}),signal:ctrl.signal}); clearTimeout(to); if(!res.ok) throw new Error('proxy '+res.status); data=await res.json(); }
   catch(e){ clearTimeout(to); throw e; }
   const query=(data&&(data.query||data))||null;
   if(!query||!query.domain) return null;
   const ans=_aiExecQuery(query);
-  return (typeof ans==='string'&&ans)?ans:null;
+  if(typeof ans==='string' && ans){ _aiHistory.push({role:'user',content:String(q)}); _aiHistory.push({role:'assistant',content:JSON.stringify(query)}); if(_aiHistory.length>12) _aiHistory=_aiHistory.slice(-12); return ans; }
+  return null;
 }
 async function _aiRespond(q){
   const url=_aiProxyUrl();
