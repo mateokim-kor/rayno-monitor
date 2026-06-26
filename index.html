@@ -5681,7 +5681,9 @@ function _rowLines(r){ const out={}; for(const c of _FILM_POS){ const f=_parseFi
 function _filmLabel(code){ const f=_parseFilm(code); if(!f||!_LINE_CODE[f.line]) return String(code||'기타').trim()||'기타'; return _LINE_CODE[f.line]+(f.vlt!=null?' '+f.vlt:''); }  // 'AU-UL-3097-XP' → '얼티넘 30'
 const FILM_MAJOR={UL:'얼티넘', PH:'팬텀', ST:'스트라', CH:'크로마'};
 function _filmCat(code){  // 코드 → {major 대분류, sub 중분류}
-  const raw=String(code||'').trim(); const p=raw.split('-'); const line=(p[1]||'').toUpperCase();
+  const raw=String(code||'').trim();
+  if(/^SP/i.test(raw)){ const _m=raw.match(/^SP(\d+)/i); const ser=_m?_m[1]:(/^SP-?R/i.test(raw)?'R':''); return {major:'스페셜', sub: ser?('스페셜'+ser):'스페셜'}; }
+  const p=raw.split('-'); const line=(p[1]||'').toUpperCase();
   if(p.length<3||(p[0]||'').toUpperCase()!=='AU'||!FILM_MAJOR[line]) return {major:'기타', sub: raw||'기타'};
   const major=FILM_MAJOR[line], suf=(p[3]||'').toUpperCase(); let sub;
   if(line==='PH'){ const m=suf.match(/F\d+/); sub='팬텀 '+(m?m[0]:suf); }
