@@ -1685,7 +1685,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 표가독성_통일';   // 배포 버전 확인용
+const BUILD = '2026-06-26 · AI_지부순위추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7622,6 +7622,7 @@ function _aiMonthRev(m){ if(!_aiSalesOK())return null; const C=SALES.channels; l
 function _aiTotalRev(){ if(!_aiSalesOK())return null; let t=0; for(let m=1;m<=12;m++){ t+=(_aiMonthRev(m)||0); } return t; }
 function _aiDealerTop(n){ if(!_aiSalesOK()||!SALES.dealers)return null;
   const arr=Object.entries(SALES.dealers).filter(([,o])=>!o.jibu).map(([nm,o])=>[nm,(typeof _sSum==='function')?_sSum(o.ma):0]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]); return arr.slice(0,n||5); }
+function _aiJibuTop(n){ if(!_aiSalesOK()||!SALES.jibu)return null; const arr=Object.entries(SALES.jibu).filter(([nm])=>nm!=='본사').map(([nm,o])=>[nm,(typeof _sSum==='function')?_sSum(o.ma):0]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]); return arr.slice(0,n||5); }
 function _aiJibuRev(j){ if(!_aiSalesOK()||!SALES.jibu||!SALES.jibu[j])return null; return (typeof _sSum==='function')?_sSum(SALES.jibu[j].ma):0; }
 /* --- 정확 집계 재사용 (대시보드와 동일 로직) --- */
 function _warrMaxDate(){ if(typeof WARR==='undefined'||!WARR.rows) return ''; let mx=''; for(const r of WARR.rows){ const d=String(warrDateStr(r)||'').slice(0,10); if(d&&d>mx)mx=d; } return mx; }
@@ -7708,6 +7709,7 @@ function _aiAnswer(q){
   if(/매출|매상|판매액|실적|얼마|매출액|판매/.test(t)){
     if(!_aiSalesOK()) return '아직 매출(ERP) 데이터가 없어요.\n[레이노 데이터 → 매출 분석]에서 ERP 파일을 올리면 바로 답해드릴게요.';
     const mM=s.match(/(\d{1,2})\s*월/); const month=mM?+mM[1]:0;
+    if(/지부/.test(t) && /(top|탑|상위|순위|많은|best|1위|랭킹)/i.test(t)){ const top=_aiJibuTop(5); if(!top||!top.length) return '지부 매출 데이터가 없어요.'; return '매출 상위 지부 TOP5\n'+top.map((x,i)=>(i+1)+'. '+x[0]+' — '+_aiFmtWon(x[1])).join('\n'); }
     if(/대리점/.test(t) && /(top|탑|상위|순위|많은|best|1위)/i.test(t)){
       const top=_aiDealerTop(5); if(!top||!top.length) return '대리점 매출 데이터가 없어요.';
       return '매출 상위 대리점 TOP5\n'+top.map((x,i)=>(i+1)+'. '+x[0]+' — '+_aiFmtWon(x[1])).join('\n');
@@ -7729,7 +7731,7 @@ function _aiAnswer(q){
     return '총 언급량은 '+tot.toLocaleString()+'건이에요.\n· 긍정 '+pos.toLocaleString()+' · 부정 '+neg.toLocaleString()+' · 중립 '+neu.toLocaleString()+'\n· 긍정률 '+rate+'%';
   }
 
-  return '데이터 기반으로 이런 걸 물어볼 수 있어요:\n\n【매출】\n· "5월 매출 얼마야?" · "전체 매출은?"\n· "엔드리스 지부 매출은?" · "B2C 매출은?"\n· "매출 상위 대리점 TOP은?"\n\n【품질보증서】\n· "보증서 총 몇 건?" · "스페셜 보증서 몇 건?"\n· "지난주 팬텀II 전면 기준 보증서 몇 건?"\n· "6월 크로마 보증서 건수" · "전면 기준 제품별로 보여줘"\n\n【모니터링】\n· "언급량/감성 어때?"';
+  return '데이터 기반으로 이런 걸 물어볼 수 있어요:\n\n【매출】\n· "5월 매출 얼마야?" · "전체 매출은?"\n· "엔드리스 지부 매출은?" · "B2C 매출은?"\n· "매출 상위 지부는? · 매출 상위 대리점은?"\n\n【품질보증서】\n· "보증서 총 몇 건?" · "스페셜 보증서 몇 건?"\n· "지난주 팬텀II 전면 기준 보증서 몇 건?"\n· "6월 크로마 보증서 건수" · "전면 기준 제품별로 보여줘"\n\n【모니터링】\n· "언급량/감성 어때?"';
 }
 
 var _aiHistory=[];
@@ -7752,6 +7754,7 @@ function _aiExecQuery(qy){
   if(domain==='sales'){
     if(!_aiSalesOK()) return '아직 매출(ERP) 데이터가 없어요.';
     const month=per.month||0;
+    if(qy.branchTop){ const top=_aiJibuTop(qy.branchTop||5); if(!top||!top.length) return '지부 매출 데이터가 없어요.'; return '매출 상위 지부 TOP'+(qy.branchTop||5)+'\n'+top.map((x,i)=>(i+1)+'. '+x[0]+' — '+_aiFmtWon(x[1])).join('\n'); }
     if(qy.dealerTop){ const top=_aiDealerTop(qy.dealerTop||5); if(!top||!top.length) return '대리점 매출 데이터가 없어요.'; return '매출 상위 대리점 TOP'+(qy.dealerTop||5)+'\n'+top.map((x,i)=>(i+1)+'. '+x[0]+' — '+_aiFmtWon(x[1])).join('\n'); }
     if(qy.channel && SALES.channels && SALES.channels[qy.channel]){ const ma=SALES.channels[qy.channel].ma||[]; if(month) return qy.channel+' '+month+'월 매출은 약 '+_aiFmtWon(+ma[month]||0)+'입니다.'; return qy.channel+' 누적 매출은 약 '+_aiFmtWon(_sSum(ma))+'입니다.'; }
     if(qy.branch && SALES.jibu && SALES.jibu[qy.branch]){ const ma=SALES.jibu[qy.branch].ma||[]; if(month) return qy.branch+' '+month+'월 매출은 약 '+_aiFmtWon(+ma[month]||0)+'입니다.'; return qy.branch+' 누적 매출은 약 '+_aiFmtWon(_sSum(ma))+'입니다.'; }
@@ -7801,7 +7804,7 @@ function _aiChatOpen(){
     send.addEventListener('click',()=>ask());
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ask(); }});
     p.querySelector('.aic-x').addEventListener('click',()=>{ p.style.display='none'; });
-    ['5월 매출 얼마야?','전체 매출은?','매출 상위 대리점','보증서 몇 건?','언급량/감성 어때?'].forEach(qx=>{ const c=document.createElement('button'); c.type='button'; c.className='aic-chip'; c.textContent=qx; c.addEventListener('click',()=>ask(qx)); chips.appendChild(c); });
+    ['5월 매출 얼마야?','전체 매출은?','매출 상위 지부','보증서 몇 건?','언급량/감성 어때?'].forEach(qx=>{ const c=document.createElement('button'); c.type='button'; c.className='aic-chip'; c.textContent=qx; c.addEventListener('click',()=>ask(qx)); chips.appendChild(c); });
     add('bot','안녕하세요! 레이노 데이터에 대해 물어보세요. 아래 예시를 눌러도 돼요.');
   }
   p.style.display='flex'; setTimeout(()=>{ try{document.getElementById('aicInput').focus();}catch(_){}} ,60);
