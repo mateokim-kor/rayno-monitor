@@ -7310,12 +7310,12 @@ function crawlInnerHTML(s, isAdmin){
       <div class="crawl-top"><span class="crawl-t"><span class="crawl-spin"></span> 자동 수집 진행 중</span><span class="crawl-pct">${pct}%</span></div>
       <div class="crawl-track"><div class="crawl-fill" style="width:${pct}%"></div></div>
       <div class="crawl-msg">${escapeHtml(s.message||'')}</div>
-      ${isAdmin?`<div style="margin-top:11px"><button class="crawl-btn stop" id="crawlStopBtn">■ 크롤링 중지</button></div>`:''}</div>`;
+      ${isAdmin?`<div style="margin-top:11px"><button class="crawl-btn stop">■ 크롤링 중지</button></div>`:''}</div>`;
   }else if(st==='await_auth'){
     return `<div class="crawl run">
       <div class="crawl-top"><span class="crawl-t">🔐 네이버 인증 대기</span></div>
       <div class="crawl-msg">${escapeHtml(s.message||'크롬 창에서 네이버 로그인/인증을 완료한 뒤 아래 버튼을 누르세요.')}</div>
-      ${isAdmin?`<div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap"><button class="crawl-btn auth" id="crawlAuthBtn">✅ 인증 완료</button><button class="crawl-btn stop" id="crawlStopBtn">■ 크롤링 중지</button></div>`:''}</div>`;
+      ${isAdmin?`<div style="margin-top:11px;display:flex;gap:8px;flex-wrap:wrap"><button class="crawl-btn auth" id="crawlAuthBtn">✅ 인증 완료</button><button class="crawl-btn stop">■ 크롤링 중지</button></div>`:''}</div>`;
   }else if(st==='error'){
     return `<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 자동 수집 오류</span>${ctl}</div><div class="crawl-msg">${escapeHtml(s.message||'다시 시도해 주세요.')}</div></div>`;
   }else if(st==='stalled'){
@@ -7398,7 +7398,7 @@ async function stopCrawl(){
 document.addEventListener('click', e=>{
   if(e.target.closest('#crawlStartBtn')) startCrawl();
   else if(e.target.closest('#crawlAuthBtn')) confirmAuthDone();
-  else if(e.target.closest('#crawlStopBtn')) stopCrawl();
+  else if(e.target.closest('.crawl-btn.stop')) stopCrawl();
   else if(e.target.closest('#crawlResetBtn')) stopCrawl();
   else if(e.target.closest('#crawlModalClose')) closeCrawlModal();
   else if(e.target.id==='crawlModal') closeCrawlModal();   // 바깥(오버레이) 클릭 시 닫기
