@@ -5708,7 +5708,9 @@ function lineWarrCard(recs){
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
   h+=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:300px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${scope==='dealer'?`<th ${thl}>담당 지부</th>`:''}<th ${th}>발급수</th></tr>`;
-  top.forEach(([g,o])=>{ h+=`<tr><td ${tdl}>${escapeHtml(g)}</td>${scope==='dealer'?`<td ${tdl}><span style="color:var(--ink2);font-size:12px">${escapeHtml(o.jibu||'-')}</span></td>`:''}<td ${tdt}>${o.tot.toLocaleString()}</td></tr>`; });
+  const _maxV=Math.max(1,...top.map(([,o])=>o.tot));
+  const tdv='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800"';
+  top.forEach(([g,o])=>{ const _p=Math.max(2,Math.round(o.tot/_maxV*100)); h+=`<tr style="background:linear-gradient(to right,rgba(244,145,28,.14) ${_p}%,transparent ${_p}%)"><td ${tdl}>${escapeHtml(g)}</td>${scope==='dealer'?`<td ${tdl}><span style="color:var(--ink2);font-size:12px">${escapeHtml(o.jibu||'-')}</span></td>`:''}<td ${tdv}>${o.tot.toLocaleString()}</td></tr>`; });
   h+=`<tr class="t-tot"><td ${tdl}><b>합계</b></td>${scope==='dealer'?`<td ${tdl}></td>`:''}<td ${tdt}><b>${top.reduce((s,[,o])=>s+o.tot,0).toLocaleString()}</b></td></tr>`;
   h+=`</table></div>`;
   if(scope==='dealer'&&groups.length>30) h+=`<div class="cap" style="margin-top:6px">상위 30개 대리점만 표시 (전체 ${groups.length}곳)</div>`;
