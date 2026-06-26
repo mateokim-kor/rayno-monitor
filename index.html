@@ -7623,45 +7623,119 @@ function _aiTotalRev(){ if(!_aiSalesOK())return null; let t=0; for(let m=1;m<=12
 function _aiDealerTop(n){ if(!_aiSalesOK()||!SALES.dealers)return null;
   const arr=Object.entries(SALES.dealers).filter(([,o])=>!o.jibu).map(([nm,o])=>[nm,(typeof _sSum==='function')?_sSum(o.ma):0]).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]); return arr.slice(0,n||5); }
 function _aiJibuRev(j){ if(!_aiSalesOK()||!SALES.jibu||!SALES.jibu[j])return null; return (typeof _sSum==='function')?_sSum(SALES.jibu[j].ma):0; }
+/* --- 정확 집계 재사용 (대시보드와 동일 로직) --- */
+function _warrMaxDate(){ if(typeof WARR==='undefined'||!WARR.rows) return ''; let mx=''; for(const r of WARR.rows){ const d=String(warrDateStr(r)||'').slice(0,10); if(d&&d>mx)mx=d; } return mx; }
+function _warrIter(o,cb){
+  if(typeof WARR==='undefined'||!WARR.rows||!WARR.rows.length) return false;
+  const ex=warrExcludedSet(); const fc=(typeof warrFrontCol==='function')?warrFrontCol():null; const fm=!!(o.frontOnly&&fc);
+  const bc=(typeof warrBranchCol==='function')?warrBranchCol():null;
+  for(const r of WARR.rows){
+    if(ex.has(warrRecKey(r))) continue;
+    if(o.from||o.to){ const d=String(warrDateStr(r)||'').slice(0,10); if(!d) continue; if(o.from&&d<o.from)continue; if(o.to&&d>o.to)continue; }
+    if(o.branch&&bc){ if(String(r[bc]||'').trim()!==o.branch) continue; }
+    if(fm && String(r[fc]||'').trim()==='') continue;
+    const scan=fm?[fc]:_FILM_POS; let repCode=null;
+    for(const c of scan){ const f=_parseFilm(r[c]); if(f&&_LINE_CODE[f.line]){ repCode=r[c]; break; } }
+    if(repCode==null) continue;
+    cb(repCode,r);
+  }
+  return true;
+}
+function _warrCountBy(o){ o=o||{}; let cnt=0; const ok=_warrIter(o,(repCode)=>{ if(o.line && _parseFilm(repCode).line!==o.line) return; if(o.group && _frontGroup(repCode)!==o.group) return; cnt++; }); return ok?cnt:null; }
+function _warrAllGroups(o){ o=o||{}; const m={}; const ok=_warrIter(o,(repCode)=>{ const g=_frontGroup(repCode); m[g]=(m[g]||0)+1; }); if(!ok) return null; return Object.entries(m).sort((a,b)=>b[1]-a[1]); }
+
+/* --- 질문 파서 --- */
+function _aiAddDays(ymd,n){ const p=ymd.split('-').map(Number); const dt=new Date(Date.UTC(p[0],p[1]-1,p[2])); dt.setUTCDate(dt.getUTCDate()+n); return dt.getUTCFullYear()+'-'+String(dt.getUTCMonth()+1).padStart(2,'0')+'-'+String(dt.getUTCDate()).padStart(2,'0'); }
+function _aiMonthRange(y,m){ const last=new Date(Date.UTC(y,m,0)).getUTCDate(); const mm=String(m).padStart(2,'0'); return {from:y+'-'+mm+'-01', to:y+'-'+mm+'-'+String(last).padStart(2,'0')}; }
+function _aiPeriod(s, maxDate){
+  const t=s.replace(/\s+/g,''); const md=maxDate||''; const yr=md?+md.slice(0,4):(new Date().getFullYear());
+  let m=t.match(/(\d{4})-(\d{1,2})-(\d{1,2})\s*[~\-]\s*(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m){ const f=m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'); const to=m[4]+'-'+m[5].padStart(2,'0')+'-'+m[6].padStart(2,'0'); return {from:f,to:to,label:f+'~'+to}; }
+  m=t.match(/(\d{1,2})\/(\d{1,2})\s*[~\-]\s*(\d{1,2})\/(\d{1,2})/);
+  if(m){ const f=yr+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0'); const to=yr+'-'+m[3].padStart(2,'0')+'-'+m[4].padStart(2,'0'); return {from:f,to:to,label:m[1]+'/'+m[2]+'~'+m[3]+'/'+m[4]}; }
+  if(/지난주|저번주|최근7일|최근일주일|최근1주|1주일|일주일/.test(t)){ if(md) return {from:_aiAddDays(md,-6),to:md,label:'최근 7일'}; }
+  if(/최근30일|최근한달|최근1개월|30일간|30일/.test(t)){ if(md) return {from:_aiAddDays(md,-29),to:md,label:'최근 30일'}; }
+  if(/이번달|이번달|당월|금월|이달/.test(t)){ if(md){ const mo=+md.slice(5,7); const r=_aiMonthRange(yr,mo); return {from:r.from,to:r.to,month:mo,label:mo+'월'}; } }
+  if(/지난달|저번달|전월/.test(t)){ if(md){ let mo=+md.slice(5,7)-1,y=yr; if(mo<1){mo=12;y--;} const r=_aiMonthRange(y,mo); return {from:r.from,to:r.to,month:mo,label:mo+'월'}; } }
+  m=t.match(/(\d{1,2})월/);
+  if(m){ const mo=+m[1]; if(mo>=1&&mo<=12){ const r=_aiMonthRange(yr,mo); return {from:r.from,to:r.to,month:mo,label:mo+'월'}; } }
+  if(/전체기간|전체|누적|전부|올해|연간|전기간/.test(t)){ return {all:true,label:'전체'}; }
+  return {label:''};
+}
+function _aiBranch(t){ if(typeof SALES_JIBU==='undefined'||!Array.isArray(SALES_JIBU)) return null; return SALES_JIBU.find(j=>t.indexOf(String(j).replace(/\s+/g,''))>=0)||null; }
+function _aiProduct(t){
+  const x=t.toLowerCase();
+  if(/스페셜|에스피|special/.test(x)||/\bsp\b/.test(x)) return {group:'스페셜',label:'스페셜'};
+  if(/크로마r|크로마알|chromar/.test(x)) return {group:'크로마 R',label:'크로마 R'};
+  if(/팬텀2|팬텀ii|팬텀투|phantom2|phantomii/.test(x)) return {group:'팬텀 II',label:'팬텀 II'};
+  if(/팬텀s|phantoms/.test(x)) return {group:'팬텀',label:'팬텀(S)'};
+  if(/얼티넘back|얼티넘백/.test(x)) return {group:'얼티넘 BACK',label:'얼티넘 BACK'};
+  if(/얼티넘side|얼티넘사이드/.test(x)) return {group:'얼티넘 SIDE',label:'얼티넘 SIDE'};
+  if(/얼티넘|울티넘|울띠넘|ultinum/.test(x)) return {line:'UL',label:'얼티넘'};
+  if(/스트라|stra/.test(x)) return {line:'ST',label:'스트라'};
+  if(/크로마|chroma/.test(x)) return {line:'CH',label:'크로마'};
+  if(/팬텀|phantom/.test(x)) return {line:'PH',label:'팬텀'};
+  return null;
+}
+
 function _aiAnswer(q){
   const s=(q||'').trim(); if(!s) return '궁금한 내용을 입력해 주세요.';
   const t=s.replace(/\s+/g,'');
-  const mM=s.match(/(\d{1,2})\s*월/); const month=mM?+mM[1]:0;
-  if(/매출|매상|판매액|실적|얼마|매출액/.test(t)){
+
+  /* ===== 품질보증서 발급 건수 ===== */
+  if(/보증서|발급|시공건|시공건수|warranty/i.test(t)){
+    if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '아직 품질보증서 데이터가 없어요.\n[레이노 데이터 → 품질보증서]에서 파일을 올리면 바로 답해드릴게요.';
+    const maxD=_warrMaxDate(); const per=_aiPeriod(s,maxD);
+    const front=/전면|앞유리|전면기준/.test(t); const branch=_aiBranch(t); const prod=_aiProduct(t);
+    const base={frontOnly:front, branch:branch||null, from:(per.all?null:per.from)||null, to:(per.all?null:per.to)||null};
+    const fl=front?'전면 기준 ':''; const pl=(per.label&&!per.all)?(per.label+' '):''; const bl=branch?(branch+' '):'';
+    if(/제품별|라인별|종류별|품목별|제품군/.test(t) && !prod){
+      const gs=_warrAllGroups(base); if(!gs||!gs.length) return '해당 조건의 보증서가 없어요.';
+      const tot=gs.reduce((a,b)=>a+b[1],0);
+      return (pl+bl+fl+'보증서 제품군별 발급').trim()+' ('+tot.toLocaleString()+'건)\n'+gs.map(g=>'· '+g[0]+' '+g[1].toLocaleString()+'건').join('\n');
+    }
+    if(prod){
+      const cnt=_warrCountBy(Object.assign({},base, prod.group?{group:prod.group}:{line:prod.line}));
+      if(cnt==null) return '계산할 수 없어요.';
+      return (pl+bl+prod.label+' '+fl+'보증서 발급은 ').replace(/\s+/g,' ').trim()+' '+cnt.toLocaleString()+'건입니다.';
+    }
+    const cnt=_warrCountBy(base); const gs=_warrAllGroups(base);
+    let ex=''; if(gs&&gs.length){ ex='\n(' + gs.slice(0,4).map(g=>g[0]+' '+g[1].toLocaleString()).join(' · ') + (gs.length>4?' …':'') + ')'; }
+    return (pl+bl+fl+'보증서 발급은 총 ').replace(/\s+/g,' ').trim()+' '+(cnt==null?'-':cnt.toLocaleString())+'건입니다.'+ex;
+  }
+
+  /* ===== 매출 ===== */
+  if(/매출|매상|판매액|실적|얼마|매출액|판매/.test(t)){
     if(!_aiSalesOK()) return '아직 매출(ERP) 데이터가 없어요.\n[레이노 데이터 → 매출 분석]에서 ERP 파일을 올리면 바로 답해드릴게요.';
-    if(/대리점/.test(t) && /(top|탑|상위|1위|순위|많은|best)/i.test(t)){
+    const mM=s.match(/(\d{1,2})\s*월/); const month=mM?+mM[1]:0;
+    if(/대리점/.test(t) && /(top|탑|상위|순위|많은|best|1위)/i.test(t)){
       const top=_aiDealerTop(5); if(!top||!top.length) return '대리점 매출 데이터가 없어요.';
       return '매출 상위 대리점 TOP5\n'+top.map((x,i)=>(i+1)+'. '+x[0]+' — '+_aiFmtWon(x[1])).join('\n');
     }
-    if(typeof SALES_JIBU!=='undefined' && Array.isArray(SALES_JIBU)){
-      const jb=SALES_JIBU.find(j=>t.indexOf(String(j).replace(/\s+/g,''))>=0);
-      if(jb){ const v=_aiJibuRev(jb); if(v!=null){ if(month){ const C=SALES.channels; /* 지부 월별은 jibu.ma */ const ma=(SALES.jibu[jb]&&SALES.jibu[jb].ma)||[]; return jb+' '+month+'월 매출은 약 '+_aiFmtWon(+ma[month]||0)+' 입니다.'; } return jb+' 누적 매출은 약 '+_aiFmtWon(v)+' 입니다.'; } }
-    }
-    if(month){ if(month<1||month>12) return '월은 1~12 사이로 물어봐 주세요.';
-      const has=(SALES.months||[]).indexOf(month)>=0; const v=_aiMonthRev(month);
-      if(!has) return month+'월 매출 데이터가 없어요.\n(데이터에 있는 월: '+((SALES.months||[]).join('월, ')||'-')+'월)';
-      return month+'월 매출은 약 '+_aiFmtWon(v)+' 입니다.\n(정확히 '+Math.round(v).toLocaleString()+'원)';
-    }
+    const chm=/b2c|비투씨|비투시/i.test(t)?'B2C':(/b2b|비투비/i.test(t)?'B2B':(/별도채널|기타채널/.test(t)?'별도채널':null));
+    if(chm && SALES.channels && SALES.channels[chm]){ const ma=SALES.channels[chm].ma||[]; if(month) return chm+' '+month+'월 매출은 약 '+_aiFmtWon(+ma[month]||0)+'입니다.'; return chm+' 누적 매출은 약 '+_aiFmtWon(_sSum(ma))+'입니다.'; }
+    const jb=_aiBranch(t);
+    if(jb && SALES.jibu && SALES.jibu[jb]){ const ma=SALES.jibu[jb].ma||[]; if(month) return jb+' '+month+'월 매출은 약 '+_aiFmtWon(+ma[month]||0)+'입니다.'; return jb+' 누적 매출은 약 '+_aiFmtWon(_sSum(ma))+'입니다.'; }
+    if(month){ if(month<1||month>12) return '월은 1~12 사이로 물어봐 주세요.'; const has=(SALES.months||[]).indexOf(month)>=0; const v=_aiMonthRev(month); if(!has) return month+'월 매출 데이터가 없어요.\n(데이터 월: '+((SALES.months||[]).join('월, '))+'월)'; return month+'월 매출은 약 '+_aiFmtWon(v)+'입니다.\n(정확히 '+Math.round(v).toLocaleString()+'원)'; }
     const tot=_aiTotalRev(); const ms=(SALES.months||[]);
-    return '전체 누적 매출은 약 '+_aiFmtWon(tot)+' 입니다.\n(데이터 월: '+(ms.join('월, ')||'-')+'월 · 정확히 '+Math.round(tot).toLocaleString()+'원)\n"5월 매출 얼마야?"처럼 월을 콕 집어 물어봐도 돼요.';
+    return '전체 누적 매출은 약 '+_aiFmtWon(tot)+'입니다.\n(데이터 월: '+(ms.join('월, ')||'-')+'월 · 정확히 '+Math.round(tot).toLocaleString()+'원)\n"5월 매출", "엔드리스 지부 매출", "B2C 매출"처럼 콕 집어 물어봐도 돼요.';
   }
-  if(/보증서|시공건|시공\s*건|warranty/i.test(t)){
-    if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '아직 품질보증서 데이터가 없어요.';
-    return '발급된 품질보증서는 총 '+WARR.rows.length.toLocaleString()+'건이에요.';
-  }
+
+  /* ===== 모니터링/감성 ===== */
   if(/언급|감성|긍정|부정|중립|여론|버즈|모니터링/.test(t)){
     if(typeof RAW==='undefined'||!RAW||!RAW.rows||!RAW.rows.length) return '아직 온라인 모니터링 데이터가 없어요.';
     let pos=0,neg=0,neu=0; RAW.rows.forEach(r=>{ const sv=(typeof sentOf==='function')?sentOf(r):''; if(sv==='긍정')pos++; else if(sv==='부정')neg++; else if(sv==='중립')neu++; });
     const tot=RAW.rows.length, cl=pos+neg+neu, rate=cl?(pos/cl*100).toFixed(1):'0';
     return '총 언급량은 '+tot.toLocaleString()+'건이에요.\n· 긍정 '+pos.toLocaleString()+' · 부정 '+neg.toLocaleString()+' · 중립 '+neu.toLocaleString()+'\n· 긍정률 '+rate+'%';
   }
-  return '데이터를 바탕으로 이런 걸 물어볼 수 있어요:\n· "5월 매출 얼마야?" / "전체 매출은?"\n· "매출 상위 대리점 TOP은?"\n· "○○ 지부 매출은?"\n· "보증서 몇 건이야?"\n· "언급량/감성 어때?"\n(원하시면 더 다양한 질문에 답하도록 늘려드릴게요.)';
+
+  return '데이터 기반으로 이런 걸 물어볼 수 있어요:\n\n【매출】\n· "5월 매출 얼마야?" · "전체 매출은?"\n· "엔드리스 지부 매출은?" · "B2C 매출은?"\n· "매출 상위 대리점 TOP은?"\n\n【품질보증서】\n· "보증서 총 몇 건?" · "스페셜 보증서 몇 건?"\n· "지난주 팬텀II 전면 기준 보증서 몇 건?"\n· "6월 크로마 보증서 건수" · "전면 기준 제품별로 보여줘"\n\n【모니터링】\n· "언급량/감성 어때?"';
 }
 function _aiChatOpen(){
   let p=document.getElementById('aiChat');
   if(!p){
     p=document.createElement('div'); p.id='aiChat';
-    p.innerHTML='<div class="aic-head"><div class="aic-orb"></div><div class="aic-ti">RAYNO AI 어시스턴트<span>데이터 기반 응답 · 로컬 계산</span></div><button class="aic-x" type="button" aria-label="닫기">\u2715</button></div>'
+    p.innerHTML='<div class="aic-head"><div class="aic-orb"></div><div class="aic-ti">RAYNO AI 어시스턴트<span>매출·보증서 정확 집계 · 로컬</span></div><button class="aic-x" type="button" aria-label="닫기">\u2715</button></div>'
       +'<div class="aic-body" id="aicBody"></div>'
       +'<div class="aic-chips" id="aicChips"></div>'
       +'<div class="aic-input"><input id="aicInput" type="text" placeholder="예) 5월 매출 얼마야?" autocomplete="off"><button id="aicSend" type="button">보내기</button></div>';
