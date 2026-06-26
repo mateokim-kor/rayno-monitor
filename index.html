@@ -5706,14 +5706,16 @@ function lineWarrCard(recs){
   const _bd=_baseAll.map(r=>String(warrDateStr(r)||'').slice(0,10)).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
   const lwMin=_bd[0]||'', lwMax=_bd[_bd.length-1]||''; LWV._min=lwMin; LWV._max=lwMax;
   let base=(LWV.scope==='range'&&(LWV.from||LWV.to))?_baseAll.filter(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(LWV.from&&d<LWV.from)return false; if(LWV.to&&d>LWV.to)return false; return true; }):_baseAll;
-  if(_lwFrontOnly){ const _fcCol=warrFrontCol(); if(_fcCol) base=base.filter(r=>String(r[_fcCol]||'').trim()!==''); }
+  const _fcCol=warrFrontCol();
+  const _frontMode=(_lwFrontOnly && !!_fcCol);
+  if(_frontMode){ base=base.filter(r=>String(r[_fcCol]||'').trim()!==''); }
   const byG={}; const lineTot={UL:0,ST:0,PH:0,CH:0,SP:0}; const subCnt={}, subGrp={};
   let lineAllTot=0;
   base.forEach(r=>{
-    const lines=_rowLines(r); Object.keys(lines).forEach(k=>{ if(k in lineTot) lineTot[k]++; });
+    const lines=_frontMode?(()=>{const o={};const _ff=_parseFilm(r[_fcCol]);if(_ff&&_LINE_CODE[_ff.line])o[_ff.line]=_ff.vlt;return o;})():_rowLines(r); Object.keys(lines).forEach(k=>{ if(k in lineTot) lineTot[k]++; });
     if(Object.keys(lines).some(k=>k in lineTot)) lineAllTot++;
     let repCode=null;
-    for(const c of _FILM_POS){ const f=_parseFilm(r[c]); if(!f||!_LINE_CODE[f.line]) continue; if(L!=='ALL' && f.line!==L) continue; repCode=r[c]; break; }
+    const _scan=_frontMode?[_fcCol]:_FILM_POS; for(const c of _scan){ const f=_parseFilm(r[c]); if(!f||!_LINE_CODE[f.line]) continue; if(L!=='ALL' && f.line!==L) continue; repCode=r[c]; break; }
     if(repCode==null) return;
     const _sub=_filmCat(repCode).sub; subCnt[_sub]=(subCnt[_sub]||0)+1; if(!subGrp[_sub]) subGrp[_sub]=_frontGroup(repCode);
     if(_lwSub.length && _lwSub.indexOf(_sub)<0) return;
