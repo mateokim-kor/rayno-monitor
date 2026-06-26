@@ -447,14 +447,23 @@
 
   /* ── 테이블 ── */
   .tbl-wrap{overflow:auto;border-radius:10px;border:1px solid var(--line)}
-  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  /* 데이터 표 가독성 통일 */
+  .dtbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;font-size:12.5px}
+  .dtbl th{padding:9px 12px !important;background:var(--bg2);color:var(--ink2);font-weight:700;font-size:11px;letter-spacing:.02em;border-bottom:1.5px solid var(--line2);white-space:nowrap;vertical-align:middle}
+  .dtbl td{padding:9px 12px !important;border-bottom:1px solid var(--line);color:var(--ink);white-space:nowrap;vertical-align:middle}
+  .dtbl tr:last-child td{border-bottom:none}
+  .dtbl tr:hover td{background:var(--card2)}
+  .dtbl b{font-weight:700}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
   th,td{padding:10px 12px;text-align:left;white-space:nowrap;vertical-align:middle}
   thead th{background:var(--bg2);color:var(--ink2);font-weight:700;font-size:11px;
            text-transform:uppercase;letter-spacing:.05em;position:sticky;top:0}
   #cafeTbl th:not(:first-child),#cafeTbl td:not(:first-child){text-align:center}
   tbody tr{border-top:1px solid var(--line)}
   tbody tr:hover{background:var(--card2)}
-  td.num{text-align:center;font-variant-numeric:tabular-nums}
+  td.num{text-align:right;font-variant-numeric:tabular-nums}
+  .t-tot td{background:var(--bg2);font-weight:700;border-top:2px solid var(--line2)}
+  tbody .t-tot:hover td{background:var(--bg2)}
   .bar-cell{min-width:120px}
   .minibar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;width:72px;display:inline-block;vertical-align:middle;margin-right:8px}
   .minibar i{display:block;height:100%;background:var(--pos)}
@@ -1659,7 +1668,7 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
 };
-const BUILD = '2026-06-25 · 롤판매_품목드릴다운';   // 배포 버전 확인용
+const BUILD = '2026-06-25 · 표가독성_통일';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3946,7 +3955,7 @@ function _renderReportImpl(){
    <div class="card rep-sec">
      <h3><span class="dot"></span>제품별 언급 분석 <span class="rep-sub2">제목·본문에서 제품명 자동 인식</span></h3>
      <div class="cap">제품 키워드가 등장한 글·댓글을 제품별로 집계했습니다. 한 글에 여러 제품이 나오면 각각에 반영됩니다.</div>
-     ${_pEnt.length?`<table style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px"><tr><th ${_pTh}>제품</th><th ${_pThr}>언급</th><th ${_pThr}>점유율</th><th ${_pTh}>감성(긍·부·중)</th></tr>${_pRows}</table>`:'<div class="empty">이 기간에 인식된 제품 언급이 없습니다. (제품 키워드는 설정 &gt; 언급 제품 키워드에서 조정)</div>'}
+     ${_pEnt.length?`<table class="dtbl" style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px"><tr><th ${_pTh}>제품</th><th ${_pThr}>언급</th><th ${_pThr}>점유율</th><th ${_pTh}>감성(긍·부·중)</th></tr>${_pRows}</table>`:'<div class="empty">이 기간에 인식된 제품 언급이 없습니다. (제품 키워드는 설정 &gt; 언급 제품 키워드에서 조정)</div>'}
    </div>`;
   box.innerHTML = head + insightBlock + deptBlock + summary + repPos + repNeg + trend + sov + productBlock + reasons + types + cafes + extra + advice + marketingBlock;
   bindReport();
@@ -5037,7 +5046,7 @@ function _miniTable(lc, vc, entries, total){
   const td='style="text-align:right;padding:6px 8px;font-size:12.5px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdb=td.slice(0,-1)+';position:relative;z-index:0"';
   const maxV=Math.max(1,...entries.map(([,v])=>v||0));
-  let h=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>${lc}</th><th ${th}>${vc}</th><th ${th}>비율</th></tr>`;
+  let h=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>${lc}</th><th ${th}>${vc}</th><th ${th}>비율</th></tr>`;
   entries.forEach(([k,v])=>{ h+=`<tr><td ${tdl}>${escapeHtml(String(k))}</td><td ${td}>${(v||0).toLocaleString()}</td><td ${tdb}>${_dbar((v||0)/maxV*100)}<span style="position:relative">${total?(v/total*100).toFixed(1)+'%':'—'}</span></td></tr>`; });
   return h+`</table>`;
 }
@@ -5085,9 +5094,9 @@ function prodRollTable(monthsArg){
   const roll=n=>n?Math.round(n).toLocaleString():'0', won=n=>n?Math.round(n).toLocaleString():'0';
   const tdb=td.slice(0,-1)+';position:relative;z-index:0"';
   const maxQ=Math.max(1,...arr.map(([,o])=>o.q||0));
-  let h=`<div class="cap" style="margin-bottom:8px">롤 제품(큰 카테고리)별 판매 수량·매출 · 표시 기간 합계</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>제품</th><th ${th}>판매 수량(롤)</th><th ${th}>매출액</th><th ${th}>수량 점유율</th><th ${th}>매출 점유율</th></tr>`;
+  let h=`<div class="cap" style="margin-bottom:8px">롤 제품(큰 카테고리)별 판매 수량·매출 · 표시 기간 합계</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>제품</th><th ${th}>판매 수량(롤)</th><th ${th}>매출액</th><th ${th}>수량 점유율</th><th ${th}>매출 점유율</th></tr>`;
   arr.forEach(([cat,o])=>{ h+=`<tr><td ${tdl}><b>${escapeHtml(cat)}</b></td><td ${td}>${roll(o.q)}</td><td ${td}>${won(o.a)}</td><td ${tdb}>${_dbar((o.q||0)/maxQ*100)}<span style="position:relative">${totQ?(o.q/totQ*100).toFixed(1)+'%':'—'}</span></td><td ${td}>${totA?(o.a/totA*100).toFixed(1)+'%':'—'}</td></tr>`; });
-  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}>${roll(totQ)}</td><td ${tdt}>${won(totA)}</td><td ${td}>100%</td><td ${td}>100%</td></tr></table></div>`;
+  h+=`<tr class="t-tot"><td ${tdl}><b>합계</b></td><td ${tdt}>${roll(totQ)}</td><td ${tdt}>${won(totA)}</td><td ${td}>100%</td><td ${td}>100%</td></tr></table></div>`;
   return h;
 }
 function jibuRollByProductTable(monthsArg){
@@ -5107,10 +5116,10 @@ function jibuRollByProductTable(monthsArg){
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
   const roll=n=>n?Math.round(n).toLocaleString():'·';
-  let h=`<div class="cap" style="margin-bottom:8px">지부별 롤 판매 수량(롤) · 표시 기간 합계 · 제품 큰 카테고리 기준</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:420px"><tr><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>합계</th>${catList.map(c=>`<th ${th}>${escapeHtml(c)}</th>`).join('')}</tr>`;
+  let h=`<div class="cap" style="margin-bottom:8px">지부별 롤 판매 수량(롤) · 표시 기간 합계 · 제품 큰 카테고리 기준</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:420px"><tr><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>합계</th>${catList.map(c=>`<th ${th}>${escapeHtml(c)}</th>`).join('')}</tr>`;
   rows.forEach(r=>{ h+=`<tr><td ${tdl}>${escapeHtml(r.j)}</td><td ${tdt}>${roll(r.tot)}</td>${catList.map(c=>`<td ${td}>${roll(r.cells[c])}</td>`).join('')}</tr>`; });
   const colT={}; catList.forEach(c=>colT[c]=rows.reduce((s,r)=>s+(r.cells[c]||0),0)); const gtot=rows.reduce((s,r)=>s+r.tot,0);
-  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${tdt}>${roll(gtot)}</td>${catList.map(c=>`<td ${td}><b>${roll(colT[c])}</b></td>`).join('')}</tr></table></div>`;
+  h+=`<tr class="t-tot"><td ${tdl}><b>합계</b></td><td ${tdt}>${roll(gtot)}</td>${catList.map(c=>`<td ${td}><b>${roll(colT[c])}</b></td>`).join('')}</tr></table></div>`;
   return h;
 }
 function salesJibuProdRankTable(){
@@ -5137,9 +5146,9 @@ function salesJibuProdRankTable(){
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
   const roll=n=>n?Math.round(n).toLocaleString():'·', kw=n=>n?(n/1e8).toFixed(1)+'억':'·';
-  let h=_jspMonSeg+seg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> ${sel==='__all'?'롤 판매 지부 순위':'를 가장 많이 판매한 지부 순위'} · ${escapeHtml(_mLabel)} · 롤 판매 수 기준</div><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
+  let h=_jspMonSeg+seg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> ${sel==='__all'?'롤 판매 지부 순위':'를 가장 많이 판매한 지부 순위'} · ${escapeHtml(_mLabel)} · 롤 판매 수 기준</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
   rows.forEach((r,i)=>{ h+=`<tr><td ${tdl} style="color:var(--ink3);width:38px">${i+1}</td><td ${tdl}>${escapeHtml(r.j)}</td><td ${tdt}>${roll(r.q)}</td><td ${td}>${kw(r.a)}</td><td ${td}>${(r.q/totQ*100).toFixed(1)}%</td></tr>`; });
-  h+=`<tr style="background:var(--bg2)"><td ${tdl}></td><td ${tdl}><b>합계</b></td><td ${tdt}><b>${roll(totQ)}</b></td><td ${td}><b>${kw(totA)}</b></td><td ${td}><b>100%</b></td></tr></table></div>`;
+  h+=`<tr class="t-tot"><td ${tdl}></td><td ${tdl}><b>합계</b></td><td ${tdt}><b>${roll(totQ)}</b></td><td ${td}><b>${kw(totA)}</b></td><td ${td}><b>100%</b></td></tr></table></div>`;
   return h;
 }
 const STATUS_RULES = { rise:5, warn:-5, alert:-10 };   // 전월 대비 증감률(%) 기준 — 여기서 수정
@@ -5288,7 +5297,7 @@ function renderDealer(){
   const tdl='style="text-align:left;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const kw=n=>{ n=n||0; return n>=1e8?(n/1e8).toFixed(1)+'억':(n>=1e4?Math.round(n/1e4).toLocaleString()+'만':String(Math.round(n))); };
-  let t=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:780px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${th}>매출</th><th ${th}>롤</th><th ${th}>보증서</th><th ${th}>글라스케어</th><th ${th}>최근 활동</th><th ${thl}>상태</th></tr>`;
+  let t=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:780px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${th}>매출</th><th ${th}>롤</th><th ${th}>보증서</th><th ${th}>글라스케어</th><th ${th}>최근 활동</th><th ${thl}>상태</th></tr>`;
   rows.forEach((d,i)=>{ const recent=d.days==null?'—':(d.days<=0?'오늘':d.days+'일 전'); const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.active?'<span style="color:var(--dv2);font-weight:700">활성</span>':'<span style="color:var(--amber);font-weight:700">휴면</span>'; t+=`<tr><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${td}>${won(d.warr)}</td><td ${td}>${won(d.glass)}</td><td ${td}>${recent}</td><td ${tdl}>${stat}</td></tr>`; });
   t+=`</table></div><div class="cap" style="margin-top:8px;line-height:1.6">${won(rows.length)}곳 표시 (전체 ${won(total)}곳) · <b>매출·롤</b>=ERP 매출(대리점별), <b>보증서·글라스케어</b>=관리자 홈페이지 데이터를 <b>대리점명으로 매칭</b>해 결합. 이름이 다르면 매칭이 안 될 수 있어 <b>대리점코드 연동 시 더 정확</b>해집니다. 활성/휴면은 시공(보증서·글라스) 최근 60일 기준 · GC카드·구매 실적(F/S/U)은 ERP 추가 연동 시 표시.</div>`;
   box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
@@ -5344,9 +5353,9 @@ function renderGlass(){
   if(scope==='prod'){
     const byP={}; recs.forEach(r=>{ const c=catOf(r); const o=byP[c.sub]||(byP[c.sub]={sub:c.sub,major:c.major,tot:0}); o.tot++; });
     const arr=Object.values(byP).sort((x,y)=>{ const im=MAJ.indexOf(x.major)-MAJ.indexOf(y.major); return im!==0?im:y.tot-x.tot; });
-    tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>제품별 글라스케어 가입수</h3><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:420px"><tr><th ${thl}>대분류</th><th ${thl}>중분류(제품)</th><th ${th}>가입수</th><th ${th}>비율</th></tr>`;
+    tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>제품별 글라스케어 가입수</h3><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:420px"><tr><th ${thl}>대분류</th><th ${thl}>중분류(제품)</th><th ${th}>가입수</th><th ${th}>비율</th></tr>`;
     arr.forEach(o=>{ tbl+=`<tr><td ${tdl} style="color:var(--ink3)">${escapeHtml(o.major)}</td><td ${tdl}><b>${escapeHtml(o.sub)}</b></td><td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${total?(o.tot/total*100).toFixed(1)+'%':'—'}</td></tr>`; });
-    tbl+=`<tr style="background:var(--bg2)"><td ${tdl} colspan="2"><b>합계</b></td><td ${tdt}>${total.toLocaleString()}</td><td ${td}>100%</td></tr></table></div></div>`;
+    tbl+=`<tr class="t-tot"><td ${tdl} colspan="2"><b>합계</b></td><td ${tdt}>${total.toLocaleString()}</td><td ${td}>100%</td></tr></table></div></div>`;
   } else {
     const gkey=r=> scope==='dealer'?(String(r[dealerCol]||'').trim()||'미지정'):(String(r['담당지부']||'').trim()||'미지정');
     const majOf=r=>{ const m=catOf(r).major; return ['얼티넘','팬텀','스트라','크로마'].includes(m)?m:'기타'; };
@@ -5354,11 +5363,11 @@ function renderGlass(){
     const groups=Object.entries(byG).sort((x,y)=>y[1].tot-x[1].tot); const top=(scope==='dealer'&&!_glDealerAll)?groups.slice(0,30):groups;
     const MC=['얼티넘','팬텀','스트라','크로마','기타'];
     const warrByG={}; if(typeof WARR!=='undefined'&&WARR&&WARR.rows){ const _wk=r=> scope==='dealer'?String(r['매장명']||'').trim():String(r['담당지부']||'').trim(); WARR.rows.forEach(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(GV.scope==='range'){ if(GV.from&&d<GV.from)return; if(GV.to&&d>GV.to)return; } if(!_glEligibleFront(r)) return; const k=_wk(r); if(k) warrByG[k]=(warrByG[k]||0)+1; }); }
-    tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>${scope==='dealer'?'대리점별':'지부별'} 글라스케어 가입수</h3><div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:${scope==='dealer'?760:660}px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${scope==='dealer'?`<th ${thl}>담당 지부</th>`:''}<th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>대상보증서</th><th ${th}>가입율</th>${MC.map(c=>`<th ${th}>${c}</th>`).join('')}</tr>`;
+    tbl=`<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>${scope==='dealer'?'대리점별':'지부별'} 글라스케어 가입수</h3><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:${scope==='dealer'?760:660}px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${scope==='dealer'?`<th ${thl}>담당 지부</th>`:''}<th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>대상보증서</th><th ${th}>가입율</th>${MC.map(c=>`<th ${th}>${c}</th>`).join('')}</tr>`;
     top.forEach(([g,o])=>{ tbl+=`<tr${scope==='jibu'?` data-jdrill="${escapeHtml(g)}" style="cursor:pointer${g===_glJibuDrill?';background:rgba(244,145,28,.10)':''}" title="클릭하면 소속 대리점 상위 10곳"`:''}><td ${tdl}>${escapeHtml(g)}${scope==='jibu'?` <span style="display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:6px;background:${g===_glJibuDrill?'var(--amber)':'rgba(244,145,28,.16)'};color:${g===_glJibuDrill?'#fff':'var(--amber)'};font-size:11px;font-weight:900;vertical-align:middle;margin-left:6px">${g===_glJibuDrill?'▾':'▸'}</span>`:''}</td>${scope==='dealer'?`<td ${tdl} style="color:var(--ink2);font-size:12px">${escapeHtml(o.jibu||'·')}</td>`:''}<td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${warrByG[g]?warrByG[g].toLocaleString():'·'}</td><td ${td}>${warrByG[g]?(o.tot/warrByG[g]*100).toFixed(1)+'%':'—'}</td>${MC.map(c=>`<td ${td}>${o[c]?o[c].toLocaleString():'·'}</td>`).join('')}</tr>`; });
     const sumc=k=>top.reduce((s,[,o])=>s+o[k],0);
     const sumWarr=top.reduce((s,[g])=>s+(warrByG[g]||0),0);
-    tbl+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td>${scope==='dealer'?`<td ${tdl}></td>`:''}<td ${tdt}>${sumc('tot').toLocaleString()}</td><td ${td}><b>${sumWarr.toLocaleString()}</b></td><td ${td}><b>${sumWarr?(sumc('tot')/sumWarr*100).toFixed(1)+'%':'—'}</b></td>${MC.map(c=>`<td ${td}><b>${sumc(c).toLocaleString()}</b></td>`).join('')}</tr></table></div><div class="cap" style="margin-top:7px">가입율 = 글라스 가입 ÷ <b>대상 보증서</b> · 대상 = 전면 시공이 얼티넘·팬텀 F95/F85·스트라·크로마9인 보증서</div>`;
+    tbl+=`<tr class="t-tot"><td ${tdl}><b>합계</b></td>${scope==='dealer'?`<td ${tdl}></td>`:''}<td ${tdt}>${sumc('tot').toLocaleString()}</td><td ${td}><b>${sumWarr.toLocaleString()}</b></td><td ${td}><b>${sumWarr?(sumc('tot')/sumWarr*100).toFixed(1)+'%':'—'}</b></td>${MC.map(c=>`<td ${td}><b>${sumc(c).toLocaleString()}</b></td>`).join('')}</tr></table></div><div class="cap" style="margin-top:7px">가입율 = 글라스 가입 ÷ <b>대상 보증서</b> · 대상 = 전면 시공이 얼티넘·팬텀 F95/F85·스트라·크로마9인 보증서</div>`;
     if(scope==='dealer'&&groups.length>30) tbl+=`<div style="margin-top:9px;text-align:center"><button class="acc-btn" id="glMore" style="padding:6px 16px">${_glDealerAll?'접기 ▲':`더보기 · 전체 ${groups.length}곳 ▼`}</button></div>`;
     tbl+=`</div>`;
     if(scope==='jibu' && _glJibuDrill){
@@ -5369,7 +5378,7 @@ function renderGlass(){
       const _xy=(window._glDrillXY)||{x:innerWidth/2-200,y:140}; const _pw=Math.min(520,innerWidth-24); const _pl=Math.max(12,Math.min(_xy.x,innerWidth-_pw-12)); const _pt=Math.max(12,Math.min((_xy.y||140)+6,innerHeight-340));
       let dr=`<div id="glDrillBg" style="position:fixed;inset:0;z-index:8999;background:rgba(0,0,0,.06)"></div><div class="card" id="glDrillCard" style="position:fixed;left:${_pl}px;top:${_pt}px;width:${_pw}px;max-height:${innerHeight-_pt-20}px;overflow:auto;z-index:9000;border:1px solid var(--amber);box-shadow:0 16px 44px rgba(0,0,0,.28)"><div style="display:flex;justify-content:space-between;align-items:center;margin:0 0 6px;gap:10px"><h3 style="margin:0"><span class="dot"></span>${escapeHtml(jb)} · 글라스케어 상위 대리점 ${arr.length}곳</h3><button class="acc-btn" id="glDrillClose" style="padding:4px 12px">닫기 ✕</button></div>`;
       if(!arr.length){ dr+=`<div class="empty">이 지부에 글라스케어 가입 대리점이 없습니다.</div></div>`; }
-      else { dr+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:460px"><tr><th ${thl}>#</th><th ${thl}>대리점</th><th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>대상보증서</th><th ${th}>가입율</th></tr>`;
+      else { dr+=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:460px"><tr><th ${thl}>#</th><th ${thl}>대리점</th><th ${tdt.replace('13px','11.5px')}>가입수</th><th ${th}>대상보증서</th><th ${th}>가입율</th></tr>`;
         arr.forEach(([dn,o],i)=>{ const w=wD[dn]; dr+=`<tr><td ${tdl} style="color:var(--ink3);width:34px">${i+1}</td><td ${tdl}>${escapeHtml(dn)}</td><td ${tdt}>${o.tot.toLocaleString()}</td><td ${td}>${w?w.toLocaleString():'·'}</td><td ${td}>${w?(o.tot/w*100).toFixed(1)+'%':'—'}</td></tr>`; });
         dr+=`</table></div><div class="cap" style="margin-top:7px">${escapeHtml(jb)} 소속 대리점을 글라스케어 가입수 상위 10곳까지 · 현재 기간/제품 필터 적용</div></div>`; }
       tbl+=dr;
@@ -5698,9 +5707,9 @@ function lineWarrCard(recs){
   const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
-  h+=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:300px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${scope==='dealer'?`<th ${thl}>담당 지부</th>`:''}<th ${th}>발급수</th></tr>`;
+  h+=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:300px"><tr><th ${thl}>${scope==='dealer'?'대리점':'지부'}</th>${scope==='dealer'?`<th ${thl}>담당 지부</th>`:''}<th ${th}>발급수</th></tr>`;
   top.forEach(([g,o])=>{ h+=`<tr><td ${tdl}>${escapeHtml(g)}</td>${scope==='dealer'?`<td ${tdl}><span style="color:var(--ink2);font-size:12px">${escapeHtml(o.jibu||'-')}</span></td>`:''}<td ${tdt}>${o.tot.toLocaleString()}</td></tr>`; });
-  h+=`<tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td>${scope==='dealer'?`<td ${tdl}></td>`:''}<td ${tdt}><b>${top.reduce((s,[,o])=>s+o.tot,0).toLocaleString()}</b></td></tr>`;
+  h+=`<tr class="t-tot"><td ${tdl}><b>합계</b></td>${scope==='dealer'?`<td ${tdl}></td>`:''}<td ${tdt}><b>${top.reduce((s,[,o])=>s+o.tot,0).toLocaleString()}</b></td></tr>`;
   h+=`</table></div>`;
   if(scope==='dealer'&&groups.length>30) h+=`<div class="cap" style="margin-top:6px">상위 30개 대리점만 표시 (전체 ${groups.length}곳)</div>`;
   return h;
@@ -6021,7 +6030,7 @@ function salesRegionMap(){
         +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;font-weight:800;color:var(--amber)">${sh.toFixed(2)}%</td>`
         +bar(sh,maxSh)+`</tr>`).join('');
       const totSh=tCar>0?(tRoll*cap/tCar*100):0;
-      const table=`<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>롤 판매</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}`
+      const table=`<table class="dtbl" style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>롤 판매</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}`
         +`<tr><td style="padding:7px 9px;font-weight:800;background:var(--bg2)">총합계</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tRoll.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tCar.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2);color:var(--amber)">${totSh.toFixed(2)}%</td><td style="background:var(--bg2)"></td></tr></table>`;
       return `<div class="cap" style="margin-bottom:10px">롤 판매 × 롤당 <b>${cap}대</b> ÷ 신차 등록 기준 · 전국 점유율 <b style="color:var(--amber)">${totSh.toFixed(2)}%</b> · 지도에 마우스를 올리면 상세 (데이터는 ⚙설정에서 입력)</div>`
         + `<div class="hm-region"><div class="hm-region-map">${svg}</div><div class="hm-region-tbl">${table}</div></div>`;
@@ -6043,7 +6052,7 @@ function salesRegionMap(){
         +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;font-weight:800;color:var(--amber)">${sh!=null?sh.toFixed(2)+'%':'—'}</td>`
         +bar(c>0?sh:w, maxV)+`</tr>`; }).join('');
     const totSh=tCar>0?(tWarr/tCar*100):null;
-    const table=`<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>보증서</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}`
+    const table=`<table class="dtbl" style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>보증서</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}`
       +`<tr><td style="padding:7px 9px;font-weight:800;background:var(--bg2)">총합계</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tWarr.toLocaleString()}건</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tCar?tCar.toLocaleString():'—'}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2);color:var(--amber)">${totSh!=null?totSh.toFixed(2)+'%':'—'}</td><td style="background:var(--bg2)"></td></tr></table>`;
     return `<div class="cap" style="margin-bottom:10px">품질보증서 <b>실시공 건수</b> ÷ 지역 <b>신차 등록</b> 기준${anyCar?` · 전국 점유율 <b style="color:var(--amber)">${(totSh||0).toFixed(2)}%</b>`:` · 신차 등록 미입력 — 시공 건수만 표시(설정에서 신차등록 입력 시 점유율)`} · 지도에 마우스를 올리면 상세</div>`
       + `<div class="hm-region"><div class="hm-region-map">${svg}</div><div class="hm-region-tbl">${table}</div></div>`;
@@ -6093,27 +6102,27 @@ function renderRevenue(){
     + chartCard('cShareSales','시장 점유율 (ERP 판매 기준)',lab+' · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· ERP 롤×시공대수 ÷ 신차 등록</span>')
     + `</div>`;
 
-  let s1=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>구성비</th></tr>`;
+  let s1=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>구성비</th></tr>`;
   const bbAmt=chAmt('B2C')+chAmt('B2B');
   ['B2C','B2B'].forEach(g=>{ s1+=`<tr><td ${tdl}><b>${g}</b></td><td ${td}>${roll(chQty(g))}</td><td ${td}>${won(chAmt(g))}</td><td ${td}>${pct(chAmt(g),bbAmt).toFixed(1)}%</td></tr>`; });
-  s1+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">B2C+B2B 합계</td><td ${td} style="font-weight:800;background:var(--line)">${roll(chQty('B2C')+chQty('B2B'))}</td><td ${td} style="font-weight:800;background:var(--line)">${won(bbAmt)}</td><td ${td} style="font-weight:800;background:var(--line)">100.0%</td></tr>`;
+  s1+=`<tr><td ${tdl} style="font-weight:800;background:var(--bg2)">B2C+B2B 합계</td><td ${td} style="font-weight:800;background:var(--bg2)">${roll(chQty('B2C')+chQty('B2B'))}</td><td ${td} style="font-weight:800;background:var(--bg2)">${won(bbAmt)}</td><td ${td} style="font-weight:800;background:var(--bg2)">100.0%</td></tr>`;
   s1+=`<tr><td ${tdl} style="color:var(--ink2)">전사 매출액 (별도채널 포함)</td><td ${td} style="color:var(--ink2)">—</td><td ${td} style="color:var(--ink2)">${won(tAmt)}</td><td ${td} style="color:var(--ink2)">${bbAmt?(bbAmt/tAmt*100).toFixed(1)+'% 비중':''}</td></tr></table>`;
 
-  let s2=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>구분</th><th ${th}>판매수량</th><th ${th}>금액(원)</th></tr>`
+  let s2=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>구분</th><th ${th}>판매수량</th><th ${th}>금액(원)</th></tr>`
     +`<tr><td ${tdl}><b>롤 품목</b></td><td ${td}><b>${roll(rollQ)}</b> 롤</td><td ${td}>${won(rollA)}</td></tr>`
     +`<tr><td ${tdl}>일반 물품</td><td ${td}>${roll(goodsQ)}</td><td ${td}>${won(goodsA)}</td></tr></table>`
     +`<div style="font-size:11px;color:var(--ink2);margin-top:6px">품목(MatName) 단위 분류 · 설정 → 매출 설정에서 변경</div>`;
 
-  let s3=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
+  let s3=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
   ['B2C','B2B'].forEach(g=>{ s3+=`<tr><td ${tdl}>${g}</td>${M.map(m=>`<td ${td}>${won(C[g].ma[m])}</td>`).join('')}<td ${td}><b>${won(_sTot(C[g].ma))}</b></td></tr>`; });
-  s3+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">B2C+B2B</td>${M.map(m=>`<td ${td} style="background:var(--line);font-weight:700">${won(C.B2C.ma[m]+C.B2B.ma[m])}</td>`).join('')}<td ${td} style="background:var(--line)"></td></tr></table><div style="font-size:11px;color:var(--ink2);margin-top:5px">단위: 원 · 별도채널 제외 (전사 매출액은 종합표 참고)</div>`;
+  s3+=`<tr><td ${tdl} style="font-weight:800;background:var(--bg2)">B2C+B2B</td>${M.map(m=>`<td ${td} style="background:var(--line);font-weight:700">${won(C.B2C.ma[m]+C.B2B.ma[m])}</td>`).join('')}<td ${td} style="background:var(--bg2)"></td></tr></table><div style="font-size:11px;color:var(--ink2);margin-top:5px">단위: 원 · 별도채널 제외 (전사 매출액은 종합표 참고)</div>`;
 
   const JG=SALES_JIBU.concat(['본사']);
   const jr=JG.map(j=>({j,q:_sPick(SALES.jibu[j].mq),a:_sPick(SALES.jibu[j].ma)})).sort((x,y)=>y.q-x.q);
   const jR=jr.reduce((s,x)=>s+x.q,0), jA=jr.reduce((s,x)=>s+x.a,0);
-  let s4=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>수량 구성비</th></tr>`;
+  let s4=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>수량 구성비</th></tr>`;
   jr.forEach(x=>{ s4+=`<tr><td ${tdl}>${x.j==='본사'?'<b>본사</b>':x.j}</td><td ${td}>${roll(x.q)}</td><td ${td}>${won(x.a)}</td><td ${td}>${pct(x.q,jR).toFixed(1)}%</td></tr>`; });
-  s4+=`<tr><td ${tdl} style="font-weight:800;background:var(--line)">합계(B2C)</td><td ${td} style="font-weight:800;background:var(--line)">${roll(jR)}</td><td ${td} style="font-weight:800;background:var(--line)">${won(jA)}</td><td ${td} style="background:var(--line)"></td></tr></table>`;
+  s4+=`<tr><td ${tdl} style="font-weight:800;background:var(--bg2)">합계(B2C)</td><td ${td} style="font-weight:800;background:var(--bg2)">${roll(jR)}</td><td ${td} style="font-weight:800;background:var(--bg2)">${won(jA)}</td><td ${td} style="background:var(--bg2)"></td></tr></table>`;
 
 
   // ⑥ 시장 점유율 — 월 차량 출고 대수(신차등록) 분모, 3가지 기준
@@ -6126,18 +6135,18 @@ function renderRevenue(){
   const shr=c=> carReg>0? (c/carReg*100).toFixed(2)+'%' : '<span style="color:var(--ink2)">신차등록 입력 필요</span>';
   let s6=`<div style="font-size:12px;color:var(--ink2);margin-bottom:9px">분모 = <b>월 차량 출고 대수(신차등록)</b> · ⚙ <b>설정 → 매출 설정</b>에서 신차등록·대리점 판매·롤당 시공대수를 입력합니다. (롤당 기본 10대, 모노카본 17대)</div>`;
   s6+=`<div style="margin-bottom:11px">월 차량 출고 대수 (${lab}): <b>${carReg?roll(carReg)+'대':'(미입력)'}</b></div>`;
-  s6+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>기준</th><th ${th}>차량대수</th><th ${th}>점유율</th></tr>`
+  s6+=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>기준</th><th ${th}>차량대수</th><th ${th}>점유율</th></tr>`
     +`<tr><td ${tdl}>품질보증서 기준 <span style="color:var(--ink2);font-weight:400">(1장=1대·자동)</span></td><td ${td}>${roll(warrCnt)}</td><td ${td}><b>${shr(warrCnt)}</b></td></tr>`
     +`<tr><td ${tdl}>대리점 판매 기준 <span style="color:var(--ink2);font-weight:400">(수기)</span></td><td ${td}>${carDealer?roll(carDealer):'<span style=\"color:var(--ink2)\">(미입력)</span>'}</td><td ${td}><b>${carDealer?shr(carDealer):'—'}</b></td></tr>`
     +`<tr><td ${tdl}>판매 기준 · B2C <span style="color:var(--ink2);font-weight:400">(롤×시공대수)</span></td><td ${td}>${roll(carB2C)}</td><td ${td}><b>${shr(carB2C)}</b></td></tr>`
     +`<tr><td ${tdl}>판매 기준 · B2B <span style="color:var(--ink2);font-weight:400">(롤×시공대수)</span></td><td ${td}>${roll(carB2B)}</td><td ${td}><b>${shr(carB2B)}</b></td></tr>`
     +`<tr><td ${tdl} style="font-weight:800;background:rgba(244,145,28,.1)">판매 기준 · 합계 (B2C+B2B)</td><td ${td} style="font-weight:800;background:rgba(244,145,28,.1)">${roll(carSales)}</td><td ${td} style="font-weight:800;background:rgba(244,145,28,.1)">${shr(carSales)}</td></tr></table>`;
-  s6+=`<div style="font-weight:700;margin:13px 0 7px">지부별 점유율 (업로드 보증서 실시공 · ${lab})</div><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>실시공(건)</th><th ${th}>점유율</th></tr>`;
+  s6+=`<div style="font-weight:700;margin:13px 0 7px">지부별 점유율 (업로드 보증서 실시공 · ${lab})</div><table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>지부</th><th ${th}>실시공(건)</th><th ${th}>점유율</th></tr>`;
   JG.forEach(j=>{ s6+=`<tr><td ${tdl}>${j}</td><td ${td}>${wj.by[j]||0}</td><td ${td}>${carReg>0?((wj.by[j]||0)/carReg*100).toFixed(2)+'%':'—'}</td></tr>`; });
   s6+=`</table>`;
 
   const dl=Object.keys(SALES.dealers).map(k=>({name:k,q:_sPick(SALES.dealers[k].mq),a:_sPick(SALES.dealers[k].ma),jibu:SALES.dealers[k].jibu})).filter(d=>d.q>0||d.a>0).sort((a,b)=>b.q-a.q);
-  let s7=`<table style="width:100%;border-collapse:collapse"><tr><th ${th}>#</th><th ${thl}>거래처</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th></tr>`;
+  let s7=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${th}>#</th><th ${thl}>거래처</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th></tr>`;
   dl.forEach((d,i)=>{ s7+=`<tr${d.jibu?' style="background:rgba(244,145,28,.07)"':''}><td ${td}>${i+1}</td><td ${tdl}>${d.name}${d.jibu?' <span style="color:var(--amber);font-size:11px">·지부</span>':''}</td><td ${td}>${roll(d.q)}</td><td ${td}>${won(d.a)}</td></tr>`; });
   s7+=`</table>`;
 
@@ -6448,7 +6457,7 @@ function dealerScorecard(){
   const _di='padding:5px 8px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink);font-size:12px;font-family:inherit';
   const _scBar=`<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:10px"><input type="date" id="scFrom" value="${_scFrom}" style="${_di}"><span style="color:var(--ink3)">~</span><input type="date" id="scTo" value="${_scTo}" style="${_di}"><button class="acc-btn" id="scApply" style="padding:5px 13px">조회</button>${_useScRange?`<button class="acc-btn" id="scReset" style="padding:5px 11px">전체</button>`:''}<span style="color:var(--ink3);font-size:11px">${_useScRange?`${_scFrom||'처음'} ~ ${_scTo||'끝'} · 시공일자 기준`:'전체 기간 · 날짜로 좁혀보기'}</span></div>`;
   let html=_scBar+`<div style="font-size:11.5px;color:var(--ink3);margin-bottom:9px">시공 건수 상위 ${_scAll?arr.length:Math.min(10,arr.length)}곳 · 신차%·최근시공·주력제품`+(dormant?` · 휴면(60일+) ${dormant}곳`:'')+`</div>`;
-  html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>매장 · 지부</th><th ${th}>시공</th><th ${th}>신차%</th><th ${th}>최근 시공</th><th ${thl} style="text-align:left">주력 제품</th></tr>`;
+  html+=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>매장 · 지부</th><th ${th}>시공</th><th ${th}>신차%</th><th ${th}>최근 시공</th><th ${thl} style="text-align:left">주력 제품</th></tr>`;
   top.forEach(d=>{
     const nwp=d.inst?Math.round(d.nw/d.inst*100):0;
     let days=d.last?Math.floor((today-new Date(d.last+'T00:00:00').getTime())/86400000):null;
@@ -6477,7 +6486,7 @@ function whiteSpaceCard(){
   const sds=_REGION_KEYS.map(k=>{ const s=G.sido[k]||{inst:0,dealers:new Set(),sgg:new Set()}; const ni=nw.byRegion[k]||0; const reg=_regionCarRegPick(k); return {k, inst:s.inst, dealers:s.dealers.size, sgg:s.sgg.size, sh: reg>0? ni/reg*100 : null}; })
     .filter(x=>x.inst>0||x.sh!=null).sort((a,b)=>{ if(a.sh==null&&b.sh==null) return b.inst-a.inst; if(a.sh==null) return 1; if(b.sh==null) return -1; return a.sh-b.sh; });
   html+=`<div style="font-weight:700;margin:4px 0 7px">시·도 침투 (점유율 낮은 순 = 확장 여지)</div>`;
-  html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도</th><th ${th}>신차 점유율</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>시군구</th></tr>`;
+  html+=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도</th><th ${th}>신차 점유율</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>시군구</th></tr>`;
   sds.forEach(x=>{ const weak = x.sh!=null && x.sh < 5; html+=`<tr data-wsregion="${escapeHtml(x.k)}"${weak?' style="background:rgba(244,145,28,.08)"':''}><td ${tdl}>${x.k}${weak?' <span style="color:var(--amber);font-size:10px;font-weight:700">확장후보</span>':''}</td><td ${td}>${x.sh!=null?x.sh.toFixed(2)+'%':'<span style="color:var(--ink2)">—</span>'}</td><td ${td}>${x.inst.toLocaleString()}</td><td ${td}>${x.dealers}</td><td ${td}>${x.sgg}</td></tr>`; });
   html+=`</table>`;
 
@@ -6485,7 +6494,7 @@ function whiteSpaceCard(){
   const sgs=Object.values(G.sgg).filter(g=>g.inst>=3).map(g=>({...g, dn:g.dealers.size, per: g.dealers.size? g.inst/g.dealers.size : g.inst})).sort((a,b)=> b.per-a.per || b.inst-a.inst).slice(0,15);
   if(sgs.length){
     html+=`<div style="font-weight:700;margin:16px 0 7px">대리점 추가 여력 시군구 <span style="color:var(--ink2);font-weight:500;font-size:12px">(대리점당 시공 많은 순 · TOP 15)</span></div>`;
-    html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도 · 시군구</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>대리점당 시공</th></tr>`;
+    html+=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도 · 시군구</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>대리점당 시공</th></tr>`;
     sgs.forEach(g=>{ const hot=g.dn<=1; html+=`<tr><td ${tdl}>${g.sido} · ${escapeHtml(g.sgg)}${hot?' <span style="color:var(--amber);font-size:10px;font-weight:700">단일대리점</span>':''}</td><td ${td}>${g.inst.toLocaleString()}</td><td ${td}>${g.dn}</td><td ${td}><b>${g.per.toFixed(1)}</b></td></tr>`; });
     html+=`</table><div style="font-size:11px;color:var(--ink3);margin-top:7px">‘단일대리점’은 그 시군구를 한 곳이 전담 — 추가 개설·이원화 여력이 큽니다. 정확한 시군구 점유율을 원하면 시군구별 신차(또는 자동차) 등록을 확보하면 됩니다.</div>`;
   }
@@ -6505,7 +6514,7 @@ function newCarShareCard(){
   const tot=retail+b2b;
   let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55">통계청 <b>신차 등록</b> 대비 레이노 장착 비율. <b style="color:#16a34a">리테일</b>은 품질보증서(신차만) 실시공, <b style="color:#3b82f6">B2B</b>는 MONO(모노카본)·PRESTO(프레스토) 차량용 판매(롤×시공대수). 두 트랙은 측정 방식이 달라 분리 표기합니다. 절대%는 보증서 발급률 때문에 과소평가 — <b>추세·지역 비교</b> 위주로 보세요.</div>`;
   html+=`<div style="margin-bottom:11px">신차 등록 (${lab}): <b>${nat?nat.toLocaleString()+'대':'(미입력)'}</b></div>`;
-  html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>트랙</th><th ${th}>차량(대)</th><th ${th}>장착 점유율</th></tr>`
+  html+=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>트랙</th><th ${th}>차량(대)</th><th ${th}>장착 점유율</th></tr>`
     +`<tr><td ${tdl}>리테일 · 신차 보증서 <span style="color:var(--ink2);font-weight:400">(실시공·신차만)</span></td><td ${td}>${retail.toLocaleString()}</td><td ${td} style="color:#16a34a">${pct(retail)}</td></tr>`
     +`<tr><td ${tdl}>B2B · MONO <span style="color:var(--ink2);font-weight:400">(모노카본·롤×시공대수)</span></td><td ${td}>${mono.toLocaleString()}</td><td ${td} style="color:#3b82f6">${pct(mono)}</td></tr>`
     +`<tr><td ${tdl}>B2B · PRESTO <span style="color:var(--ink2);font-weight:400">(프레스토·롤×시공대수)</span></td><td ${td}>${presto.toLocaleString()}</td><td ${td} style="color:#3b82f6">${pct(presto)}</td></tr>`
@@ -6515,7 +6524,7 @@ function newCarShareCard(){
     .filter(x=>x.inst>0||x.reg>0).sort((a,b)=>(b.sh==null?-1:b.sh)-(a.sh==null?-1:a.sh)||b.inst-a.inst);
   if(regs.length){
     html+=`<div style="font-weight:700;margin:15px 0 7px">시·도별 신차 장착 점유율 <span style="color:var(--ink2);font-weight:500;font-size:12px">(리테일 보증서 기준 · ${lab})</span></div>`;
-    html+=`<table style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도</th><th ${th}>신차 시공(건)</th><th ${th}>신차 등록</th><th ${th}>점유율</th></tr>`;
+    html+=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도</th><th ${th}>신차 시공(건)</th><th ${th}>신차 등록</th><th ${th}>점유율</th></tr>`;
     regs.forEach(x=>{ html+=`<tr><td ${tdl}>${x.k}</td><td ${td}>${x.inst.toLocaleString()}</td><td ${td}>${x.reg?x.reg.toLocaleString():'<span style="color:var(--ink2)">미입력</span>'}</td><td ${td}>${x.sh!=null?'<b>'+x.sh.toFixed(2)+'%</b>':'—'}</td></tr>`; });
     html+=`</table><div style="font-size:11px;color:var(--ink3);margin-top:7px">시·도별 신차 등록(통계청 17개 시·도)은 ⚙ 설정 → 매출 → <b>지역별 세일즈 입력</b>에 넣으면 점유율이 채워집니다.</div>`;
   } else {
@@ -6598,7 +6607,7 @@ function salesItemClassHTML(){
       const tg= admin? `<select class="sales-type" data-mat="${em}" style="padding:2px 5px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)"><option value="roll"${cur==='roll'?' selected':''}>롤</option><option value="goods"${cur==='goods'?' selected':''}>일반</option><option value="excl"${cur==='excl'?' selected':''}>제외</option></select>` : (ex?'제외':(rt?'롤':'일반'));
       rowsH+=`<tr${ex?' style="opacity:.5"':''}><td ${tdl} style="padding-left:16px">${mat}</td><td ${td}>${roll(q)}</td><td ${td}>${tg}</td></tr>`; });
     const bulk= admin? `<span style="float:right;font-weight:400"><button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="roll" style="padding:1px 8px;font-size:11px">전체 롤</button> <button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="goods" style="padding:1px 8px;font-size:11px">전체 일반</button> <button class="sales-bulk acc-btn" data-mid="${encodeURIComponent(mid)}" data-val="excl" style="padding:1px 8px;font-size:11px">전체 제외</button></span>` : '';
-    s5+=`<details style="border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;font-size:13px;list-style:none">${mid} <span style="color:var(--ink2);font-weight:400">· ${items.length}품목 · 수량 ${roll(gq)} · 롤 ${nRoll}/일반 ${nGoods}${nExcl?`/<span style="color:var(--neg)">제외 ${nExcl}</span>`:''}</span>${bulk}</summary><table style="width:100%;border-collapse:collapse"><tr><th ${thl}>품목(MatName)</th><th ${th}>판매수량</th><th ${th}>분류</th></tr>${rowsH}</table></details>`; });
+    s5+=`<details style="border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card)"><summary style="padding:9px 12px;cursor:pointer;font-weight:700;font-size:13px;list-style:none">${mid} <span style="color:var(--ink2);font-weight:400">· ${items.length}품목 · 수량 ${roll(gq)} · 롤 ${nRoll}/일반 ${nGoods}${nExcl?`/<span style="color:var(--neg)">제외 ${nExcl}</span>`:''}</span>${bulk}</summary><table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>품목(MatName)</th><th ${th}>판매수량</th><th ${th}>분류</th></tr>${rowsH}</table></details>`; });
   return s5;
 }
 
@@ -6646,21 +6655,21 @@ function salesSettingsSectionHTML(){
   const th=`style="background:var(--ink);color:var(--bg);padding:7px 8px;font-size:11px;font-weight:800;text-align:center;white-space:nowrap"`;
   const tdl=`style="padding:5px 8px;text-align:left;font-size:12px;font-weight:700;white-space:nowrap;background:var(--card);position:sticky;left:0"`;
   const mfields=(metric)=> MM.map(m=>`<td style="padding:2px"><input class="sc-in" data-metric="${metric}" data-month="${m}" type="number" min="0" value="${sc[metric][m]||''}" placeholder="0" style="width:88px;text-align:right;padding:4px 5px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:12px"></td>`).join('');
-  let grid=`<div style="overflow-x:auto"><table style="border-collapse:collapse"><tr><th ${thl}>항목</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`
+  let grid=`<div style="overflow-x:auto"><table class="dtbl" style="border-collapse:collapse"><tr><th ${thl}>항목</th>${MM.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`
         +`<tr><td ${tdl}>신차등록(대)</td>${mfields('carReg')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.carReg))}</td></tr>`
     +`<tr><td ${tdl}>대리점 판매(롤)</td>${mfields('dealerSales')}<td style="text-align:right;padding:5px 8px;font-weight:800;font-size:12px">${won(_scSum(sc.dealerSales))}</td></tr>`
     +`</table></div>`;
   let capHTML;
   if(SALES&&SALES.prodAll){ const rm={}; SALES.prodList.forEach(mat=>{ if(_isRoll(mat)) rm[_midOf(mat)]=true; });
     const cap=(SALES.inputs&&SALES.inputs.cap)||{};
-    capHTML=`<div style="overflow-x:auto"><table style="border-collapse:collapse"><tr><th ${thl}>롤 중분류</th><th ${th}>롤당 시공가능대수</th></tr>`
+    capHTML=`<div style="overflow-x:auto"><table class="dtbl" style="border-collapse:collapse"><tr><th ${thl}>롤 중분류</th><th ${th}>롤당 시공가능대수</th></tr>`
       + Object.keys(rm).sort().map(mid=>`<tr><td ${tdl}>${mid}</td><td style="padding:4px 8px;text-align:right"><input class="sc-cap" data-mid="${encodeURIComponent(mid)}" type="number" min="0" step="0.1" value="${_sNum(cap[mid]||0)||''}" placeholder="${_capDef(mid)}" style="width:90px;text-align:right;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:12px"></td></tr>`).join('')
       + `</table></div>`;
   } else capHTML=`<div class="empty" style="padding:18px;color:var(--ink2);font-size:13px">매출 ERP 파일을 먼저 올리면(레이노 데이터 → 매출) 롤 중분류 목록이 여기에 나타납니다.</div>`;
   const _mids=(SALES&&SALES.prodList)?[...new Set(SALES.prodList.map(_midOf))].sort():[];
   const _mt=sc.midType||{}, _kw=sc.exclKw||[];
   const _msel=mid=>`<select class="sc-mid" data-mid="${encodeURIComponent(mid)}" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);font-size:12px"><option value="">자동</option><option value="roll"${_mt[mid]==='roll'?' selected':''}>롤</option><option value="goods"${_mt[mid]==='goods'?' selected':''}>일반</option><option value="excl"${_mt[mid]==='excl'?' selected':''}>제외</option></select>`;
-  const _midTable=_mids.length?`<div class="srt" style="overflow-x:auto;max-height:320px;overflow-y:auto;margin-top:6px"><table style="border-collapse:collapse"><tr><th ${thl}>중분류</th><th ${th}>규칙</th></tr>`+_mids.map(mid=>`<tr><td ${tdl}>${mid}</td><td style="padding:4px 10px;text-align:center">${_msel(mid)}</td></tr>`).join('')+`</table></div>`:`<div class="cap" style="margin-top:6px">매출 ERP 업로드 후 중분류 목록이 표시됩니다.</div>`;
+  const _midTable=_mids.length?`<div class="srt" style="overflow-x:auto;max-height:320px;overflow-y:auto;margin-top:6px"><table class="dtbl" style="border-collapse:collapse"><tr><th ${thl}>중분류</th><th ${th}>규칙</th></tr>`+_mids.map(mid=>`<tr><td ${tdl}>${mid}</td><td style="padding:4px 10px;text-align:center">${_msel(mid)}</td></tr>`).join('')+`</table></div>`:`<div class="cap" style="margin-top:6px">매출 ERP 업로드 후 중분류 목록이 표시됩니다.</div>`;
   const _chips=_kw.length?_kw.map((k,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--bg2);border:1px solid var(--line);border-radius:980px;padding:3px 6px 3px 11px;margin:3px 3px 0 0;font-size:12px">${escapeHtml(k)}<button class="kw-del" data-i="${i}" style="border:none;background:var(--line);color:var(--ink);border-radius:50%;width:17px;height:17px;cursor:pointer;font-size:12px;line-height:1;padding:0">×</button></span>`).join(''):`<span class="cap">등록된 키워드 없음</span>`;
   const ruleCard=`<div class="card set-card"><h3><span class="dot"></span>🎯 롤 분류 규칙 <span style="font-weight:400;font-size:12px;color:var(--ink2)">· 영구 저장 · 매 업로드 자동 적용</span></h3>
      <div class="cap">매번 품목을 제외할 필요 없이, <b>중분류 규칙</b>과 <b>제외 키워드</b>를 한 번만 설정하면 모든 업로드에 자동 적용됩니다. 개별 품목 예외는 아래 ‘품목 분류’에서 지정(규칙보다 우선).</div>
@@ -6681,7 +6690,7 @@ function salesSettingsSectionHTML(){
   const regionCard=`<div class="card set-card"><h3><span class="dot"></span>🗺 지역별 세일즈 입력 (롤 판매 · 신차 등록)</h3>
      <div class="cap">시·도별 <b>롤 판매 수</b>와 <b>신차 등록(차량 출고) 대수</b>를 월별로 입력하면, 매출 화면의 <b>지역별 시장 점유율 지도</b>가 실제 점유율로 표시됩니다. <b>점유율 = 롤 판매 × 롤당 대수 ÷ 신차 등록</b>. 입력칸을 벗어나면 자동 저장됩니다.</div>
      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:9px 0 11px"><label style="font-weight:700;font-size:13px">입력 월 ${rMonthSel}</label><label style="font-size:12px;color:var(--ink2)">롤당 대수 ${rCapIn}</label></div>
-     <div style="overflow-x:auto"><table style="border-collapse:collapse;min-width:400px"><tr><th ${thl}>지역</th><th ${th}>롤 판매</th><th ${th}>신차 등록</th><th ${th}>${rmo}월 점유율</th></tr>
+     <div style="overflow-x:auto"><table class="dtbl" style="border-collapse:collapse;min-width:400px"><tr><th ${thl}>지역</th><th ${th}>롤 판매</th><th ${th}>신차 등록</th><th ${th}>${rmo}월 점유율</th></tr>
      ${rRows}
      <tr><td ${tdl} style="background:var(--bg2);font-weight:800;position:sticky;left:0">총합계</td><td style="padding:5px 9px;text-align:right;font-weight:800;font-size:12px;background:var(--bg2)">${rTotR.toLocaleString()}</td><td style="padding:5px 9px;text-align:right;font-weight:800;font-size:12px;background:var(--bg2)">${rTotC.toLocaleString()}</td><td style="padding:5px 9px;text-align:right;font-weight:800;font-size:12px;background:var(--bg2);color:var(--amber)">${rTotSh}</td></tr>
      </table></div></div>
