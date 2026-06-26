@@ -1144,6 +1144,26 @@
   .mt-right{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
   .mon-toolbar .tooltgl{margin:0}
   .mon-toolbar .hdr-search{margin:0}
+  .rev-hero-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .rev-hero-ctrl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .rev-legend{display:flex;gap:18px;margin:14px 0 4px}
+  .rev-legend .rl-i{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--ink2)}
+  .rev-legend .rl-d{width:9px;height:9px;border-radius:3px}
+  .rev-hero-body{display:flex;gap:18px;align-items:stretch;flex-wrap:wrap}
+  .rev-chart{flex:1 1 360px;min-width:280px;display:flex;align-items:center}
+  .rev-svg{width:100%;height:auto;display:block}
+  .rev-side{flex:0 0 248px;display:flex;flex-direction:column;gap:10px}
+  @media(max-width:780px){.rev-side{flex-basis:100%}}
+  .rev-side-h{font-size:12px;font-weight:800;color:var(--ink)}
+  .rev-side-rng{color:var(--ink3);font-weight:600}
+  .rev-sc{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+  .rev-sc-head{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:6px}
+  .rev-sc-dot{width:8px;height:8px;border-radius:50%;flex:none}
+  .rev-sc-main{display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .rev-sc-val{font-size:21px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.05}
+  .rev-sc-delta{font-size:11px;font-weight:700;margin-top:3px;white-space:nowrap}
+  .rev-sc-spark{width:84px;height:30px;flex:none}
+  .rev-sc-spark .mspk{width:84px;height:30px;display:block}
   .emi{width:1em;height:1em;display:inline-block;vertical-align:-.14em;flex:none}
   .ws-toolbar{display:flex;align-items:center;margin:0 0 16px;flex-wrap:wrap;gap:8px}
   .ws-toolbar .nav-tools{margin-left:auto}
@@ -5028,6 +5048,56 @@ function handleGlassFile(file){
   }catch(ex){ toast('파일 오류: '+ex.message,true); } };
   rd.readAsArrayBuffer(file);
 }
+function _smoothPath(pts){
+  if(!pts.length) return '';
+  if(pts.length<3) return 'M '+pts.map(p=>p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' L ');
+  let d='M '+pts[0][0].toFixed(1)+' '+pts[0][1].toFixed(1);
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||pts[i+1];
+    const c1x=p1[0]+(p2[0]-p0[0])/6, c1y=p1[1]+(p2[1]-p0[1])/6;
+    const c2x=p2[0]-(p3[0]-p1[0])/6, c2y=p2[1]-(p3[1]-p1[1])/6;
+    d+=` C ${c1x.toFixed(1)} ${c1y.toFixed(1)}, ${c2x.toFixed(1)} ${c2y.toFixed(1)}, ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+function _revTrendSvg(months, series){
+  const W=580,H=240,padL=46,padR=14,padT=12,padB=28;
+  const ptW=W-padL-padR, ptH=H-padT-padB, n=months.length;
+  if(!n) return '<div class="empty">표시할 매출 데이터가 없습니다.</div>';
+  const allV=series.reduce((a,s)=>a.concat(s.vals),[]);
+  let rawMax=Math.max(1,...allV);
+  const eok=v=>v/1e8;
+  let step=10; const me=eok(rawMax); if(me<=5)step=1; else if(me<=20)step=5; else if(me<=50)step=10; else step=20;
+  const maxEok=Math.max(step, Math.ceil(me/step)*step), maxV=maxEok*1e8;
+  const X=i=> padL+(n<=1?ptW/2:ptW*i/(n-1));
+  const Y=v=> padT+ptH*(1-v/maxV);
+  let grid='';
+  const ticks=4;
+  for(let g=0;g<=ticks;g++){ const val=maxV*g/ticks, gy=Y(val);
+    grid+=`<line x1="${padL}" y1="${gy.toFixed(1)}" x2="${W-padR}" y2="${gy.toFixed(1)}" stroke="var(--line)" stroke-width="1"/>`;
+    grid+=`<text x="${padL-9}" y="${(gy+3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--ink3)">${Math.round(eok(val))}억</text>`;
+  }
+  let xlab=''; months.forEach((m,i)=>{ xlab+=`<text x="${X(i).toFixed(1)}" y="${H-9}" text-anchor="middle" font-size="10.5" fill="var(--ink3)">${m}월</text>`; });
+  let paths='';
+  series.forEach(s=>{
+    const pts=s.vals.map((v,i)=>[X(i),Y(v)]);
+    const d=_smoothPath(pts);
+    if(s.fill){ const area=d+` L ${X(n-1).toFixed(1)} ${Y(0).toFixed(1)} L ${X(0).toFixed(1)} ${Y(0).toFixed(1)} Z`; paths+=`<path d="${area}" fill="${s.color}" opacity=".11"/>`; }
+    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>`;
+    pts.forEach(p=>{ paths+=`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.2" fill="var(--card)" stroke="${s.color}" stroke-width="2"/>`; });
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" class="rev-svg" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">${grid}${paths}${xlab}</svg>`;
+}
+function _miniSpark(vals, color){
+  const a=(vals||[]).map(x=>+x||0); if(a.length<2) return '';
+  const W=84,H=30,pad=2, n=a.length, mx=Math.max(1,...a), mn=Math.min(...a), rng=(mx-mn)||1;
+  const X=i=>pad+(W-2*pad)*i/(n-1), Y=v=>pad+(H-2*pad)*(1-(v-mn)/rng);
+  const pts=a.map((v,i)=>[X(i),Y(v)]);
+  const d=_smoothPath(pts);
+  const area=d+` L ${X(n-1).toFixed(1)} ${H-pad} L ${X(0).toFixed(1)} ${H-pad} Z`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="mspk" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="${area}" fill="${color}" opacity=".13"/><path d="${d}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
 function _sparkbar(vals, color, opts){
   const a=(vals||[]).map(x=>+x||0); if(!a.length) return '';
   opts=opts||{}; const lab=opts.label||'';
@@ -5219,12 +5289,33 @@ function renderRDash(){
     const pm=rng?ms.filter(m=>m>=fM&&m<=tM):ms;
     const ch=(c,m)=>(C[c]&&C[c].ma[m])||0, psum=c=>pm.reduce((s,m)=>s+ch(c,m),0);
     const lbl=rng?`${fromS} ~ ${toS}`:'전체 누적';
-    const cards=[
-      _dcard('전사 매출', eok(psum('B2C')+psum('B2B')+psum('별도채널'))+'억', lbl,'var(--dv4)',_sparkbar(ms.map(m=>ch('B2C',m)+ch('B2B',m)+ch('별도채널',m)),'var(--dv4)',{label:'전사 매출',fmt:v=>eok(v)+'억',months:ms})),
-      _dcard('B2C', eok(psum('B2C'))+'억', lbl,'var(--dv1)',_sparkbar(ms.map(m=>ch('B2C',m)),'var(--dv1)',{label:'B2C',fmt:v=>eok(v)+'억',months:ms})),
-      _dcard('B2B', eok(psum('B2B'))+'억', lbl,'var(--dv2)',_sparkbar(ms.map(m=>ch('B2B',m)),'var(--dv2)',{label:'B2B',fmt:v=>eok(v)+'억',months:ms}))
-    ];
-    h+=`<div class="card">${cardHead('매출 핵심', _dateBar('rds',RDS,sMin,sMax))}${grid(cards)}<div class="cap" style="margin-top:8px">매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div></div>`;
+    const _trMon=ms.slice();
+    const _vTot=ms.map(m=>ch('B2C',m)+ch('B2B',m)+ch('별도채널',m)), _vB2C=ms.map(m=>ch('B2C',m)), _vB2B=ms.map(m=>ch('B2B',m));
+    const _cAM='#f4911c', _cBL='#3b82f6', _cGN='#1f9d6b';
+    const _chartSvg=_revTrendSvg(_trMon,[{name:'전체',vals:_vTot,color:_cAM,fill:true},{name:'B2C',vals:_vB2C,color:_cBL,fill:false},{name:'B2B',vals:_vB2B,color:_cGN,fill:false}]);
+    const _mom=v=>{ if(v.length<2)return null; const a=v[v.length-2],b=v[v.length-1]; if(!a)return null; return (b-a)/Math.abs(a)*100; };
+    const _sc=(lab,valWon,vals,color)=>{ const dp=_mom(vals);
+      let dHtml='<span style="color:var(--ink3)">기간 누적</span>';
+      if(dp!=null){ const up=dp>0.05,dn=dp<-0.05; const col=up?'var(--pos)':dn?'var(--neg)':'var(--ink3)'; const ar=up?'▲':dn?'▼':'•'; dHtml=`<span style="color:${col}">${ar} ${Math.abs(dp).toFixed(1)}%</span> <span style="color:var(--ink3)">전월 대비</span>`; }
+      return `<div class="rev-sc"><div class="rev-sc-head"><span class="rev-sc-dot" style="background:${color}"></span>${lab}</div><div class="rev-sc-main"><div><div class="rev-sc-val">${eok(valWon)}억</div><div class="rev-sc-delta">${dHtml}</div></div><div class="rev-sc-spark">${_miniSpark(vals,color)}</div></div></div>`; };
+    const _sideTot=psum('B2C')+psum('B2B')+psum('별도채널');
+    h+=`<div class="card rev-hero">
+      <div class="rev-hero-head">
+        <div><h3 style="margin:0">매출 추이</h3><div class="cap" style="margin-top:3px">기간별 매출 흐름을 한눈에 비교하세요.</div></div>
+        <div class="rev-hero-ctrl">${_dateBar('rds',RDS,sMin,sMax)}</div>
+      </div>
+      <div class="rev-legend"><span class="rl-i"><span class="rl-d" style="background:${_cAM}"></span>전체</span><span class="rl-i"><span class="rl-d" style="background:${_cBL}"></span>B2C</span><span class="rl-i"><span class="rl-d" style="background:${_cGN}"></span>B2B</span></div>
+      <div class="rev-hero-body">
+        <div class="rev-chart">${_chartSvg}</div>
+        <div class="rev-side">
+          <div class="rev-side-h">누적 매출 <span class="rev-side-rng">(${lbl})</span></div>
+          ${_sc('전체 매출',_sideTot,_vTot,_cAM)}
+          ${_sc('B2C 매출',psum('B2C'),_vB2C,_cBL)}
+          ${_sc('B2B 매출',psum('B2B'),_vB2B,_cGN)}
+        </div>
+      </div>
+      <div class="cap" style="margin-top:10px">매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div>
+    </div>`;
     h+=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월별 매출 현황</h3>${salesSummaryTable()}</div>`;
     const _avM=_salesMonths(), _selM=new Set(RDJ.sel||[]);
     const monthTab=`<div class="seg rdj-month" style="flex-wrap:wrap"><button data-rm="all" class="${_selM.size===0?'on':''}">누적</button>${_avM.map(m=>`<button data-rm="${m}" class="${_selM.has(m)?'on':''}">${m}월</button>`).join('')}</div>`;
