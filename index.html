@@ -7731,20 +7731,70 @@ function _aiAnswer(q){
 
   return '데이터 기반으로 이런 걸 물어볼 수 있어요:\n\n【매출】\n· "5월 매출 얼마야?" · "전체 매출은?"\n· "엔드리스 지부 매출은?" · "B2C 매출은?"\n· "매출 상위 대리점 TOP은?"\n\n【품질보증서】\n· "보증서 총 몇 건?" · "스페셜 보증서 몇 건?"\n· "지난주 팬텀II 전면 기준 보증서 몇 건?"\n· "6월 크로마 보증서 건수" · "전면 기준 제품별로 보여줘"\n\n【모니터링】\n· "언급량/감성 어때?"';
 }
+
+/* --- 구조화 쿼리 실행기 (LLM이 해석한 query → 검증된 집계로 정확 응답) --- */
+function _aiExecQuery(qy){
+  qy=qy||{}; const domain=qy.domain; const per=qy.period||{};
+  if(domain==='warranty'){
+    if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '아직 품질보증서 데이터가 없어요.';
+    let from=per.all?null:(per.from||null), to=per.all?null:(per.to||null), plabel='';
+    if(!from && per.month){ const md=_warrMaxDate(); const yr=md?+md.slice(0,4):new Date().getFullYear(); const r=_aiMonthRange(yr, per.month); from=r.from; to=r.to; plabel=per.month+'월 '; }
+    else if(from&&to){ plabel=from+'~'+to+' '; }
+    const front=!!qy.frontOnly, branch=qy.branch||null;
+    const base={frontOnly:front, branch:branch, from:from, to:to};
+    const fl=front?'전면 기준 ':''; const bl=branch?(branch+' '):'';
+    if(qy.breakdown && !qy.product){ const gs=_warrAllGroups(base); if(!gs||!gs.length) return '해당 조건의 보증서가 없어요.'; const tot=gs.reduce((a,b)=>a+b[1],0); return (plabel+bl+fl+'보증서 제품군별 발급').trim()+' ('+tot.toLocaleString()+'건)\n'+gs.map(g=>'· '+g[0]+' '+g[1].toLocaleString()+'건').join('\n'); }
+    if(qy.product){ const p=_aiProduct(String(qy.product).replace(/\s+/g,''))||{group:qy.product}; const cnt=_warrCountBy(Object.assign({},base, p.group?{group:p.group}:(p.line?{line:p.line}:{group:qy.product}))); if(cnt==null) return '계산할 수 없어요.'; return (plabel+bl+(p.label||qy.product)+' '+fl+'보증서 발급은 ').replace(/\s+/g,' ').trim()+' '+cnt.toLocaleString()+'건입니다.'; }
+    const cnt=_warrCountBy(base); const gs=_warrAllGroups(base); let ex=''; if(gs&&gs.length){ ex='\n('+gs.slice(0,4).map(g=>g[0]+' '+g[1].toLocaleString()).join(' · ')+(gs.length>4?' …':'')+')'; }
+    return (plabel+bl+fl+'보증서 발급은 총 ').replace(/\s+/g,' ').trim()+' '+(cnt==null?'-':cnt.toLocaleString())+'건입니다.'+ex;
+  }
+  if(domain==='sales'){
+    if(!_aiSalesOK()) return '아직 매출(ERP) 데이터가 없어요.';
+    const month=per.month||0;
+    if(qy.dealerTop){ const top=_aiDealerTop(qy.dealerTop||5); if(!top||!top.length) return '대리점 매출 데이터가 없어요.'; return '매출 상위 대리점 TOP'+(qy.dealerTop||5)+'\n'+top.map((x,i)=>(i+1)+'. '+x[0]+' — '+_aiFmtWon(x[1])).join('\n'); }
+    if(qy.channel && SALES.channels && SALES.channels[qy.channel]){ const ma=SALES.channels[qy.channel].ma||[]; if(month) return qy.channel+' '+month+'월 매출은 약 '+_aiFmtWon(+ma[month]||0)+'입니다.'; return qy.channel+' 누적 매출은 약 '+_aiFmtWon(_sSum(ma))+'입니다.'; }
+    if(qy.branch && SALES.jibu && SALES.jibu[qy.branch]){ const ma=SALES.jibu[qy.branch].ma||[]; if(month) return qy.branch+' '+month+'월 매출은 약 '+_aiFmtWon(+ma[month]||0)+'입니다.'; return qy.branch+' 누적 매출은 약 '+_aiFmtWon(_sSum(ma))+'입니다.'; }
+    if(month){ if(month<1||month>12) return '월은 1~12 사이로 물어봐 주세요.'; const v=_aiMonthRev(month); const has=(SALES.months||[]).indexOf(month)>=0; if(!has) return month+'월 매출 데이터가 없어요.'; return month+'월 매출은 약 '+_aiFmtWon(v)+'입니다.\n(정확히 '+Math.round(v).toLocaleString()+'원)'; }
+    const tot=_aiTotalRev(); return '전체 누적 매출은 약 '+_aiFmtWon(tot)+'입니다.\n(정확히 '+Math.round(tot).toLocaleString()+'원)';
+  }
+  if(domain==='mention') return _aiAnswer('언급');
+  return null;
+}
+function _aiProxyUrl(){ try{ return (localStorage.getItem('rayno_ai_proxy')||'').trim(); }catch(_){ return ''; } }
+async function _aiAskLLM(q, url){
+  const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),12000);
+  let data;
+  try{ const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q}),signal:ctrl.signal}); clearTimeout(to); if(!res.ok) throw new Error('proxy '+res.status); data=await res.json(); }
+  catch(e){ clearTimeout(to); throw e; }
+  const query=(data&&(data.query||data))||null;
+  if(!query||!query.domain) return null;
+  const ans=_aiExecQuery(query);
+  return (typeof ans==='string'&&ans)?ans:null;
+}
+async function _aiRespond(q){
+  const url=_aiProxyUrl();
+  if(url){ try{ const a=await _aiAskLLM(q,url); if(a) return a; }catch(_){ /* 폴백 */ } }
+  return _aiAnswer(q);
+}
+
+function _aiSetMode(p){ try{ const el=p.querySelector('#aicMode'); if(el) el.textContent=_aiProxyUrl()?'Haiku 연결됨 · 정확 집계':'로컬 모드 · 정확 집계'; }catch(_){} }
+
 function _aiChatOpen(){
   let p=document.getElementById('aiChat');
   if(!p){
     p=document.createElement('div'); p.id='aiChat';
-    p.innerHTML='<div class="aic-head"><div class="aic-orb"></div><div class="aic-ti">RAYNO AI 어시스턴트<span>매출·보증서 정확 집계 · 로컬</span></div><button class="aic-x" type="button" aria-label="닫기">\u2715</button></div>'
+    p.innerHTML='<div class="aic-head"><div class="aic-orb"></div><div class="aic-ti">RAYNO AI 어시스턴트<span id="aicMode">로컬 모드 · 정확 집계</span></div><button class="aic-x" type="button" aria-label="닫기">\u2715</button></div>'
       +'<div class="aic-body" id="aicBody"></div>'
       +'<div class="aic-chips" id="aicChips"></div>'
       +'<div class="aic-input"><input id="aicInput" type="text" placeholder="예) 5월 매출 얼마야?" autocomplete="off"><button id="aicSend" type="button">보내기</button></div>';
     document.body.appendChild(p);
+    try{ const hd=p.querySelector('.aic-head'); const gear=document.createElement('button'); gear.className='aic-x'; gear.type='button'; gear.title='Haiku 연결 설정'; gear.textContent='\u2699'; gear.style.marginRight='2px'; hd.insertBefore(gear, hd.querySelector('.aic-x')); gear.addEventListener('click',()=>{ const cur=_aiProxyUrl(); const u=prompt('Haiku 프록시 URL을 입력하세요 (Supabase Edge Function 주소).\n비우면 무료 로컬 모드로 동작합니다.', cur); if(u!==null){ try{ localStorage.setItem('rayno_ai_proxy', u.trim()); }catch(_){} _aiSetMode(p); } }); }catch(_){}
+    _aiSetMode(p);
     const body=p.querySelector('#aicBody'), inp=p.querySelector('#aicInput'), send=p.querySelector('#aicSend'), chips=p.querySelector('#aicChips');
     function add(role,text){ const b=document.createElement('div'); b.className='aic-msg '+role; b.textContent=text; body.appendChild(b); body.scrollTop=body.scrollHeight; return b; }
     function ask(q){ q=(q==null?inp.value:q).trim(); if(!q)return; add('user',q); inp.value='';
       const tp=add('bot',' '); tp.classList.add('aic-typing'); tp.textContent='…';
-      setTimeout(()=>{ tp.remove(); add('bot', _aiAnswer(q)); },180); }
+      _aiRespond(q).then(a=>{ tp.remove(); add('bot', a); }).catch(()=>{ tp.remove(); add('bot', _aiAnswer(q)); }); }
     send.addEventListener('click',()=>ask());
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ask(); }});
     p.querySelector('.aic-x').addEventListener('click',()=>{ p.style.display='none'; });
