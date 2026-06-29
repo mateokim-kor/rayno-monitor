@@ -1503,6 +1503,7 @@
     <div class="nav" id="raynoNav">
       <button class="nav-btn on" data-rview="dash"><span data-txt="tabRDash">대시보드</span></button>
       <button class="nav-btn" data-rview="revenue"><span data-txt="tabRevenue">매출 현황</span></button>
+      <button class="nav-btn" data-rview="yoy"><span>전년 대비</span></button>
       <button class="nav-btn" data-rview="warranty"><span data-txt="tabWarranty">품질보증서 현황</span></button>
       <button class="nav-btn" data-rview="glass"><span data-txt="tabGlass">글라스케어 현황</span></button>
       <button class="nav-btn" data-rview="dealer"><span data-txt="tabDealer">대리점 현황</span></button>
@@ -1527,6 +1528,7 @@
     <div id="rDealer" style="display:none"></div>
     <div id="rGlass" style="display:none"></div>
     <div id="rRevenue"></div>
+    <div id="rYoY" style="display:none"></div>
     <input type="file" id="warrFileInput" accept=".xlsx,.xls" hidden>
     <input type="file" id="salesFileInput" accept=".xls,.xlsx,.csv,.txt" hidden><input type="file" id="salesPrevFileInput" accept=".xls,.xlsx,.csv,.txt" hidden>
     <input type="file" id="glassFileInput" accept=".xlsx,.xls" hidden>
@@ -1750,7 +1752,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 표 풀폭 복귀(확장 기회만 2단 유지)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 전년 대비(YoY) 탭 추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7296,7 +7298,7 @@ function renderWarrReport(){
 
   box.innerHTML = headCard + kpiCard + insightCard + (moverCard?`<div class="biz-grid">${moverCard}${dailyCard}</div>`:dailyCard) + compGrid;
 }
-const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', dealer:'rDealer', search:'rSearch', revenue:'rRevenue'};
+const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', dealer:'rDealer', search:'rSearch', revenue:'rRevenue', yoy:'rYoY'};
 function _saveNav(){ try{ localStorage.setItem('rayno_nav', JSON.stringify({ ws:workspace, cv:(typeof state!=='undefined'&&state&&state.view)||'dash', rv:rview })); }catch(e){} }
 function _sbSyncActive(){
   try{
@@ -7332,6 +7334,7 @@ function setRView(v){
   else if(v==='glass') renderGlass();
   else if(v==='dealer'){ renderDealer(); if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='dealer') renderDealer(); }); } }
   else if(v==='search') renderMetric('search');
+  else if(v==='yoy') renderYoY();
   else renderRevenue();
 }
 function _fmtUpl(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d.getTime())) return ''; const p=n=>String(n).padStart(2,'0'); const rel=_relDays(v); return `최근 업로드 ${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${rel?' · '+rel:''}`; }
@@ -8406,6 +8409,7 @@ function _applySidebarLayout(){
       {h:'레이노 데이터', items:[
         {t:'데이터 대시보드', ic:'data', k:'rayno:dash', d:'레이노 영업·품질 데이터를 한눈에 봅니다', go:()=>goRayno('dash')},
         {t:'매출 분석', ic:'chart', k:'rayno:revenue', d:'채널·지부·대리점별 매출을 분석합니다', go:()=>goRayno('revenue')},
+        {t:'전년 대비', ic:'chart', k:'rayno:yoy', d:'매출·보증서·글라스케어를 전년과 비교합니다', go:()=>goRayno('yoy')},
         {t:'품질보증서', ic:'shield', k:'rayno:warranty', d:'보증서 발급 현황과 시공 데이터를 분석합니다', go:()=>goRayno('warranty')},
         {t:'글라스케어 현황', ic:'sparkle', k:'rayno:glass', d:'글라스케어 시공·판매 현황을 분석합니다', go:()=>goRayno('glass')},
         {t:'대리점 현황', ic:'store', k:'rayno:dealer', d:'대리점별 실적과 담당 지부를 관리합니다', go:()=>goRayno('dealer')},
@@ -9104,6 +9108,81 @@ boot();
     _loadExcelJS().then(function(EX){ return styled(d,title,fname,EX); }).catch(function(){ fallback(d,title,fname); }).finally(function(){ b.textContent=old; setTimeout(function(){b.dataset.busy='';},1500); });
   });
 })();
+</script>
+<script>
+/* ── 전년 대비 (YoY) 탭 ── 매출=금액, 품질보증서·글라스케어=건수 ── */
+function _yoyFmtWon(n){ const v=+n||0; return Math.abs(v)>=1e8?(v/1e8).toFixed(1)+'억':Math.abs(v)>=1e4?Math.round(v/1e4).toLocaleString()+'만':v.toLocaleString(); }
+function _yoyFmtCnt(n){ return (+n||0).toLocaleString()+'건'; }
+function _yoyPctV(cur,prev){ if(!prev) return null; return (cur-prev)/prev*100; }
+
+function _yoyWarrYM(){ const out={}; try{ const ex=warrExcludedSet(); ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{ if(ex.has(warrRecKey(r)))return; const ds=warrDateStr(r); if(!/^\d{4}-\d{2}/.test(ds||''))return; const y=+ds.slice(0,4),m=+ds.slice(5,7); if(!m)return; (out[y]=out[y]||{})[m]=(out[y][m]||0)+1; }); }catch(_){ } return out; }
+function _yoyGlassYM(){ const out={}; try{ ((typeof GLASS!=='undefined'&&GLASS&&GLASS.rows)||[]).forEach(r=>{ const ds=String(_glassDateStr(r)||''); if(!/^\d{4}-\d{2}/.test(ds))return; const y=+ds.slice(0,4),m=+ds.slice(5,7); if(!m)return; (out[y]=out[y]||{})[m]=(out[y][m]||0)+1; }); }catch(_){ } return out; }
+
+function _yoyEmpty(title,msg){
+  return `<div class="card"><h3 style="margin:0 0 8px"><span class="dot"></span>${title}</h3><div style="padding:22px 14px;text-align:center;color:var(--ink3);font-size:13px;background:var(--bg2,#f7f8fa);border-radius:10px">${msg}</div></div>`;
+}
+function _yoyBuild(key,title,months,curOf,prevOf,fmt,curLab,prevLab){
+  const curArr=months.map(curOf), prevArr=months.map(prevOf);
+  const cCum=curArr.reduce((s,v)=>s+v,0), pCum=prevArr.reduce((s,v)=>s+v,0);
+  const pct=_yoyPctV(cCum,pCum);
+  const dir=pct==null?'':(pct>=0?'▲':'▼'), col=pct==null?'#888':(pct>=0?'#16a34a':'#dc2626'), pctTxt=pct==null?'-':(Math.abs(pct).toFixed(1)+'%');
+  const ml=months.length?(months[0]+'~'+months[months.length-1]+'월'):'';
+  const th='style="text-align:right;padding:7px 9px;background:var(--amber);color:#fff;font-size:11px;font-weight:800;white-space:nowrap"';
+  const thl='style="text-align:left;padding:7px 9px;background:var(--amber);color:#fff;font-size:11px;font-weight:800"';
+  let rows='';
+  months.forEach((m,i)=>{ const c=curArr[i],p=prevArr[i],pp=_yoyPctV(c,p); const d=pp==null?'':(pp>=0?'▲':'▼'), cl=pp==null?'#888':(pp>=0?'#16a34a':'#dc2626');
+    rows+=`<tr><td style="padding:5px 9px;border-bottom:1px solid var(--line)">${m}월</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums">${fmt(c)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:#888;font-variant-numeric:tabular-nums">${fmt(p)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:${cl};font-weight:700">${pp==null?'-':d+Math.abs(pp).toFixed(1)+'%'}</td></tr>`;
+  });
+  const html=`<div class="card">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+      <div><h3 style="margin:0"><span class="dot"></span>${title}</h3><div style="color:var(--ink2);font-size:12px;margin-top:3px">${curLab} vs ${prevLab} · ${ml} 누계 기준</div></div>
+      <div style="text-align:right"><div style="font-size:24px;font-weight:800;color:${col};line-height:1.1">${dir} ${pctTxt}</div><div style="color:var(--ink2);font-size:12px;margin-top:2px">올해 ${fmt(cCum)} · 전년 ${fmt(pCum)}</div></div>
+    </div>
+    <div style="height:228px;position:relative;margin:8px 0 6px"><canvas id="yoyc_${key}"></canvas></div>
+    <div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse">
+      <tr><th ${thl}>월</th><th ${th}>올해</th><th ${th}>전년</th><th ${th}>증감</th></tr>${rows}
+    </table></div>
+  </div>`;
+  return {html, chart:{key, months, curArr, prevArr}};
+}
+function _yoySectionFromYM(ym, key, title, fmt){
+  const years=Object.keys(ym).map(Number).filter(y=>y>0).sort((a,b)=>a-b);
+  if(!years.length) return {html:_yoyEmpty(title,'데이터가 없습니다.'), chart:null};
+  const curY=years[years.length-1], prevY=curY-1, cur=ym[curY]||{}, prev=ym[prevY]||{};
+  if(!ym[prevY]) return {html:_yoyEmpty(title, `전년(${prevY}년) 데이터가 없습니다 — 작년 데이터가 함께 올라가 있으면 자동으로 비교됩니다. (현재 ${curY}년 데이터만 존재)`), chart:null};
+  const mset=new Set([...Object.keys(cur),...Object.keys(prev)].map(Number).filter(Boolean));
+  const months=[...mset].sort((a,b)=>a-b);
+  if(!months.length) return {html:_yoyEmpty(title,'데이터가 없습니다.'), chart:null};
+  return _yoyBuild(key,title,months,m=>cur[m]||0,m=>prev[m]||0,fmt,curY+'년',prevY+'년');
+}
+function _yoySales(){
+  const T='매출 (금액)';
+  if(typeof SALES==='undefined'||!SALES||!SALES.prodAll) return {html:_yoyEmpty(T,'올해 매출 데이터가 없습니다 — 매출 화면에서 ‘＋ 매출 ERP’로 올려주세요.'), chart:null};
+  const months=(SALES.months||[]).slice();
+  if(!months.length) return {html:_yoyEmpty(T,'매출 월 데이터가 없습니다.'), chart:null};
+  if(!SALES.prev||!SALES.prev.channels) return {html:_yoyEmpty(T,'전년 매출 데이터가 없습니다 — 매출 화면에서 ‘＋ 전년 매출’로 올리면 자동으로 비교됩니다.'), chart:null};
+  return _yoyBuild('sales',T,months,m=>_salesTotalOver(SALES,[m]),m=>_salesTotalOver(SALES.prev,[m]),_yoyFmtWon,'올해','전년');
+}
+function _yoyDrawChart(c){
+  if(!c) return;
+  try{ makeChart('yoyc_'+c.key, { type:'bar',
+    data:{ labels:c.months.map(m=>m+'월'), datasets:[
+      {label:'올해', data:c.curArr, backgroundColor:'#f4911c', borderRadius:3, maxBarThickness:34},
+      {label:'전년', data:c.prevArr, backgroundColor:'#d4dae2', borderRadius:3, maxBarThickness:34} ]},
+    options:{ responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{ legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:11}}},
+        tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(c.key==='sales'?_yoyFmtWon(ctx.parsed.y):(ctx.parsed.y||0).toLocaleString()+'건')}} },
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true,ticks:{callback:v=>c.key==='sales'?_yoyFmtWon(v):v}} } } }); }catch(_){ }
+}
+function renderYoY(){
+  const box=document.getElementById('rYoY'); if(!box) return;
+  const sSec=_yoySales();
+  const wSec=_yoySectionFromYM(_yoyWarrYM(),'warr','품질보증서 (발급 건수)',_yoyFmtCnt);
+  const gSec=_yoySectionFromYM(_yoyGlassYM(),'glass','글라스케어 (가입 건수)',_yoyFmtCnt);
+  const intro=`<div style="margin:2px 0 14px;color:var(--ink2);font-size:12px">매출은 <b>금액</b>, 품질보증서·글라스케어는 <b>건수</b> 기준으로 올해와 전년 같은 기간을 비교합니다.</div>`;
+  box.innerHTML = intro + sSec.html + wSec.html + gSec.html;
+  _yoyDrawChart(sSec.chart); _yoyDrawChart(wSec.chart); _yoyDrawChart(gSec.chart);
+}
 </script>
 </body>
 </html>
