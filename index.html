@@ -1746,7 +1746,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 그룹 드롭다운 가로 다단(16:9)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 매출 표 엑셀 + 헤더 이모지 제거';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6478,6 +6478,7 @@ function renderRevenue(){
   const td=`style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px"`;
   const card=s=>`<div class="card">${s}</div>`;
   const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
+  const hhx=t=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${t}</h3><button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(t)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button></div>`;
   const lab=_salesLabel();
   let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
 
@@ -6553,16 +6554,16 @@ function renderRevenue(){
     + salesKPI()
     + charts
     + salesCompareCard()
-    + card(hh('📊 세일즈 데이터 · 월별 종합 (단위: 원, VAT 별도)')+salesSummaryTable())
-    + card(hh('🎞 롤 판매 수 · 중분류별 (B2C / B2B)')+salesRollTable())
-    + card(hh('🏢 지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
-    + card(hh('🏆 지부별 제품 판매 순위 · 롤')+salesJibuProdRankTable())
-    + card(hh('📈 시장 점유율 · '+lab)+salesShareTable())
+    + card(hhx('세일즈 데이터 · 월별 종합 (단위: 원, VAT 별도)')+salesSummaryTable())
+    + card(hhx('롤 판매 수 · 중분류별 (B2C / B2B)')+salesRollTable())
+    + card(hhx('지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
+    + card(hhx('지부별 제품 판매 순위 · 롤')+salesJibuProdRankTable())
+    + card(hhx('시장 점유율 · '+lab)+salesShareTable())
     + (()=>{
         const _avM=_salesMonths(), _selM=_regMonths.filter(m=>_avM.indexOf(m)>=0).sort((a,b)=>a-b);
         const _mkMs=(k)=>`<div class="an-filt" style="margin-bottom:9px">${_msField(k,'월', _avM.map(m=>({v:m,t:m+'월'})), _selM)}</div>`;
         const _sv=_salesSel; _salesSel=_selM.slice();
-        let out=''; try{ out = card(hh('🗺 지역별 시장 점유율')+_mkMs('regMon')+salesRegionMap()) + card(hh('🎯 확장 기회 지역')+_mkMs('regMonB')+whiteSpaceCard()); } finally { _salesSel=_sv; }
+        let out=''; try{ out = card(hh('지역별 시장 점유율')+_mkMs('regMon')+salesRegionMap()) + card(hh('확장 기회 지역')+_mkMs('regMonB')+whiteSpaceCard()); } finally { _salesSel=_sv; }
         return out;
       })()
     + salesAnalysisCard();
@@ -6755,7 +6756,7 @@ function salesCompareCard(){
   const opt=sel=>ms.map(m=>`<option value="${m}"${sel===m?' selected':''}>${m}월</option>`).join('');
   const thl=`class="l"`, th=``, tdl=`class="l"`, td=``;
   const ss=`style="padding:5px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;font-weight:700"`;
-  let h=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>📊 월 비교</h3>`
+  let h=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월 비교</h3>`
    +`<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:13px"><select id="salesCmpA" ${ss}>${opt(A)}</select><b style="color:var(--ink2)">vs</b><select id="salesCmpB" ${ss}>${opt(B)}</select></div>`
    +`<div class="iv-wrap"><table class="iv"><tr><th ${thl}>지표</th><th ${th}>${A}월</th><th ${th}>${B}월</th><th ${th}>증감</th><th ${th}>증감률</th></tr>`;
   rows.forEach(r=>{ const a=r.f(A)||0,b=r.f(B)||0,d=b-a,p=a?(d/a*100):0; const col=d>0?'#16a34a':(d<0?'#dc2626':'var(--ink2)'),sg=d>0?'+':'';
@@ -9024,6 +9025,66 @@ boot();
     if(cb.checked){ if(i<0)a.push(v); } else if(i>=0){ a.splice(i,1); }
     syncOpt(cb); if(ms.querySelector('.ms-gall')) syncGalls(ms); setCnt(ms);
     if(r.applyOn==='change'){ try{ r.render(); }catch(_){ } } else { dirtyKey=ms.dataset.ms; }
+  });
+})();
+</script>
+<script>
+/* ── 표 → 엑셀 내보내기 (렌더된 테이블 그대로, 현재 필터 반영) ── */
+(function(){
+  function _loadExcelJS(){ return new Promise(function(res,rej){ if(window.ExcelJS)return res(window.ExcelJS); var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'; s.onload=function(){ window.ExcelJS?res(window.ExcelJS):rej(new Error('no')); }; s.onerror=function(){ rej(new Error('cdn')); }; document.head.appendChild(s); }); }
+  function numify(v){ if(v==null)return ''; var t=String(v).trim(); if(t===''||t==='·'||t==='-'||t==='—')return ''; if(/%$/.test(t))return t; var n=t.replace(/[,\s₩원롤대건곳개%]/g,''); if(/^-?\d+(\.\d+)?$/.test(n))return Number(n); return t; }
+  function parseTable(tbl){
+    var header=null, body=[];
+    [].slice.call(tbl.querySelectorAll('tr')).forEach(function(tr){
+      try{ if(window.getComputedStyle(tr).display==='none') return; }catch(_){ }
+      var cells=[].slice.call(tr.children).filter(function(c){return c.tagName==='TD'||c.tagName==='TH';});
+      if(!cells.length) return;
+      var vals=[];
+      cells.forEach(function(c){ var txt=(c.textContent||'').replace(/\s+/g,' ').trim(); vals.push(txt); var cs=parseInt(c.getAttribute('colspan')||'1',10); for(var k=1;k<cs;k++) vals.push(''); });
+      var allTh=cells.every(function(c){return c.tagName==='TH';});
+      if(allTh && !header){ header=vals; } else { body.push({vals:vals, tot:tr.classList.contains('t-tot')}); }
+    });
+    if(!header && body.length){ header=body.shift().vals; }
+    var w=Math.max(header?header.length:0); body.forEach(function(r){ w=Math.max(w,r.vals.length); });
+    return {header:header||[], body:body, ncol:w};
+  }
+  function ctx(){ try{ if(typeof _salesSel!=='undefined' && _salesSel && _salesSel.length) return '선택월 '+_salesSel.slice().sort(function(a,b){return a-b;}).join('·')+'월'; }catch(_){ } return '전체 기간'; }
+  function titleOf(b){ return (b.dataset.xt||'매출 표')+'   |   '+ctx()+'   |   '+new Date().toLocaleDateString('ko-KR'); }
+  function fnameOf(b){ return '레이노_매출_'+String(b.dataset.xt||'표').replace(/[^\w가-힣]+/g,'_').replace(/^_|_$/g,'').slice(0,40)+'.xlsx'; }
+  function fallback(d,title,fname){
+    var aoa=[[title], d.header];
+    d.body.forEach(function(r){ aoa.push(r.vals.map(numify)); });
+    var ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:Math.max(0,d.ncol-1)}}];
+    ws['!cols']=new Array(d.ncol).fill(0).map(function(_,i){return {wch:i===0?20:13};});
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'표'); XLSX.writeFile(wb,fname);
+    if(typeof toast==='function') toast('엑셀 다운로드 완료 (기본 서식)');
+  }
+  function styled(d,title,fname,ExcelJS){
+    var nC=d.ncol;
+    var BLACK='FF1A1D24',ORANGE='FFF06A1E',GRAYA='FFF7F8FA',WHITE='FFFFFFFF',TOTBG='FFFFF1E6';
+    var bd={style:'thin',color:{argb:'FFE3E7EE'}}, border={top:bd,left:bd,bottom:bd,right:bd};
+    var wb=new ExcelJS.Workbook(), ws=wb.addWorksheet('표',{views:[{state:'frozen',ySplit:2}]});
+    ws.mergeCells(1,1,1,Math.max(1,nC)); var t=ws.getCell(1,1); t.value=title;
+    t.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLACK}}; t.font={bold:true,color:{argb:WHITE},size:12}; t.alignment={vertical:'middle',horizontal:'left',indent:1}; ws.getRow(1).height=30;
+    var hr=ws.getRow(2); for(var i=0;i<nC;i++){ var c=hr.getCell(i+1); c.value=d.header[i]||''; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ORANGE}}; c.font={bold:true,color:{argb:WHITE},size:11}; c.alignment={vertical:'middle',horizontal:i===0?'left':'center',wrapText:true}; c.border=border; } hr.height=24;
+    d.body.forEach(function(r,ri){ var row=ws.getRow(3+ri);
+      for(var j=0;j<nC;j++){ var raw=r.vals[j]!=null?r.vals[j]:''; var val=numify(raw); var c=row.getCell(j+1); c.value=val; c.border=border; var isNum=(typeof val==='number'); c.alignment={vertical:'middle',horizontal:j===0?'left':(isNum?'right':'center')}; if(isNum)c.numFmt='#,##0'; if(r.tot){ c.font={bold:true}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:TOTBG}}; } else { c.fill={type:'pattern',pattern:'solid',fgColor:{argb: ri%2?GRAYA:WHITE}}; } }
+      row.height=18;
+    });
+    ws.getColumn(1).width=22; for(var k=2;k<=nC;k++) ws.getColumn(k).width=13;
+    return wb.xlsx.writeBuffer().then(function(buf){ var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},3000); if(typeof toast==='function') toast('엑셀 다운로드 완료'); });
+  }
+  document.addEventListener('click', function(e){
+    var b=e.target&&e.target.closest&&e.target.closest('.xlsx-tbl'); if(!b)return; e.preventDefault();
+    if(b.dataset.busy==='1')return;
+    var card=b.closest('.card'); var tbl=card&&card.querySelector('table');
+    if(!tbl){ if(typeof toast==='function') toast('내보낼 표를 찾지 못했습니다.', true); return; }
+    var d=parseTable(tbl);
+    if(!d.body.length){ if(typeof toast==='function') toast('표에 데이터가 없습니다.', true); return; }
+    var title=titleOf(b), fname=fnameOf(b);
+    var old=b.textContent; b.dataset.busy='1'; b.textContent='⏳ 생성 중…';
+    _loadExcelJS().then(function(EX){ return styled(d,title,fname,EX); }).catch(function(){ fallback(d,title,fname); }).finally(function(){ b.textContent=old; setTimeout(function(){b.dataset.busy='';},1500); });
   });
 })();
 </script>
