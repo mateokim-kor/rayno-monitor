@@ -1472,6 +1472,7 @@
         <button class="acc-btn" id="salesAddBtn" style="display:none">＋ 매출 ERP</button><span class="upl-date" id="salesUplDate" style="display:none"></span><button class="acc-btn" id="salesPrevBtn" style="display:none">＋ 전년 매출</button>
         <button class="acc-btn" id="glassAddBtn" style="display:none">＋ 글라스케어 엑셀</button><span class="upl-date" id="glassUplDate" style="display:none"></span>
         <button class="acc-btn admin-only" id="dataCheckBtn">🔎 데이터 점검</button>
+        <button class="acc-btn admin-only" id="erpSyncBtn" style="display:none">🔄 지금 수집</button>
         <button class="acc-btn" id="warrCfgBtn">⚙ 표시 설정</button>
         <button class="acc-btn" id="raynoLoginBtn">🔐 관리자 로그인</button>
         <button class="acc-btn" id="raynoLogoutBtn">로그아웃</button>
@@ -1704,7 +1705,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · AI 해석형(원인·YoY·브리핑)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 수동수집버튼+보증서연동라벨';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7034,7 +7035,7 @@ function _restoreNav(nav){
   try{_sbSyncActive();}catch(_){}
 }
 function setRView(v){
-  rview=v; _saveNav(); try{_sbSyncActive();}catch(_){}
+  rview=v; _saveNav(); try{_sbSyncActive();}catch(_){} try{window.__erpLivePing&&window.__erpLivePing();}catch(_){}
   document.querySelectorAll('#raynoNav .nav-btn').forEach(b=>b.classList.toggle('on', b.dataset.rview===v));
   Object.values(RVIEW_BOX).forEach(id=>{const el=document.getElementById(id); if(el)el.style.display='none';});
   const el=document.getElementById(RVIEW_BOX[v]); if(el) el.style.display='block';
@@ -7073,6 +7074,7 @@ function applyRaynoAuth(){
   set('salesUplDate', admin && rview==='revenue');
   set('glassAddBtn', admin && rview==='glass');
   set('glassUplDate', admin && rview==='glass');
+  set('erpSyncBtn', admin);
   updateUploadDates();
 }
 function raynoLockOn(){ const c=STORE&&STORE.config&&STORE.config.raynoLock; return c? c.on!==false : true; }
@@ -8350,7 +8352,12 @@ boot();
     if(ws!=='cafe' && ws!=='rayno'){ el.style.display='none'; return; }
     el.style.display='inline-flex';
     var dot=el.querySelector('#erpLiveDot'), txt=el.querySelector('#erpLiveTxt');
-    var label=(ws==='rayno')?'ERP':'모니터링', fresh=(ws==='rayno')?FRESH_ERP:FRESH_MON;
+    var label, fresh;
+    if(ws==='rayno'){
+      var _rv=(typeof rview!=='undefined')?rview:'';
+      label=(_rv==='warranty'||_rv==='warrReport')?'관리자 홈페이지':'ERP';   // 글라스케어는 API 연동 후 추가
+      fresh=FRESH_ERP;
+    } else { label='모니터링'; fresh=FRESH_MON; }
     var info=_cache[ws];
     if(!info || !info.ok){ dot.className='erp-dot'; dot.style.background='#9aa'; txt.innerHTML='<b>'+label+'</b> 연동 정보 없음'; return; }
     var age=Date.now()-info.ms, when=fmt(info.ms);
@@ -8384,6 +8391,7 @@ boot();
 
   function boot(){
     injectCSS(); ensure();
+    window.__erpLivePing=function(){ try{render();}catch(_){} };   // 탭 전환 즉시 라벨 갱신용
     setInterval(tick, 60000);                          // 네트워크 조회: 60초(현재 워크스페이스만)
     setInterval(function(){                             // 탭 전환 감지: 캐시 즉시표시 + 새로조회
       var ws=wsNow();
@@ -8394,6 +8402,23 @@ boot();
     setTimeout(tick, 1200);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
+<script>
+/* ── 관리자: ERP·품질보증서 수동 수집 트리거 (erp_command.json) ── */
+(function(){
+  document.addEventListener('click', function(e){
+    var b = e.target && e.target.closest && e.target.closest('#erpSyncBtn');
+    if(!b) return;
+    if(typeof auth==='undefined' || auth!=='admin') return;
+    if(b.dataset.busy==='1') return;
+    b.dataset.busy='1'; var old=b.textContent; b.textContent='⏳ 요청 중…';
+    var cmd={action:'collect', nonce:Date.now(), at:new Date().toISOString()};
+    Promise.resolve(typeof cloudSaveJSON==='function' ? cloudSaveJSON('erp_command.json', cmd) : false)
+      .then(function(ok){ if(typeof toast==='function') toast(ok ? '수집 요청을 보냈습니다 · 30초 내 자동 갱신돼요' : '⚠ 요청 전송 실패 (관리자 권한·네트워크 확인)', !ok); })
+      .catch(function(){ if(typeof toast==='function') toast('⚠ 요청 전송 실패', true); })
+      .finally(function(){ b.textContent=old; setTimeout(function(){ b.dataset.busy=''; }, 4000); });
+  });
 })();
 </script>
 </body>
