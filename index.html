@@ -1702,7 +1702,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · ERP실시간연동+수동버튼';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · ERP연동핀(고정형)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -8128,17 +8128,21 @@ try{ _applySidebarLayout(); }catch(e){}
 boot();
 </script>
 <script>
-/* ── ERP 실시간 연동 상태 위젯 (erp_status.json 폴링 + 수동 연동 버튼) ──
-   · #raynoNav .nav-tools 안에 핀(pill) 삽입 → 대시보드/매출 탭에서만 표시
-   · 파란불 = lastSuccess 70분 이내 / 회색 = 그보다 오래 / 주황 = 연동 중
-   · 버튼은 관리자(auth==='admin')에게만, cloudSaveJSON으로 erp_command.json 기록 */
+/* ── ERP 실시간 연동 상태 위젯 v2 (화면 고정형) ──
+   사이드바 레이아웃이 #raynoNav / .nav-tools 를 이동시키므로 nav에 의존하지 않고
+   body에 position:fixed 핀으로 띄운다. 대시보드/매출 탭(rview)일 때만 표시. */
 (function(){
   var CMD_FILE='erp_command.json', STATUS_FILE='erp_status.json';
   var FRESH_MS=70*60*1000, _last=null, _busy=false;
 
   function statusURL(){ return SUPA.url+'/storage/v1/object/public/'+SUPA.bucket+'/'+STATUS_FILE+'?cb='+Date.now(); }
-  function onTab(){ return (typeof rview!=='undefined') && (rview==='dash'||rview==='revenue'); }
+  function onTab(){
+    var rv=(typeof rview!=='undefined')?rview:'';
+    var ws=(typeof workspace!=='undefined')?workspace:'';
+    return ws==='rayno' && (rv==='dash'||rv==='revenue');
+  }
   function isAdmin(){ return (typeof auth!=='undefined') && auth==='admin'; }
+  function sidebarOn(){ return !!(document.querySelector('.wrap.has-sidebar')||document.getElementById('rSidebar')); }
   function fmtAgo(ms){
     if(!isFinite(ms)) return '기록 없음';
     var m=Math.floor(ms/60000);
@@ -8148,9 +8152,21 @@ boot();
   function fetchStatus(){
     return fetch(statusURL()).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; });
   }
+  function ensureWidget(){
+    var el=document.getElementById('erpLive');
+    if(!el){
+      el=document.createElement('div'); el.id='erpLive'; el.className='erp-live'; el.style.display='none';
+      el.innerHTML='<span id="erpLiveDot" class="erp-dot"></span><span id="erpLiveTxt">연동 확인 중…</span>'+
+                   '<button id="erpSyncBtn" class="erp-sync" type="button" style="display:none">지금 연동</button>';
+      document.body.appendChild(el);
+      var b=document.getElementById('erpSyncBtn'); if(b) b.addEventListener('click', manualSync);
+    }
+    return el;
+  }
   function render(s){
-    var el=document.getElementById('erpLive'); if(!el) return;
+    var el=ensureWidget();
     if(!onTab()){ el.style.display='none'; return; }
+    el.style.left = sidebarOn() ? '252px' : '18px';   // 사이드바 폭(236) 피하기
     el.style.display='inline-flex';
     var dot=document.getElementById('erpLiveDot'), txt=document.getElementById('erpLiveTxt'), btn=document.getElementById('erpSyncBtn');
     if(btn) btn.style.display=isAdmin()?'inline-block':'none';
@@ -8163,8 +8179,8 @@ boot();
     else { dot.className='erp-dot'; dot.style.background='#9aa'; txt.textContent='마지막 갱신 '+fmtAgo(age); }
   }
   function tick(){
-    if(typeof document!=='undefined' && document.hidden) return;   // 탭 숨김 시 egress 절약
-    if(!onTab()){ render(_last); return; }                          // 해당 탭 아닐 땐 fetch 안 함
+    if(typeof document!=='undefined' && document.hidden) return;
+    if(!onTab()){ render(_last); return; }
     fetchStatus().then(function(s){ _last=s; render(s); });
   }
   function manualSync(){
@@ -8178,25 +8194,13 @@ boot();
       .catch(function(e){ if(typeof toast==='function') toast('요청 실패: '+((e&&e.message)||e),true); })
       .finally(function(){ _busy=false; if(btn){ btn.textContent=old; btn.disabled=false; } setTimeout(tick,3000); });
   }
-  function ensureWidget(){
-    if(document.getElementById('erpLive')) return true;
-    var nav=document.getElementById('raynoNav'); if(!nav) return false;
-    var host=nav.querySelector('.nav-tools')||nav;
-    var el=document.createElement('span'); el.id='erpLive'; el.className='erp-live'; el.style.display='none';
-    el.innerHTML='<span id="erpLiveDot" class="erp-dot"></span><span id="erpLiveTxt">연동 확인 중…</span>'+
-                 '<button id="erpSyncBtn" class="erp-sync" type="button" style="display:none">지금 연동</button>';
-    if(host.classList && host.classList.contains('nav-tools')) host.insertBefore(el, host.firstChild);
-    else host.appendChild(el);
-    var b=document.getElementById('erpSyncBtn'); if(b) b.addEventListener('click', manualSync);
-    return true;
-  }
   function injectCSS(){
     if(document.getElementById('erpLiveCSS')) return;
     var st=document.createElement('style'); st.id='erpLiveCSS';
     st.textContent=
-      '.erp-live{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;margin-right:6px;'+
-      'border-radius:999px;background:rgba(34,197,94,.08);border:1px solid rgba(0,0,0,.10);'+
-      'font-size:12px;color:var(--ink2,#555);white-space:nowrap;line-height:1.6}'+
+      '.erp-live{position:fixed;bottom:18px;left:18px;z-index:70;display:inline-flex;align-items:center;gap:6px;'+
+      'padding:5px 12px;border-radius:999px;background:var(--card,#fff);border:1px solid var(--line2,rgba(0,0,0,.12));'+
+      'box-shadow:0 4px 16px rgba(0,0,0,.12);font-size:12px;color:var(--ink2,#555);white-space:nowrap;line-height:1.6}'+
       '.erp-dot{width:8px;height:8px;border-radius:50%;background:#9aa;flex:0 0 auto}'+
       '.erp-dot.pulse{animation:erpPulse 1.6s ease-in-out infinite}'+
       '@keyframes erpPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.45)}50%{box-shadow:0 0 0 5px rgba(34,197,94,0)}}'+
@@ -8206,12 +8210,10 @@ boot();
     document.head.appendChild(st);
   }
   function boot(){
-    injectCSS();
-    // 레이노 nav가 늦게 그려질 수 있어 잠깐 재시도
-    var tries=0; var iv=setInterval(function(){ tries++; if(ensureWidget()||tries>40) clearInterval(iv); }, 250);
-    setInterval(tick, 60000);                 // 60초마다 상태 폴링
-    setInterval(function(){ render(_last); }, 1000);  // 탭 전환 시 표시/숨김만 갱신(네트워크 X)
-    setTimeout(tick, 1500);
+    injectCSS(); ensureWidget();
+    setInterval(tick, 60000);
+    setInterval(function(){ render(_last); }, 1000);  // 탭 전환 시 표시/숨김·위치 갱신
+    setTimeout(tick, 1200);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
