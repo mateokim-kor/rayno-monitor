@@ -1708,7 +1708,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 발급현황 엑셀내보내기(지부x제품)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부제품 발급현황 엑셀(위치수정)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5305,7 +5305,7 @@ function renderRDash(){
     const wj={}; W.forEach(r=>{const j=String(r['담당지부']||'').trim()||'미지정'; wj[j]=(wj[j]||0)+1;}); const wjt=Object.entries(wj).sort((a,b)=>b[1]-a[1]);
     const cards=[ _dcard('발급',won(wTot)+'건',lbl,'var(--dv3)',''), _dcard('신차 비율',pct(newN,wTot),'신차 '+won(newN)+' · 중고 '+won(wTot-newN),'var(--dv3)',''), _dcard('얼티넘 발급',won(ul)+'건','보증서 1건 기준','var(--dv2)',''), _dcard('스트라 발급',won(st)+'건','보증서 1건 기준','var(--dv2)','') ];
     const lineRows=[['얼티넘',ul],['스트라',st],['팬텀',ph],['카본',cha],['미분류',etc]].filter(x=>x[1]>0);
-    h+=`<div class="card">${cardHead('품질보증서 발급 현황', _dateBar('rdw',RDW,minD,maxD)+'<button class="acc-btn" id="warrIssueXlsx" style="margin-left:6px" title="현재 기간 필터 기준 지부×제품 매트릭스를 엑셀로 내려받습니다">⬇ 엑셀</button>')}${grid(cards)}${split(_miniTable('지부','발급',wjt,wTot),_miniTable('제품 라인','발급',lineRows,lineRows.reduce((s,x)=>s+x[1],0)||1))}</div>`;
+    h+=`<div class="card">${cardHead('품질보증서 발급 현황', _dateBar('rdw',RDW,minD,maxD))}${grid(cards)}${split(_miniTable('지부','발급',wjt,wTot),_miniTable('제품 라인','발급',lineRows,lineRows.reduce((s,x)=>s+x[1],0)||1))}</div>`;
   }
   if(hasGlass){
     const dcol=(GLASS.columns||[]).includes('매장명(대리점명)')?'매장명(대리점명)':'매장명';
@@ -5784,7 +5784,7 @@ function lineWarrCard(recs){
   const scopeBtns=`<button data-sc="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-sc="dealer" class="${scope==='dealer'?'on':''}">대리점별</button>`;
   let h=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55"><b>${Llabel}</b> 보증서 발급 — ${scope==='dealer'?'대리점별':'지부별'} 발급 건수. <b>보증서 1건 기준</b> · 이 카드는 아래 <b>자체 기간 필터</b>를 사용합니다(상단 필터와 별개).</div>`;
   h+=`<div class="lw-filt">
-    <div class="lw-frow"><span class="lw-flabel">기간</span><div class="cardctrl lw-fgrow">${_dateBar('lw', LWV, lwMin, lwMax)}</div></div>
+    <div class="lw-frow"><span class="lw-flabel">기간</span><div class="cardctrl lw-fgrow">${_dateBar('lw', LWV, lwMin, lwMax)}<button class="acc-btn" id="warrLineXlsx" style="margin-left:6px" title="현재 카드 필터(기간·구분·전면만) 기준 지부×제품 매트릭스를 엑셀로 내려받습니다">⬇ 엑셀</button></div></div>
     <div class="lw-frow"><span class="lw-flabel">구분</span><div class="seg" id="lwScope">${scopeBtns}</div>${warrFrontCol()?`<span class="lw-fdiv"></span><div class="seg" id="lwFront"><button data-fo="1" class="${_lwFrontOnly?'on':''}" title="앞유리(전면) 시공 보증서만 보기">전면만</button></div>`:''}</div>
   </div>`;
   { const subs=Object.keys(subCnt).sort((a,b)=>subCnt[b]-subCnt[a]); const lineAll=Object.values(subCnt).reduce((s,n)=>s+n,0);
@@ -8425,34 +8425,45 @@ boot();
 })();
 </script>
 <script>
-/* ── 품질보증서 발급 현황: 지부×제품 매트릭스 엑셀 내보내기 (기간 필터 반영) ── */
+/* ── 지부/제품별 보증서 발급 현황: 지부×제품 매트릭스 엑셀 내보내기 (이 카드 자체 필터 LWV 반영) ── */
 (function(){
   function _wIssueData(){
     if(!(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)) return null;
-    var dates=WARR.rows.map(function(r){return warrDateStr(r);}).filter(function(d){return /^\d{4}-\d{2}-\d{2}$/.test(d);}).sort();
-    var minD=dates[0]||'', maxD=dates[dates.length-1]||'';
-    var st=(typeof RDW!=='undefined'&&RDW)||{};
-    var rng=st.scope==='range', fromD=rng?(st.from||minD):minD, toD=rng?(st.to||maxD):maxD;
-    function inDay(d){ d=String(d||'').slice(0,10); if(!d)return false; if(fromD&&d<fromD)return false; if(toD&&d>toD)return false; return true; }
-    var W=rng?WARR.rows.filter(function(r){return inDay(warrDateStr(r));}):WARR.rows;
+    var ex=(typeof warrExcludedSet==='function')?warrExcludedSet():new Set();
+    var baseAll=(WARR.rows||[]).filter(function(r){ return !ex.has(warrRecKey(r)); });
+    var bd=baseAll.map(function(r){return String(warrDateStr(r)||'').slice(0,10);}).filter(function(s){return /^\d{4}-\d{2}-\d{2}$/.test(s);}).sort();
+    var minD=bd[0]||'', maxD=bd[bd.length-1]||'';
+    var lv=(typeof LWV!=='undefined'&&LWV)||{scope:'all'};
+    var rng=(lv.scope==='range'&&(lv.from||lv.to));
+    var fromD=rng?(lv.from||minD):minD, toD=rng?(lv.to||maxD):maxD;
+    var base=rng?baseAll.filter(function(r){ var d=String(warrDateStr(r)||'').slice(0,10); if(lv.from&&d<lv.from)return false; if(lv.to&&d>lv.to)return false; return true; }):baseAll;
+    var fcCol=(typeof warrFrontCol==='function')?warrFrontCol():'';
+    var frontMode=(typeof _lwFrontOnly!=='undefined' && _lwFrontOnly && !!fcCol);
+    if(frontMode){ base=base.filter(function(r){ return String(r[fcCol]||'').trim()!==''; }); }
+    var scope=(typeof _lwScope!=='undefined'?_lwScope:'jibu');
     var LINES=['얼티넘','스트라','팬텀','크로마','스페셜'];
     function lineOf(r){
-      var f=_parseFilm(r['시공내역(전면)']);
-      if(!(f&&_LINE_CODE[f.line])){ for(var i=0;i<_FILM_POS.length;i++){ var g=_parseFilm(r[_FILM_POS[i]]); if(g&&_LINE_CODE[g.line]){ f=g; break; } } }
-      return (f&&_LINE_CODE[f.line])?_LINE_CODE[f.line]:'미분류';
+      var scan=frontMode?[fcCol]:_FILM_POS;
+      for(var i=0;i<scan.length;i++){ var f=_parseFilm(r[scan[i]]); if(f&&_LINE_CODE[f.line]) return _LINE_CODE[f.line]; }
+      return '미분류';
     }
     var cols=LINES.concat(['미분류']);
-    var jmap={};
-    W.forEach(function(r){
-      var j=String(r['담당지부']||'').trim()||'미지정';
-      var o=jmap[j]; if(!o){ o=jmap[j]={지부:j,_t:0,_new:0}; cols.forEach(function(c){o[c]=0;}); }
+    var gmap={};
+    base.forEach(function(r){
+      var g = scope==='dealer' ? (String(r['매장명']||r['대리점코드']||'').trim()||'미지정') : (String(r['담당지부']||'').trim()||'미지정');
+      var o=gmap[g]; if(!o){ o=gmap[g]={name:g,jibu:'',_t:0,_new:0}; cols.forEach(function(c){o[c]=0;}); }
       o[lineOf(r)]++; o._t++; if(_warrIsNew(r))o._new++;
+      if(scope==='dealer'&&!o.jibu){ var jb=String(r['담당지부']||'').trim(); if(jb)o.jibu=jb; }
     });
-    var rows=Object.keys(jmap).map(function(k){return jmap[k];}).sort(function(a,b){return b._t-a._t;});
-    var wTot=W.length, newN=W.filter(_warrIsNew).length;
+    var rows=Object.keys(gmap).map(function(k){return gmap[k];}).sort(function(a,b){return b._t-a._t;});
+    var wTot=base.length, newN=base.filter(_warrIsNew).length;
     var used=cols.filter(function(c){ return rows.some(function(r){return (r[c]||0)>0;}); });
-    return {rng:rng,fromD:fromD,toD:toD,minD:minD,maxD:maxD,wTot:wTot,newN:newN,used:used,rows:rows};
+    var lead = scope==='dealer' ? ['대리점','담당지부'] : ['담당지부'];
+    return {rng:rng,fromD:fromD,toD:toD,minD:minD,maxD:maxD,wTot:wTot,newN:newN,used:used,rows:rows,scope:scope,frontMode:frontMode,lead:lead};
   }
+  function _leadVals(d,r){ return d.scope==='dealer' ? [r.name, r.jibu||'-'] : [r.name]; }
+  function _title(d){ var period=d.rng?(d.fromD+' ~ '+d.toD):'전체 기간 ('+d.minD+' ~ '+d.maxD+')'; return '지부/제품별 보증서 발급 현황   |   '+(d.scope==='dealer'?'대리점별':'지부별')+(d.frontMode?' · 전면만':'')+'   |   '+period+'   |   총 '+d.wTot.toLocaleString()+'건  (신차 '+d.newN.toLocaleString()+' · 중고 '+(d.wTot-d.newN).toLocaleString()+')'; }
+  function _fname(d){ return '레이노_'+(d.scope==='dealer'?'대리점':'지부')+'제품_보증서발급_'+(d.rng?(d.fromD+'_'+d.toD):'전체')+'.xlsx'; }
   function _loadExcelJS(){
     return new Promise(function(res,rej){
       if(window.ExcelJS) return res(window.ExcelJS);
@@ -8463,76 +8474,74 @@ boot();
       document.head.appendChild(s);
     });
   }
-  function _fname(d){ return '레이노_지부제품_보증서발급_'+(d.rng?(d.fromD+'_'+d.toD):'전체')+'.xlsx'; }
   function _fallback(d){   // ExcelJS 못 불러올 때: 기본 XLSX(서식 X)
-    var cols=d.used, header=['담당지부'].concat(cols).concat(['합계','비중(%)']);
-    var period=d.rng?(d.fromD+' ~ '+d.toD):'전체 기간 ('+d.minD+' ~ '+d.maxD+')';
-    var aoa=[['품질보증서 발급 현황 | '+period+' | 총 '+d.wTot+'건 (신차 '+d.newN+' · 중고 '+(d.wTot-d.newN)+')'], header];
-    d.rows.forEach(function(r){ aoa.push([r.지부].concat(cols.map(function(c){return r[c]||0;})).concat([r._t, d.wTot?+( r._t/d.wTot*100).toFixed(1):0])); });
+    var cols=d.used, header=d.lead.concat(cols).concat(['합계','비중(%)']);
+    var aoa=[[_title(d)], header];
+    d.rows.forEach(function(r){ aoa.push(_leadVals(d,r).concat(cols.map(function(c){return r[c]||0;})).concat([r._t, d.wTot?+(r._t/d.wTot*100).toFixed(1):0])); });
     var tot=cols.map(function(c){return d.rows.reduce(function(s,r){return s+(r[c]||0);},0);});
-    aoa.push(['합계'].concat(tot).concat([d.wTot,100]));
+    var totLead=d.lead.map(function(_,i){return i===0?'합계':'';});
+    aoa.push(totLead.concat(tot).concat([d.wTot,100]));
     var ws=XLSX.utils.aoa_to_sheet(aoa);
     ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:header.length-1}}];
-    ws['!cols']=[{wch:18}].concat(cols.map(function(){return {wch:10};})).concat([{wch:10},{wch:10}]);
-    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'지부별 제품 발급');
+    ws['!cols']=d.lead.map(function(){return {wch:18};}).concat(cols.map(function(){return {wch:10};})).concat([{wch:10},{wch:10}]);
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,(d.scope==='dealer'?'대리점별':'지부별')+' 제품 발급');
     XLSX.writeFile(wb,_fname(d));
     if(typeof toast==='function') toast('엑셀 다운로드 완료 (기본 서식)');
   }
   function _xlsxStyled(d, ExcelJS){
-    var cols=d.used, header=['담당지부'].concat(cols).concat(['합계','비중']);
+    var cols=d.used, leadN=d.lead.length, header=d.lead.concat(cols).concat(['합계','비중']);
     var nC=header.length;
     var BLACK='FF1A1D24', ORANGE='FFF06A1E', GRAYA='FFF7F8FA', WHITE='FFFFFFFF', TOTBG='FFFFF1E6';
     var bd={style:'thin',color:{argb:'FFE3E7EE'}};
     var border={top:bd,left:bd,bottom:bd,right:bd};
     var wb=new ExcelJS.Workbook();
-    var ws=wb.addWorksheet('지부별 제품 발급',{views:[{state:'frozen',ySplit:2}]});
-    var period=d.rng?(d.fromD+' ~ '+d.toD):'전체 기간 ('+d.minD+' ~ '+d.maxD+')';
+    var ws=wb.addWorksheet((d.scope==='dealer'?'대리점별':'지부별')+' 제품 발급',{views:[{state:'frozen',ySplit:2}]});
     ws.mergeCells(1,1,1,nC);
     var t=ws.getCell(1,1);
-    t.value='품질보증서 발급 현황    |    '+period+'    |    총 '+d.wTot.toLocaleString()+'건  (신차 '+d.newN.toLocaleString()+' · 중고 '+(d.wTot-d.newN).toLocaleString()+')';
+    t.value=_title(d);
     t.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLACK}};
     t.font={bold:true,color:{argb:WHITE},size:12};
     t.alignment={vertical:'middle',horizontal:'left',indent:1};
     ws.getRow(1).height=30;
     var hr=ws.getRow(2);
-    header.forEach(function(h,i){ var c=hr.getCell(i+1); c.value=h; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ORANGE}}; c.font={bold:true,color:{argb:WHITE},size:11}; c.alignment={vertical:'middle',horizontal:i===0?'left':'center'}; c.border=border; });
+    header.forEach(function(h,i){ var c=hr.getCell(i+1); c.value=h; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ORANGE}}; c.font={bold:true,color:{argb:WHITE},size:11}; c.alignment={vertical:'middle',horizontal:i<leadN?'left':'center'}; c.border=border; });
     hr.height=22;
     var tot={}; cols.forEach(function(c){tot[c]=0;});
     d.rows.forEach(function(r,ri){
       var row=ws.getRow(3+ri);
-      var vals=[r.지부].concat(cols.map(function(c){return r[c]||0;})).concat([r._t, d.wTot?r._t/d.wTot:0]);
+      var vals=_leadVals(d,r).concat(cols.map(function(c){return r[c]||0;})).concat([r._t, d.wTot?r._t/d.wTot:0]);
       vals.forEach(function(v,i){
         var c=row.getCell(i+1); c.value=v; c.border=border;
-        c.alignment={vertical:'middle',horizontal:i===0?'left':'right'};
+        c.alignment={vertical:'middle',horizontal:i<leadN?'left':'right'};
         c.fill={type:'pattern',pattern:'solid',fgColor:{argb: ri%2?GRAYA:WHITE}};
-        if(i>0&&i<=cols.length) c.numFmt='#,##0';
-        if(i===nC-2){ c.numFmt='#,##0'; c.font={bold:true}; }
+        if(i>=leadN&&i<nC-1) c.numFmt='#,##0';
+        if(i===nC-2){ c.font={bold:true}; }
         if(i===nC-1) c.numFmt='0.0%';
       });
       cols.forEach(function(c){tot[c]+=(r[c]||0);});
       row.height=18;
     });
     var tr=ws.getRow(3+d.rows.length);
-    var tv=['합계'].concat(cols.map(function(c){return tot[c];})).concat([d.wTot,1]);
+    var totLead=d.lead.map(function(_,i){return i===0?'합계':'';});
+    var tv=totLead.concat(cols.map(function(c){return tot[c];})).concat([d.wTot,1]);
     var topB={style:'medium',color:{argb:ORANGE}};
     tv.forEach(function(v,i){
       var c=tr.getCell(i+1); c.value=v;
       c.fill={type:'pattern',pattern:'solid',fgColor:{argb:TOTBG}};
       c.font={bold:true,color:{argb:'FF7A3E12'}};
-      c.alignment={vertical:'middle',horizontal:i===0?'left':'right'};
+      c.alignment={vertical:'middle',horizontal:i<leadN?'left':'right'};
       c.border={top:topB,left:bd,bottom:bd,right:bd};
-      if(i>0&&i<=cols.length) c.numFmt='#,##0';
-      if(i===nC-2) c.numFmt='#,##0';
+      if(i>=leadN&&i<nC-1) c.numFmt='#,##0';
       if(i===nC-1) c.numFmt='0.0%';
     });
     tr.height=20;
     ws.mergeCells(4+d.rows.length,1,4+d.rows.length,nC);
     var fn=ws.getCell(4+d.rows.length,1);
-    fn.value='※ 제품 라인은 전면 시공 제품 기준 1건 1라인 분류 · 미분류 = 전면 제품 미입력 보증서 · 발급일(보증서 등록일) 기준 집계';
+    fn.value='※ 제품 라인 = 전면 시공 제품 기준 1건 1라인 분류 · 미분류 = 인식 가능한 제품코드 없는 보증서 · 발급일(보증서 등록일) 기준 · 화면의 제품 라인 탭 선택과 무관하게 전체 라인을 매트릭스로 표기'+(d.scope==='dealer'?' · 대리점 전체 표기(화면 상위30 제한 없음)':'');
     fn.font={italic:true,color:{argb:'FF8A94A6'},size:9.5};
     fn.alignment={vertical:'middle',horizontal:'left'};
-    ws.getColumn(1).width=20;
-    for(var i=2;i<=cols.length+1;i++) ws.getColumn(i).width=10;
+    for(var li=1;li<=leadN;li++) ws.getColumn(li).width= li===1?20:16;
+    for(var i=leadN+1;i<=nC-2;i++) ws.getColumn(i).width=10;
     ws.getColumn(nC-1).width=11; ws.getColumn(nC).width=9;
     return wb.xlsx.writeBuffer().then(function(buf){
       var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -8542,7 +8551,7 @@ boot();
     });
   }
   document.addEventListener('click', function(e){
-    var b=e.target&&e.target.closest&&e.target.closest('#warrIssueXlsx');
+    var b=e.target&&e.target.closest&&e.target.closest('#warrLineXlsx');
     if(!b) return; e.preventDefault();
     if(b.dataset.busy==='1') return;
     var d=_wIssueData();
@@ -8555,4 +8564,5 @@ boot();
   });
 })();
 </script>
+</body>
 </html>
