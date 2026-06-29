@@ -1503,7 +1503,7 @@
     <div class="nav" id="raynoNav">
       <button class="nav-btn on" data-rview="dash"><span data-txt="tabRDash">대시보드</span></button>
       <button class="nav-btn" data-rview="revenue"><span data-txt="tabRevenue">매출 현황</span></button>
-      <button class="nav-btn" data-rview="yoy"><span>전년 대비</span></button>
+      <button class="nav-btn" data-rview="yoy"><span>YoY 실적 비교</span></button>
       <button class="nav-btn" data-rview="warranty"><span data-txt="tabWarranty">품질보증서 현황</span></button>
       <button class="nav-btn" data-rview="glass"><span data-txt="tabGlass">글라스케어 현황</span></button>
       <button class="nav-btn" data-rview="dealer"><span data-txt="tabDealer">대리점 현황</span></button>
@@ -1753,7 +1753,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 지부별 제품순위에 지부×월 매트릭스 보기';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · YoY 매출 기준토글+탭명 변경+매출탭 YoY카드 제거';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6576,7 +6576,7 @@ function renderRevenue(){
   const rep=salesReportText();
   let s8=`<button id="salesRepCopy" class="acc-btn" style="margin-bottom:8px">📋 리포트 복사</button><pre id="salesRepText" style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:inherit;font-size:13px;color:var(--ink);margin:0">${rep.replace(/</g,'&lt;')}</pre>`;
 
-  box.innerHTML=`${(SALES&&SALES.prev)?_yoyHtml():''}<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
+  box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
     + sel
     + salesKPI()
     + charts
@@ -8432,7 +8432,7 @@ function _applySidebarLayout(){
       {h:'레이노 데이터', items:[
         {t:'데이터 대시보드', ic:'data', k:'rayno:dash', d:'레이노 영업·품질 데이터를 한눈에 봅니다', go:()=>goRayno('dash')},
         {t:'매출 분석', ic:'chart', k:'rayno:revenue', ht:'매출 분석 (B2C+B2B)', d:'채널·지부·대리점별 매출을 분석합니다', go:()=>goRayno('revenue')},
-        {t:'전년 대비', ic:'chart', k:'rayno:yoy', d:'매출·보증서·글라스케어를 전년과 비교합니다', go:()=>goRayno('yoy')},
+        {t:'YoY 실적 비교', ic:'chart', k:'rayno:yoy', d:'매출·보증서·글라스케어를 전년과 비교합니다', go:()=>goRayno('yoy')},
         {t:'품질보증서', ic:'shield', k:'rayno:warranty', d:'보증서 발급 현황과 시공 데이터를 분석합니다', go:()=>goRayno('warranty')},
         {t:'글라스케어 현황', ic:'sparkle', k:'rayno:glass', d:'글라스케어 시공·판매 현황을 분석합니다', go:()=>goRayno('glass')},
         {t:'대리점 현황', ic:'store', k:'rayno:dealer', d:'대리점별 실적과 담당 지부를 관리합니다', go:()=>goRayno('dealer')},
@@ -9137,6 +9137,18 @@ boot();
 function _yoyFmtWon(n){ const v=+n||0; return Math.abs(v)>=1e8?(v/1e8).toFixed(1)+'억':Math.abs(v)>=1e4?Math.round(v/1e4).toLocaleString()+'만':v.toLocaleString(); }
 function _yoyFmtCnt(n){ return (+n||0).toLocaleString()+'건'; }
 function _yoyPctV(cur,prev){ if(!prev) return null; return (cur-prev)/prev*100; }
+let _yoySalesBasis='all';   // all=전사 · b2c · b2b · b2cb2b
+function _salesBasisOver(S, months, basis){
+  if(!S||!S.channels) return 0;
+  const C=S.channels;
+  const b2c=_sSumMonths(C.B2C&&C.B2C.ma, months);
+  const b2b=_sSumMonths(C.B2B&&C.B2B.ma, months);
+  const etc=_sSumMonths(C['별도채널']&&C['별도채널'].ma, months);
+  if(basis==='b2c') return b2c;
+  if(basis==='b2b') return b2b;
+  if(basis==='b2cb2b') return b2c+b2b;
+  return b2c+b2b+etc;        // 전사
+}
 
 function _yoyWarrYM(){ try{ if(typeof YOY!=='undefined'&&YOY&&YOY.warranty&&Object.keys(YOY.warranty).length) return YOY.warranty; }catch(_){ } const out={}; try{ const ex=warrExcludedSet(); ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{ if(ex.has(warrRecKey(r)))return; const ds=warrDateStr(r); if(!/^\d{4}-\d{2}/.test(ds||''))return; const y=+ds.slice(0,4),m=+ds.slice(5,7); if(!m)return; (out[y]=out[y]||{})[m]=(out[y][m]||0)+1; }); }catch(_){ } return out; }
 function _yoyGlassYM(){ try{ if(typeof YOY!=='undefined'&&YOY&&YOY.glass&&Object.keys(YOY.glass).length) return YOY.glass; }catch(_){ } const out={}; try{ ((typeof GLASS!=='undefined'&&GLASS&&GLASS.rows)||[]).forEach(r=>{ const ds=String(_glassDateStr(r)||''); if(!/^\d{4}-\d{2}/.test(ds))return; const y=+ds.slice(0,4),m=+ds.slice(5,7); if(!m)return; (out[y]=out[y]||{})[m]=(out[y][m]||0)+1; }); }catch(_){ } return out; }
@@ -9144,7 +9156,7 @@ function _yoyGlassYM(){ try{ if(typeof YOY!=='undefined'&&YOY&&YOY.glass&&Object
 function _yoyEmpty(title,msg){
   return `<div class="card"><h3 style="margin:0 0 8px"><span class="dot"></span>${title}</h3><div style="padding:22px 14px;text-align:center;color:var(--ink3);font-size:13px;background:var(--bg2,#f7f8fa);border-radius:10px">${msg}</div></div>`;
 }
-function _yoyBuild(key,title,months,curOf,prevOf,fmt,curLab,prevLab){
+function _yoyBuild(key,title,months,curOf,prevOf,fmt,curLab,prevLab,topExtra){
   const curArr=months.map(curOf), prevArr=months.map(prevOf);
   const cCum=curArr.reduce((s,v)=>s+v,0), pCum=prevArr.reduce((s,v)=>s+v,0);
   const pct=_yoyPctV(cCum,pCum);
@@ -9161,6 +9173,7 @@ function _yoyBuild(key,title,months,curOf,prevOf,fmt,curLab,prevLab){
       <div><h3 style="margin:0"><span class="dot"></span>${title}</h3><div style="color:var(--ink2);font-size:12px;margin-top:3px">${curLab} vs ${prevLab} · ${ml} 누계 기준</div></div>
       <div style="text-align:right"><div style="font-size:24px;font-weight:800;color:${col};line-height:1.1">${dir} ${pctTxt}</div><div style="color:var(--ink2);font-size:12px;margin-top:2px">올해 ${fmt(cCum)} · 전년 ${fmt(pCum)}</div></div>
     </div>
+    ${topExtra||''}
     <div style="height:228px;position:relative;margin:8px 0 6px"><canvas id="yoyc_${key}"></canvas></div>
     <div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse">
       <tr><th ${thl}>월</th><th ${th}>올해</th><th ${th}>전년</th><th ${th}>증감</th></tr>${rows}
@@ -9179,12 +9192,15 @@ function _yoySectionFromYM(ym, key, title, fmt){
   return _yoyBuild(key,title,months,m=>cur[m]||0,m=>prev[m]||0,fmt,curY+'년',prevY+'년');
 }
 function _yoySales(){
-  const T='매출 (금액)';
+  const basis=_yoySalesBasis||'all';
+  const BL={all:'전사 매출',b2c:'B2C',b2b:'B2B',b2cb2b:'B2C+B2B'};
+  const T='매출 · '+(BL[basis]||'전사 매출');
   if(typeof SALES==='undefined'||!SALES||!SALES.prodAll) return {html:_yoyEmpty(T,'올해 매출 데이터가 없습니다 — 매출 화면에서 ‘＋ 매출 ERP’로 올려주세요.'), chart:null};
   const months=(SALES.months||[]).slice();
   if(!months.length) return {html:_yoyEmpty(T,'매출 월 데이터가 없습니다.'), chart:null};
   if(!SALES.prev||!SALES.prev.channels) return {html:_yoyEmpty(T,'전년 매출 데이터가 없습니다 — 매출 화면에서 ‘＋ 전년 매출’로 올리면 자동으로 비교됩니다.'), chart:null};
-  return _yoyBuild('sales',T,months,m=>_salesTotalOver(SALES,[m]),m=>_salesTotalOver(SALES.prev,[m]),_yoyFmtWon,'올해','전년');
+  const seg=`<div class="seg" id="yoyBasisSeg" style="margin:2px 0 6px;flex-wrap:wrap"><button data-yb="all" class="${basis==='all'?'on':''}">전사 매출</button><button data-yb="b2c" class="${basis==='b2c'?'on':''}">B2C</button><button data-yb="b2b" class="${basis==='b2b'?'on':''}">B2B</button><button data-yb="b2cb2b" class="${basis==='b2cb2b'?'on':''}">B2C+B2B</button></div>`;
+  return _yoyBuild('sales',T,months,m=>_salesBasisOver(SALES,[m],basis),m=>_salesBasisOver(SALES.prev,[m],basis),_yoyFmtWon,'올해','전년',seg);
 }
 function _yoyDrawChart(c){
   if(!c) return;
@@ -9200,7 +9216,7 @@ function _yoyDrawChart(c){
 function renderYoY(){
   const box=document.getElementById('rYoY'); if(!box) return;
   if(!yoyLoaded || !salesLoaded || !glassLoaded){
-    box.innerHTML='<div style="padding:48px 16px;text-align:center;color:var(--ink3);font-size:13px">전년 대비 데이터를 불러오는 중…</div>';
+    box.innerHTML='<div style="padding:48px 16px;text-align:center;color:var(--ink3);font-size:13px">YoY 실적 비교 데이터를 불러오는 중…</div>';
     Promise.all([
       (typeof ensureYoy==='function'?ensureYoy():Promise.resolve()),
       (typeof ensureSales==='function'?ensureSales():Promise.resolve()),
@@ -9215,6 +9231,12 @@ function renderYoY(){
   box.innerHTML = intro + sSec.html + wSec.html + gSec.html;
   _yoyDrawChart(sSec.chart); _yoyDrawChart(wSec.chart); _yoyDrawChart(gSec.chart);
 }
+document.addEventListener('click', function(e){
+  var b=e.target&&e.target.closest&&e.target.closest('#yoyBasisSeg button[data-yb]');
+  if(!b) return;
+  _yoySalesBasis=b.dataset.yb||'all';
+  if(typeof renderYoY==='function') renderYoY();
+});
 </script>
 </body>
 </html>
