@@ -1704,7 +1704,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · AI 고도화(추이·비중·비교)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · AI 해석형(원인·YoY·브리핑)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7959,11 +7959,59 @@ function _aiBreakSales(q){
   return '\uB300\uB9AC\uC810 \uB9E4\uCD9C TOP'+dt.length+'\n'+
     dt.map(function(x,i){ return (i+1)+'. '+x[0]+' \u2014 '+_aiFmtWon(x[1]); }).join('\n');
 }
+function _aiMentioned(q){ var mm=(String(q).match(/(\d{1,2})\s*\uC6D4/g)||[]).map(function(x){return parseInt(x,10);}).filter(function(n){return n>=1&&n<=12;}); var u=[]; mm.forEach(function(n){ if(u.indexOf(n)<0)u.push(n); }); return u; }
+function _aiWhySales(q){
+  if(typeof SALES==='undefined' || !_aiSalesOK()) return null;
+  if(!/\uC65C|\uC6D0\uC778|\uC774\uC720|\uB54C\uBB38|\uC5B4\uCC0C\uC11C/.test(q)) return null;
+  if(!/\uB9E4\uCD9C|\uB9E4\uC0C1|\uC2E4\uC801|\uD310\uB9E4|\uB5A8\uC5B4|\uD558\uB77D|\uAE09\uAC10|\uC904|\uAC10\uC18C|\uC62C\uB77C|\uC0C1\uC2B9|\uAE09\uC99D|\uB298/.test(q)) return null;
+  var ms=_aiMonthsAsc(); if(ms.length<2) return null;
+  var men=_aiMentioned(q);
+  var tgt = men.length? Math.max.apply(null,men) : ms[ms.length-1];
+  var prv = (men.length>=2)? men.sort(function(a,b){return a-b;})[men.length-2] : tgt-1;
+  if(prv<1) prv=tgt-1; if(prv<1) return null;
+  var rt=_aiMonthRev(tgt)||0, rp=_aiMonthRev(prv)||0, d=rt-rp;
+  var pct=rp?Math.round(d/rp*1000)/10:0, ar=d>0?'\u25B2':(d<0?'\u25BC':'\u2013');
+  var chs=['B2C','B2B','\uBCC4\uB3C4\uCC44\uB110'].map(function(k){ var ma=(SALES.channels[k]&&SALES.channels[k].ma)||[]; return [k,(+ma[tgt]||0)-(+ma[prv]||0)]; }).filter(function(x){return SALES.channels[x[0]];});
+  chs.sort(function(a,b){return Math.abs(b[1])-Math.abs(a[1]);});
+  var chLines=chs.map(function(x){ var a2=x[1]>0?'\u25B2':(x[1]<0?'\u25BC':'\u2013'); return '\u00B7 '+x[0]+' '+a2+' '+_aiFmtWon(Math.abs(x[1])); });
+  var br='';
+  if(SALES.jibu){ var bs=Object.keys(SALES.jibu).filter(function(k){return k!=='\uBCF8\uC0AC';}).map(function(k){ var ma=SALES.jibu[k].ma||[]; return [k,(+ma[tgt]||0)-(+ma[prv]||0)]; }).filter(function(x){return x[1]!==0;}); bs.sort(function(a,b){return Math.abs(b[1])-Math.abs(a[1]);}); if(bs.length){ br='\n\uC9C0\uBD80 \uBCC0\uB3D9 \uD070 \uACF3: '+bs.slice(0,2).map(function(x){ var a2=x[1]>0?'\u25B2':'\u25BC'; return x[0]+' '+a2+_aiFmtWon(Math.abs(x[1])); }).join(' \u00B7 '); } }
+  var main = chs.length? ('\n\u2192 \uAC00\uC7A5 \uD070 \uC601\uD5A5: '+chs[0][0]+' '+(chs[0][1]>=0?'\u25B2':'\u25BC')+' '+_aiFmtWon(Math.abs(chs[0][1]))+(d!==0&&chs[0][1]!==0?(' ('+Math.round(chs[0][1]/d*100)+'% \uAE30\uC5EC)'):'')) : '';
+  return tgt+'\uC6D4 \uB9E4\uCD9C\uC740 '+prv+'\uC6D4 \uB300\uBE44 '+ar+' '+_aiFmtWon(Math.abs(d))+' ('+(d>=0?'+':'')+pct+'%)\n\uCC44\uB110\uBCC4 \uC99D\uAC10:\n'+chLines.join('\n')+main+br;
+}
+function _aiYoYSales(q){
+  if(typeof SALES==='undefined' || !_aiSalesOK()) return null;
+  if(!/\uC804\uB144|\uC791\uB144|yoy/i.test(q)) return null;
+  if(!SALES.prev || !SALES.prev.channels) return '\uC804\uB144 \uB9E4\uCD9C \uB370\uC774\uD130\uAC00 \uC544\uC9C1 \uC5C6\uC5B4\uC694. (\uAD00\uB9AC\uC790 \uD654\uBA74\uC5D0\uC11C \u300C\uFF0B\uC804\uB144 \uB9E4\uCD9C\u300D \uC5C5\uB85C\uB4DC)';
+  var ms=_aiMonthsAsc(); if(!ms.length) return null;
+  var men=_aiMentioned(q), scope=men.length===1?[men[0]]:ms;
+  var lab=men.length===1?(men[0]+'\uC6D4'):((ms[0])+'~'+(ms[ms.length-1])+'\uC6D4 \uB204\uACC4');
+  var cur=_salesTotalOver(SALES,scope), prv=_salesTotalOver(SALES.prev,scope), pct=_yoyPct(cur,prv);
+  var ar=pct==null?'\u2013':(pct>=0?'\u25B2':'\u25BC'), pt=pct==null?'-':(Math.abs(pct).toFixed(1)+'%');
+  var head='\uC804\uB144 \uB300\uBE44(YoY) '+lab+': \uC62C\uD574 '+_aiFmtWon(cur)+' \u00B7 \uC804\uB144 '+_aiFmtWon(prv)+' \u2192 '+ar+' '+pt;
+  if(men.length===1) return head;
+  var lines=ms.map(function(m){ var c=_salesTotalOver(SALES,[m]), p=_salesTotalOver(SALES.prev,[m]), pp=_yoyPct(c,p); var a2=pp==null?'\u2013':(pp>=0?'\u25B2':'\u25BC'); return '\u00B7 '+m+'\uC6D4: \uC62C\uD574 '+_aiFmtWon(c)+' vs \uC804\uB144 '+_aiFmtWon(p)+' ('+a2+(pp==null?'-':Math.abs(pp).toFixed(0)+'%')+')'; });
+  return head+'\n'+lines.join('\n');
+}
+function _aiBrief(q){
+  if(!/\uC694\uC57D|\uBE0C\uB9AC\uD551|\uC885\uD569|\uC804\uBC18|\uD55C\uB208\uC5D0|\uD55C \uB208\uC5D0|\uC815\uB9AC\uD574|\uC804\uCCB4\uC801\uC73C\uB85C|\uC0C1\uD669\s?\uC5B4\uB54C/.test(q)) return null;
+  var out=['\uD83D\uDCCA RAYNO \uD604\uD669 \uC694\uC57D'];
+  if(typeof SALES!=='undefined' && _aiSalesOK()){
+    var ms=_aiMonthsAsc(), tot=_aiTotalRev()||0;
+    var momTxt='';
+    if(ms.length>=2){ var a=ms[ms.length-2], b=ms[ms.length-1], va=_aiMonthRev(a)||0, vb=_aiMonthRev(b)||0, d=vb-va, pc=va?Math.round(d/va*1000)/10:0, ar=d>0?'\u25B2':(d<0?'\u25BC':'\u2013'); momTxt=' \u00B7 \uCD5C\uADFC '+b+'\uC6D4 '+ar+(d>=0?'+':'')+pc+'%'; }
+    out.push('\u00B7 \uB204\uC801 \uB9E4\uCD9C '+_aiFmtWon(tot)+momTxt);
+    var keys=['B2C','B2B','\uBCC4\uB3C4\uCC44\uB110'].filter(function(k){return SALES.channels&&SALES.channels[k];}).map(function(k){return [k,_sSum(SALES.channels[k].ma||[])];}).sort(function(a,b){return b[1]-a[1];});
+    if(keys.length&&tot) out.push('\u00B7 \uCC44\uB110 1\uC704 '+keys[0][0]+' '+_aiFmtWon(keys[0][1])+' ('+Math.round(keys[0][1]/tot*100)+'%)');
+    var jt=_aiJibuTop(1); if(jt&&jt.length) out.push('\u00B7 \uC9C0\uBD80 1\uC704 '+jt[0][0]+' '+_aiFmtWon(jt[0][1]));
+  }
+  if(typeof WARR!=='undefined' && WARR.rows && WARR.rows.length){ var wc=_warrCountBy({}); if(wc!=null) out.push('\u00B7 \uBCF4\uC99D\uC11C \uCD1D '+wc.toLocaleString()+'\uAC74'); }
+  if(typeof STORE!=='undefined' && STORE.rows && STORE.rows.length){ out.push('\u00B7 \uC628\uB77C\uC778 \uC218\uC9D1 '+STORE.rows.length.toLocaleString()+'\uAC74'); }
+  return out.length>1? out.join('\n') : null;
+}
 function _aiSmart(q){
-  q=String(q||''); var f;
-  try{ f=_aiTryCompare(q); if(f) return f; }catch(_){}
-  try{ f=_aiTrendSales(q); if(f) return f; }catch(_){}
-  try{ f=_aiBreakSales(q); if(f) return f; }catch(_){}
+  q=String(q||''); var f, fns=[_aiWhySales,_aiYoYSales,_aiTryCompare,_aiTrendSales,_aiBreakSales,_aiBrief];
+  for(var i=0;i<fns.length;i++){ try{ f=fns[i](q); if(f) return f; }catch(_){} }
   return null;
 }
 async function _aiRespond(q){
@@ -7994,7 +8042,7 @@ function _aiChatOpen(){
     send.addEventListener('click',()=>ask());
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ask(); }});
     p.querySelector('.aic-x[aria-label="닫기"]').addEventListener('click',()=>{ p.style.display='none'; });
-    ['5월이랑 6월 매출 비교','채널별 매출 비중','매출 추이 어때?','매출 상위 지부','보증서 몇 건?'].forEach(qx=>{ const c=document.createElement('button'); c.type='button'; c.className='aic-chip'; c.textContent=qx; c.addEventListener('click',()=>ask(qx)); chips.appendChild(c); });
+    ['요약해줘','왜 매출 줄었어?','전년 대비 어때?','채널별 매출 비중','5월이랑 6월 매출 비교'].forEach(qx=>{ const c=document.createElement('button'); c.type='button'; c.className='aic-chip'; c.textContent=qx; c.addEventListener('click',()=>ask(qx)); chips.appendChild(c); });
     add('bot','안녕하세요! 레이노 데이터에 대해 물어보세요. 아래 예시를 눌러도 돼요.');
   }
   p.style.display='flex'; setTimeout(()=>{ try{document.getElementById('aicInput').focus();}catch(_){}} ,60);
