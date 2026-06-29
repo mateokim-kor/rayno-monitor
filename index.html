@@ -1752,7 +1752,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 전년 대비(YoY) 탭 추가';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 매출 분석 헤더 (B2C+B2B) 표기';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7311,7 +7311,7 @@ function _sbSyncActive(){
     let act=null;
     items.forEach(b=>{ const on=(b.dataset.k===key); b.classList.toggle('on',on); if(on)act=b; });
     const ht=document.getElementById('headerTitle'), hs=document.getElementById('headerSub');
-    if(act && ht){ if(act.dataset.title) ht.textContent=act.dataset.title; if(hs) hs.textContent=act.dataset.desc||''; }
+    if(act && ht){ ht.textContent=act.dataset.htitle||act.dataset.title||''; if(hs) hs.textContent=act.dataset.desc||''; }
   }catch(_){}
 }
 function _restoreNav(nav){
@@ -8408,7 +8408,7 @@ function _applySidebarLayout(){
       ]},
       {h:'레이노 데이터', items:[
         {t:'데이터 대시보드', ic:'data', k:'rayno:dash', d:'레이노 영업·품질 데이터를 한눈에 봅니다', go:()=>goRayno('dash')},
-        {t:'매출 분석', ic:'chart', k:'rayno:revenue', d:'채널·지부·대리점별 매출을 분석합니다', go:()=>goRayno('revenue')},
+        {t:'매출 분석', ic:'chart', k:'rayno:revenue', ht:'매출 분석 (B2C+B2B)', d:'채널·지부·대리점별 매출을 분석합니다', go:()=>goRayno('revenue')},
         {t:'전년 대비', ic:'chart', k:'rayno:yoy', d:'매출·보증서·글라스케어를 전년과 비교합니다', go:()=>goRayno('yoy')},
         {t:'품질보증서', ic:'shield', k:'rayno:warranty', d:'보증서 발급 현황과 시공 데이터를 분석합니다', go:()=>goRayno('warranty')},
         {t:'글라스케어 현황', ic:'sparkle', k:'rayno:glass', d:'글라스케어 시공·판매 현황을 분석합니다', go:()=>goRayno('glass')},
@@ -8433,7 +8433,7 @@ function _applySidebarLayout(){
       const hd=document.createElement('div'); hd.className='rsb-sec'; hd.textContent=sec.h; grp.appendChild(hd);
       sec.items.forEach(it=>{
         const btn=document.createElement('button'); btn.type='button'; btn.className='rsb-item';
-        btn.innerHTML='<span class="sb-ic">'+_sbSvg(it.ic)+'</span><span class="rsb-lbl">'+it.t+'</span>'; if(it.k) btn.dataset.k=it.k; btn.dataset.title=it.t; if(it.d) btn.dataset.desc=it.d;
+        btn.innerHTML='<span class="sb-ic">'+_sbSvg(it.ic)+'</span><span class="rsb-lbl">'+it.t+'</span>'; if(it.k) btn.dataset.k=it.k; btn.dataset.title=it.t; btn.dataset.htitle=it.ht||it.t; if(it.d) btn.dataset.desc=it.d;
         btn.addEventListener('click',()=>{ allItems.forEach(b=>b.classList.remove('on')); btn.classList.add('on'); it.go(); });
         grp.appendChild(btn); allItems.push(btn);
       });
