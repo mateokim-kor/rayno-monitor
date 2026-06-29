@@ -1753,7 +1753,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · YoY 매출 기준토글+탭명 변경+매출탭 YoY카드 제거';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · YoY 보증서·글라스 전년 동기 비교 수정';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -9186,8 +9186,9 @@ function _yoySectionFromYM(ym, key, title, fmt){
   if(!years.length) return {html:_yoyEmpty(title,'데이터가 없습니다.'), chart:null};
   const curY=years[years.length-1], prevY=curY-1, cur=ym[curY]||{}, prev=ym[prevY]||{};
   if(!ym[prevY]) return {html:_yoyEmpty(title, `전년(${prevY}년) 데이터가 없습니다 — 작년 데이터가 함께 올라가 있으면 자동으로 비교됩니다. (현재 ${curY}년 데이터만 존재)`), chart:null};
-  const mset=new Set([...Object.keys(cur),...Object.keys(prev)].map(Number).filter(Boolean));
-  const months=[...mset].sort((a,b)=>a-b);
+  // 전년 '동기' 비교: 올해 존재하는 월만 사용(아직 안 지난 달까지 전년 전체를 합산하지 않도록)
+  let months=Object.keys(cur).map(Number).filter(Boolean).sort((a,b)=>a-b);
+  if(!months.length) months=Object.keys(prev).map(Number).filter(Boolean).sort((a,b)=>a-b);
   if(!months.length) return {html:_yoyEmpty(title,'데이터가 없습니다.'), chart:null};
   return _yoyBuild(key,title,months,m=>cur[m]||0,m=>prev[m]||0,fmt,curY+'년',prevY+'년');
 }
