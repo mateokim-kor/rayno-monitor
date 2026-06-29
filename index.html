@@ -1747,12 +1747,13 @@ const SUPA = {
   warrFile: 'warranty.json',
   glassFile: 'glasscare.json',
   salesFile: 'sales.json',
+  yoyFile: 'yoy.json',
   statusFile: 'crawl_status.json',
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 매출 분석 헤더 (B2C+B2B) 표기';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · YoY 보증서 yoy.json 연동(413 회피)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4909,7 +4910,7 @@ const brandEl=document.querySelector('.brand'); if(brandEl) brandEl.addEventList
 // ════════════════════════════════════════════════════
 let BIZ={rows:[],version:1};                 // 검색량/매출 (수기): {ym, search, revenue}
 let WARR={rows:[],columns:[],config:null,version:1};   // 품질보증서 (엑셀, 원본 컬럼 보존)
-let bizLoaded=false, warrLoaded=false;
+let bizLoaded=false, warrLoaded=false; let YOY=null, yoyLoaded=false;
 let workspace='cafe', rview='dash', raynoUnlocked=false, warrCfgOpen=false;
 
 /* ===== 경쟁사 프로모션 모니터링 (수동 입력 트래커) ===== */
@@ -5104,6 +5105,7 @@ async function cloudSaveJSON(file,obj){
 async function ensureBiz(){ if(bizLoaded)return; const j=await cloudLoadJSON(SUPA.bizFile); if(j&&j.rows)BIZ=j; bizLoaded=true; }
 async function ensureWarr(){ if(warrLoaded)return; const j=await cloudLoadJSON(SUPA.warrFile); if(j&&j.rows){ WARR=j; WARR.columns=WARR.columns||[]; warrDedupe(); ensureWarrCfg(); } warrLoaded=true; }
 async function ensureGlass(){ if(glassLoaded)return; const j=await cloudLoadJSON(SUPA.glassFile); if(j&&j.rows){ GLASS=j; GLASS.columns=GLASS.columns||[]; } glassLoaded=true; }
+async function ensureYoy(){ if(yoyLoaded)return; try{ const j=await cloudLoadJSON(SUPA.yoyFile); if(j) YOY=j; }catch(_){ } yoyLoaded=true; }
 function parseGlassWB(wb){
   const sh=wb.SheetNames[0]; const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sh],{header:1,defval:''});
   let hr=aoa.findIndex(r=>r&&r.some(c=>String(c).trim()!==''));
@@ -9115,8 +9117,8 @@ function _yoyFmtWon(n){ const v=+n||0; return Math.abs(v)>=1e8?(v/1e8).toFixed(1
 function _yoyFmtCnt(n){ return (+n||0).toLocaleString()+'건'; }
 function _yoyPctV(cur,prev){ if(!prev) return null; return (cur-prev)/prev*100; }
 
-function _yoyWarrYM(){ const out={}; try{ const ex=warrExcludedSet(); ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{ if(ex.has(warrRecKey(r)))return; const ds=warrDateStr(r); if(!/^\d{4}-\d{2}/.test(ds||''))return; const y=+ds.slice(0,4),m=+ds.slice(5,7); if(!m)return; (out[y]=out[y]||{})[m]=(out[y][m]||0)+1; }); }catch(_){ } return out; }
-function _yoyGlassYM(){ const out={}; try{ ((typeof GLASS!=='undefined'&&GLASS&&GLASS.rows)||[]).forEach(r=>{ const ds=String(_glassDateStr(r)||''); if(!/^\d{4}-\d{2}/.test(ds))return; const y=+ds.slice(0,4),m=+ds.slice(5,7); if(!m)return; (out[y]=out[y]||{})[m]=(out[y][m]||0)+1; }); }catch(_){ } return out; }
+function _yoyWarrYM(){ try{ if(typeof YOY!=='undefined'&&YOY&&YOY.warranty&&Object.keys(YOY.warranty).length) return YOY.warranty; }catch(_){ } const out={}; try{ const ex=warrExcludedSet(); ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{ if(ex.has(warrRecKey(r)))return; const ds=warrDateStr(r); if(!/^\d{4}-\d{2}/.test(ds||''))return; const y=+ds.slice(0,4),m=+ds.slice(5,7); if(!m)return; (out[y]=out[y]||{})[m]=(out[y][m]||0)+1; }); }catch(_){ } return out; }
+function _yoyGlassYM(){ try{ if(typeof YOY!=='undefined'&&YOY&&YOY.glass&&Object.keys(YOY.glass).length) return YOY.glass; }catch(_){ } const out={}; try{ ((typeof GLASS!=='undefined'&&GLASS&&GLASS.rows)||[]).forEach(r=>{ const ds=String(_glassDateStr(r)||''); if(!/^\d{4}-\d{2}/.test(ds))return; const y=+ds.slice(0,4),m=+ds.slice(5,7); if(!m)return; (out[y]=out[y]||{})[m]=(out[y][m]||0)+1; }); }catch(_){ } return out; }
 
 function _yoyEmpty(title,msg){
   return `<div class="card"><h3 style="margin:0 0 8px"><span class="dot"></span>${title}</h3><div style="padding:22px 14px;text-align:center;color:var(--ink3);font-size:13px;background:var(--bg2,#f7f8fa);border-radius:10px">${msg}</div></div>`;
@@ -9176,6 +9178,15 @@ function _yoyDrawChart(c){
 }
 function renderYoY(){
   const box=document.getElementById('rYoY'); if(!box) return;
+  if(!yoyLoaded || !salesLoaded || !glassLoaded){
+    box.innerHTML='<div style="padding:48px 16px;text-align:center;color:var(--ink3);font-size:13px">전년 대비 데이터를 불러오는 중…</div>';
+    Promise.all([
+      (typeof ensureYoy==='function'?ensureYoy():Promise.resolve()),
+      (typeof ensureSales==='function'?ensureSales():Promise.resolve()),
+      (typeof ensureGlass==='function'?ensureGlass():Promise.resolve())
+    ]).then(()=>{ if(rview==='yoy') renderYoY(); }).catch(()=>{ if(rview==='yoy') renderYoY(); });
+    return;
+  }
   const sSec=_yoySales();
   const wSec=_yoySectionFromYM(_yoyWarrYM(),'warr','품질보증서 (발급 건수)',_yoyFmtCnt);
   const gSec=_yoySectionFromYM(_yoyGlassYM(),'glass','글라스케어 (가입 건수)',_yoyFmtCnt);
