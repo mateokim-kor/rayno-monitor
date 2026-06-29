@@ -1750,7 +1750,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 본문폭 캡(여백 해결)+표 정리 전탭';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지역 표 2단 분할(시·도 침투/시군구)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6876,6 +6876,18 @@ function dealerScorecard(){
   if(arr.length>10) html+=`<div style="text-align:center;margin-top:9px"><button class="acc-btn" id="scMore" style="padding:6px 16px">${_scAll?'접기 ▲':`더보기 · 전체 ${arr.length}곳 ▼`}</button></div>`;
   return html;
 }
+/* 긴 단일 표를 2단(좌/우)으로 분할 — 가로 공간 활용 + 높이 절반. 좁으면 자동 1단 */
+function _tbl2up(headHtml, rowHtmls, opt){
+  opt=opt||{}; var minW=opt.minW||320, minRows=opt.minRows||10;
+  var mk=function(body){ return '<table class="dtbl" style="width:100%;border-collapse:collapse">'+headHtml+body+'</table>'; };
+  var n=rowHtmls.length;
+  if(n<minRows) return '<div class="iv-wrap">'+mk(rowHtmls.join(''))+'</div>';
+  var half=Math.ceil(n/2);
+  return '<div class="tbl2up" style="display:grid;grid-template-columns:repeat(auto-fit,minmax('+minW+'px,1fr));gap:14px;align-items:start">'
+    +'<div class="iv-wrap">'+mk(rowHtmls.slice(0,half).join(''))+'</div>'
+    +'<div class="iv-wrap">'+mk(rowHtmls.slice(half).join(''))+'</div>'
+  +'</div>';
+}
 function whiteSpaceCard(){
   const thl='style="text-align:left;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
   const th ='style="text-align:right;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
@@ -6891,17 +6903,18 @@ function whiteSpaceCard(){
   const sds=_REGION_KEYS.map(k=>{ const s=G.sido[k]||{inst:0,dealers:new Set(),sgg:new Set()}; const ni=nw.byRegion[k]||0; const reg=_regionCarRegPick(k); return {k, inst:s.inst, dealers:s.dealers.size, sgg:s.sgg.size, sh: reg>0? ni/reg*100 : null}; })
     .filter(x=>x.inst>0||x.sh!=null).sort((a,b)=>{ if(a.sh==null&&b.sh==null) return b.inst-a.inst; if(a.sh==null) return 1; if(b.sh==null) return -1; return a.sh-b.sh; });
   html+=`<div style="font-weight:700;margin:4px 0 7px">시·도 침투 (점유율 낮은 순 = 확장 여지)</div>`;
-  html+=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도</th><th ${th}>신차 점유율</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>시군구</th></tr>`;
-  sds.forEach(x=>{ const weak = x.sh!=null && x.sh < 5; html+=`<tr data-wsregion="${escapeHtml(x.k)}"${weak?' style="background:rgba(244,145,28,.08)"':''}><td ${tdl}>${x.k}${weak?' <span style="color:var(--amber);font-size:10px;font-weight:700">확장후보</span>':''}</td><td ${td}>${x.sh!=null?x.sh.toFixed(2)+'%':'<span style="color:var(--ink2)">—</span>'}</td><td ${td}>${x.inst.toLocaleString()}</td><td ${td}>${x.dealers}</td><td ${td}>${x.sgg}</td></tr>`; });
-  html+=`</table>`;
+  const _sidoHead=`<tr><th ${thl}>시·도</th><th ${th}>신차 점유율</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>시군구</th></tr>`;
+  const _sidoRows=sds.map(x=>{ const weak = x.sh!=null && x.sh < 5; return `<tr data-wsregion="${escapeHtml(x.k)}"${weak?' style="background:rgba(244,145,28,.08)"':''}><td ${tdl}>${x.k}${weak?' <span style="color:var(--amber);font-size:10px;font-weight:700">확장후보</span>':''}</td><td ${td}>${x.sh!=null?x.sh.toFixed(2)+'%':'<span style="color:var(--ink2)">—</span>'}</td><td ${td}>${x.inst.toLocaleString()}</td><td ${td}>${x.dealers}</td><td ${td}>${x.sgg}</td></tr>`; });
+  html+=_tbl2up(_sidoHead, _sidoRows, {minW:300, minRows:8});
 
   // 시군구: 대리점당 시공 많은 순(추가 개설 여력) · 시공 3건 이상
   const sgs=Object.values(G.sgg).filter(g=>g.inst>=3).map(g=>({...g, dn:g.dealers.size, per: g.dealers.size? g.inst/g.dealers.size : g.inst})).sort((a,b)=> b.per-a.per || b.inst-a.inst).slice(0,15);
   if(sgs.length){
     html+=`<div style="font-weight:700;margin:16px 0 7px">대리점 추가 여력 시군구 <span style="color:var(--ink2);font-weight:500;font-size:12px">(대리점당 시공 많은 순 · TOP 15)</span></div>`;
-    html+=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>시·도 · 시군구</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>대리점당 시공</th></tr>`;
-    sgs.forEach(g=>{ const hot=g.dn<=1; html+=`<tr><td ${tdl}>${g.sido} · ${escapeHtml(g.sgg)}${hot?' <span style="color:var(--amber);font-size:10px;font-weight:700">단일대리점</span>':''}</td><td ${td}>${g.inst.toLocaleString()}</td><td ${td}>${g.dn}</td><td ${td}><b>${g.per.toFixed(1)}</b></td></tr>`; });
-    html+=`</table><div style="font-size:11px;color:var(--ink3);margin-top:7px">‘단일대리점’은 그 시군구를 한 곳이 전담 — 추가 개설·이원화 여력이 큽니다. 정확한 시군구 점유율을 원하면 시군구별 신차(또는 자동차) 등록을 확보하면 됩니다.</div>`;
+    const _sggHead=`<tr><th ${thl}>시·도 · 시군구</th><th ${th}>시공</th><th ${th}>대리점</th><th ${th}>대리점당 시공</th></tr>`;
+    const _sggRows=sgs.map(g=>{ const hot=g.dn<=1; return `<tr><td ${tdl}>${g.sido} · ${escapeHtml(g.sgg)}${hot?' <span style="color:var(--amber);font-size:10px;font-weight:700">단일대리점</span>':''}</td><td ${td}>${g.inst.toLocaleString()}</td><td ${td}>${g.dn}</td><td ${td}><b>${g.per.toFixed(1)}</b></td></tr>`; });
+    html+=_tbl2up(_sggHead, _sggRows, {minW:330, minRows:8});
+    html+=`<div style="font-size:11px;color:var(--ink3);margin-top:7px">‘단일대리점’은 그 시군구를 한 곳이 전담 — 추가 개설·이원화 여력이 큽니다. 정확한 시군구 점유율을 원하면 시군구별 신차(또는 자동차) 등록을 확보하면 됩니다.</div>`;
   }
   return html;
 }
