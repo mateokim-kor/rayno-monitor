@@ -1190,6 +1190,32 @@
   .kpi.k-neg .kpi-ic svg{stroke:var(--neg)}
   .kpi.k-neu .kpi-ic svg{stroke:#6b7280}
   .kpi.k-plain .kpi-ic svg{stroke:var(--amber)}
+  /* 지부 분석 필터 — 드롭다운 멀티셀렉트 */
+  .an-filt{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:2px 0 4px}
+  .an-hint{font-size:12px;color:var(--ink3);margin:2px 2px 8px}
+  .ms{position:relative;display:inline-block}
+  .ms-btn{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border:1px solid var(--line2);border-radius:10px;background:var(--card);font-size:13px;cursor:pointer;color:var(--ink);font-family:inherit;transition:border-color .12s,box-shadow .12s}
+  .ms-btn:hover{border-color:var(--amber)}
+  .ms.open .ms-btn{border-color:var(--amber);box-shadow:0 0 0 3px rgba(244,145,28,.15)}
+  .ms-btn .ms-lab{font-weight:600;color:var(--ink2)}
+  .ms-btn .ms-cnt{color:var(--amber);font-weight:700}
+  .ms-btn .ms-car{color:var(--ink3);font-size:10px;transition:transform .15s}
+  .ms.open .ms-btn .ms-car{transform:rotate(180deg)}
+  .ms-pop{position:absolute;z-index:60;top:calc(100% + 6px);left:0;min-width:280px;max-width:340px;background:var(--card);border:1px solid var(--line2);border-radius:14px;box-shadow:0 14px 38px rgba(0,0,0,.16);padding:14px 14px 12px}
+  .ms-pop[hidden]{display:none}
+  .ms-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;max-height:280px;overflow:auto}
+  .ms-grid.one{grid-template-columns:1fr}
+  .ms-opt{display:flex;align-items:center;gap:9px;font-size:13.5px;padding:6px 5px;border-radius:7px;cursor:pointer;color:var(--ink2);user-select:none}
+  .ms-opt:hover{background:var(--bg2)}
+  .ms-opt input{position:absolute;opacity:0;width:0;height:0}
+  .ms-opt .ms-box{width:17px;height:17px;border:2px solid var(--line2);border-radius:5px;flex:none;position:relative;transition:background .12s,border-color .12s}
+  .ms-opt.on{color:var(--amber);font-weight:600}
+  .ms-opt.on .ms-box{background:var(--amber);border-color:var(--amber)}
+  .ms-opt.on .ms-box:after{content:'';position:absolute;left:4.5px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .ms-foot{display:flex;justify-content:space-between;align-items:center;margin-top:11px;padding-top:9px;border-top:1px solid var(--line)}
+  .ms-clear{background:none;border:none;color:var(--ink3);font-size:12.5px;cursor:pointer;font-family:inherit;padding:4px 2px}
+  .ms-clear:hover{color:var(--ink2)}
+  .ms-done{background:none;border:none;color:var(--amber);font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;padding:4px 6px}
 </style>
 </head>
 <body>
@@ -1708,7 +1734,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 지부분석 제품선택·월복수·금액수량·전체선기본';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부분석 필터 드롭다운 통합';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5397,11 +5423,13 @@ function glassAnalysisCard(){
   return `<div class="card">
     <h3 style="margin:0"><span class="dot"></span>지부 분석 — 월별·제품별 가입 추이</h3>
     <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부·제품·월을 골라 <b>월별 가입 추이</b>를 봅니다. 기본은 굵은 전체선만 보이고, <b>제품을 선택</b>하면 해당 제품 선이 켜져요.</div>
-    <div class="lw-filt">
-      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="gbaJibu" style="max-width:180px">${opts}</select><span class="lw-flabel" style="margin-left:8px">제품</span>${_anProdSeg('gbaProdSeg',(d&&d.presentLines)||[],GBA.prod)}</div>
-      <div class="lw-frow"><span class="lw-flabel">월</span><div class="cardctrl lw-fgrow">${_anMonthSeg('gbaMonthSeg',(d&&d.avMonths)||[],GBA.sel,(d&&d.multiYear))}<button class="acc-btn" id="gbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="월×제품 가입 매트릭스 엑셀">⬇ 엑셀 다운로드</button></div></div>
-      <div class="lw-frow"><span class="lw-fhint">${escapeHtml(hint)}</span></div>
+    <div class="an-filt">
+      <select class="dt-select" id="gbaJibu" style="max-width:180px">${opts}</select>
+      ${_msField('gbaProd','제품', ((d&&d.presentLines)||[]).map(l=>({v:l})), GBA.prod)}
+      ${_msField('gbaMonth','월', ((d&&d.avMonths)||[]).map(m=>({v:m,t:_anMlab(m,(d&&d.multiYear))})), GBA.sel)}
+      <button class="acc-btn" id="gbaXlsx" style="margin-left:auto;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="월×제품 가입 매트릭스 엑셀">⬇ 엑셀 다운로드</button>
     </div>
+    <div class="an-hint" id="gbaHint">${escapeHtml(hint)}</div>
     <div style="position:relative;height:340px;margin-top:6px"><canvas id="gbaChart"></canvas></div>
   </div>`;
 }
@@ -5874,6 +5902,23 @@ function _anProdSeg(id, lines, selArr){ const sel=new Set(selArr||[]); return `<
 function _anToggle(arr, v){ if(v==='__all'){ arr.length=0; return; } const i=arr.indexOf(v); if(i>=0)arr.splice(i,1); else arr.push(v); }
 function _anReg(id){ switch(id){ case 'jbaMonthSeg':return{arr:JBA.sel,render:renderWarranty}; case 'jbaProdSeg':return{arr:JBA.prod,render:renderWarranty}; case 'gbaMonthSeg':return{arr:GBA.sel,render:renderGlass}; case 'gbaProdSeg':return{arr:GBA.prod,render:renderGlass}; case 'sbaMonthSeg':return{arr:SBA.sel,render:renderRevenue}; case 'sbaProdSeg':return{arr:SBA.prod,render:renderRevenue}; } return null; }
 function _anDatasets(d, colorOf, prodActive){ const ds=[{label:'전체',data:d.totalSeries,borderColor:'#111827',backgroundColor:'#111827',borderWidth:3,pointRadius:2,pointHoverRadius:5,tension:.32,order:0}]; d.usedLines.forEach((l,i)=>{ const c=colorOf(l,i); ds.push({label:l,data:d.lineSeries[l],borderColor:c,backgroundColor:c,borderWidth:2,pointRadius:2,pointHoverRadius:4,tension:.32,order:1,hidden:!prodActive}); }); return ds; }
+// 드롭다운 멀티셀렉트 필드 (레퍼런스형) — key: jbaProd/jbaMonth/gbaProd/gbaMonth/sbaProd/sbaMonth
+function _msField(key, label, options, selectedArr){
+  const sel=new Set((selectedArr||[]).map(String));
+  const cnt = sel.size? (sel.size+'개') : '전체';
+  const one = options.length<=4 ? ' one' : '';
+  const items = options.map(o=>{ const v=String(o.v), t=o.t==null?v:o.t; const on=sel.has(v); return `<label class="ms-opt${on?' on':''}"><input type="checkbox" value="${escapeHtml(v)}"${on?' checked':''}><span class="ms-box"></span>${escapeHtml(t)}</label>`; }).join('');
+  return `<div class="ms" data-ms="${key}">
+    <button type="button" class="ms-btn"><span class="ms-lab">${escapeHtml(label)}</span><span class="ms-cnt">${cnt}</span><span class="ms-car">▾</span></button>
+    <div class="ms-pop" hidden><div class="ms-grid${one}">${items}</div><div class="ms-foot"><button type="button" class="ms-clear">선택 해제</button><button type="button" class="ms-done">완료</button></div></div>
+  </div>`;
+}
+function _anHintHtml(tab){
+  if(tab==='jba'){ const d=_jbaData(); return d&&d.wTot?`${JBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총 ${d.wTot.toLocaleString()}건`:'데이터 없음'; }
+  if(tab==='gba'){ const d=_gbaData(); return d&&d.wTot?`${GBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총 ${d.wTot.toLocaleString()}건`:'데이터 없음'; }
+  if(tab==='sba'){ const d=_sbaData(); const qty=(SBA.metric==='qty'); return d&&d.wTot?(qty?`${SBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총 ${d.wTot.toLocaleString()}롤`:`${SBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총매출 ${(d.wTot/1e8).toFixed(1)}억`):'데이터 없음'; }
+  return '';
+}
 
 // ── 보증서 지부 분석 ──
 function _jbaBranches(){ const ex=(typeof warrExcludedSet==='function')?warrExcludedSet():new Set(); const s={}; ((WARR&&WARR.rows)||[]).forEach(r=>{ if(ex.has(warrRecKey(r)))return; const j=String(r['담당지부']||'').trim(); if(j)s[j]=(s[j]||0)+1; }); return Object.keys(s).sort((a,b)=>s[b]-s[a]); }
@@ -5905,11 +5950,13 @@ function jibuAnalysisCard(){
   return `<div class="card">
     <h3 style="margin:0"><span class="dot"></span>지부 분석 — 월별·제품별 발급 추이</h3>
     <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부·제품·월을 골라 <b>월별 발급 추이</b>를 봅니다. 기본은 굵은 전체선만 보이고, <b>제품을 선택</b>하면 해당 제품 선이 켜져요(범례 클릭으로도 토글). <b>발급일(등록일) 기준</b>.</div>
-    <div class="lw-filt">
-      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="jbaJibu" style="max-width:180px">${opts}</select><span class="lw-flabel" style="margin-left:8px">제품</span>${_anProdSeg('jbaProdSeg',(d&&d.presentLines)||[],JBA.prod)}</div>
-      <div class="lw-frow"><span class="lw-flabel">월</span><div class="cardctrl lw-fgrow">${_anMonthSeg('jbaMonthSeg',(d&&d.avMonths)||[],JBA.sel,(d&&d.multiYear))}<button class="acc-btn" id="jbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="월×제품 발급 매트릭스 엑셀">⬇ 엑셀 다운로드</button></div></div>
-      <div class="lw-frow"><span class="lw-fhint">${escapeHtml(hint)}</span></div>
+    <div class="an-filt">
+      <select class="dt-select" id="jbaJibu" style="max-width:180px">${opts}</select>
+      ${_msField('jbaProd','제품', ((d&&d.presentLines)||[]).map(l=>({v:l})), JBA.prod)}
+      ${_msField('jbaMonth','월', ((d&&d.avMonths)||[]).map(m=>({v:m,t:_anMlab(m,(d&&d.multiYear))})), JBA.sel)}
+      <button class="acc-btn" id="jbaXlsx" style="margin-left:auto;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="월×제품 발급 매트릭스 엑셀">⬇ 엑셀 다운로드</button>
     </div>
+    <div class="an-hint" id="jbaHint">${escapeHtml(hint)}</div>
     <div style="position:relative;height:340px;margin-top:6px"><canvas id="jbaChart"></canvas></div>
   </div>`;
 }
@@ -6349,12 +6396,14 @@ function salesAnalysisCard(){
   return `<div class="card">
     <h3 style="margin:0"><span class="dot"></span>지부 분석 — 월별·제품별 ${qty?'롤 수량':'매출'} 추이</h3>
     <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부·제품·월을 골라 <b>월별 추이</b>를 봅니다. 기본은 굵은 전체선만, <b>제품 선택</b> 시 해당 제품 선이 켜져요. 금액/롤 수량 전환 가능(VAT 별도).</div>
-    <div class="lw-filt">
-      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="sbaJibu" style="max-width:170px">${opts}</select><span class="lw-flabel" style="margin-left:8px">지표</span>${metSeg}</div>
-      <div class="lw-frow"><span class="lw-flabel">제품</span>${_anProdSeg('sbaProdSeg',(d&&d.presentLines)||[],SBA.prod)}</div>
-      <div class="lw-frow"><span class="lw-flabel">월</span><div class="cardctrl lw-fgrow">${_anMonthSeg('sbaMonthSeg',(d&&d.avMonths)||[],SBA.sel,false)}<button class="acc-btn" id="sbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="월×제품 매트릭스 엑셀">⬇ 엑셀 다운로드</button></div></div>
-      <div class="lw-frow"><span class="lw-fhint">${escapeHtml(hint)}</span></div>
+    <div class="an-filt">
+      <select class="dt-select" id="sbaJibu" style="max-width:170px">${opts}</select>
+      ${metSeg}
+      ${_msField('sbaProd','제품', ((d&&d.presentLines)||[]).map(l=>({v:l})), SBA.prod)}
+      ${_msField('sbaMonth','월', ((d&&d.avMonths)||[]).map(m=>({v:m,t:_anMlab(m,false)})), SBA.sel)}
+      <button class="acc-btn" id="sbaXlsx" style="margin-left:auto;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="월×제품 매트릭스 엑셀">⬇ 엑셀 다운로드</button>
     </div>
+    <div class="an-hint" id="sbaHint">${escapeHtml(hint)}</div>
     <div style="position:relative;height:340px;margin-top:6px"><canvas id="sbaChart"></canvas></div>
   </div>`;
 }
@@ -8893,6 +8942,39 @@ boot();
     if(!d||!d.months.length){ if(typeof toast==='function') toast('내보낼 데이터가 없습니다.', true); return; }
     var old=b.textContent; b.dataset.busy='1'; b.textContent='⏳ 생성 중…';
     _loadExcelJS().then(function(EX){ return _styled(d,EX); }).catch(function(){ _fallback(d); }).finally(function(){ b.textContent=old; setTimeout(function(){b.dataset.busy='';},1500); });
+  });
+})();
+</script>
+<script>
+/* ── 지부 분석 드롭다운 멀티셀렉트 동작 ── */
+(function(){
+  function reg(key){ switch(key){
+    case 'jbaProd': return {arr:JBA.prod, chart:_jbaRenderChart, tab:'jba'};
+    case 'jbaMonth':return {arr:JBA.sel,  chart:_jbaRenderChart, tab:'jba'};
+    case 'gbaProd': return {arr:GBA.prod, chart:_gbaRenderChart, tab:'gba'};
+    case 'gbaMonth':return {arr:GBA.sel,  chart:_gbaRenderChart, tab:'gba'};
+    case 'sbaProd': return {arr:SBA.prod, chart:_sbaRenderChart, tab:'sba'};
+    case 'sbaMonth':return {arr:SBA.sel,  chart:_sbaRenderChart, tab:'sba'};
+  } return null; }
+  function closeAll(except){ document.querySelectorAll('.ms').forEach(function(ms){ if(ms===except)return; ms.classList.remove('open'); var p=ms.querySelector('.ms-pop'); if(p)p.setAttribute('hidden',''); }); }
+  function updBtn(ms){ var r=reg(ms.dataset.ms); var c=ms.querySelector('.ms-cnt'); if(c&&r)c.textContent=r.arr.length?(r.arr.length+'개'):'전체'; }
+  function upHint(r){ if(!r)return; var el=document.getElementById(r.tab+'Hint'); if(el&&typeof _anHintHtml==='function'){ try{ el.textContent=_anHintHtml(r.tab); }catch(_){ } } }
+  document.addEventListener('click', function(e){
+    var btn=e.target.closest&&e.target.closest('.ms-btn');
+    if(btn){ e.preventDefault(); var ms=btn.closest('.ms'); var pop=ms.querySelector('.ms-pop'); var willOpen=pop.hasAttribute('hidden'); closeAll(ms); if(willOpen){ ms.classList.add('open'); pop.removeAttribute('hidden'); } else { ms.classList.remove('open'); pop.setAttribute('hidden',''); } return; }
+    var clr=e.target.closest&&e.target.closest('.ms-clear');
+    if(clr){ e.preventDefault(); var ms2=clr.closest('.ms'); var r=reg(ms2.dataset.ms); if(r){ r.arr.length=0; ms2.querySelectorAll('.ms-opt').forEach(function(o){o.classList.remove('on');}); ms2.querySelectorAll('input[type=checkbox]').forEach(function(c){c.checked=false;}); updBtn(ms2); try{ r.chart(); }catch(_){ } upHint(r); } return; }
+    var dn=e.target.closest&&e.target.closest('.ms-done');
+    if(dn){ e.preventDefault(); var ms3=dn.closest('.ms'); ms3.classList.remove('open'); var p=ms3.querySelector('.ms-pop'); if(p)p.setAttribute('hidden',''); return; }
+    if(!(e.target.closest&&e.target.closest('.ms'))) closeAll(null);
+  });
+  document.addEventListener('change', function(e){
+    var cb=e.target.closest&&e.target.closest('.ms-pop input[type=checkbox]'); if(!cb)return;
+    var ms=cb.closest('.ms'); var r=reg(ms.dataset.ms); if(!r)return;
+    var v=cb.value, i=r.arr.indexOf(v);
+    if(cb.checked){ if(i<0)r.arr.push(v); } else if(i>=0){ r.arr.splice(i,1); }
+    var opt=cb.closest('.ms-opt'); if(opt)opt.classList.toggle('on',cb.checked);
+    updBtn(ms); try{ r.chart(); }catch(_){ } upHint(r);
   });
 })();
 </script>
