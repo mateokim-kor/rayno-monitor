@@ -1704,7 +1704,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · AI어시스턴트 좌측패널';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · AI라벨 Sonnet';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7873,7 +7873,7 @@ async function _aiRespond(q){
   return _aiAnswer(q);
 }
 
-function _aiSetMode(p){ try{ const el=p.querySelector('#aicMode'); if(el) el.textContent=_aiProxyUrl()?'Haiku 연결됨 · 정확 집계':'로컬 모드 · 정확 집계'; }catch(_){} }
+function _aiSetMode(p){ try{ const el=p.querySelector('#aicMode'); if(el) el.textContent=_aiProxyUrl()?'Sonnet 연결됨 · 정확 집계':'로컬 모드 · 정확 집계'; }catch(_){} }
 
 function _aiChatOpen(){
   let p=document.getElementById('aiChat');
@@ -7884,7 +7884,7 @@ function _aiChatOpen(){
       +'<div class="aic-chips" id="aicChips"></div>'
       +'<div class="aic-input"><input id="aicInput" type="text" placeholder="예) 5월 매출 얼마야?" autocomplete="off"><button id="aicSend" type="button">보내기</button></div>';
     document.body.appendChild(p);
-    try{ const hd=p.querySelector('.aic-head'); const gear=document.createElement('button'); gear.className='aic-x'; gear.type='button'; gear.title='Haiku 연결 설정'; gear.textContent='\u2699'; gear.style.marginRight='2px'; hd.insertBefore(gear, hd.querySelector('.aic-x')); gear.addEventListener('click',()=>{ const cur=_aiProxyUrl(); const u=prompt('Haiku 프록시 URL을 입력하세요 (Supabase Edge Function 주소).\n비우면 무료 로컬 모드로 동작합니다.', cur); if(u!==null){ try{ localStorage.setItem('rayno_ai_proxy', u.trim()); }catch(_){} _aiSetMode(p); } }); }catch(_){}
+    try{ const hd=p.querySelector('.aic-head'); const gear=document.createElement('button'); gear.className='aic-x'; gear.type='button'; gear.title='AI 프록시 연결 설정'; gear.textContent='\u2699'; gear.style.marginRight='2px'; hd.insertBefore(gear, hd.querySelector('.aic-x')); gear.addEventListener('click',()=>{ const cur=_aiProxyUrl(); const u=prompt('AI 프록시 URL을 입력하세요 (Supabase Edge Function 주소).\n비우면 무료 로컬 모드로 동작합니다.', cur); if(u!==null){ try{ localStorage.setItem('rayno_ai_proxy', u.trim()); }catch(_){} _aiSetMode(p); } }); }catch(_){}
     _aiSetMode(p);
     const body=p.querySelector('#aicBody'), inp=p.querySelector('#aicInput'), send=p.querySelector('#aicSend'), chips=p.querySelector('#aicChips');
     function add(role,text){ const b=document.createElement('div'); b.className='aic-msg '+role; b.textContent=text; body.appendChild(b); body.scrollTop=body.scrollHeight; return b; }
