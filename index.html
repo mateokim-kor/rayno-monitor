@@ -1087,7 +1087,9 @@
   #rSbReopen{display:none;position:fixed;left:12px;top:14px;z-index:30;width:38px;height:38px;border-radius:10px;background:#13151a;color:#e8c9a0;border:1px solid #2f3744;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.35)}
   #rSbReopen:hover{color:#ffb967;border-color:var(--amber)}
   /* AI 대화창 */
-  #aiChat{display:none;position:fixed;right:22px;bottom:22px;width:368px;max-width:calc(100vw - 24px);height:540px;max-height:calc(100vh - 44px);background:var(--card);border:1px solid var(--line2);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);z-index:95;flex-direction:column;overflow:hidden}
+  #aiChat{display:none;position:fixed;left:252px;right:auto;bottom:22px;width:368px;max-width:calc(100vw - 24px);height:540px;max-height:calc(100vh - 44px);background:var(--card);border:1px solid var(--line2);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.30);z-index:95;flex-direction:column;overflow:hidden}
+  .wrap.has-sidebar.collapsed ~ #aiChat{left:16px}
+  @media(max-width:760px){ #aiChat{left:12px;right:12px;width:auto;max-width:none} }
   .aic-head{display:flex;align-items:center;gap:11px;padding:14px 16px;background:#13151a;color:#fff;flex:none}
   .aic-orb{width:32px;height:32px;border-radius:50%;flex:none;background:radial-gradient(circle at 38% 34%,#ffd9a0,#ff9d2e 33%,#f4801a 56%,#b8500a 80%);box-shadow:0 0 14px 3px rgba(244,145,28,.5)}
   .aic-ti{font-size:14px;font-weight:800;line-height:1.2;flex:1}
@@ -1702,7 +1704,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 연동핀 타이틀옆+최종크롤시각';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · AI어시스턴트 좌측패널';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
