@@ -1702,7 +1702,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 연동핀(헤더·워크스페이스별)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 연동핀 경량화(버튼제거)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -8128,50 +8128,45 @@ try{ _applySidebarLayout(); }catch(e){}
 boot();
 </script>
 <script>
-/* ── 실시간 연동 상태 핀 v3 (헤더 고정 · 워크스페이스별 · 모든 페이지) ──
+/* ── 실시간 연동 상태 핀 v4 (표시 전용 · 헤더 · 워크스페이스별) ──
    온라인 모니터링 → "모니터링 실시간 연동 중", 레이노 데이터 → "ERP 실시간 연동 중".
-   헤더(.brand 옆)에 붙어 모든 탭/비로그인에서도 보이며, 마지막 연동 시각을 표시한다. */
+   상태 표시만 한다(버튼 없음). 헤더에 붙어 모든 탭/비로그인에서 보인다. */
 (function(){
-  var CMD_FILE='erp_command.json', ERP_STATUS='erp_status.json';
+  var ERP_STATUS='erp_status.json';
   var FRESH_ERP=70*60*1000;        // ERP: 매시간 → 70분
   var FRESH_MON=26*60*60*1000;     // 모니터링: 일 단위 → 26시간
-  var _last=null, _busy=false;
+  var _cache={}, _shownWs=null;
 
   function wsNow(){ return (typeof workspace!=='undefined')?workspace:'cafe'; }
-  function isAdmin(){ return (typeof auth!=='undefined') && auth==='admin'; }
   function header(){ return document.querySelector('.wrap > header') || document.querySelector('header'); }
   function fmt(ms){
     if(!ms||!isFinite(ms)) return '';
     var d=new Date(ms), now=new Date();
     var hm=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
-    var sameDay=d.toDateString()===now.toDateString();
-    return sameDay ? ('오늘 '+hm) : ((d.getMonth()+1)+'월 '+d.getDate()+'일 '+hm);
+    return (d.toDateString()===now.toDateString()) ? ('오늘 '+hm) : ((d.getMonth()+1)+'월 '+d.getDate()+'일 '+hm);
   }
-  function ago(ms){ if(!ms) return Infinity; return Date.now()-ms; }
 
-  // 워크스페이스별 상태 조회 → {ok, ms, running, error}
   function getInfo(ws){
     if(ws==='rayno'){
       var url=SUPA.url+'/storage/v1/object/public/'+SUPA.bucket+'/'+ERP_STATUS+'?cb='+Date.now();
       return fetch(url).then(function(r){ return r.ok?r.json():null; }).then(function(s){
         if(s){
           var t=s.lastSuccess?new Date(s.lastSuccess).getTime():(s.at?new Date(s.at).getTime():0);
-          return {ok:true, ms:t, running:s.state==='running', error:s.state==='error'};
+          return {ok:!!t, ms:t, running:s.state==='running', error:s.state==='error'};
         }
-        return _mtFallback(SUPA.salesFile);   // 상태파일 없으면 sales.json 시각으로
-      }).catch(function(){ return _mtFallback(SUPA.salesFile); });
+        return _mt(SUPA.salesFile);
+      }).catch(function(){ return _mt(SUPA.salesFile); });
     }
-    // cafe(모니터링): 모니터링 데이터 파일의 클라우드 갱신시각
-    return _mtFallback(SUPA.dataFile);
+    return _mt(SUPA.dataFile);   // cafe: 모니터링 데이터 갱신시각
   }
-  function _mtFallback(file){
+  function _mt(file){
     try{
-      if(typeof _cloudMtimes!=='function') return {ok:false, ms:0};
+      if(typeof _cloudMtimes!=='function') return {ok:false,ms:0};
       return Promise.resolve(_cloudMtimes()).then(function(map){
-        var v=(map&&file)?map[file]:null; var t=v?new Date(v).getTime():0;
+        var v=(map&&file)?map[file]:null, t=v?new Date(v).getTime():0;
         return {ok:!!t, ms:t, running:false, error:false};
-      }).catch(function(){ return {ok:false, ms:0}; });
-    }catch(e){ return {ok:false, ms:0}; }
+      }).catch(function(){ return {ok:false,ms:0}; });
+    }catch(e){ return {ok:false,ms:0}; }
   }
 
   function ensure(){
@@ -8180,31 +8175,23 @@ boot();
     var h=header(); if(!h) return null;
     if(!el){
       el=document.createElement('div'); el.id='erpLive'; el.className='erp-live';
-      el.innerHTML='<span id="erpLiveDot" class="erp-dot"></span>'+
-                   '<span id="erpLiveTxt" class="erp-live-txt">연동 확인 중…</span>'+
-                   '<button id="erpSyncBtn" class="erp-sync" type="button" style="display:none">지금 연동</button>';
+      el.innerHTML='<span id="erpLiveDot" class="erp-dot"></span><span id="erpLiveTxt" class="erp-live-txt">연동 확인 중…</span>';
     }
     var brand=h.querySelector('.brand');
-    if(brand && brand.parentNode===h) brand.insertAdjacentElement('afterend', el);
-    else h.appendChild(el);
-    var b=el.querySelector('#erpSyncBtn'); if(b && !b._wired){ b._wired=1; b.addEventListener('click', manualSync); }
+    if(brand && brand.parentNode===h) brand.insertAdjacentElement('afterend', el); else h.appendChild(el);
     return el;
   }
 
-  function render(info){
+  function render(){
     var el=ensure(); if(!el) return;
     var ws=wsNow();
-    if(ws!=='cafe' && ws!=='rayno'){ el.style.display='none'; return; }   // 설정 등에서는 숨김
+    if(ws!=='cafe' && ws!=='rayno'){ el.style.display='none'; return; }
     el.style.display='inline-flex';
-    var dot=el.querySelector('#erpLiveDot'), txt=el.querySelector('#erpLiveTxt'), btn=el.querySelector('#erpSyncBtn');
-    // 버튼: 레이노 + 관리자에서만
-    if(btn) btn.style.display=(ws==='rayno'&&isAdmin())?'inline-block':'none';
-
-    var label = (ws==='rayno') ? 'ERP' : '모니터링';
-    var fresh = (ws==='rayno') ? FRESH_ERP : FRESH_MON;
-
+    var dot=el.querySelector('#erpLiveDot'), txt=el.querySelector('#erpLiveTxt');
+    var label=(ws==='rayno')?'ERP':'모니터링', fresh=(ws==='rayno')?FRESH_ERP:FRESH_MON;
+    var info=_cache[ws];
     if(!info || !info.ok){ dot.className='erp-dot'; dot.style.background='#9aa'; txt.innerHTML='<b>'+label+'</b> 연동 정보 없음'; return; }
-    var age=ago(info.ms), when=fmt(info.ms);
+    var age=Date.now()-info.ms, when=fmt(info.ms);
     if(info.running){ dot.className='erp-dot pulse'; dot.style.background='#f59e0b'; txt.innerHTML='<b>'+label+'</b> 연동 중…'; }
     else if(info.error){ dot.className='erp-dot'; dot.style.background='#ef4444'; txt.innerHTML='<b>'+label+'</b> 연동 오류'+(when?' · '+when:''); }
     else if(age<=fresh){ dot.className='erp-dot pulse'; dot.style.background='#22c55e'; txt.innerHTML='<b>'+label+' 실시간 연동 중</b>'+(when?' · '+when:''); }
@@ -8214,20 +8201,8 @@ boot();
   function tick(){
     if(typeof document!=='undefined' && document.hidden) return;
     var ws=wsNow();
-    if(ws!=='cafe' && ws!=='rayno'){ render(null); return; }
-    Promise.resolve(getInfo(ws)).then(function(info){ _last=info; render(info); }).catch(function(){ render(_last); });
-  }
-
-  function manualSync(){
-    if(_busy) return;
-    if(!isAdmin()){ if(typeof toast==='function') toast('관리자만 연동할 수 있습니다.',true); return; }
-    if(typeof cloudSaveJSON!=='function'){ if(typeof toast==='function') toast('클라우드 함수를 찾을 수 없습니다.',true); return; }
-    var btn=document.getElementById('erpSyncBtn'); var old=btn?btn.textContent:'';
-    _busy=true; if(btn){ btn.textContent='요청 중…'; btn.disabled=true; }
-    Promise.resolve(cloudSaveJSON(CMD_FILE, {action:'collect', nonce:Date.now(), at:new Date().toISOString()}))
-      .then(function(ok){ if(ok && typeof toast==='function') toast('연동 요청을 보냈습니다 — 최대 1분 내 갱신됩니다.'); })
-      .catch(function(e){ if(typeof toast==='function') toast('요청 실패: '+((e&&e.message)||e),true); })
-      .finally(function(){ _busy=false; if(btn){ btn.textContent=old; btn.disabled=false; } setTimeout(tick,3000); });
+    if(ws!=='cafe' && ws!=='rayno'){ render(); return; }
+    Promise.resolve(getInfo(ws)).then(function(info){ _cache[ws]=info; render(); }).catch(function(){ render(); });
   }
 
   function injectCSS(){
@@ -8241,17 +8216,19 @@ boot();
       '.erp-dot{width:9px;height:9px;border-radius:50%;background:#9aa;flex:0 0 auto}'+
       '.erp-dot.pulse{animation:erpPulse 1.6s ease-in-out infinite}'+
       '@keyframes erpPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}50%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}'+
-      '.erp-sync{margin-left:2px;padding:3px 11px;border-radius:7px;border:1px solid rgba(0,0,0,.15);'+
-      'background:var(--amber,#f59e0b);color:#fff;font-size:12px;font-weight:800;cursor:pointer}'+
-      '.erp-sync:disabled{opacity:.6;cursor:default}'+
       '@media(max-width:560px){.erp-live{font-size:12px;padding:6px 11px}}';
     document.head.appendChild(st);
   }
 
   function boot(){
     injectCSS(); ensure();
-    setInterval(tick, 60000);
-    setInterval(function(){ render(_last); }, 1000);  // 탭 전환 시 문구/표시 갱신
+    setInterval(tick, 60000);                          // 네트워크 조회: 60초(현재 워크스페이스만)
+    setInterval(function(){                             // 탭 전환 감지: 캐시 즉시표시 + 새로조회
+      var ws=wsNow();
+      if(ws==='cafe' || ws==='rayno'){
+        if(ws!==_shownWs){ _shownWs=ws; render(); tick(); } else render();
+      } else render();
+    }, 2000);
     setTimeout(tick, 1200);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
