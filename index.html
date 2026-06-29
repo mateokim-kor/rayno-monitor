@@ -1702,7 +1702,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · ERP연동핀(고정형)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 연동핀(헤더·워크스페이스별)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -8128,61 +8128,96 @@ try{ _applySidebarLayout(); }catch(e){}
 boot();
 </script>
 <script>
-/* ── ERP 실시간 연동 상태 위젯 v2 (화면 고정형) ──
-   사이드바 레이아웃이 #raynoNav / .nav-tools 를 이동시키므로 nav에 의존하지 않고
-   body에 position:fixed 핀으로 띄운다. 대시보드/매출 탭(rview)일 때만 표시. */
+/* ── 실시간 연동 상태 핀 v3 (헤더 고정 · 워크스페이스별 · 모든 페이지) ──
+   온라인 모니터링 → "모니터링 실시간 연동 중", 레이노 데이터 → "ERP 실시간 연동 중".
+   헤더(.brand 옆)에 붙어 모든 탭/비로그인에서도 보이며, 마지막 연동 시각을 표시한다. */
 (function(){
-  var CMD_FILE='erp_command.json', STATUS_FILE='erp_status.json';
-  var FRESH_MS=70*60*1000, _last=null, _busy=false;
+  var CMD_FILE='erp_command.json', ERP_STATUS='erp_status.json';
+  var FRESH_ERP=70*60*1000;        // ERP: 매시간 → 70분
+  var FRESH_MON=26*60*60*1000;     // 모니터링: 일 단위 → 26시간
+  var _last=null, _busy=false;
 
-  function statusURL(){ return SUPA.url+'/storage/v1/object/public/'+SUPA.bucket+'/'+STATUS_FILE+'?cb='+Date.now(); }
-  function onTab(){
-    var rv=(typeof rview!=='undefined')?rview:'';
-    var ws=(typeof workspace!=='undefined')?workspace:'';
-    return ws==='rayno' && (rv==='dash'||rv==='revenue');
-  }
+  function wsNow(){ return (typeof workspace!=='undefined')?workspace:'cafe'; }
   function isAdmin(){ return (typeof auth!=='undefined') && auth==='admin'; }
-  function sidebarOn(){ return !!(document.querySelector('.wrap.has-sidebar')||document.getElementById('rSidebar')); }
-  function fmtAgo(ms){
-    if(!isFinite(ms)) return '기록 없음';
-    var m=Math.floor(ms/60000);
-    if(m<1) return '방금'; if(m<60) return m+'분 전';
-    var h=Math.floor(m/60); return h+'시간 '+(m%60)+'분 전';
+  function header(){ return document.querySelector('.wrap > header') || document.querySelector('header'); }
+  function fmt(ms){
+    if(!ms||!isFinite(ms)) return '';
+    var d=new Date(ms), now=new Date();
+    var hm=('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+    var sameDay=d.toDateString()===now.toDateString();
+    return sameDay ? ('오늘 '+hm) : ((d.getMonth()+1)+'월 '+d.getDate()+'일 '+hm);
   }
-  function fetchStatus(){
-    return fetch(statusURL()).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; });
-  }
-  function ensureWidget(){
-    var el=document.getElementById('erpLive');
-    if(!el){
-      el=document.createElement('div'); el.id='erpLive'; el.className='erp-live'; el.style.display='none';
-      el.innerHTML='<span id="erpLiveDot" class="erp-dot"></span><span id="erpLiveTxt">연동 확인 중…</span>'+
-                   '<button id="erpSyncBtn" class="erp-sync" type="button" style="display:none">지금 연동</button>';
-      document.body.appendChild(el);
-      var b=document.getElementById('erpSyncBtn'); if(b) b.addEventListener('click', manualSync);
+  function ago(ms){ if(!ms) return Infinity; return Date.now()-ms; }
+
+  // 워크스페이스별 상태 조회 → {ok, ms, running, error}
+  function getInfo(ws){
+    if(ws==='rayno'){
+      var url=SUPA.url+'/storage/v1/object/public/'+SUPA.bucket+'/'+ERP_STATUS+'?cb='+Date.now();
+      return fetch(url).then(function(r){ return r.ok?r.json():null; }).then(function(s){
+        if(s){
+          var t=s.lastSuccess?new Date(s.lastSuccess).getTime():(s.at?new Date(s.at).getTime():0);
+          return {ok:true, ms:t, running:s.state==='running', error:s.state==='error'};
+        }
+        return _mtFallback(SUPA.salesFile);   // 상태파일 없으면 sales.json 시각으로
+      }).catch(function(){ return _mtFallback(SUPA.salesFile); });
     }
+    // cafe(모니터링): 모니터링 데이터 파일의 클라우드 갱신시각
+    return _mtFallback(SUPA.dataFile);
+  }
+  function _mtFallback(file){
+    try{
+      if(typeof _cloudMtimes!=='function') return {ok:false, ms:0};
+      return Promise.resolve(_cloudMtimes()).then(function(map){
+        var v=(map&&file)?map[file]:null; var t=v?new Date(v).getTime():0;
+        return {ok:!!t, ms:t, running:false, error:false};
+      }).catch(function(){ return {ok:false, ms:0}; });
+    }catch(e){ return {ok:false, ms:0}; }
+  }
+
+  function ensure(){
+    var el=document.getElementById('erpLive');
+    if(el && el.isConnected) return el;
+    var h=header(); if(!h) return null;
+    if(!el){
+      el=document.createElement('div'); el.id='erpLive'; el.className='erp-live';
+      el.innerHTML='<span id="erpLiveDot" class="erp-dot"></span>'+
+                   '<span id="erpLiveTxt" class="erp-live-txt">연동 확인 중…</span>'+
+                   '<button id="erpSyncBtn" class="erp-sync" type="button" style="display:none">지금 연동</button>';
+    }
+    var brand=h.querySelector('.brand');
+    if(brand && brand.parentNode===h) brand.insertAdjacentElement('afterend', el);
+    else h.appendChild(el);
+    var b=el.querySelector('#erpSyncBtn'); if(b && !b._wired){ b._wired=1; b.addEventListener('click', manualSync); }
     return el;
   }
-  function render(s){
-    var el=ensureWidget();
-    if(!onTab()){ el.style.display='none'; return; }
-    el.style.left = sidebarOn() ? '252px' : '18px';   // 사이드바 폭(236) 피하기
+
+  function render(info){
+    var el=ensure(); if(!el) return;
+    var ws=wsNow();
+    if(ws!=='cafe' && ws!=='rayno'){ el.style.display='none'; return; }   // 설정 등에서는 숨김
     el.style.display='inline-flex';
-    var dot=document.getElementById('erpLiveDot'), txt=document.getElementById('erpLiveTxt'), btn=document.getElementById('erpSyncBtn');
-    if(btn) btn.style.display=isAdmin()?'inline-block':'none';
-    if(!s){ dot.className='erp-dot'; dot.style.background='#9aa'; txt.textContent='연동 상태 없음'; return; }
-    var last = s.lastSuccess ? new Date(s.lastSuccess).getTime() : (s.at? new Date(s.at).getTime() : 0);
-    var age = last ? (Date.now()-last) : Infinity;
-    if(s.state==='running'){ dot.className='erp-dot pulse'; dot.style.background='#f59e0b'; txt.textContent='연동 중…'; }
-    else if(s.state==='error'){ dot.className='erp-dot'; dot.style.background='#ef4444'; txt.textContent='연동 오류 · '+fmtAgo(age); }
-    else if(age<=FRESH_MS){ dot.className='erp-dot pulse'; dot.style.background='#22c55e'; txt.textContent='실시간 연동 중'; }
-    else { dot.className='erp-dot'; dot.style.background='#9aa'; txt.textContent='마지막 갱신 '+fmtAgo(age); }
+    var dot=el.querySelector('#erpLiveDot'), txt=el.querySelector('#erpLiveTxt'), btn=el.querySelector('#erpSyncBtn');
+    // 버튼: 레이노 + 관리자에서만
+    if(btn) btn.style.display=(ws==='rayno'&&isAdmin())?'inline-block':'none';
+
+    var label = (ws==='rayno') ? 'ERP' : '모니터링';
+    var fresh = (ws==='rayno') ? FRESH_ERP : FRESH_MON;
+
+    if(!info || !info.ok){ dot.className='erp-dot'; dot.style.background='#9aa'; txt.innerHTML='<b>'+label+'</b> 연동 정보 없음'; return; }
+    var age=ago(info.ms), when=fmt(info.ms);
+    if(info.running){ dot.className='erp-dot pulse'; dot.style.background='#f59e0b'; txt.innerHTML='<b>'+label+'</b> 연동 중…'; }
+    else if(info.error){ dot.className='erp-dot'; dot.style.background='#ef4444'; txt.innerHTML='<b>'+label+'</b> 연동 오류'+(when?' · '+when:''); }
+    else if(age<=fresh){ dot.className='erp-dot pulse'; dot.style.background='#22c55e'; txt.innerHTML='<b>'+label+' 실시간 연동 중</b>'+(when?' · '+when:''); }
+    else { dot.className='erp-dot'; dot.style.background='#9aa'; txt.innerHTML='<b>'+label+'</b> 마지막 갱신'+(when?' '+when:''); }
   }
+
   function tick(){
     if(typeof document!=='undefined' && document.hidden) return;
-    if(!onTab()){ render(_last); return; }
-    fetchStatus().then(function(s){ _last=s; render(s); });
+    var ws=wsNow();
+    if(ws!=='cafe' && ws!=='rayno'){ render(null); return; }
+    Promise.resolve(getInfo(ws)).then(function(info){ _last=info; render(info); }).catch(function(){ render(_last); });
   }
+
   function manualSync(){
     if(_busy) return;
     if(!isAdmin()){ if(typeof toast==='function') toast('관리자만 연동할 수 있습니다.',true); return; }
@@ -8194,25 +8229,29 @@ boot();
       .catch(function(e){ if(typeof toast==='function') toast('요청 실패: '+((e&&e.message)||e),true); })
       .finally(function(){ _busy=false; if(btn){ btn.textContent=old; btn.disabled=false; } setTimeout(tick,3000); });
   }
+
   function injectCSS(){
     if(document.getElementById('erpLiveCSS')) return;
     var st=document.createElement('style'); st.id='erpLiveCSS';
     st.textContent=
-      '.erp-live{position:fixed;bottom:18px;left:18px;z-index:70;display:inline-flex;align-items:center;gap:6px;'+
-      'padding:5px 12px;border-radius:999px;background:var(--card,#fff);border:1px solid var(--line2,rgba(0,0,0,.12));'+
-      'box-shadow:0 4px 16px rgba(0,0,0,.12);font-size:12px;color:var(--ink2,#555);white-space:nowrap;line-height:1.6}'+
-      '.erp-dot{width:8px;height:8px;border-radius:50%;background:#9aa;flex:0 0 auto}'+
+      '.erp-live{margin-left:auto;display:inline-flex;align-items:center;gap:8px;'+
+      'padding:7px 15px;border-radius:999px;background:var(--card,#fff);border:1px solid var(--line2,rgba(0,0,0,.12));'+
+      'box-shadow:0 2px 10px rgba(0,0,0,.08);font-size:13px;color:var(--ink2,#555);white-space:nowrap;line-height:1.5}'+
+      '.erp-live .erp-live-txt b{color:var(--ink,#1a1a1a);font-weight:800}'+
+      '.erp-dot{width:9px;height:9px;border-radius:50%;background:#9aa;flex:0 0 auto}'+
       '.erp-dot.pulse{animation:erpPulse 1.6s ease-in-out infinite}'+
-      '@keyframes erpPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.45)}50%{box-shadow:0 0 0 5px rgba(34,197,94,0)}}'+
-      '.erp-sync{margin-left:4px;padding:2px 9px;border-radius:6px;border:1px solid rgba(0,0,0,.15);'+
-      'background:var(--amber,#f59e0b);color:#fff;font-size:11px;font-weight:700;cursor:pointer}'+
-      '.erp-sync:disabled{opacity:.6;cursor:default}';
+      '@keyframes erpPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}50%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}'+
+      '.erp-sync{margin-left:2px;padding:3px 11px;border-radius:7px;border:1px solid rgba(0,0,0,.15);'+
+      'background:var(--amber,#f59e0b);color:#fff;font-size:12px;font-weight:800;cursor:pointer}'+
+      '.erp-sync:disabled{opacity:.6;cursor:default}'+
+      '@media(max-width:560px){.erp-live{font-size:12px;padding:6px 11px}}';
     document.head.appendChild(st);
   }
+
   function boot(){
-    injectCSS(); ensureWidget();
+    injectCSS(); ensure();
     setInterval(tick, 60000);
-    setInterval(function(){ render(_last); }, 1000);  // 탭 전환 시 표시/숨김·위치 갱신
+    setInterval(function(){ render(_last); }, 1000);  // 탭 전환 시 문구/표시 갱신
     setTimeout(tick, 1200);
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
