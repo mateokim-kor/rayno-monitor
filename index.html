@@ -1702,7 +1702,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-26 · ERP대리점마스터연동';   // 배포 버전 확인용
+const BUILD = '2026-06-26 · 롤수량+전체매출';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5137,8 +5137,8 @@ function prodRollTable(monthsArg){
   const CATL={MONO:'모노', PRESTO:'프레스토'};
   const catOf=mat=>{ const c=(typeof _midOf==='function'?_midOf(mat):mat)||'기타'; return CATL[c]||c; };
   const agg={};
-  Object.values(SALES.jibuProd).forEach(pm=>{ Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const cat=catOf(mat); const oo=pm[mat]; const o=agg[cat]||(agg[cat]={q:0,a:0}); o.q+=sm(oo.q||oo); o.a+=sm(oo.a||{}); }); });
-  const arr=Object.entries(agg).filter(([,o])=>o.q>0).sort((a,b)=>b[1].q-a[1].q);
+  Object.values(SALES.jibuProd).forEach(pm=>{ Object.keys(pm).forEach(mat=>{ const oo=pm[mat]; const qv=sm(oo.q||oo), av=sm(oo.a||{}); if(_isRoll(mat)){ const cat=catOf(mat); const o=agg[cat]||(agg[cat]={q:0,a:0}); o.q+=qv; o.a+=av; } else { const o=agg['기타']||(agg['기타']={q:0,a:0}); o.a+=av; } }); });
+  const arr=Object.entries(agg).filter(([,o])=>o.q>0||o.a>0).sort((a,b)=>b[1].q-a[1].q);
   if(!arr.length) return '<div class="empty">롤 판매 데이터가 없습니다.</div>';
   const totQ=arr.reduce((s,[,o])=>s+o.q,0), totA=arr.reduce((s,[,o])=>s+o.a,0);
   const thl='style="text-align:left;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
@@ -5192,7 +5192,7 @@ function salesJibuProdRankTable(){
   let sel=_jspSel; if(sel!=='__all' && catList.indexOf(sel)<0) sel=catList[0];
   const seg=`<div class="seg" id="jspSeg" style="margin-bottom:10px;flex-wrap:wrap"><button data-cat="__all" class="${sel==='__all'?'on':''}">전체</button>${catList.map(c=>`<button data-cat="${escapeHtml(c)}" class="${c===sel?'on':''}">${escapeHtml(c)}</button>`).join('')}</div>`;
   const JG=SALES_JIBU.concat(['본사']);
-  const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; let q=0,a=0; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; if(sel!=='__all' && catOf(mat)!==sel)return; const oo=pm[mat]; q+=sm(oo.q||oo); a+=sm(oo.a||{}); }); return {j,q,a}; }).filter(r=>r.q>0).sort((x,y)=>y.q-x.q);
+  const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; let q=0,a=0; Object.keys(pm).forEach(mat=>{ const oo=pm[mat]; if(sel==='__all'){ if(_isRoll(mat)) q+=sm(oo.q||oo); a+=sm(oo.a||{}); } else { if(!_isRoll(mat)||catOf(mat)!==sel)return; q+=sm(oo.q||oo); a+=sm(oo.a||{}); } }); return {j,q,a}; }).filter(r=>r.q>0||r.a>0).sort((x,y)=>y.q-x.q);
   const totQ=rows.reduce((s,r)=>s+r.q,0)||1, totA=rows.reduce((s,r)=>s+r.a,0);
   if(!rows.length) return _jspMonSeg+seg+'<div class="empty">선택한 제품의 지부별 판매 데이터가 없습니다.</div>';
   const thl='style="text-align:left;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
@@ -5336,16 +5336,16 @@ function renderDealer(){
   const all=_dealerAgg();
   if(!all.length){ box.innerHTML='<div class="card"><div class="empty">품질보증서·글라스케어 데이터가 업로드되면 대리점 목록이 집계됩니다.<br>월평균 롤·GC카드·구매 실적(F/S/U) 등은 추후 ERP 연결 시 표시됩니다.</div></div>'; return; }
   const won=n=>(n||0).toLocaleString();
-  const total=all.length, members=all.filter(d=>d.member).length, active=all.filter(d=>d.active).length, jibus=new Set(all.map(d=>d.jibu).filter(Boolean)).size, salesN=all.filter(d=>d.salesA>0).length;
+  const total=all.length, erpTotal=all.filter(d=>d.erp).length, noErp=all.filter(d=>!d.erp).length, members=all.filter(d=>d.member).length, active=all.filter(d=>d.active).length, jibus=new Set(all.map(d=>d.jibu).filter(Boolean)).size, salesN=all.filter(d=>d.salesA>0).length;
   let rows=all.slice();
-  if(DLR.status==='active') rows=rows.filter(d=>d.active); else if(DLR.status==='dormant') rows=rows.filter(d=>!d.active);
+  if(DLR.status==='active') rows=rows.filter(d=>d.active); else if(DLR.status==='dormant') rows=rows.filter(d=>!d.active); else if(DLR.status==='noerp') rows=rows.filter(d=>!d.erp);
   if(DLR.jibu!=='전체') rows=rows.filter(d=>d.jibu===DLR.jibu);
   if(DLR.member==='member') rows=rows.filter(d=>d.member); else if(DLR.member==='normal') rows=rows.filter(d=>!d.member);
   if(DLR.q){ const q=DLR.q.toLowerCase(); rows=rows.filter(d=>d.name.toLowerCase().includes(q)||(d.code||'').toLowerCase().includes(q)); }
   rows.sort((a,b)=>(b.salesA-a.salesA)||((b.warr+b.glass)-(a.warr+a.glass)));
   const jibuList=[...new Set(all.map(d=>d.jibu).filter(Boolean))].sort();
-  const kpis=[ _dcard('전체 대리점', won(total)+'곳','ERP 마스터 기준','var(--dv1)',''), _dcard('매출 대리점', won(salesN)+'곳','ERP 매출 있는 곳','var(--dv4)',''), _dcard('멤버스', won(members)+'곳','글라스케어 멤버스','var(--dv2)',''), _dcard('활성(시공)', won(active)+'곳','최근 60일 내 시공','var(--dv6)','') ];
-  const statusSeg=`<div class="seg" id="dlrStatus"><button data-st="all" class="${DLR.status==='all'?'on':''}">전체</button><button data-st="active" class="${DLR.status==='active'?'on':''}">활성</button><button data-st="dormant" class="${DLR.status==='dormant'?'on':''}">휴면</button></div>`;
+  const kpis=[ _dcard('전체 대리점', won(erpTotal)+'곳','ERP 마스터 기준','var(--dv1)',''), _dcard('ERP 미등록', won(noErp)+'곳','실적만 있음·정리 대상','var(--dv3)',''), _dcard('매출 대리점', won(salesN)+'곳','ERP 매출 있는 곳','var(--dv4)',''), _dcard('멤버스', won(members)+'곳','글라스케어 멤버스','var(--dv2)',''), _dcard('활성(시공)', won(active)+'곳','최근 60일 내 시공','var(--dv6)','') ];
+  const statusSeg=`<div class="seg" id="dlrStatus"><button data-st="all" class="${DLR.status==='all'?'on':''}">전체</button><button data-st="active" class="${DLR.status==='active'?'on':''}">활성</button><button data-st="dormant" class="${DLR.status==='dormant'?'on':''}">휴면</button><button data-st="noerp" class="${DLR.status==='noerp'?'on':''}">ERP미등록</button></div>`;
   const jibuOpt=['전체'].concat(jibuList).map(j=>`<option ${DLR.jibu===j?'selected':''}>${escapeHtml(j)}</option>`).join('');
   const memberOpt=`<option value="all" ${DLR.member==='all'?'selected':''}>멤버스: 전체</option><option value="member" ${DLR.member==='member'?'selected':''}>멤버스</option><option value="normal" ${DLR.member==='normal'?'selected':''}>일반</option>`;
   const filters=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0">${statusSeg}<select class="dt-select" id="dlrJibu">${jibuOpt}</select><select class="dt-select" id="dlrMember">${memberOpt}</select><input type="text" class="dt-input" id="dlrQ" placeholder="대리점명·코드 검색" value="${escapeHtml(DLR.q)}" style="min-width:170px"><button class="acc-btn" id="dlrSearchBtn">검색</button></div>`;
@@ -5355,8 +5355,8 @@ function renderDealer(){
   const td='style="text-align:right;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const kw=n=>{ n=n||0; return n>=1e8?(n/1e8).toFixed(1)+'억':(n>=1e4?Math.round(n/1e4).toLocaleString()+'만':String(Math.round(n))); };
   let t=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:780px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${th}>매출</th><th ${th}>롤</th><th ${th}>보증서</th><th ${th}>글라스케어</th><th ${th}>최근 활동</th><th ${thl}>상태</th></tr>`;
-  rows.forEach((d,i)=>{ const recent=d.days==null?'—':(d.days<=0?'오늘':d.days+'일 전'); const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.active?'<span style="color:var(--dv2);font-weight:700">활성</span>':'<span style="color:var(--amber);font-weight:700">휴면</span>'; t+=`<tr><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${td}>${won(d.warr)}</td><td ${td}>${won(d.glass)}</td><td ${td}>${recent}</td><td ${tdl}>${stat}</td></tr>`; });
-  t+=`</table></div><div class="cap" style="margin-top:8px;line-height:1.6">${won(rows.length)}곳 표시 (전체 ${won(total)}곳) · <b>매출·롤</b>=ERP 매출(대리점별), <b>보증서·글라스케어</b>=관리자 홈페이지 데이터를 <b>대리점명으로 매칭</b>해 결합. <b>ERP 대리점 마스터(전국) 기준</b>이며, 보증서·글라스케어는 <b>대리점코드 우선 매칭</b>으로 결합됩니다. 활성/휴면은 시공(보증서·글라스) 최근 60일 기준 · GC카드·구매 실적(F/S/U)은 ERP 추가 연동 시 표시.</div>`;
+  rows.forEach((d,i)=>{ const recent=d.days==null?'—':(d.days<=0?'오늘':d.days+'일 전'); const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.active?'<span style="color:var(--dv2);font-weight:700">활성</span>':'<span style="color:var(--amber);font-weight:700">휴면</span>'; t+=`<tr><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${d.erp?escapeHtml(d.code||'-'):'<span style=\"color:var(--neg);font-weight:700;font-size:11px\">ERP미등록</span>'}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${td}>${won(d.warr)}</td><td ${td}>${won(d.glass)}</td><td ${td}>${recent}</td><td ${tdl}>${stat}</td></tr>`; });
+  t+=`</table></div><div class="cap" style="margin-top:8px;line-height:1.6">${won(rows.length)}곳 표시 (ERP 마스터 ${won(erpTotal)}곳 + 미등록 ${won(noErp)}곳) · <b>매출·롤</b>=ERP 매출(대리점별), <b>보증서·글라스케어</b>=관리자 홈페이지 데이터를 <b>대리점명으로 매칭</b>해 결합. <b>ERP 대리점 마스터(전국) 기준</b>이며, 보증서·글라스케어는 <b>대리점코드 우선 매칭</b>으로 결합됩니다. 활성/휴면은 시공(보증서·글라스) 최근 60일 기준 · GC카드·구매 실적(F/S/U)은 ERP 추가 연동 시 표시.</div>`;
   box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
 }
 function renderGlass(){
@@ -6696,7 +6696,7 @@ function salesJibuRollTable(monthsArg){
   if(!SALES||!SALES.jibuProd) return '<div style="color:var(--ink2);font-size:13px">ERP 재업로드 후 표시됩니다.</div>';
   const M=(monthsArg&&monthsArg.length)?monthsArg:_salesDispMonths(), JG=SALES_JIBU.concat(['본사']), C=SALES.channels;
   const roll=n=>n?Math.round(n).toLocaleString():'0', won=n=>n?Math.round(n).toLocaleString():'0';
-  function jr(j){ const q=_sMz(),a=_sMz(); const pm=SALES.jibuProd[j]||{}; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; const o=pm[mat]; const oq=o.q||o, oa=o.a||_sMz(); for(let m=1;m<=12;m++){q[m]+=oq[m]||0; a[m]+=oa[m]||0;} }); return {q,a}; }
+  function jr(j){ const q=_sMz(),a=_sMz(); const pm=SALES.jibuProd[j]||{}; Object.keys(pm).forEach(mat=>{ const o=pm[mat]; const oq=o.q||o, oa=o.a||_sMz(); const rl=_isRoll(mat); for(let m=1;m<=12;m++){ if(rl)q[m]+=oq[m]||0; a[m]+=oa[m]||0; } }); return {q,a}; }
   const rows=JG.map(j=>({j,...jr(j)}));
   const _rtot=r=>{ let s=0; M.forEach(m=>s+=r.a[m]||0); return s; };   // 표시 기간 롤 매출 합(점유율=매출÷B2C이라 매출 합 내림차순=점유율 내림차순)
   rows.sort((x,y)=> _rtot(y)-_rtot(x));   // 점유율 순 정렬
