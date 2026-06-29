@@ -1708,7 +1708,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 탭전환 차트애니OFF';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 발급현황 미분류+등록일기준';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5266,7 +5266,7 @@ function renderRDash(){
   const grid=cards=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${cards.join('')}</div>`;
   const split=(t1,t2)=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:14px"><div>${t1}</div><div>${t2}</div></div>`;
   const cardHead=(title,bar)=>`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px"><h3 style="margin:0"><span class="dot"></span>${title}</h3><div class="cardctrl">${bar}</div></div>`;
-  const wDates=hasWarr?WARR.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
+  const wDates=hasWarr?WARR.rows.map(r=>warrDateStr(r)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
   const gDates=hasGlass?GLASS.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
   const yr=((wDates[wDates.length-1]||gDates[gDates.length-1]||'').slice(0,4))||String(new Date().getFullYear());
   let h=_summaryHero();
@@ -5299,12 +5299,12 @@ function renderRDash(){
     const rng=RDW.scope==='range', fromD=rng?(RDW.from||minD):minD, toD=rng?(RDW.to||maxD):maxD;
     const inDay=d=>{ d=String(d||'').slice(0,10); if(!d)return false; if(fromD&&d<fromD)return false; if(toD&&d>toD)return false; return true; };
     const lbl=rng?`${fromD} ~ ${toD}`:'전체 누적';
-    const W=rng?WARR.rows.filter(r=>inDay(r['시공일자'])):WARR.rows;
+    const W=rng?WARR.rows.filter(r=>inDay(warrDateStr(r))):WARR.rows;
     const wTot=W.length, newN=W.filter(_warrIsNew).length;
-    let ul=0,st=0,ph=0,cha=0; W.forEach(r=>{const L=_rowLines(r); if(L.UL)ul++; if(L.ST)st++; if(L.PH)ph++; if(L.CH)cha++;});
+    let ul=0,st=0,ph=0,cha=0,etc=0; W.forEach(r=>{const L=_rowLines(r); let any=false; if(L.UL){ul++;any=true;} if(L.ST){st++;any=true;} if(L.PH){ph++;any=true;} if(L.CH){cha++;any=true;} if(!any)etc++;});  // etc=제품 미인식(전면 빈값 등) → 미분류
     const wj={}; W.forEach(r=>{const j=String(r['담당지부']||'').trim()||'미지정'; wj[j]=(wj[j]||0)+1;}); const wjt=Object.entries(wj).sort((a,b)=>b[1]-a[1]);
     const cards=[ _dcard('발급',won(wTot)+'건',lbl,'var(--dv3)',''), _dcard('신차 비율',pct(newN,wTot),'신차 '+won(newN)+' · 중고 '+won(wTot-newN),'var(--dv3)',''), _dcard('얼티넘 발급',won(ul)+'건','보증서 1건 기준','var(--dv2)',''), _dcard('스트라 발급',won(st)+'건','보증서 1건 기준','var(--dv2)','') ];
-    const lineRows=[['얼티넘',ul],['스트라',st],['팬텀',ph],['카본',cha]].filter(x=>x[1]>0);
+    const lineRows=[['얼티넘',ul],['스트라',st],['팬텀',ph],['카본',cha],['미분류',etc]].filter(x=>x[1]>0);
     h+=`<div class="card">${cardHead('품질보증서 발급 현황', _dateBar('rdw',RDW,minD,maxD))}${grid(cards)}${split(_miniTable('지부','발급',wjt,wTot),_miniTable('제품 라인','발급',lineRows,lineRows.reduce((s,x)=>s+x[1],0)||1))}</div>`;
   }
   if(hasGlass){
