@@ -1228,6 +1228,12 @@
   .ms-gall.part{border-color:var(--amber);color:var(--amber)}
   .ms-opt.rad .ms-box{border-radius:50%}
   .ms-opt.rad.on .ms-box:after{left:4px;top:4px;width:5px;height:5px;border:none;background:#fff;border-radius:50%;transform:none}
+  /* 매출 탭 표 가독성: 내용 폭에 맞춰 축소(전폭으로 늘어나 휑해지는 것 방지) + 살짝 컴팩트 */
+  #rRevenue table.dtbl{width:auto !important;min-width:0 !important;font-size:13px}
+  #rRevenue .iv-wrap{display:inline-block;max-width:100%;vertical-align:top}
+  #rRevenue table.dtbl th{padding:8px 14px !important;font-size:11.5px}
+  #rRevenue table.dtbl td{padding:7px 14px !important}
+  #rRevenue table.dtbl tbody tr:hover td, #rRevenue table.dtbl tr:hover td{background:rgba(244,145,28,.05)}
 </style>
 </head>
 <body>
@@ -1746,7 +1752,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 매출 표 엑셀 + 헤더 이모지 제거';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 매출 표 가독성(내용폭 맞춤)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
