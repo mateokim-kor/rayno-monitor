@@ -1704,7 +1704,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · AI라벨 Sonnet';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · AI 다중월 매출비교';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7843,6 +7843,7 @@ function _aiExecQuery(qy){
   }
   if(domain==='sales'){
     if(!_aiSalesOK()) return '아직 매출(ERP) 데이터가 없어요.';
+    if(Array.isArray(qy.months) && qy.months.length>=2) return _aiCompareSales(qy.months.filter(function(n){return n>=1&&n<=12;}), {channel:qy.channel||null, branch:qy.branch||null});
     const month=per.month||0;
     if(qy.branchTop){ const top=_aiJibuTop(qy.branchTop||5); if(!top||!top.length) return '지부 매출 데이터가 없어요.'; return '매출 상위 지부 TOP'+(qy.branchTop||5)+'\n'+top.map((x,i)=>(i+1)+'. '+x[0]+' — '+_aiFmtWon(x[1])).join('\n'); }
     if(qy.dealerTop){ const top=_aiDealerTop(qy.dealerTop||5); if(!top||!top.length) return '대리점 매출 데이터가 없어요.'; return '매출 상위 대리점 TOP'+(qy.dealerTop||5)+'\n'+top.map((x,i)=>(i+1)+'. '+x[0]+' — '+_aiFmtWon(x[1])).join('\n'); }
@@ -7867,7 +7868,42 @@ async function _aiAskLLM(q, url){
   if(typeof ans==='string' && ans){ _aiHistory.push({role:'user',content:String(q)}); _aiHistory.push({role:'assistant',content:JSON.stringify(query)}); if(_aiHistory.length>12) _aiHistory=_aiHistory.slice(-12); return ans; }
   return null;
 }
+function _aiCompareSales(months, opt){
+  opt=opt||{};
+  if(typeof _aiSalesOK==='function' && !_aiSalesOK()) return '아직 매출(ERP) 데이터가 없어요.';
+  var have=(typeof SALES!=='undefined'&&SALES.months)?SALES.months:[];
+  var ch=opt.channel||null, br=opt.branch||null;
+  var lab = ch?(ch+' '):(br?(br+' '):'');
+  function rev(m){
+    if(ch && SALES.channels && SALES.channels[ch]) return +(((SALES.channels[ch].ma)||[])[m])||0;
+    if(br && SALES.jibu && SALES.jibu[br]) return +(((SALES.jibu[br].ma)||[])[m])||0;
+    return (typeof _aiMonthRev==='function')?_aiMonthRev(m):0;
+  }
+  var rows=months.map(function(m){ return {m:m, v:rev(m), has:have.indexOf(m)>=0}; });
+  var lines=rows.map(function(r){ return '· '+r.m+'월: '+(r.has?_aiFmtWon(r.v):'데이터 없음'); });
+  var extra='';
+  if(rows.length===2 && rows[0].has && rows[1].has){
+    var a=rows[0].v, b=rows[1].v, d=b-a, pct=a?Math.round(d/a*1000)/10:0;
+    var ar=d>0?'\u25B2':(d<0?'\u25BC':'\u2013');
+    extra='\n\u2192 '+rows[1].m+'\uC6D4\uC774 '+rows[0].m+'\uC6D4\uBCF4\uB2E4 '+ar+' '+_aiFmtWon(Math.abs(d))+' ('+(d>=0?'+':'')+pct+'%)';
+  }
+  return (lab+months.map(function(m){return m+'\uC6D4';}).join(' vs ')+' \uB9E4\uCD9C \uBE44\uAD50').trim()+'\n'+lines.join('\n')+extra;
+}
+function _aiTryCompare(q){
+  q=String(q||'');
+  if(typeof SALES==='undefined') return null;
+  if(!/\uB9E4\uCD9C|\uB9E4\uC0C1|\uC2E4\uC801|\uD310\uB9E4/.test(q)) return null;     // 매출/매상/실적/판매 질문만
+  var mm=(q.match(/(\d{1,2})\s*\uC6D4/g)||[]).map(function(x){return parseInt(x,10);}).filter(function(n){return n>=1&&n<=12;});
+  var uniq=[]; mm.forEach(function(n){ if(uniq.indexOf(n)<0) uniq.push(n); });
+  if(uniq.length<2) return null;                                                       // 두 달 이상일 때만 비교
+  var ch=null;
+  if(/b2c|B2C|\uBE44\uD22C\uC528/.test(q)) ch='B2C'; else if(/b2b|B2B|\uBE44\uD22C\uBE44/.test(q)) ch='B2B';
+  var br=null;
+  if(!ch && SALES.jibu){ var ks=Object.keys(SALES.jibu); for(var i=0;i<ks.length;i++){ if(q.indexOf(ks[i])>=0){ br=ks[i]; break; } } }
+  return _aiCompareSales(uniq, {channel:ch, branch:br});
+}
 async function _aiRespond(q){
+  try{ const c=_aiTryCompare(q); if(c) return c; }catch(_){}   // 다중 월 비교는 로컬에서 직접 처리(스키마 한계 우회)
   const url=_aiProxyUrl();
   if(url){ try{ const a=await _aiAskLLM(q,url); if(a) return a; }catch(_){ /* 폴백 */ } }
   return _aiAnswer(q);
