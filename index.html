@@ -1704,7 +1704,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · AI 다중월 매출비교';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · AI 고도화(추이·비중·비교)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7902,8 +7902,72 @@ function _aiTryCompare(q){
   if(!ch && SALES.jibu){ var ks=Object.keys(SALES.jibu); for(var i=0;i<ks.length;i++){ if(q.indexOf(ks[i])>=0){ br=ks[i]; break; } } }
   return _aiCompareSales(uniq, {channel:ch, branch:br});
 }
+function _aiScope(q){
+  var ch=null, br=null;
+  if(/\uBCC4\uB3C4\s*\uCC44\uB110|\uAE30\uD0C0\s*\uCC44\uB110/.test(q)) ch='\uBCC4\uB3C4\uCC44\uB110';
+  else if(/b2c|B2C|\uBE44\uD22C\uC528/.test(q)) ch='B2C';
+  else if(/b2b|B2B|\uBE44\uD22C\uBE44/.test(q)) ch='B2B';
+  if(!ch && typeof SALES!=='undefined' && SALES.jibu){ var ks=Object.keys(SALES.jibu); for(var i=0;i<ks.length;i++){ if(ks[i] && ks[i]!=='\uBCF8\uC0AC' && q.indexOf(ks[i])>=0){ br=ks[i]; break; } } }
+  return {ch:ch, br:br, lab: ch?(ch+' '):(br?(br+' '):'')};
+}
+function _aiRevOf(m, ch, br){
+  if(ch && SALES.channels && SALES.channels[ch]) return +(((SALES.channels[ch].ma)||[])[m])||0;
+  if(br && SALES.jibu && SALES.jibu[br]) return +(((SALES.jibu[br].ma)||[])[m])||0;
+  return _aiMonthRev(m)||0;
+}
+function _aiMonthsAsc(){ var m=((typeof SALES!=='undefined'&&SALES.months)?SALES.months:[]).slice(); m.sort(function(a,b){return a-b;}); return m; }
+function _aiTrendSales(q){
+  if(typeof SALES==='undefined' || !_aiSalesOK()) return null;
+  if(!/\uB9E4\uCD9C|\uB9E4\uC0C1|\uC2E4\uC801|\uD310\uB9E4/.test(q)) return null;
+  if(!/\uCD94\uC774|\uCD94\uC138|\uD750\uB984|\uC99D\uAC10|\uC99D\uAC00\uC138|\uAC10\uC18C\uC138|\uC131\uC7A5\uC138|\uB298\uC5C8|\uC904\uC5C8|\uC6D4\uBCC4|\uC5B4\uB290\s?\uB2EC|\uBB34\uC2A8\s?\uB2EC|\uC81C\uC77C\s?(\uB192|\uB9CE|\uC801|\uB0AE)|\uAC00\uC7A5\s?(\uB192|\uB9CE|\uC801|\uB0AE)|\uCD5C\uACE0|\uCD5C\uC800|\uD53C\uD06C/.test(q)) return null;
+  var sc=_aiScope(q), ms=_aiMonthsAsc(); if(ms.length<2) return null;
+  var rows=ms.map(function(m){ return {m:m, v:_aiRevOf(m, sc.ch, sc.br)}; });
+  var mx=rows[0], mn=rows[0]; rows.forEach(function(r){ if(r.v>mx.v)mx=r; if(r.v<mn.v)mn=r; });
+  var first=rows[0].v, last=rows[rows.length-1].v;
+  var dir = last>first?'\uC804\uBC18\uC801\uC73C\uB85C \uC0C1\uC2B9\uC138':(last<first?'\uC804\uBC18\uC801\uC73C\uB85C \uD558\uB77D\uC138':'\uD070 \uBCC0\uD654 \uC5C6\uC74C');
+  var mom='';
+  if(rows.length>=2){ var a=rows[rows.length-2], b=rows[rows.length-1]; var d=b.v-a.v, pct=a.v?Math.round(d/a.v*1000)/10:0; var ar=d>0?'\u25B2':(d<0?'\u25BC':'\u2013'); mom='\n\u00B7 \uCD5C\uADFC '+b.m+'\uC6D4\uC740 '+a.m+'\uC6D4 \uB300\uBE44 '+ar+' '+_aiFmtWon(Math.abs(d))+' ('+(d>=0?'+':'')+pct+'%)'; }
+  var lines=rows.map(function(r){ return '\u00B7 '+r.m+'\uC6D4: '+_aiFmtWon(r.v); });
+  return (sc.lab+'\uC6D4\uBCC4 \uB9E4\uCD9C \uCD94\uC774').trim()+'\n'+lines.join('\n')+
+    '\n\u2192 \uCD5C\uACE0 '+mx.m+'\uC6D4('+_aiFmtWon(mx.v)+') \u00B7 \uCD5C\uC800 '+mn.m+'\uC6D4('+_aiFmtWon(mn.v)+') \u00B7 '+dir+mom;
+}
+function _aiBreakSales(q){
+  if(typeof SALES==='undefined' || !_aiSalesOK()) return null;
+  var dim=null;
+  if(/\uB300\uB9AC\uC810\s?\uBCC4|\uB300\uB9AC\uC810\s?\uC21C\uC704|\uB300\uB9AC\uC810\s?\uB9E4\uCD9C/.test(q)) dim='dealer';
+  else if(/\uC9C0\uBD80\s?\uBCC4|\uC9C0\uBD80\s?\uC21C\uC704|\uC9C0\uBD80\s?\uB9E4\uCD9C|\uC9C0\uBD80\s?\uBE44\uC911/.test(q)) dim='branch';
+  else if(/\uCC44\uB110\s?\uBCC4|\uCC44\uB110\s?\uBE44\uC911|\uCC44\uB110\s?\uAD6C\uC131|\uBE44\uC911|\uAD6C\uC131\uBE44|\uAD6C\uC131\s?\uBE44\uC728/.test(q)) dim='channel';
+  if(!dim) return null;
+  if(!/\uB9E4\uCD9C|\uB9E4\uC0C1|\uC2E4\uC801|\uD310\uB9E4|\uBE44\uC911|\uAD6C\uC131|\uCC44\uB110|\uC9C0\uBD80|\uB300\uB9AC\uC810/.test(q)) return null;
+  var mm=(q.match(/(\d{1,2})\s*\uC6D4/g)||[]).map(function(x){return parseInt(x,10);}).filter(function(n){return n>=1&&n<=12;});
+  var one=mm.length===1?mm[0]:0;
+  if(dim==='channel'){
+    var keys=['B2C','B2B','\uBCC4\uB3C4\uCC44\uB110'].filter(function(k){ return SALES.channels && SALES.channels[k]; });
+    var rows=keys.map(function(k){ var ma=SALES.channels[k].ma||[]; var v=one?(+ma[one]||0):_sSum(ma); return [k,v]; }).filter(function(r){return r[1]>0;});
+    var tot=rows.reduce(function(a,b){return a+b[1];},0); if(!tot) return null;
+    rows.sort(function(a,b){return b[1]-a[1];});
+    return ((one?one+'\uC6D4 ':'\uB204\uC801 ')+'\uCC44\uB110\uBCC4 \uB9E4\uCD9C').trim()+' (\uCD1D '+_aiFmtWon(tot)+')\n'+
+      rows.map(function(r){ return '\u00B7 '+r[0]+': '+_aiFmtWon(r[1])+' ('+Math.round(r[1]/tot*100)+'%)'; }).join('\n');
+  }
+  if(dim==='branch'){
+    var top=_aiJibuTop(99); if(!top||!top.length) return null;
+    var gt=top.reduce(function(a,b){return a+b[1];},0)||1;
+    return '\uC9C0\uBD80\uBCC4 \uB9E4\uCD9C (\uB204\uC801 \u00B7 \uCD1D '+_aiFmtWon(gt)+')\n'+
+      top.map(function(x,i){ return (i+1)+'. '+x[0]+' \u2014 '+_aiFmtWon(x[1])+' ('+Math.round(x[1]/gt*100)+'%)'; }).join('\n');
+  }
+  var dt=_aiDealerTop(10); if(!dt||!dt.length) return null;
+  return '\uB300\uB9AC\uC810 \uB9E4\uCD9C TOP'+dt.length+'\n'+
+    dt.map(function(x,i){ return (i+1)+'. '+x[0]+' \u2014 '+_aiFmtWon(x[1]); }).join('\n');
+}
+function _aiSmart(q){
+  q=String(q||''); var f;
+  try{ f=_aiTryCompare(q); if(f) return f; }catch(_){}
+  try{ f=_aiTrendSales(q); if(f) return f; }catch(_){}
+  try{ f=_aiBreakSales(q); if(f) return f; }catch(_){}
+  return null;
+}
 async function _aiRespond(q){
-  try{ const c=_aiTryCompare(q); if(c) return c; }catch(_){}   // 다중 월 비교는 로컬에서 직접 처리(스키마 한계 우회)
+  try{ const c=_aiSmart(q); if(c) return c; }catch(_){}   // 비교/추이/비중 등 고급 질의는 로컬 정확집계로 직접 처리
   const url=_aiProxyUrl();
   if(url){ try{ const a=await _aiAskLLM(q,url); if(a) return a; }catch(_){ /* 폴백 */ } }
   return _aiAnswer(q);
@@ -7930,7 +7994,7 @@ function _aiChatOpen(){
     send.addEventListener('click',()=>ask());
     inp.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); ask(); }});
     p.querySelector('.aic-x[aria-label="닫기"]').addEventListener('click',()=>{ p.style.display='none'; });
-    ['5월 매출 얼마야?','전체 매출은?','매출 상위 지부','보증서 몇 건?','언급량/감성 어때?'].forEach(qx=>{ const c=document.createElement('button'); c.type='button'; c.className='aic-chip'; c.textContent=qx; c.addEventListener('click',()=>ask(qx)); chips.appendChild(c); });
+    ['5월이랑 6월 매출 비교','채널별 매출 비중','매출 추이 어때?','매출 상위 지부','보증서 몇 건?'].forEach(qx=>{ const c=document.createElement('button'); c.type='button'; c.className='aic-chip'; c.textContent=qx; c.addEventListener('click',()=>ask(qx)); chips.appendChild(c); });
     add('bot','안녕하세요! 레이노 데이터에 대해 물어보세요. 아래 예시를 눌러도 돼요.');
   }
   p.style.display='flex'; setTimeout(()=>{ try{document.getElementById('aicInput').focus();}catch(_){}} ,60);
