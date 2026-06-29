@@ -1232,9 +1232,6 @@
   #rMain table.dtbl th{padding:8px 13px !important;font-size:11.5px}
   #rMain table.dtbl td{padding:7px 13px !important}
   #rMain table.dtbl tbody tr:hover td, #rMain table.dtbl tr:hover td{background:rgba(244,145,28,.05)}
-  /* 좁은 표(시장 점유율·순위)는 내용 폭으로 줄여 가운데 — 넓은 표는 영향 없음(자동 꽉 채움) */
-  #rMain .iv-wrap.tbl-fit{max-width:max-content;margin-left:auto;margin-right:auto}
-  #rMain .iv-wrap.tbl-fit>table{width:auto !important;min-width:0 !important}
 </style>
 </head>
 <body>
@@ -1753,7 +1750,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 본문 풀폭 복귀+좁은표 콘텐츠폭';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 표 풀폭 복귀(확장 기회만 2단 유지)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5200,7 +5197,7 @@ function prodRollTable(monthsArg){
   const roll=n=>n?Math.round(n).toLocaleString():'0', won=n=>n?Math.round(n).toLocaleString():'0';
   const tdb=td.slice(0,-1)+';position:relative;z-index:0"';
   const maxQ=Math.max(1,...arr.map(([,o])=>o.q||0));
-  let h=`<div class="cap" style="margin-bottom:8px">롤 제품(큰 카테고리)별 판매 수량·매출 · 표시 기간 합계</div><div class="iv-wrap tbl-fit"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>제품</th><th ${th}>판매 수량(롤)</th><th ${th}>매출액</th><th ${th}>수량 점유율</th><th ${th}>매출 점유율</th></tr>`;
+  let h=`<div class="cap" style="margin-bottom:8px">롤 제품(큰 카테고리)별 판매 수량·매출 · 표시 기간 합계</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>제품</th><th ${th}>판매 수량(롤)</th><th ${th}>매출액</th><th ${th}>수량 점유율</th><th ${th}>매출 점유율</th></tr>`;
   arr.forEach(([cat,o])=>{ h+=`<tr><td ${tdl}><b>${escapeHtml(cat)}</b></td><td ${td}>${roll(o.q)}</td><td ${td}>${won(o.a)}</td><td ${tdb}>${_dbar((o.q||0)/maxQ*100)}<span style="position:relative">${totQ?(o.q/totQ*100).toFixed(1)+'%':'—'}</span></td><td ${td}>${totA?(o.a/totA*100).toFixed(1)+'%':'—'}</td></tr>`; });
   h+=`<tr class="t-tot"><td ${tdl}><b>합계</b></td><td ${tdt}>${roll(totQ)}</td><td ${tdt}>${won(totA)}</td><td ${td}>100%</td><td ${td}>100%</td></tr></table></div>`;
   return h;
@@ -5252,7 +5249,7 @@ function salesJibuProdRankTable(){
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
   const roll=n=>n?Math.round(n).toLocaleString():'·', kw=n=>n?Math.round(n).toLocaleString()+'원':'·';
-  let h=_jspMonSeg+seg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> ${sel==='__all'?'롤 판매 지부 순위':'를 가장 많이 판매한 지부 순위'} · ${escapeHtml(_mLabel)} · 롤 판매 수 기준</div><div class="iv-wrap tbl-fit"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
+  let h=_jspMonSeg+seg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> ${sel==='__all'?'롤 판매 지부 순위':'를 가장 많이 판매한 지부 순위'} · ${escapeHtml(_mLabel)} · 롤 판매 수 기준</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
   rows.forEach((r,i)=>{ h+=`<tr><td ${tdl} style="color:var(--ink3);width:38px">${i+1}</td><td ${tdl}>${escapeHtml(r.j)}</td><td ${tdt}>${roll(r.q)}</td><td ${td}>${kw(r.a)}</td><td ${td}>${(r.q/totQ*100).toFixed(1)}%</td></tr>`; });
   h+=`<tr class="t-tot"><td ${tdl}></td><td ${tdl}><b>합계</b></td><td ${tdt}><b>${roll(totQ)}</b></td><td ${td}><b>${kw(totA)}</b></td><td ${td}><b>100%</b></td></tr></table></div>`;
   return h;
@@ -7063,7 +7060,7 @@ function salesShareTable(){
   const anyCr=M.some(m=>cr(m)>0);
   let h=`<div class="cap" style="margin-bottom:8px;line-height:1.65">모든 점유율의 <b>분모 = 신차 등록(시장)</b>으로 같습니다. 분자(우리 실적)를 3가지로 봅니다 — <b style="color:#16a34a">보증서</b>=실제 <b>신차</b> 시공(실측·가장 정확), <b style="color:#f4911c">대리점</b>·<b style="color:#3b82f6">판매</b>=롤 출고를 시공대수로 환산한 <b>추정치</b>라 보통 보증서보다 큽니다. ⚙설정에서 신차등록·대리점 판매·롤당 대수 입력(롤당 10대·모노카본 17대).</div>`;
   if(!anyCr) h+=`<div style="padding:9px 12px;background:rgba(244,145,28,.1);border-radius:8px;font-size:12px;margin-bottom:8px">⚠ <b>신차등록(월 출고 대수)</b>이 없어 점유율이 계산되지 않습니다. ⚙설정 → 매출 설정에서 입력하세요.</div>`;
-  h+=`<div class="iv-wrap tbl-fit"><table class="iv iv-sticky"><tr><th ${thl}>기준</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}${showT?`<th ${th}>누적</th>`:''}</tr>`;
+  h+=`<div class="iv-wrap"><table class="iv iv-sticky"><tr><th ${thl}>기준</th>${M.map(m=>`<th ${th}>${m}월</th>`).join('')}${showT?`<th ${th}>누적</th>`:''}</tr>`;
   bases.forEach(b=>{ h+=`<tr class="${b.hi?'sub':''}"><td class="l">${b.n} <span class="s">${b.s}</span></td>${M.map(m=>_shCell(b.f(m),cr(m),b.n,b.d,m+'월')).join('')}${showT?(()=>{ let n=0,c=0; M.forEach(m=>{n+=b.f(m);c+=cr(m);}); return _shCell(n,c,b.n,b.d,'누적'); })():''}</tr>`; });
   h+=`</table></div><div class="cap" style="margin-top:6px">점유율 = 기준 차량대수 ÷ 월 출고 대수 · 신차등록 미입력 월은 '—' · <b>숫자를 누르면 산출식</b>이 표시됩니다</div>`;
   return h;
