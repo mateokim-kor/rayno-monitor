@@ -1708,7 +1708,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 지부제품 발급현황 엑셀(위치수정)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 엑셀 다운로드 버튼(녹색)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5784,7 +5784,7 @@ function lineWarrCard(recs){
   const scopeBtns=`<button data-sc="jibu" class="${scope==='jibu'?'on':''}">지부별</button><button data-sc="dealer" class="${scope==='dealer'?'on':''}">대리점별</button>`;
   let h=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px;line-height:1.55"><b>${Llabel}</b> 보증서 발급 — ${scope==='dealer'?'대리점별':'지부별'} 발급 건수. <b>보증서 1건 기준</b> · 이 카드는 아래 <b>자체 기간 필터</b>를 사용합니다(상단 필터와 별개).</div>`;
   h+=`<div class="lw-filt">
-    <div class="lw-frow"><span class="lw-flabel">기간</span><div class="cardctrl lw-fgrow">${_dateBar('lw', LWV, lwMin, lwMax)}<button class="acc-btn" id="warrLineXlsx" style="margin-left:6px" title="현재 카드 필터(기간·구분·전면만) 기준 지부×제품 매트릭스를 엑셀로 내려받습니다">⬇ 엑셀</button></div></div>
+    <div class="lw-frow"><span class="lw-flabel">기간</span><div class="cardctrl lw-fgrow">${_dateBar('lw', LWV, lwMin, lwMax)}<button class="acc-btn" id="warrLineXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="현재 카드 필터(기간·구분·전면만) 기준 지부×제품 매트릭스를 엑셀로 내려받습니다">⬇ 엑셀 다운로드</button></div></div>
     <div class="lw-frow"><span class="lw-flabel">구분</span><div class="seg" id="lwScope">${scopeBtns}</div>${warrFrontCol()?`<span class="lw-fdiv"></span><div class="seg" id="lwFront"><button data-fo="1" class="${_lwFrontOnly?'on':''}" title="앞유리(전면) 시공 보증서만 보기">전면만</button></div>`:''}</div>
   </div>`;
   { const subs=Object.keys(subCnt).sort((a,b)=>subCnt[b]-subCnt[a]); const lineAll=Object.values(subCnt).reduce((s,n)=>s+n,0);
