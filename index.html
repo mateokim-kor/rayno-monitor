@@ -1065,8 +1065,8 @@
   /* ── 다크 사이드바 (리디자인 1단계) ── */
   body.sidebar-on{padding:0 !important}
   .wrap.has-sidebar{display:grid;grid-template-columns:236px minmax(0,1fr);grid-template-rows:auto 1fr;grid-template-areas:"side head" "side main";max-width:none;margin:0;min-height:100vh}
-  .wrap.has-sidebar>header{grid-area:head;margin:24px 30px 2px;background:transparent;border:none;box-shadow:none;padding:0}
-  .wrap.has-sidebar>#rMain{grid-area:main;padding:6px 30px 44px;min-width:0}
+  .wrap.has-sidebar>header{grid-area:head;margin:24px 30px 2px;background:transparent;border:none;box-shadow:none;padding:0;max-width:1280px}
+  .wrap.has-sidebar>#rMain{grid-area:main;padding:6px 30px 44px;min-width:0;max-width:1280px}
   .wrap.has-sidebar>#rSidebar{grid-area:side;position:sticky;top:0;height:100vh;background:#13151a;color:#c7ccd6;display:flex;flex-direction:column;padding:16px 13px 12px;overflow:hidden;z-index:6}
   .rsb-brand{display:flex;align-items:center;gap:9px;padding:2px 8px 12px;margin-bottom:6px;border-bottom:1px solid #262a32;background:none;border-left:none;border-right:none;border-top:none;width:100%;cursor:pointer}
   .rsb-brand:hover{opacity:.85}
@@ -1228,12 +1228,10 @@
   .ms-gall.part{border-color:var(--amber);color:var(--amber)}
   .ms-opt.rad .ms-box{border-radius:50%}
   .ms-opt.rad.on .ms-box:after{left:4px;top:4px;width:5px;height:5px;border:none;background:#fff;border-radius:50%;transform:none}
-  /* 매출 탭 표 가독성: 내용 폭에 맞춰 축소(전폭으로 늘어나 휑해지는 것 방지) + 살짝 컴팩트 */
-  #rRevenue table.dtbl{width:auto !important;min-width:0 !important;font-size:13px}
-  #rRevenue .iv-wrap{display:inline-block;max-width:100%;vertical-align:top}
-  #rRevenue table.dtbl th{padding:8px 14px !important;font-size:11.5px}
-  #rRevenue table.dtbl td{padding:7px 14px !important}
-  #rRevenue table.dtbl tbody tr:hover td, #rRevenue table.dtbl tr:hover td{background:rgba(244,145,28,.05)}
+  /* 레이노 탭 표 가독성: 카드 폭을 채우되 패딩·행 hover 정리(보증서·글라스·매출 공통) */
+  #rMain table.dtbl th{padding:8px 13px !important;font-size:11.5px}
+  #rMain table.dtbl td{padding:7px 13px !important}
+  #rMain table.dtbl tbody tr:hover td, #rMain table.dtbl tr:hover td{background:rgba(244,145,28,.05)}
 </style>
 </head>
 <body>
@@ -1752,7 +1750,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 매출 표 가독성(내용폭 맞춤)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 본문폭 캡(여백 해결)+표 정리 전탭';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
