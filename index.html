@@ -1216,10 +1216,11 @@
   .ms-clear{background:none;border:none;color:var(--ink3);font-size:12.5px;cursor:pointer;font-family:inherit;padding:4px 2px}
   .ms-clear:hover{color:var(--ink2)}
   .ms-done{background:none;border:none;color:var(--amber);font-weight:700;font-size:13.5px;cursor:pointer;font-family:inherit;padding:4px 6px}
-  .ms-pop.ms-wide{min-width:340px;max-width:440px}
+  .ms-pop.ms-wide{min-width:300px;max-width:none;width:min(94vw,860px)}
+  .ms-grpwrap{column-width:212px;column-gap:22px}
+  .ms-pop.ms-wide .ms-grid{grid-template-columns:1fr;gap:1px 0;max-height:none}
   .ms-cnt2{margin-left:auto;font-size:11px;color:var(--ink3);opacity:.8}
-  .ms-grp{margin-bottom:10px}
-  .ms-grp:last-of-type{margin-bottom:2px}
+  .ms-grp{margin-bottom:14px;break-inside:avoid;-webkit-column-break-inside:avoid;page-break-inside:avoid;display:inline-block;width:100%}
   .ms-grph{display:flex;align-items:center;gap:8px;margin:2px 2px 5px;font-size:12px;color:var(--ink2)}
   .ms-grph b{font-size:12.5px;color:var(--ink)}
   .ms-gall{font-size:11px;color:var(--ink3);border:1px solid var(--line2);border-radius:980px;padding:2px 9px;cursor:pointer;user-select:none}
@@ -1745,7 +1746,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 전체 필터 드롭다운 통일';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 그룹 드롭다운 가로 다단(16:9)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5944,7 +5945,7 @@ function _msFieldG(key, label, groups, selectedArr){
   }).join('');
   return `<div class="ms" data-ms="${key}">
     <button type="button" class="ms-btn"><span class="ms-lab">${escapeHtml(label)}</span><span class="ms-cnt">${cnt}</span><span class="ms-car">▾</span></button>
-    <div class="ms-pop ms-wide" hidden>${body}<div class="ms-foot"><button type="button" class="ms-clear">선택 해제</button><button type="button" class="ms-done">완료</button></div></div>
+    <div class="ms-pop ms-wide" hidden><div class="ms-grpwrap">${body}</div><div class="ms-foot"><button type="button" class="ms-clear">선택 해제</button><button type="button" class="ms-done">완료</button></div></div>
   </div>`;
 }
 function _anHintHtml(tab){
@@ -9006,7 +9007,7 @@ boot();
   function closeAll(except){ document.querySelectorAll('.ms').forEach(function(ms){ if(ms!==except) closeMs(ms); }); }
   document.addEventListener('click', function(e){
     var btn=e.target.closest&&e.target.closest('.ms-btn');
-    if(btn){ e.preventDefault(); var ms=btn.closest('.ms'); var key=ms.dataset.ms; var willOpen=ms.querySelector('.ms-pop').hasAttribute('hidden'); closeAll(null); if(willOpen){ var t=document.querySelector('.ms[data-ms="'+key+'"]'); if(t){ t.classList.add('open'); var tp=t.querySelector('.ms-pop'); if(tp)tp.removeAttribute('hidden'); } } return; }
+    if(btn){ e.preventDefault(); var ms=btn.closest('.ms'); var key=ms.dataset.ms; var willOpen=ms.querySelector('.ms-pop').hasAttribute('hidden'); closeAll(null); if(willOpen){ var t=document.querySelector('.ms[data-ms="'+key+'"]'); if(t){ t.classList.add('open'); var tp=t.querySelector('.ms-pop'); if(tp){ tp.style.left=''; tp.removeAttribute('hidden'); try{ var rc=tp.getBoundingClientRect(); var ov=rc.right-(window.innerWidth-8); if(ov>0){ var nl=Math.max(-(rc.left-8), -ov); tp.style.left=nl+'px'; } }catch(_){ } } } } return; }
     var gall=e.target.closest&&e.target.closest('.ms-gall');
     if(gall){ e.preventDefault(); var ms2=gall.closest('.ms'); var r2=reg(ms2.dataset.ms); if(!r2)return; var vals=(gall.dataset.gall||'').split('||').filter(Boolean); var a=r2.get(); var all=vals.length&&vals.every(function(v){return a.indexOf(v)>=0;}); vals.forEach(function(v){ var i=a.indexOf(v); if(all){ if(i>=0)a.splice(i,1); } else if(i<0){ a.push(v); } var cb=ms2.querySelector('input[value="'+CSS.escape(v)+'"]'); if(cb){ cb.checked=!all; syncOpt(cb); } }); syncGalls(ms2); setCnt(ms2); if(r2.applyOn==='change'){ try{r2.render();}catch(_){ } } else { dirtyKey=ms2.dataset.ms; } return; }
     var clr=e.target.closest&&e.target.closest('.ms-clear');
