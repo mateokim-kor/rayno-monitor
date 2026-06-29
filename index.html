@@ -1702,7 +1702,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 연동핀 경량화(버튼제거)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 연동핀 타이틀옆+최종크롤시각';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -8157,7 +8157,16 @@ boot();
         return _mt(SUPA.salesFile);
       }).catch(function(){ return _mt(SUPA.salesFile); });
     }
-    return _mt(SUPA.dataFile);   // cafe: 모니터링 데이터 갱신시각
+    // cafe(모니터링): 최종 크롤링 시간 = crawl_status.json 의 at
+    var curl=SUPA.url+'/storage/v1/object/public/'+SUPA.bucket+'/'+SUPA.statusFile+'?cb='+Date.now();
+    return fetch(curl).then(function(r){ return r.ok?r.json():null; }).then(function(s){
+      if(s && s.at){
+        var t=new Date(s.at).getTime();
+        var run=(s.state==='running'||s.state==='await_auth') && (Date.now()-t<120000);
+        return {ok:!!t, ms:t, running:run, error:s.state==='error'};
+      }
+      return _mt(SUPA.dataFile);   // 상태파일 없으면 데이터 갱신시각으로 폴백
+    }).catch(function(){ return _mt(SUPA.dataFile); });
   }
   function _mt(file){
     try{
@@ -8177,8 +8186,11 @@ boot();
       el=document.createElement('div'); el.id='erpLive'; el.className='erp-live';
       el.innerHTML='<span id="erpLiveDot" class="erp-dot"></span><span id="erpLiveTxt" class="erp-live-txt">연동 확인 중…</span>';
     }
-    var brand=h.querySelector('.brand');
-    if(brand && brand.parentNode===h) brand.insertAdjacentElement('afterend', el); else h.appendChild(el);
+    var ht=document.getElementById('headerTitle');
+    var wrap=ht?ht.parentNode:null;
+    if(wrap && wrap.parentNode){ wrap.insertAdjacentElement('afterend', el); }   // 타이틀 바로 옆
+    else { var brand=h.querySelector('.brand'); if(brand) brand.appendChild(el); else h.appendChild(el); }
+    if(!el._noprop){ el._noprop=1; el.addEventListener('click', function(e){ e.stopPropagation(); }); }  // 브랜드 클릭(홈이동) 방지
     return el;
   }
 
@@ -8209,7 +8221,7 @@ boot();
     if(document.getElementById('erpLiveCSS')) return;
     var st=document.createElement('style'); st.id='erpLiveCSS';
     st.textContent=
-      '.erp-live{margin-left:auto;display:inline-flex;align-items:center;gap:8px;'+
+      '.erp-live{margin-left:10px;align-self:center;display:inline-flex;align-items:center;gap:8px;'+
       'padding:7px 15px;border-radius:999px;background:var(--card,#fff);border:1px solid var(--line2,rgba(0,0,0,.12));'+
       'box-shadow:0 2px 10px rgba(0,0,0,.08);font-size:13px;color:var(--ink2,#555);white-space:nowrap;line-height:1.5}'+
       '.erp-live .erp-live-txt b{color:var(--ink,#1a1a1a);font-weight:800}'+
