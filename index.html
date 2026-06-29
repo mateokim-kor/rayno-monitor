@@ -1708,7 +1708,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 지부 분석 매출·글라스 추가';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부분석 제품선택·월복수·금액수량·전체선기본';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5366,25 +5366,27 @@ function renderDealer(){
   box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
 }
 // ── 글라스케어 지부 분석: 월별 × 제품 가입 추이 ──
-let GBA={ jibu:'', scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };
+let GBA={ jibu:'', prod:[], sel:[] };
 function _glassDateStr(r){ const cols=(GLASS&&GLASS.columns)||[]; const dc=(GV.dateCol&&cols.includes(GV.dateCol))?GV.dateCol:(cols.includes('시공일자')?'시공일자':(cols.find(c=>/일자|날짜/.test(c))||'시공일자')); return warrParseDate(r[dc]); }
 function _glassFrontLine(r){ const f=_parseFilm(r['썬팅제품(전면)']); return (f&&_LINE_CODE[f.line])?_LINE_CODE[f.line]:'미분류'; }
 function _gbaBranches(){ const s={}; ((GLASS&&GLASS.rows)||[]).forEach(r=>{ const j=String(r['담당지부']||'').trim(); if(j)s[j]=(s[j]||0)+1; }); return Object.keys(s).sort((a,b)=>s[b]-s[a]); }
 function _gbaData(){
   if(!(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows&&GLASS.rows.length)) return null;
   let base=GLASS.rows.slice();
-  const bd=base.map(r=>String(_glassDateStr(r)||'').slice(0,10)).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
-  const minD=bd[0]||'', maxD=bd[bd.length-1]||''; GBA._min=minD; GBA._max=maxD;
-  const rng=(GBA.scope==='range'&&(GBA.from||GBA.to));
-  if(rng) base=base.filter(r=>{ const d=String(_glassDateStr(r)||'').slice(0,10); if(GBA.from&&d<GBA.from)return false; if(GBA.to&&d>GBA.to)return false; return true; });
+  const am={}; base.forEach(r=>{ const ym=String(_glassDateStr(r)||'').slice(0,7); if(/^\d{4}-\d{2}$/.test(ym))am[ym]=1; });
+  const avMonths=Object.keys(am).sort(); const multiYear=new Set(avMonths.map(m=>m.slice(0,4))).size>1;
   if(GBA.jibu) base=base.filter(r=>String(r['담당지부']||'').trim()===GBA.jibu);
-  const mset={}, byMonth={};
-  base.forEach(r=>{ const ym=String(_glassDateStr(r)||'').slice(0,7); if(!/^\d{4}-\d{2}$/.test(ym))return; mset[ym]=1; const o=byMonth[ym]||(byMonth[ym]={_t:0}); const ln=_glassFrontLine(r); o[ln]=(o[ln]||0)+1; o._t++; });
-  const months=Object.keys(mset).sort();
-  const usedLines=_JBA_LINES.filter(l=>months.some(m=>((byMonth[m]&&byMonth[m][l])||0)>0));
+  const pl={}; base.forEach(r=>{ pl[_glassFrontLine(r)]=1; }); const presentLines=_JBA_LINES.filter(l=>pl[l]);
+  const months=(GBA.sel&&GBA.sel.length)? avMonths.filter(m=>GBA.sel.indexOf(m)>=0) : avMonths;
+  const prodSel=(GBA.prod&&GBA.prod.length)? presentLines.filter(p=>GBA.prod.indexOf(p)>=0) : presentLines;
+  const mS=new Set(months), pS=new Set(prodSel);
+  const byMonth={}; months.forEach(m=>byMonth[m]={_t:0});
+  base.forEach(r=>{ const ym=String(_glassDateStr(r)||'').slice(0,7); if(!mS.has(ym))return; const ln=_glassFrontLine(r); if(!pS.has(ln))return; const o=byMonth[ym]; o[ln]=(o[ln]||0)+1; o._t++; });
+  const usedLines=prodSel.filter(l=>months.some(m=>(byMonth[m][l]||0)>0));
   const totalSeries=months.map(m=>byMonth[m]._t||0);
-  const lineSeries={}; usedLines.forEach(l=>{ lineSeries[l]=months.map(m=>(byMonth[m]&&byMonth[m][l])||0); });
-  return {rng, from:rng?(GBA.from||minD):minD, to:rng?(GBA.to||maxD):maxD, minD, maxD, jibu:GBA.jibu, months, usedLines, totalSeries, lineSeries, byMonth, wTot:base.length};
+  const lineSeries={}; usedLines.forEach(l=>lineSeries[l]=months.map(m=>byMonth[m][l]||0));
+  const monthLabels=months.map(m=>_anMlab(m,multiYear));
+  return {avMonths,multiYear,presentLines,months,monthLabels,usedLines,totalSeries,lineSeries,byMonth,jibu:GBA.jibu,prod:(GBA.prod||[]).slice(),sel:(GBA.sel||[]).slice(),wTot:totalSeries.reduce((a,b)=>a+b,0),unit:'건',numFmt:'#,##0'};
 }
 function glassAnalysisCard(){
   if(!(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows&&GLASS.rows.length)) return '';
@@ -5394,10 +5396,11 @@ function glassAnalysisCard(){
   const hint=d&&d.wTot? `${GBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총 ${d.wTot.toLocaleString()}건` : '데이터 없음';
   return `<div class="card">
     <h3 style="margin:0"><span class="dot"></span>지부 분석 — 월별·제품별 가입 추이</h3>
-    <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부를 선택하면 <b>월별 가입량(굵은 전체선)</b>과 <b>제품 라인별 추이</b>를 함께 봅니다. 범례 클릭으로 선을 켜고 끌 수 있어요.</div>
+    <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부·제품·월을 골라 <b>월별 가입 추이</b>를 봅니다. 기본은 굵은 전체선만 보이고, <b>제품을 선택</b>하면 해당 제품 선이 켜져요.</div>
     <div class="lw-filt">
-      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="gbaJibu" style="max-width:200px">${opts}</select><span class="lw-fhint" style="margin-left:8px">${escapeHtml(hint)}</span></div>
-      <div class="lw-frow"><span class="lw-flabel">기간</span><div class="cardctrl lw-fgrow">${_dateBar('gba', GBA, (d&&d.minD)||'', (d&&d.maxD)||'')}<button class="acc-btn" id="gbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="선택 지부의 월별×제품 가입 매트릭스를 엑셀로 내려받습니다">⬇ 엑셀 다운로드</button></div></div>
+      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="gbaJibu" style="max-width:180px">${opts}</select><span class="lw-flabel" style="margin-left:8px">제품</span>${_anProdSeg('gbaProdSeg',(d&&d.presentLines)||[],GBA.prod)}</div>
+      <div class="lw-frow"><span class="lw-flabel">월</span><div class="cardctrl lw-fgrow">${_anMonthSeg('gbaMonthSeg',(d&&d.avMonths)||[],GBA.sel,(d&&d.multiYear))}<button class="acc-btn" id="gbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="월×제품 가입 매트릭스 엑셀">⬇ 엑셀 다운로드</button></div></div>
+      <div class="lw-frow"><span class="lw-fhint">${escapeHtml(hint)}</span></div>
     </div>
     <div style="position:relative;height:340px;margin-top:6px"><canvas id="gbaChart"></canvas></div>
   </div>`;
@@ -5405,12 +5408,11 @@ function glassAnalysisCard(){
 function _gbaRenderChart(){
   const cv=document.getElementById('gbaChart'); if(!cv) return;
   const d=_gbaData(); if(!d||!d.months.length) return;
-  const ds=[{ label:'전체', data:d.totalSeries, borderColor:'#111827', backgroundColor:'#111827', borderWidth:3, pointRadius:2, pointHoverRadius:5, tension:.32, order:0 }];
-  d.usedLines.forEach(l=>{ ds.push({ label:l, data:d.lineSeries[l], borderColor:_JBA_COLOR[l]||'#888', backgroundColor:_JBA_COLOR[l]||'#888', borderWidth:2, pointRadius:2, pointHoverRadius:4, tension:.32, order:1 }); });
+  const prodActive=!!(GBA.prod&&GBA.prod.length);
   makeChart('gbaChart', { type:'line',
-    data:{ labels:d.months.map(m=>m.replace('-','.').slice(2)), datasets:ds },
+    data:{ labels:d.monthLabels, datasets:_anDatasets(d,(l)=>_JBA_COLOR[l]||'#888',prodActive) },
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      plugins:{ legend:{ position:'top' }, tooltip:{ callbacks:{ title:(it)=>'20'+(it[0]?it[0].label:'') } } },
+      plugins:{ legend:{ position:'top' } },
       scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } } });
 }
 function renderGlass(){
@@ -5708,7 +5710,7 @@ function monthRange(ym){ const a=ym.split('-').map(Number); const last=new Date(
 const WV={ gran:'month', scope:'all', from:'', to:'', branch:'전체', fronts:[], showExcluded:false, tab:'overview', preset:'all', _min:'', _max:'' };
 const LWV={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 지부/제품별 발급 카드 자체 기간 필터
 let _lwLine='ALL', _lwScope='jibu', _lwSub=[], _lwFrontOnly=false;   // 제품 라인 발급 카드(얼티넘/스트라/팬텀/카본 × 지부/대리점 × VLT)
-let JBA={ jibu:'', scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 지부 분석 카드(월별×제품 추이) 자체 기간 필터
+let JBA={ jibu:'', prod:[], sel:[] };   // 지부 분석(보증서): 지부·제품(복수)·월(복수)
 let GLASS=null, glassLoaded=false, _glScope='jibu', _glDealerAll=false, _glJibuDrill='';   // 글라스케어 가입
 let ERPD=null, erpdLoaded=false;   // ERP 대리점 마스터(dealers.json)
 async function ensureErpd(){ if(erpdLoaded)return; const j=await cloudLoadJSON(SUPA.dealerFile); if(j&&Array.isArray(j.dealers)) ERPD=j; erpdLoaded=true; }
@@ -5862,30 +5864,37 @@ function lineWarrCard(recs){
   if(scope==='dealer'&&groups.length>30) h+=`<div class="cap" style="margin-top:6px">상위 30개 대리점만 표시 (전체 ${groups.length}곳)</div>`;
   return h;
 }
-// ── 지부 분석: 월별 × 제품 발급 추이 (멀티라인) ──
+// ── 멀티라인 지부 분석: 공통 헬퍼 (보증서/글라스/매출 공용) ──
 const _JBA_LINES=['얼티넘','스트라','팬텀','크로마','스페셜','미분류'];
 const _JBA_COLOR={'얼티넘':'#2563eb','스트라':'#f59e0b','팬텀':'#8b5cf6','크로마':'#ec4899','스페셜':'#06b6d4','미분류':'#9ca3af'};
-function _jbaBranches(){
-  const ex=(typeof warrExcludedSet==='function')?warrExcludedSet():new Set();
-  const s={}; ((WARR&&WARR.rows)||[]).forEach(r=>{ if(ex.has(warrRecKey(r)))return; const j=String(r['담당지부']||'').trim(); if(j)s[j]=(s[j]||0)+1; });
-  return Object.keys(s).sort((a,b)=>s[b]-s[a]);
-}
+const _SBA_PALETTE=['#2563eb','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#10b981','#9ca3af'];
+function _anMlab(ym, multiYear){ ym=String(ym); if(/^\d{4}-\d{2}$/.test(ym)) return multiYear? ym.slice(2) : (parseInt(ym.slice(5,7),10)+'월'); if(/^\d{1,2}$/.test(ym)) return ym+'월'; return ym; }
+function _anMonthSeg(id, avMonths, selArr, multiYear){ const sel=new Set((selArr||[]).map(String)); return `<div class="seg" id="${id}" style="flex-wrap:wrap"><button data-anm="__all" class="${sel.size===0?'on':''}">전체</button>`+avMonths.map(m=>`<button data-anm="${escapeHtml(String(m))}" class="${sel.has(String(m))?'on':''}">${escapeHtml(_anMlab(m,multiYear))}</button>`).join('')+`</div>`; }
+function _anProdSeg(id, lines, selArr){ const sel=new Set(selArr||[]); return `<div class="seg" id="${id}" style="flex-wrap:wrap"><button data-anp="__all" class="${sel.size===0?'on':''}">전체</button>`+lines.map(l=>`<button data-anp="${escapeHtml(l)}" class="${sel.has(l)?'on':''}">${escapeHtml(l)}</button>`).join('')+`</div>`; }
+function _anToggle(arr, v){ if(v==='__all'){ arr.length=0; return; } const i=arr.indexOf(v); if(i>=0)arr.splice(i,1); else arr.push(v); }
+function _anReg(id){ switch(id){ case 'jbaMonthSeg':return{arr:JBA.sel,render:renderWarranty}; case 'jbaProdSeg':return{arr:JBA.prod,render:renderWarranty}; case 'gbaMonthSeg':return{arr:GBA.sel,render:renderGlass}; case 'gbaProdSeg':return{arr:GBA.prod,render:renderGlass}; case 'sbaMonthSeg':return{arr:SBA.sel,render:renderRevenue}; case 'sbaProdSeg':return{arr:SBA.prod,render:renderRevenue}; } return null; }
+function _anDatasets(d, colorOf, prodActive){ const ds=[{label:'전체',data:d.totalSeries,borderColor:'#111827',backgroundColor:'#111827',borderWidth:3,pointRadius:2,pointHoverRadius:5,tension:.32,order:0}]; d.usedLines.forEach((l,i)=>{ const c=colorOf(l,i); ds.push({label:l,data:d.lineSeries[l],borderColor:c,backgroundColor:c,borderWidth:2,pointRadius:2,pointHoverRadius:4,tension:.32,order:1,hidden:!prodActive}); }); return ds; }
+
+// ── 보증서 지부 분석 ──
+function _jbaBranches(){ const ex=(typeof warrExcludedSet==='function')?warrExcludedSet():new Set(); const s={}; ((WARR&&WARR.rows)||[]).forEach(r=>{ if(ex.has(warrRecKey(r)))return; const j=String(r['담당지부']||'').trim(); if(j)s[j]=(s[j]||0)+1; }); return Object.keys(s).sort((a,b)=>s[b]-s[a]); }
 function _jbaData(){
   if(!(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)) return null;
   const ex=(typeof warrExcludedSet==='function')?warrExcludedSet():new Set();
   let base=(WARR.rows||[]).filter(r=>!ex.has(warrRecKey(r)));
-  const bd=base.map(r=>String(warrDateStr(r)||'').slice(0,10)).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
-  const minD=bd[0]||'', maxD=bd[bd.length-1]||''; JBA._min=minD; JBA._max=maxD;
-  const rng=(JBA.scope==='range'&&(JBA.from||JBA.to));
-  if(rng) base=base.filter(r=>{ const d=String(warrDateStr(r)||'').slice(0,10); if(JBA.from&&d<JBA.from)return false; if(JBA.to&&d>JBA.to)return false; return true; });
+  const am={}; base.forEach(r=>{ const ym=String(warrDateStr(r)||'').slice(0,7); if(/^\d{4}-\d{2}$/.test(ym))am[ym]=1; });
+  const avMonths=Object.keys(am).sort(); const multiYear=new Set(avMonths.map(m=>m.slice(0,4))).size>1;
   if(JBA.jibu) base=base.filter(r=>String(r['담당지부']||'').trim()===JBA.jibu);
-  const mset={}, byMonth={};
-  base.forEach(r=>{ const ym=String(warrDateStr(r)||'').slice(0,7); if(!/^\d{4}-\d{2}$/.test(ym))return; mset[ym]=1; const o=byMonth[ym]||(byMonth[ym]={_t:0}); const ln=_warrFrontLine(r); o[ln]=(o[ln]||0)+1; o._t++; });
-  const months=Object.keys(mset).sort();
-  const usedLines=_JBA_LINES.filter(l=>months.some(m=>((byMonth[m]&&byMonth[m][l])||0)>0));
+  const pl={}; base.forEach(r=>{ pl[_warrFrontLine(r)]=1; }); const presentLines=_JBA_LINES.filter(l=>pl[l]);
+  const months=(JBA.sel&&JBA.sel.length)? avMonths.filter(m=>JBA.sel.indexOf(m)>=0) : avMonths;
+  const prodSel=(JBA.prod&&JBA.prod.length)? presentLines.filter(p=>JBA.prod.indexOf(p)>=0) : presentLines;
+  const mS=new Set(months), pS=new Set(prodSel);
+  const byMonth={}; months.forEach(m=>byMonth[m]={_t:0});
+  base.forEach(r=>{ const ym=String(warrDateStr(r)||'').slice(0,7); if(!mS.has(ym))return; const ln=_warrFrontLine(r); if(!pS.has(ln))return; const o=byMonth[ym]; o[ln]=(o[ln]||0)+1; o._t++; });
+  const usedLines=prodSel.filter(l=>months.some(m=>(byMonth[m][l]||0)>0));
   const totalSeries=months.map(m=>byMonth[m]._t||0);
-  const lineSeries={}; usedLines.forEach(l=>{ lineSeries[l]=months.map(m=>(byMonth[m]&&byMonth[m][l])||0); });
-  return {rng, from:rng?(JBA.from||minD):minD, to:rng?(JBA.to||maxD):maxD, minD, maxD, jibu:JBA.jibu, months, usedLines, totalSeries, lineSeries, byMonth, wTot:base.length};
+  const lineSeries={}; usedLines.forEach(l=>lineSeries[l]=months.map(m=>byMonth[m][l]||0));
+  const monthLabels=months.map(m=>_anMlab(m,multiYear));
+  return {avMonths,multiYear,presentLines,months,monthLabels,usedLines,totalSeries,lineSeries,byMonth,jibu:JBA.jibu,prod:(JBA.prod||[]).slice(),sel:(JBA.sel||[]).slice(),wTot:totalSeries.reduce((a,b)=>a+b,0),unit:'건',numFmt:'#,##0'};
 }
 function jibuAnalysisCard(){
   if(!(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)) return '';
@@ -5895,10 +5904,11 @@ function jibuAnalysisCard(){
   const hint=d&&d.wTot? `${JBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총 ${d.wTot.toLocaleString()}건` : '데이터 없음';
   return `<div class="card">
     <h3 style="margin:0"><span class="dot"></span>지부 분석 — 월별·제품별 발급 추이</h3>
-    <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부를 선택하면 <b>월별 발급량(굵은 전체선)</b>과 <b>제품 라인별 추이</b>를 함께 봅니다. 범례를 클릭해 선을 켜고 끌 수 있어요. <b>발급일(보증서 등록일) 기준</b>.</div>
+    <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부·제품·월을 골라 <b>월별 발급 추이</b>를 봅니다. 기본은 굵은 전체선만 보이고, <b>제품을 선택</b>하면 해당 제품 선이 켜져요(범례 클릭으로도 토글). <b>발급일(등록일) 기준</b>.</div>
     <div class="lw-filt">
-      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="jbaJibu" style="max-width:200px">${opts}</select><span class="lw-fhint" style="margin-left:8px">${escapeHtml(hint)}</span></div>
-      <div class="lw-frow"><span class="lw-flabel">기간</span><div class="cardctrl lw-fgrow">${_dateBar('jba', JBA, (d&&d.minD)||'', (d&&d.maxD)||'')}<button class="acc-btn" id="jbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="선택 지부의 월별×제품 발급 매트릭스를 엑셀로 내려받습니다">⬇ 엑셀 다운로드</button></div></div>
+      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="jbaJibu" style="max-width:180px">${opts}</select><span class="lw-flabel" style="margin-left:8px">제품</span>${_anProdSeg('jbaProdSeg',(d&&d.presentLines)||[],JBA.prod)}</div>
+      <div class="lw-frow"><span class="lw-flabel">월</span><div class="cardctrl lw-fgrow">${_anMonthSeg('jbaMonthSeg',(d&&d.avMonths)||[],JBA.sel,(d&&d.multiYear))}<button class="acc-btn" id="jbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="월×제품 발급 매트릭스 엑셀">⬇ 엑셀 다운로드</button></div></div>
+      <div class="lw-frow"><span class="lw-fhint">${escapeHtml(hint)}</span></div>
     </div>
     <div style="position:relative;height:340px;margin-top:6px"><canvas id="jbaChart"></canvas></div>
   </div>`;
@@ -5906,12 +5916,11 @@ function jibuAnalysisCard(){
 function _jbaRenderChart(){
   const cv=document.getElementById('jbaChart'); if(!cv) return;
   const d=_jbaData(); if(!d||!d.months.length) return;
-  const ds=[{ label:'전체', data:d.totalSeries, borderColor:'#111827', backgroundColor:'#111827', borderWidth:3, pointRadius:2, pointHoverRadius:5, tension:.32, order:0 }];
-  d.usedLines.forEach(l=>{ ds.push({ label:l, data:d.lineSeries[l], borderColor:_JBA_COLOR[l]||'#888', backgroundColor:_JBA_COLOR[l]||'#888', borderWidth:2, pointRadius:2, pointHoverRadius:4, tension:.32, order:1 }); });
+  const prodActive=!!(JBA.prod&&JBA.prod.length);
   makeChart('jbaChart', { type:'line',
-    data:{ labels:d.months.map(m=>m.replace('-','.').slice(2)), datasets:ds },
+    data:{ labels:d.monthLabels, datasets:_anDatasets(d,(l)=>_JBA_COLOR[l]||'#888',prodActive) },
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      plugins:{ legend:{ position:'top' }, tooltip:{ callbacks:{ title:(it)=>'20'+(it[0]?it[0].label:'') } } },
+      plugins:{ legend:{ position:'top' } },
       scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } } });
 }
 function renderWarranty(){
@@ -6304,39 +6313,47 @@ function salesRegionMap(){
 
 // ── 매출 지부 분석: 월별 × 제품(중분류) 매출 추이 ──
 const _SBA_PAL=['#2563eb','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#10b981','#9ca3af'];
-let SBA={ jibu:'', sel:[] };
+let SBA={ jibu:'', prod:[], sel:[], metric:'amt' };
 function _sbaCatOf(mat){ const CATL={MONO:'모노',PRESTO:'프레스토'}; const c=(typeof _midOf==='function'?_midOf(mat):mat)||'기타'; return CATL[c]||c; }
 function _sbaBranches(){ if(!(SALES&&SALES.jibuProd)) return []; const tot={}; Object.keys(SALES.jibuProd).forEach(j=>{ const pm=SALES.jibuProd[j]||{}; let s=0; Object.keys(pm).forEach(mat=>{ const a=(pm[mat]&&pm[mat].a)||{}; for(let m=1;m<=12;m++)s+=a[m]||0; }); tot[j]=s; }); return Object.keys(tot).sort((a,b)=>tot[b]-tot[a]); }
 function _sbaData(){
   if(!(typeof SALES!=='undefined'&&SALES&&SALES.jibuProd)) return null;
+  const qty=(SBA.metric==='qty');
   const avM=(typeof _salesMonths==='function')?_salesMonths():((SALES.months||[]).slice());
-  const mnums=(SBA.sel&&SBA.sel.length)? avM.filter(m=>SBA.sel.indexOf(m)>=0) : avM;
+  const srcAll=SBA.jibu ? (SALES.jibuProd[SBA.jibu]?{[SBA.jibu]:SALES.jibuProd[SBA.jibu]}:{}) : SALES.jibuProd;
+  const catTotAll={};
+  Object.keys(srcAll).forEach(j=>{ const pm=srcAll[j]||{}; Object.keys(pm).forEach(mat=>{ const roll=!(typeof _isRoll==='function')||_isRoll(mat); if(qty&&!roll)return; const cat=(!roll)?'기타':_sbaCatOf(mat); const map=(pm[mat]&&(qty?pm[mat].q:pm[mat].a))||{}; let s=0; for(let m=1;m<=12;m++)s+=map[m]||0; if(s)catTotAll[cat]=(catTotAll[cat]||0)+s; }); });
+  const presentCats=Object.keys(catTotAll).sort((a,b)=>catTotAll[b]-catTotAll[a]);
+  const mnums=(SBA.sel&&SBA.sel.length)? avM.filter(m=>SBA.sel.indexOf(String(m))>=0) : avM;
   const months=mnums.map(m=>m+'월');
+  const prodActive=!!(SBA.prod&&SBA.prod.length);
+  const prodSel=prodActive? presentCats.filter(c=>SBA.prod.indexOf(c)>=0) : presentCats;
+  const pS=new Set(prodSel);
   const byMonth={}; months.forEach(ml=>byMonth[ml]={_t:0});
-  const src=SBA.jibu ? (SALES.jibuProd[SBA.jibu]?{[SBA.jibu]:SALES.jibuProd[SBA.jibu]}:{}) : SALES.jibuProd;
-  Object.keys(src).forEach(j=>{ const pm=src[j]||{}; Object.keys(pm).forEach(mat=>{ const cat=(typeof _isRoll==='function'&&!_isRoll(mat))?'기타':_sbaCatOf(mat); const a=(pm[mat]&&pm[mat].a)||{}; mnums.forEach(m=>{ const v=a[m]||0; if(!v)return; const ml=m+'월'; const o=byMonth[ml]; o[cat]=(o[cat]||0)+v; o._t+=v; }); }); });
-  const catTot={}; months.forEach(ml=>Object.keys(byMonth[ml]).forEach(c=>{ if(c==='_t')return; catTot[c]=(catTot[c]||0)+byMonth[ml][c]; }));
-  let cats=Object.keys(catTot).sort((a,b)=>catTot[b]-catTot[a]); let used;
-  if(cats.length>6){ const keep=cats.slice(0,6), rest=cats.slice(6); months.forEach(ml=>{ let e=0; rest.forEach(c=>{ e+=byMonth[ml][c]||0; delete byMonth[ml][c]; }); if(e)byMonth[ml]['기타']=(byMonth[ml]['기타']||0)+e; }); used=keep.slice(); if(rest.length&&used.indexOf('기타')<0)used.push('기타'); }
-  else used=cats;
+  Object.keys(srcAll).forEach(j=>{ const pm=srcAll[j]||{}; Object.keys(pm).forEach(mat=>{ const roll=!(typeof _isRoll==='function')||_isRoll(mat); if(qty&&!roll)return; const cat=(!roll)?'기타':_sbaCatOf(mat); if(!pS.has(cat))return; const map=(pm[mat]&&(qty?pm[mat].q:pm[mat].a))||{}; mnums.forEach(m=>{ const v=map[m]||0; if(!v)return; const ml=m+'월'; const o=byMonth[ml]; o[cat]=(o[cat]||0)+v; o._t+=v; }); }); });
+  let used=prodSel.slice();
+  if(!prodActive && used.length>6){ const keep=used.slice(0,6), rest=used.slice(6); months.forEach(ml=>{ let e=0; rest.forEach(c=>{ e+=byMonth[ml][c]||0; delete byMonth[ml][c]; }); if(e)byMonth[ml]['기타']=(byMonth[ml]['기타']||0)+e; }); used=keep.slice(); if(rest.length&&used.indexOf('기타')<0)used.push('기타'); }
+  used=used.filter(c=>months.some(ml=>(byMonth[ml][c]||0)>0));
   const totalSeries=months.map(ml=>Math.round(byMonth[ml]._t||0));
-  const lineSeries={}; used.forEach(c=>{ lineSeries[c]=months.map(ml=>Math.round(byMonth[ml][c]||0)); });
+  const lineSeries={}; used.forEach(c=>lineSeries[c]=months.map(ml=>Math.round(byMonth[ml][c]||0)));
   const wTot=totalSeries.reduce((a,b)=>a+b,0);
-  return {months, usedLines:used, totalSeries, lineSeries, byMonth, jibu:SBA.jibu, wTot, sel:(SBA.sel||[]).slice(), avM};
+  return {avMonths:avM.map(String), multiYear:false, presentLines:presentCats, months, monthLabels:months, usedLines:used, totalSeries, lineSeries, byMonth, jibu:SBA.jibu, prod:(SBA.prod||[]).slice(), sel:(SBA.sel||[]).slice(), metric:SBA.metric, wTot, unit:qty?'롤':'원', numFmt:'#,##0'};
 }
 function salesAnalysisCard(){
   if(!(typeof SALES!=='undefined'&&SALES&&SALES.jibuProd)) return '';
   const branches=_sbaBranches();
   const opts=`<option value=""${SBA.jibu===''?' selected':''}>전체 지부</option>`+branches.map(b=>`<option value="${escapeHtml(b)}"${SBA.jibu===b?' selected':''}>${escapeHtml(b)}</option>`).join('');
-  const d=_sbaData(); const avM=(d&&d.avM)||[]; const selSet=new Set(SBA.sel||[]);
-  const monthSeg=`<div class="seg" id="sbaMonthSeg" style="flex-wrap:wrap"><button data-sbm="0" class="${selSet.size===0?'on':''}">전체</button>${avM.map(m=>`<button data-sbm="${m}" class="${selSet.has(m)?'on':''}">${m}월</button>`).join('')}</div>`;
-  const hint=d&&d.wTot? `${SBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총매출 ${(d.wTot/1e8).toFixed(1)}억` : '데이터 없음';
+  const d=_sbaData(); const qty=(SBA.metric==='qty');
+  const metSeg=`<div class="seg" id="sbaMetric"><button data-sbmetric="amt" class="${!qty?'on':''}">금액</button><button data-sbmetric="qty" class="${qty?'on':''}">롤 수량</button></div>`;
+  const hint=d&&d.wTot? (qty? `${SBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총 ${d.wTot.toLocaleString()}롤` : `${SBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총매출 ${(d.wTot/1e8).toFixed(1)}억`) : '데이터 없음';
   return `<div class="card">
-    <h3 style="margin:0"><span class="dot"></span>지부 분석 — 월별·제품별 매출 추이</h3>
-    <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부를 선택하면 <b>월별 매출(굵은 전체선)</b>과 <b>제품(중분류)별 매출 추이</b>를 함께 봅니다. 범례 클릭으로 선을 켜고 끌 수 있어요. 단위: 원(VAT 별도).</div>
+    <h3 style="margin:0"><span class="dot"></span>지부 분석 — 월별·제품별 ${qty?'롤 수량':'매출'} 추이</h3>
+    <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부·제품·월을 골라 <b>월별 추이</b>를 봅니다. 기본은 굵은 전체선만, <b>제품 선택</b> 시 해당 제품 선이 켜져요. 금액/롤 수량 전환 가능(VAT 별도).</div>
     <div class="lw-filt">
-      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="sbaJibu" style="max-width:200px">${opts}</select><span class="lw-fhint" style="margin-left:8px">${escapeHtml(hint)}</span></div>
-      <div class="lw-frow"><span class="lw-flabel">월</span><div class="cardctrl lw-fgrow">${monthSeg}<button class="acc-btn" id="sbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="선택 지부의 월별×제품 매출 매트릭스를 엑셀로 내려받습니다">⬇ 엑셀 다운로드</button></div></div>
+      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="sbaJibu" style="max-width:170px">${opts}</select><span class="lw-flabel" style="margin-left:8px">지표</span>${metSeg}</div>
+      <div class="lw-frow"><span class="lw-flabel">제품</span>${_anProdSeg('sbaProdSeg',(d&&d.presentLines)||[],SBA.prod)}</div>
+      <div class="lw-frow"><span class="lw-flabel">월</span><div class="cardctrl lw-fgrow">${_anMonthSeg('sbaMonthSeg',(d&&d.avMonths)||[],SBA.sel,false)}<button class="acc-btn" id="sbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="월×제품 매트릭스 엑셀">⬇ 엑셀 다운로드</button></div></div>
+      <div class="lw-frow"><span class="lw-fhint">${escapeHtml(hint)}</span></div>
     </div>
     <div style="position:relative;height:340px;margin-top:6px"><canvas id="sbaChart"></canvas></div>
   </div>`;
@@ -6344,14 +6361,15 @@ function salesAnalysisCard(){
 function _sbaRenderChart(){
   const cv=document.getElementById('sbaChart'); if(!cv) return;
   const d=_sbaData(); if(!d||!d.months.length) return;
+  const qty=(d.metric==='qty');
   const moneyTick=v=> v>=1e8?(v/1e8).toLocaleString()+'억': v>=1e4?(v/1e4).toLocaleString()+'만': (v||0).toLocaleString();
-  const ds=[{ label:'전체', data:d.totalSeries, borderColor:'#111827', backgroundColor:'#111827', borderWidth:3, pointRadius:2, pointHoverRadius:5, tension:.32, order:0 }];
-  d.usedLines.forEach((l,i)=>{ const col=_SBA_PAL[i%_SBA_PAL.length]; ds.push({ label:l, data:d.lineSeries[l], borderColor:col, backgroundColor:col, borderWidth:2, pointRadius:2, pointHoverRadius:4, tension:.32, order:1 }); });
+  const prodActive=!!(SBA.prod&&SBA.prod.length);
+  const ds=_anDatasets(d,(l,i)=>_SBA_PAL[i%_SBA_PAL.length],prodActive);
   makeChart('sbaChart', { type:'line',
-    data:{ labels:d.months, datasets:ds },
+    data:{ labels:d.monthLabels, datasets:ds },
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
-      plugins:{ legend:{position:'top'}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y||0).toLocaleString()+'원'}} },
-      scales:{ y:{ beginAtZero:true, ticks:{ callback:moneyTick } } } } });
+      plugins:{ legend:{position:'top'}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y||0).toLocaleString()+(qty?'롤':'원')}} },
+      scales:{ y:{ beginAtZero:true, ticks:{ callback: qty? (v=>(v||0).toLocaleString()) : moneyTick } } } } });
 }
 function renderRevenue(){
   const box=document.getElementById('rRevenue'); if(!box) return;
@@ -6562,7 +6580,6 @@ document.getElementById('rRevenue').addEventListener('change', e=>{
 })();
 document.getElementById('rRevenue').addEventListener('click', e=>{
   const t=e.target;
-  const _sbm=t.closest&&t.closest('#sbaMonthSeg button'); if(_sbm){ const m=parseInt(_sbm.dataset.sbm,10); if(m===0){ SBA.sel=[]; } else { const i=SBA.sel.indexOf(m); if(i>=0)SBA.sel.splice(i,1); else SBA.sel.push(m); } renderRevenue(); return; }
   const _rollB=t.closest&&t.closest('[data-rollmid]');
   if(_rollB){ const key=_rollB.dataset.rollmid; _rollExp[key]=!_rollExp[key]; _rollB.classList.toggle('on', _rollExp[key]);
     const box=document.getElementById('rRevenue'); box.querySelectorAll('.roll-sub').forEach(r=>{ if(r.dataset.rollsub===key) r.style.display=_rollExp[key]?'':'none'; });
@@ -7480,6 +7497,8 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const _lsub=e.target.closest('button[data-lwsub]'); if(_lsub){ const _sv=_lsub.dataset.lwsub; if(_sv==='__all'){ _lwSub=[]; } else { const _i=_lwSub.indexOf(_sv); if(_i>=0) _lwSub.splice(_i,1); else _lwSub.push(_sv); } renderWarranty(); return; }
   const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; _lwSub=[]; renderWarranty(); return; }
   const _fo=e.target.closest('#lwFront button'); if(_fo){ _lwFrontOnly=!_lwFrontOnly; renderWarranty(); return; } const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
+  const _anb=e.target.closest&&e.target.closest('button[data-anm],button[data-anp]'); if(_anb){ const _cont=_anb.closest('.seg'); const _reg=_cont&&(typeof _anReg==='function')&&_anReg(_cont.id); if(_reg){ _anToggle(_reg.arr, _anb.dataset.anm!=null?_anb.dataset.anm:_anb.dataset.anp); _reg.render(); return; } }
+  const _met=e.target.closest&&e.target.closest('#sbaMetric button'); if(_met){ SBA.metric=_met.dataset.sbmetric; SBA.prod=[]; renderRevenue(); return; }
   const _gsb=e.target.closest('#glScope button'); if(_gsb){ _glScope=_gsb.dataset.s; _glDealerAll=false; _glJibuDrill=''; renderGlass(); return; }
   const _jd=e.target.closest('[data-jdrill]'); if(_jd){ const v=_jd.dataset.jdrill; try{ const _r=_jd.getBoundingClientRect(); window._glDrillXY={x:_r.left+Math.min(_r.width,240), y:_r.bottom}; }catch(_){ } _glJibuDrill=(_glJibuDrill===v?'':v); renderGlass(); return; }
   if(e.target.closest('#glDrillClose')){ _glJibuDrill=''; renderGlass(); return; }
@@ -8742,12 +8761,12 @@ boot();
 /* ── 지부 분석: 월별×제품 발급 매트릭스 엑셀 내보내기 ── */
 (function(){
   function _loadExcelJS(){ return new Promise(function(res,rej){ if(window.ExcelJS)return res(window.ExcelJS); var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'; s.onload=function(){ window.ExcelJS?res(window.ExcelJS):rej(new Error('no')); }; s.onerror=function(){ rej(new Error('cdn')); }; document.head.appendChild(s); }); }
-  function _title(d){ var p=d.rng?(d.from+' ~ '+d.to):'전체 기간 ('+d.minD+' ~ '+d.maxD+')'; return '지부 분석 · 월별×제품 발급   |   '+(d.jibu||'전체 지부')+'   |   '+p+'   |   총 '+d.wTot.toLocaleString()+'건'; }
-  function _fname(d){ return '레이노_지부분석_'+(d.jibu||'전체')+'_'+(d.rng?(d.from+'_'+d.to):'전체')+'.xlsx'; }
+  function _title(d){ var mr=(d.monthLabels&&d.monthLabels.length)?(d.monthLabels[0]+'~'+d.monthLabels[d.monthLabels.length-1]):'-'; var pf=(d.prod&&d.prod.length)?(' · 제품 '+d.prod.join('/')):''; return '지부 분석 · 월별×제품 발급   |   '+(d.jibu||'전체 지부')+pf+'   |   '+mr+'   |   총 '+d.wTot.toLocaleString()+'건'; }
+  function _fname(d){ return '레이노_지부분석_발급_'+(d.jibu||'전체')+'.xlsx'; }
   function _fallback(d){
     var header=['월'].concat(d.usedLines).concat(['합계']);
     var aoa=[[_title(d)],header];
-    d.months.forEach(function(m){ var o=d.byMonth[m]||{}; aoa.push([m].concat(d.usedLines.map(function(l){return o[l]||0;})).concat([o._t||0])); });
+    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; aoa.push([d.monthLabels[ri]].concat(d.usedLines.map(function(l){return o[l]||0;})).concat([o._t||0])); });
     var tot=d.usedLines.map(function(l){return d.months.reduce(function(s,m){return s+((d.byMonth[m]||{})[l]||0);},0);});
     aoa.push(['합계'].concat(tot).concat([d.wTot]));
     var ws=XLSX.utils.aoa_to_sheet(aoa);
@@ -8766,7 +8785,7 @@ boot();
     t.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLACK}}; t.font={bold:true,color:{argb:WHITE},size:12}; t.alignment={vertical:'middle',horizontal:'left',indent:1}; ws.getRow(1).height=30;
     var hr=ws.getRow(2); header.forEach(function(h,i){ var c=hr.getCell(i+1); c.value=h; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ORANGE}}; c.font={bold:true,color:{argb:WHITE},size:11}; c.alignment={vertical:'middle',horizontal:i===0?'left':'center'}; c.border=border; }); hr.height=22;
     var tot={}; lines.forEach(function(l){tot[l]=0;});
-    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; var vals=[m].concat(lines.map(function(l){return o[l]||0;})).concat([o._t||0]);
+    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; var vals=[d.monthLabels[ri]].concat(lines.map(function(l){return o[l]||0;})).concat([o._t||0]);
       var row=ws.getRow(3+ri);
       vals.forEach(function(v,i){ var c=row.getCell(i+1); c.value=v; c.border=border; c.alignment={vertical:'middle',horizontal:i===0?'left':'right'}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb: ri%2?GRAYA:WHITE}}; if(i>0) c.numFmt='#,##0'; if(i===nC-1) c.font={bold:true}; });
       lines.forEach(function(l){tot[l]+=(o[l]||0);}); row.height=18;
@@ -8791,12 +8810,12 @@ boot();
 /* ── 글라스케어 지부 분석: 월별×제품 가입 매트릭스 엑셀 내보내기 ── */
 (function(){
   function _loadExcelJS(){ return new Promise(function(res,rej){ if(window.ExcelJS)return res(window.ExcelJS); var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'; s.onload=function(){ window.ExcelJS?res(window.ExcelJS):rej(new Error('no')); }; s.onerror=function(){ rej(new Error('cdn')); }; document.head.appendChild(s); }); }
-  function _title(d){ var p=d.rng?(d.from+' ~ '+d.to):'전체 기간 ('+d.minD+' ~ '+d.maxD+')'; return '글라스케어 지부 분석 · 월별×제품 가입   |   '+(d.jibu||'전체 지부')+'   |   '+p+'   |   총 '+d.wTot.toLocaleString()+'건'; }
-  function _fname(d){ return '레이노_글라스지부분석_'+(d.jibu||'전체')+'_'+(d.rng?(d.from+'_'+d.to):'전체')+'.xlsx'; }
+  function _title(d){ var mr=(d.monthLabels&&d.monthLabels.length)?(d.monthLabels[0]+'~'+d.monthLabels[d.monthLabels.length-1]):'-'; var pf=(d.prod&&d.prod.length)?(' · 제품 '+d.prod.join('/')):''; return '글라스케어 지부 분석 · 월별×제품 가입   |   '+(d.jibu||'전체 지부')+pf+'   |   '+mr+'   |   총 '+d.wTot.toLocaleString()+'건'; }
+  function _fname(d){ return '레이노_글라스지부분석_'+(d.jibu||'전체')+'.xlsx'; }
   function _fallback(d){
     var header=['월'].concat(d.usedLines).concat(['합계']);
     var aoa=[[_title(d)],header];
-    d.months.forEach(function(m){ var o=d.byMonth[m]||{}; aoa.push([m].concat(d.usedLines.map(function(l){return o[l]||0;})).concat([o._t||0])); });
+    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; aoa.push([d.monthLabels[ri]].concat(d.usedLines.map(function(l){return o[l]||0;})).concat([o._t||0])); });
     var tot=d.usedLines.map(function(l){return d.months.reduce(function(s,m){return s+((d.byMonth[m]||{})[l]||0);},0);});
     aoa.push(['합계'].concat(tot).concat([d.wTot]));
     var ws=XLSX.utils.aoa_to_sheet(aoa);
@@ -8814,7 +8833,7 @@ boot();
     t.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLACK}}; t.font={bold:true,color:{argb:WHITE},size:12}; t.alignment={vertical:'middle',horizontal:'left',indent:1}; ws.getRow(1).height=30;
     var hr=ws.getRow(2); header.forEach(function(h,i){ var c=hr.getCell(i+1); c.value=h; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ORANGE}}; c.font={bold:true,color:{argb:WHITE},size:11}; c.alignment={vertical:'middle',horizontal:i===0?'left':'center'}; c.border=border; }); hr.height=22;
     var tot={}; lines.forEach(function(l){tot[l]=0;});
-    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; var vals=[m].concat(lines.map(function(l){return o[l]||0;})).concat([o._t||0]); var row=ws.getRow(3+ri);
+    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; var vals=[d.monthLabels[ri]].concat(lines.map(function(l){return o[l]||0;})).concat([o._t||0]); var row=ws.getRow(3+ri);
       vals.forEach(function(v,i){ var c=row.getCell(i+1); c.value=v; c.border=border; c.alignment={vertical:'middle',horizontal:i===0?'left':'right'}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb: ri%2?GRAYA:WHITE}}; if(i>0) c.numFmt='#,##0'; if(i===nC-1) c.font={bold:true}; });
       lines.forEach(function(l){tot[l]+=(o[l]||0);}); row.height=18; });
     var tr=ws.getRow(3+d.months.length); var tv=['합계'].concat(lines.map(function(l){return tot[l];})).concat([d.wTot]); var topB={style:'medium',color:{argb:ORANGE}};
@@ -8836,12 +8855,12 @@ boot();
 /* ── 매출 지부 분석: 월별×제품 매출 매트릭스 엑셀 내보내기 ── */
 (function(){
   function _loadExcelJS(){ return new Promise(function(res,rej){ if(window.ExcelJS)return res(window.ExcelJS); var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'; s.onload=function(){ window.ExcelJS?res(window.ExcelJS):rej(new Error('no')); }; s.onerror=function(){ rej(new Error('cdn')); }; document.head.appendChild(s); }); }
-  function _title(d){ return '매출 지부 분석 · 월별×제품 매출(원)   |   '+(d.jibu||'전체 지부')+'   |   '+(d.months.length?d.months[0]+'~'+d.months[d.months.length-1]:'-')+'   |   총매출 '+(d.wTot).toLocaleString()+'원'; }
-  function _fname(d){ return '레이노_매출지부분석_'+(d.jibu||'전체')+'.xlsx'; }
+  function _title(d){ var unit=d.unit||'원'; var mr=(d.monthLabels&&d.monthLabels.length)?(d.monthLabels[0]+'~'+d.monthLabels[d.monthLabels.length-1]):'-'; var pf=(d.prod&&d.prod.length)?(' · 제품 '+d.prod.join('/')):''; return '매출 지부 분석 · 월별×제품 '+(unit==='롤'?'롤 수량':'매출')+'   |   '+(d.jibu||'전체 지부')+pf+'   |   '+mr+'   |   총 '+(d.wTot).toLocaleString()+unit; }
+  function _fname(d){ return '레이노_매출지부분석_'+((d.unit==='롤')?'롤_':'')+(d.jibu||'전체')+'.xlsx'; }
   function _fallback(d){
     var header=['월'].concat(d.usedLines).concat(['합계']);
     var aoa=[[_title(d)],header];
-    d.months.forEach(function(m){ var o=d.byMonth[m]||{}; aoa.push([m].concat(d.usedLines.map(function(l){return Math.round(o[l]||0);})).concat([Math.round(o._t||0)])); });
+    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; aoa.push([d.monthLabels[ri]].concat(d.usedLines.map(function(l){return Math.round(o[l]||0);})).concat([Math.round(o._t||0)])); });
     var tot=d.usedLines.map(function(l){return Math.round(d.months.reduce(function(s,m){return s+((d.byMonth[m]||{})[l]||0);},0));});
     aoa.push(['합계'].concat(tot).concat([d.wTot]));
     var ws=XLSX.utils.aoa_to_sheet(aoa);
@@ -8859,7 +8878,7 @@ boot();
     t.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLACK}}; t.font={bold:true,color:{argb:WHITE},size:12}; t.alignment={vertical:'middle',horizontal:'left',indent:1}; ws.getRow(1).height=30;
     var hr=ws.getRow(2); header.forEach(function(h,i){ var c=hr.getCell(i+1); c.value=h; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ORANGE}}; c.font={bold:true,color:{argb:WHITE},size:11}; c.alignment={vertical:'middle',horizontal:i===0?'left':'center'}; c.border=border; }); hr.height=22;
     var tot={}; lines.forEach(function(l){tot[l]=0;});
-    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; var vals=[m].concat(lines.map(function(l){return Math.round(o[l]||0);})).concat([Math.round(o._t||0)]); var row=ws.getRow(3+ri);
+    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; var vals=[d.monthLabels[ri]].concat(lines.map(function(l){return Math.round(o[l]||0);})).concat([Math.round(o._t||0)]); var row=ws.getRow(3+ri);
       vals.forEach(function(v,i){ var c=row.getCell(i+1); c.value=v; c.border=border; c.alignment={vertical:'middle',horizontal:i===0?'left':'right'}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb: ri%2?GRAYA:WHITE}}; if(i>0) c.numFmt='#,##0'; if(i===nC-1) c.font={bold:true}; });
       lines.forEach(function(l){tot[l]+=(o[l]||0);}); row.height=18; });
     var tr=ws.getRow(3+d.months.length); var tv=['합계'].concat(lines.map(function(l){return Math.round(tot[l]);})).concat([d.wTot]); var topB={style:'medium',color:{argb:ORANGE}};
