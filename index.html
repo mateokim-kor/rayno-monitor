@@ -1708,7 +1708,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 지부 분석(월별x제품 추이) 추가';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부 분석 매출·글라스 추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5127,7 +5127,7 @@ function _dateBar(prefix, st, minD, maxD){
 }
 function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; const mx=st._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
 function _dfApply(st, render, fp, tp){ const f=document.getElementById(fp),t=document.getElementById(tp); st.from=f?f.value:''; st.to=t?t.value:''; if(st.from&&st.to&&st.to<st.from){const x=st.from;st.from=st.to;st.to=x;} st.scope='range'; st.preset='custom'; render(); }
-function _dfReg(px){ if(px==='gv')return{st:GV,render:renderGlass}; if(px==='wv')return{st:WV,render:renderWarranty}; if(px==='rds')return{st:RDS,render:renderRDash}; if(px==='rdw')return{st:RDW,render:renderRDash}; if(px==='rdg')return{st:RDG,render:renderRDash}; if(px==='lw')return{st:LWV,render:renderWarranty}; if(px==='jba')return{st:JBA,render:renderWarranty}; return null; }
+function _dfReg(px){ if(px==='gv')return{st:GV,render:renderGlass}; if(px==='wv')return{st:WV,render:renderWarranty}; if(px==='rds')return{st:RDS,render:renderRDash}; if(px==='rdw')return{st:RDW,render:renderRDash}; if(px==='rdg')return{st:RDG,render:renderRDash}; if(px==='lw')return{st:LWV,render:renderWarranty}; if(px==='jba')return{st:JBA,render:renderWarranty}; if(px==='gba')return{st:GBA,render:renderGlass}; return null; }
 function _moSelect(px, st, months, inline){
   const ms=[...new Set((months||[]).filter(Boolean))].sort();
   if(!ms.length) return '';
@@ -5365,6 +5365,54 @@ function renderDealer(){
   t+=`</table></div><div class="cap" style="margin-top:8px;line-height:1.6">${won(rows.length)}곳 표시 (ERP 마스터 ${won(erpTotal)}곳 + 미등록 ${won(noErp)}곳) · <b>매출·롤</b>=ERP 매출(대리점별), <b>보증서·글라스케어</b>=관리자 홈페이지 데이터를 <b>대리점명으로 매칭</b>해 결합. <b>ERP 대리점 마스터(전국) 기준</b>이며, 보증서·글라스케어는 <b>대리점코드 우선 매칭</b>으로 결합됩니다. 활성/휴면은 시공(보증서·글라스) 최근 60일 기준 · GC카드·구매 실적(F/S/U)은 ERP 추가 연동 시 표시.</div>`;
   box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
 }
+// ── 글라스케어 지부 분석: 월별 × 제품 가입 추이 ──
+let GBA={ jibu:'', scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };
+function _glassDateStr(r){ const cols=(GLASS&&GLASS.columns)||[]; const dc=(GV.dateCol&&cols.includes(GV.dateCol))?GV.dateCol:(cols.includes('시공일자')?'시공일자':(cols.find(c=>/일자|날짜/.test(c))||'시공일자')); return warrParseDate(r[dc]); }
+function _glassFrontLine(r){ const f=_parseFilm(r['썬팅제품(전면)']); return (f&&_LINE_CODE[f.line])?_LINE_CODE[f.line]:'미분류'; }
+function _gbaBranches(){ const s={}; ((GLASS&&GLASS.rows)||[]).forEach(r=>{ const j=String(r['담당지부']||'').trim(); if(j)s[j]=(s[j]||0)+1; }); return Object.keys(s).sort((a,b)=>s[b]-s[a]); }
+function _gbaData(){
+  if(!(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows&&GLASS.rows.length)) return null;
+  let base=GLASS.rows.slice();
+  const bd=base.map(r=>String(_glassDateStr(r)||'').slice(0,10)).filter(s=>/^\d{4}-\d{2}-\d{2}$/.test(s)).sort();
+  const minD=bd[0]||'', maxD=bd[bd.length-1]||''; GBA._min=minD; GBA._max=maxD;
+  const rng=(GBA.scope==='range'&&(GBA.from||GBA.to));
+  if(rng) base=base.filter(r=>{ const d=String(_glassDateStr(r)||'').slice(0,10); if(GBA.from&&d<GBA.from)return false; if(GBA.to&&d>GBA.to)return false; return true; });
+  if(GBA.jibu) base=base.filter(r=>String(r['담당지부']||'').trim()===GBA.jibu);
+  const mset={}, byMonth={};
+  base.forEach(r=>{ const ym=String(_glassDateStr(r)||'').slice(0,7); if(!/^\d{4}-\d{2}$/.test(ym))return; mset[ym]=1; const o=byMonth[ym]||(byMonth[ym]={_t:0}); const ln=_glassFrontLine(r); o[ln]=(o[ln]||0)+1; o._t++; });
+  const months=Object.keys(mset).sort();
+  const usedLines=_JBA_LINES.filter(l=>months.some(m=>((byMonth[m]&&byMonth[m][l])||0)>0));
+  const totalSeries=months.map(m=>byMonth[m]._t||0);
+  const lineSeries={}; usedLines.forEach(l=>{ lineSeries[l]=months.map(m=>(byMonth[m]&&byMonth[m][l])||0); });
+  return {rng, from:rng?(GBA.from||minD):minD, to:rng?(GBA.to||maxD):maxD, minD, maxD, jibu:GBA.jibu, months, usedLines, totalSeries, lineSeries, byMonth, wTot:base.length};
+}
+function glassAnalysisCard(){
+  if(!(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows&&GLASS.rows.length)) return '';
+  const branches=_gbaBranches();
+  const opts=`<option value=""${GBA.jibu===''?' selected':''}>전체 지부</option>`+branches.map(b=>`<option value="${escapeHtml(b)}"${GBA.jibu===b?' selected':''}>${escapeHtml(b)}</option>`).join('');
+  const d=_gbaData();
+  const hint=d&&d.wTot? `${GBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총 ${d.wTot.toLocaleString()}건` : '데이터 없음';
+  return `<div class="card">
+    <h3 style="margin:0"><span class="dot"></span>지부 분석 — 월별·제품별 가입 추이</h3>
+    <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부를 선택하면 <b>월별 가입량(굵은 전체선)</b>과 <b>제품 라인별 추이</b>를 함께 봅니다. 범례 클릭으로 선을 켜고 끌 수 있어요.</div>
+    <div class="lw-filt">
+      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="gbaJibu" style="max-width:200px">${opts}</select><span class="lw-fhint" style="margin-left:8px">${escapeHtml(hint)}</span></div>
+      <div class="lw-frow"><span class="lw-flabel">기간</span><div class="cardctrl lw-fgrow">${_dateBar('gba', GBA, (d&&d.minD)||'', (d&&d.maxD)||'')}<button class="acc-btn" id="gbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="선택 지부의 월별×제품 가입 매트릭스를 엑셀로 내려받습니다">⬇ 엑셀 다운로드</button></div></div>
+    </div>
+    <div style="position:relative;height:340px;margin-top:6px"><canvas id="gbaChart"></canvas></div>
+  </div>`;
+}
+function _gbaRenderChart(){
+  const cv=document.getElementById('gbaChart'); if(!cv) return;
+  const d=_gbaData(); if(!d||!d.months.length) return;
+  const ds=[{ label:'전체', data:d.totalSeries, borderColor:'#111827', backgroundColor:'#111827', borderWidth:3, pointRadius:2, pointHoverRadius:5, tension:.32, order:0 }];
+  d.usedLines.forEach(l=>{ ds.push({ label:l, data:d.lineSeries[l], borderColor:_JBA_COLOR[l]||'#888', backgroundColor:_JBA_COLOR[l]||'#888', borderWidth:2, pointRadius:2, pointHoverRadius:4, tension:.32, order:1 }); });
+  makeChart('gbaChart', { type:'line',
+    data:{ labels:d.months.map(m=>m.replace('-','.').slice(2)), datasets:ds },
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{ position:'top' }, tooltip:{ callbacks:{ title:(it)=>'20'+(it[0]?it[0].label:'') } } },
+      scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } } });
+}
 function renderGlass(){
   const box=document.getElementById('rGlass'); if(!box) return; const admin=(auth==='admin');
   if(!GLASS||!GLASS.rows||!GLASS.rows.length){ box.innerHTML=`<div class="card"><div class="empty">글라스케어 가입 데이터가 없습니다.${admin?' 우측 상단 <b>＋ 글라스케어 엑셀</b>로 업로드하세요.':''}</div></div>`; return; }
@@ -5447,7 +5495,8 @@ function renderGlass(){
       tbl+=dr;
     }
   }
-  box.innerHTML=kpis+controls+tbl;
+  box.innerHTML=kpis+controls+tbl+glassAnalysisCard();
+  try{ _gbaRenderChart(); }catch(_){}
 }
 function normYM(s){
   const str=String(s==null?'':s);
@@ -6253,6 +6302,57 @@ function salesRegionMap(){
   return modeSeg+body;
 }
 
+// ── 매출 지부 분석: 월별 × 제품(중분류) 매출 추이 ──
+const _SBA_PAL=['#2563eb','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#10b981','#9ca3af'];
+let SBA={ jibu:'', sel:[] };
+function _sbaCatOf(mat){ const CATL={MONO:'모노',PRESTO:'프레스토'}; const c=(typeof _midOf==='function'?_midOf(mat):mat)||'기타'; return CATL[c]||c; }
+function _sbaBranches(){ if(!(SALES&&SALES.jibuProd)) return []; const tot={}; Object.keys(SALES.jibuProd).forEach(j=>{ const pm=SALES.jibuProd[j]||{}; let s=0; Object.keys(pm).forEach(mat=>{ const a=(pm[mat]&&pm[mat].a)||{}; for(let m=1;m<=12;m++)s+=a[m]||0; }); tot[j]=s; }); return Object.keys(tot).sort((a,b)=>tot[b]-tot[a]); }
+function _sbaData(){
+  if(!(typeof SALES!=='undefined'&&SALES&&SALES.jibuProd)) return null;
+  const avM=(typeof _salesMonths==='function')?_salesMonths():((SALES.months||[]).slice());
+  const mnums=(SBA.sel&&SBA.sel.length)? avM.filter(m=>SBA.sel.indexOf(m)>=0) : avM;
+  const months=mnums.map(m=>m+'월');
+  const byMonth={}; months.forEach(ml=>byMonth[ml]={_t:0});
+  const src=SBA.jibu ? (SALES.jibuProd[SBA.jibu]?{[SBA.jibu]:SALES.jibuProd[SBA.jibu]}:{}) : SALES.jibuProd;
+  Object.keys(src).forEach(j=>{ const pm=src[j]||{}; Object.keys(pm).forEach(mat=>{ const cat=(typeof _isRoll==='function'&&!_isRoll(mat))?'기타':_sbaCatOf(mat); const a=(pm[mat]&&pm[mat].a)||{}; mnums.forEach(m=>{ const v=a[m]||0; if(!v)return; const ml=m+'월'; const o=byMonth[ml]; o[cat]=(o[cat]||0)+v; o._t+=v; }); }); });
+  const catTot={}; months.forEach(ml=>Object.keys(byMonth[ml]).forEach(c=>{ if(c==='_t')return; catTot[c]=(catTot[c]||0)+byMonth[ml][c]; }));
+  let cats=Object.keys(catTot).sort((a,b)=>catTot[b]-catTot[a]); let used;
+  if(cats.length>6){ const keep=cats.slice(0,6), rest=cats.slice(6); months.forEach(ml=>{ let e=0; rest.forEach(c=>{ e+=byMonth[ml][c]||0; delete byMonth[ml][c]; }); if(e)byMonth[ml]['기타']=(byMonth[ml]['기타']||0)+e; }); used=keep.slice(); if(rest.length&&used.indexOf('기타')<0)used.push('기타'); }
+  else used=cats;
+  const totalSeries=months.map(ml=>Math.round(byMonth[ml]._t||0));
+  const lineSeries={}; used.forEach(c=>{ lineSeries[c]=months.map(ml=>Math.round(byMonth[ml][c]||0)); });
+  const wTot=totalSeries.reduce((a,b)=>a+b,0);
+  return {months, usedLines:used, totalSeries, lineSeries, byMonth, jibu:SBA.jibu, wTot, sel:(SBA.sel||[]).slice(), avM};
+}
+function salesAnalysisCard(){
+  if(!(typeof SALES!=='undefined'&&SALES&&SALES.jibuProd)) return '';
+  const branches=_sbaBranches();
+  const opts=`<option value=""${SBA.jibu===''?' selected':''}>전체 지부</option>`+branches.map(b=>`<option value="${escapeHtml(b)}"${SBA.jibu===b?' selected':''}>${escapeHtml(b)}</option>`).join('');
+  const d=_sbaData(); const avM=(d&&d.avM)||[]; const selSet=new Set(SBA.sel||[]);
+  const monthSeg=`<div class="seg" id="sbaMonthSeg" style="flex-wrap:wrap"><button data-sbm="0" class="${selSet.size===0?'on':''}">전체</button>${avM.map(m=>`<button data-sbm="${m}" class="${selSet.has(m)?'on':''}">${m}월</button>`).join('')}</div>`;
+  const hint=d&&d.wTot? `${SBA.jibu||'전체 지부'} · ${d.months.length}개월 · 총매출 ${(d.wTot/1e8).toFixed(1)}억` : '데이터 없음';
+  return `<div class="card">
+    <h3 style="margin:0"><span class="dot"></span>지부 분석 — 월별·제품별 매출 추이</h3>
+    <div style="font-size:12px;color:var(--ink2);margin:6px 0 10px;line-height:1.55">지부를 선택하면 <b>월별 매출(굵은 전체선)</b>과 <b>제품(중분류)별 매출 추이</b>를 함께 봅니다. 범례 클릭으로 선을 켜고 끌 수 있어요. 단위: 원(VAT 별도).</div>
+    <div class="lw-filt">
+      <div class="lw-frow"><span class="lw-flabel">지부</span><select class="dt-select" id="sbaJibu" style="max-width:200px">${opts}</select><span class="lw-fhint" style="margin-left:8px">${escapeHtml(hint)}</span></div>
+      <div class="lw-frow"><span class="lw-flabel">월</span><div class="cardctrl lw-fgrow">${monthSeg}<button class="acc-btn" id="sbaXlsx" style="margin-left:6px;background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="선택 지부의 월별×제품 매출 매트릭스를 엑셀로 내려받습니다">⬇ 엑셀 다운로드</button></div></div>
+    </div>
+    <div style="position:relative;height:340px;margin-top:6px"><canvas id="sbaChart"></canvas></div>
+  </div>`;
+}
+function _sbaRenderChart(){
+  const cv=document.getElementById('sbaChart'); if(!cv) return;
+  const d=_sbaData(); if(!d||!d.months.length) return;
+  const moneyTick=v=> v>=1e8?(v/1e8).toLocaleString()+'억': v>=1e4?(v/1e4).toLocaleString()+'만': (v||0).toLocaleString();
+  const ds=[{ label:'전체', data:d.totalSeries, borderColor:'#111827', backgroundColor:'#111827', borderWidth:3, pointRadius:2, pointHoverRadius:5, tension:.32, order:0 }];
+  d.usedLines.forEach((l,i)=>{ const col=_SBA_PAL[i%_SBA_PAL.length]; ds.push({ label:l, data:d.lineSeries[l], borderColor:col, backgroundColor:col, borderWidth:2, pointRadius:2, pointHoverRadius:4, tension:.32, order:1 }); });
+  makeChart('sbaChart', { type:'line',
+    data:{ labels:d.months, datasets:ds },
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+      plugins:{ legend:{position:'top'}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y||0).toLocaleString()+'원'}} },
+      scales:{ y:{ beginAtZero:true, ticks:{ callback:moneyTick } } } } });
+}
 function renderRevenue(){
   const box=document.getElementById('rRevenue'); if(!box) return;
   const admin=(auth==='admin');
@@ -6362,8 +6462,10 @@ function renderRevenue(){
         const _sv=_salesSel; _salesSel=_selM.slice();
         let out=''; try{ out = card(hh('🗺 지역별 시장 점유율')+_seg+salesRegionMap()) + card(hh('🎯 확장 기회 지역')+_seg+whiteSpaceCard()); } finally { _salesSel=_sv; }
         return out;
-      })();
+      })()
+    + salesAnalysisCard();
   drawSalesCharts();
+  try{ _sbaRenderChart(); }catch(_){}
 }
 function drawSalesCharts(){
   if(typeof Chart==='undefined'||!SALES||!SALES.channels) return;
@@ -6445,6 +6547,7 @@ document.getElementById('rRevenue').addEventListener('change', e=>{
   const t=e.target;
   if(t.id==='salesCmpA'){ _salesCmpA=parseInt(t.value,10)||0; renderRevenue(); return; }
   if(t.id==='salesCmpB'){ _salesCmpB=parseInt(t.value,10)||0; renderRevenue(); return; }
+  if(t.id==='sbaJibu'){ SBA.jibu=t.value; renderRevenue(); return; }
   if(t.classList.contains('sales-cap')){ SALES.inputs.cap[decodeURIComponent(t.dataset.mid)]=_sNum(t.value); }
   else if(t.classList.contains('sales-type')){ SALES.inputs.itemType=SALES.inputs.itemType||{}; SALES.inputs.itemType[decodeURIComponent(t.dataset.mat)]=t.value; }
   else if(t.id==='salesCarInput'){ SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.carSales[parseInt(t.dataset.month,10)]=_sNum(t.value); }
@@ -6459,6 +6562,7 @@ document.getElementById('rRevenue').addEventListener('change', e=>{
 })();
 document.getElementById('rRevenue').addEventListener('click', e=>{
   const t=e.target;
+  const _sbm=t.closest&&t.closest('#sbaMonthSeg button'); if(_sbm){ const m=parseInt(_sbm.dataset.sbm,10); if(m===0){ SBA.sel=[]; } else { const i=SBA.sel.indexOf(m); if(i>=0)SBA.sel.splice(i,1); else SBA.sel.push(m); } renderRevenue(); return; }
   const _rollB=t.closest&&t.closest('[data-rollmid]');
   if(_rollB){ const key=_rollB.dataset.rollmid; _rollExp[key]=!_rollExp[key]; _rollB.classList.toggle('on', _rollExp[key]);
     const box=document.getElementById('rRevenue'); box.querySelectorAll('.roll-sub').forEach(r=>{ if(r.dataset.rollsub===key) r.style.display=_rollExp[key]?'':'none'; });
@@ -7371,6 +7475,8 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   if(e.target.id==='lwApply'){ _dfApply(LWV,renderWarranty,'lwFrom','lwTo'); return; }
   const _jbap=e.target.closest('#jbaPreset button'); if(_jbap){ _dfPreset(JBA,renderWarranty,_jbap.dataset.rp); return; }
   if(e.target.id==='jbaApply'){ _dfApply(JBA,renderWarranty,'jbaFrom','jbaTo'); return; }
+  const _gbap=e.target.closest('#gbaPreset button'); if(_gbap){ _dfPreset(GBA,renderGlass,_gbap.dataset.rp); return; }
+  if(e.target.id==='gbaApply'){ _dfApply(GBA,renderGlass,'gbaFrom','gbaTo'); return; }
   const _lsub=e.target.closest('button[data-lwsub]'); if(_lsub){ const _sv=_lsub.dataset.lwsub; if(_sv==='__all'){ _lwSub=[]; } else { const _i=_lwSub.indexOf(_sv); if(_i>=0) _lwSub.splice(_i,1); else _lwSub.push(_sv); } renderWarranty(); return; }
   const _ll=e.target.closest('#lwLine button'); if(_ll){ _lwLine=_ll.dataset.l; _lwSub=[]; renderWarranty(); return; }
   const _fo=e.target.closest('#lwFront button'); if(_fo){ _lwFrontOnly=!_lwFrontOnly; renderWarranty(); return; } const _ls=e.target.closest('#lwScope button'); if(_ls){ _lwScope=_ls.dataset.sc; renderWarranty(); return; }
@@ -7459,6 +7565,9 @@ document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='jbaJibu'){ JBA.jibu=e.target.value; renderWarranty(); return; }
   if(e.target.id==='jbaFrom'){ JBA.from=e.target.value; if(JBA.from&&JBA.to&&JBA.to<JBA.from)JBA.to=JBA.from; JBA.scope='range'; JBA.preset='custom'; renderWarranty(); return; }
   if(e.target.id==='jbaTo'){ JBA.to=e.target.value; if(JBA.from&&JBA.to&&JBA.to<JBA.from)JBA.from=JBA.to; JBA.scope='range'; JBA.preset='custom'; renderWarranty(); return; }
+  if(e.target.id==='gbaJibu'){ GBA.jibu=e.target.value; renderGlass(); return; }
+  if(e.target.id==='gbaFrom'){ GBA.from=e.target.value; if(GBA.from&&GBA.to&&GBA.to<GBA.from)GBA.to=GBA.from; GBA.scope='range'; GBA.preset='custom'; renderGlass(); return; }
+  if(e.target.id==='gbaTo'){ GBA.to=e.target.value; if(GBA.from&&GBA.to&&GBA.to<GBA.from)GBA.from=GBA.to; GBA.scope='range'; GBA.preset='custom'; renderGlass(); return; }
   if(e.target.id==='gvTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; GV.scope='range'; GV.preset='custom'; renderGlass(); return; }
   if(e.target.id==='dlrJibu'){ DLR.jibu=e.target.value; renderDealer(); return; }
   if(e.target.id==='dlrMember'){ DLR.member=e.target.value; renderDealer(); return; }
@@ -8672,6 +8781,96 @@ boot();
     var b=e.target&&e.target.closest&&e.target.closest('#jbaXlsx'); if(!b)return; e.preventDefault();
     if(b.dataset.busy==='1')return;
     var d=(typeof _jbaData==='function')?_jbaData():null;
+    if(!d||!d.months.length){ if(typeof toast==='function') toast('내보낼 데이터가 없습니다.', true); return; }
+    var old=b.textContent; b.dataset.busy='1'; b.textContent='⏳ 생성 중…';
+    _loadExcelJS().then(function(EX){ return _styled(d,EX); }).catch(function(){ _fallback(d); }).finally(function(){ b.textContent=old; setTimeout(function(){b.dataset.busy='';},1500); });
+  });
+})();
+</script>
+<script>
+/* ── 글라스케어 지부 분석: 월별×제품 가입 매트릭스 엑셀 내보내기 ── */
+(function(){
+  function _loadExcelJS(){ return new Promise(function(res,rej){ if(window.ExcelJS)return res(window.ExcelJS); var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'; s.onload=function(){ window.ExcelJS?res(window.ExcelJS):rej(new Error('no')); }; s.onerror=function(){ rej(new Error('cdn')); }; document.head.appendChild(s); }); }
+  function _title(d){ var p=d.rng?(d.from+' ~ '+d.to):'전체 기간 ('+d.minD+' ~ '+d.maxD+')'; return '글라스케어 지부 분석 · 월별×제품 가입   |   '+(d.jibu||'전체 지부')+'   |   '+p+'   |   총 '+d.wTot.toLocaleString()+'건'; }
+  function _fname(d){ return '레이노_글라스지부분석_'+(d.jibu||'전체')+'_'+(d.rng?(d.from+'_'+d.to):'전체')+'.xlsx'; }
+  function _fallback(d){
+    var header=['월'].concat(d.usedLines).concat(['합계']);
+    var aoa=[[_title(d)],header];
+    d.months.forEach(function(m){ var o=d.byMonth[m]||{}; aoa.push([m].concat(d.usedLines.map(function(l){return o[l]||0;})).concat([o._t||0])); });
+    var tot=d.usedLines.map(function(l){return d.months.reduce(function(s,m){return s+((d.byMonth[m]||{})[l]||0);},0);});
+    aoa.push(['합계'].concat(tot).concat([d.wTot]));
+    var ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:header.length-1}}];
+    ws['!cols']=[{wch:10}].concat(d.usedLines.map(function(){return {wch:9};})).concat([{wch:9}]);
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'월별 제품 가입'); XLSX.writeFile(wb,_fname(d));
+    if(typeof toast==='function') toast('엑셀 다운로드 완료 (기본 서식)');
+  }
+  function _styled(d,ExcelJS){
+    var lines=d.usedLines, header=['월'].concat(lines).concat(['합계']), nC=header.length;
+    var BLACK='FF1A1D24',ORANGE='FFF06A1E',GRAYA='FFF7F8FA',WHITE='FFFFFFFF',TOTBG='FFFFF1E6';
+    var bd={style:'thin',color:{argb:'FFE3E7EE'}}, border={top:bd,left:bd,bottom:bd,right:bd};
+    var wb=new ExcelJS.Workbook(), ws=wb.addWorksheet('월별 제품 가입',{views:[{state:'frozen',ySplit:2,xSplit:1}]});
+    ws.mergeCells(1,1,1,nC); var t=ws.getCell(1,1); t.value=_title(d);
+    t.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLACK}}; t.font={bold:true,color:{argb:WHITE},size:12}; t.alignment={vertical:'middle',horizontal:'left',indent:1}; ws.getRow(1).height=30;
+    var hr=ws.getRow(2); header.forEach(function(h,i){ var c=hr.getCell(i+1); c.value=h; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ORANGE}}; c.font={bold:true,color:{argb:WHITE},size:11}; c.alignment={vertical:'middle',horizontal:i===0?'left':'center'}; c.border=border; }); hr.height=22;
+    var tot={}; lines.forEach(function(l){tot[l]=0;});
+    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; var vals=[m].concat(lines.map(function(l){return o[l]||0;})).concat([o._t||0]); var row=ws.getRow(3+ri);
+      vals.forEach(function(v,i){ var c=row.getCell(i+1); c.value=v; c.border=border; c.alignment={vertical:'middle',horizontal:i===0?'left':'right'}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb: ri%2?GRAYA:WHITE}}; if(i>0) c.numFmt='#,##0'; if(i===nC-1) c.font={bold:true}; });
+      lines.forEach(function(l){tot[l]+=(o[l]||0);}); row.height=18; });
+    var tr=ws.getRow(3+d.months.length); var tv=['합계'].concat(lines.map(function(l){return tot[l];})).concat([d.wTot]); var topB={style:'medium',color:{argb:ORANGE}};
+    tv.forEach(function(v,i){ var c=tr.getCell(i+1); c.value=v; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:TOTBG}}; c.font={bold:true,color:{argb:'FF7A3E12'}}; c.alignment={vertical:'middle',horizontal:i===0?'left':'right'}; c.border={top:topB,left:bd,bottom:bd,right:bd}; if(i>0) c.numFmt='#,##0'; }); tr.height=20;
+    ws.getColumn(1).width=12; for(var i=2;i<=nC;i++) ws.getColumn(i).width=10;
+    return wb.xlsx.writeBuffer().then(function(buf){ var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=_fname(d); document.body.appendChild(a); a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},3000); if(typeof toast==='function') toast('엑셀 다운로드 완료'); });
+  }
+  document.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest&&e.target.closest('#gbaXlsx'); if(!b)return; e.preventDefault();
+    if(b.dataset.busy==='1')return;
+    var d=(typeof _gbaData==='function')?_gbaData():null;
+    if(!d||!d.months.length){ if(typeof toast==='function') toast('내보낼 데이터가 없습니다.', true); return; }
+    var old=b.textContent; b.dataset.busy='1'; b.textContent='⏳ 생성 중…';
+    _loadExcelJS().then(function(EX){ return _styled(d,EX); }).catch(function(){ _fallback(d); }).finally(function(){ b.textContent=old; setTimeout(function(){b.dataset.busy='';},1500); });
+  });
+})();
+</script>
+<script>
+/* ── 매출 지부 분석: 월별×제품 매출 매트릭스 엑셀 내보내기 ── */
+(function(){
+  function _loadExcelJS(){ return new Promise(function(res,rej){ if(window.ExcelJS)return res(window.ExcelJS); var s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'; s.onload=function(){ window.ExcelJS?res(window.ExcelJS):rej(new Error('no')); }; s.onerror=function(){ rej(new Error('cdn')); }; document.head.appendChild(s); }); }
+  function _title(d){ return '매출 지부 분석 · 월별×제품 매출(원)   |   '+(d.jibu||'전체 지부')+'   |   '+(d.months.length?d.months[0]+'~'+d.months[d.months.length-1]:'-')+'   |   총매출 '+(d.wTot).toLocaleString()+'원'; }
+  function _fname(d){ return '레이노_매출지부분석_'+(d.jibu||'전체')+'.xlsx'; }
+  function _fallback(d){
+    var header=['월'].concat(d.usedLines).concat(['합계']);
+    var aoa=[[_title(d)],header];
+    d.months.forEach(function(m){ var o=d.byMonth[m]||{}; aoa.push([m].concat(d.usedLines.map(function(l){return Math.round(o[l]||0);})).concat([Math.round(o._t||0)])); });
+    var tot=d.usedLines.map(function(l){return Math.round(d.months.reduce(function(s,m){return s+((d.byMonth[m]||{})[l]||0);},0));});
+    aoa.push(['합계'].concat(tot).concat([d.wTot]));
+    var ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:header.length-1}}];
+    ws['!cols']=[{wch:8}].concat(d.usedLines.map(function(){return {wch:14};})).concat([{wch:16}]);
+    var wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'월별 제품 매출'); XLSX.writeFile(wb,_fname(d));
+    if(typeof toast==='function') toast('엑셀 다운로드 완료 (기본 서식)');
+  }
+  function _styled(d,ExcelJS){
+    var lines=d.usedLines, header=['월'].concat(lines).concat(['합계']), nC=header.length;
+    var BLACK='FF1A1D24',ORANGE='FFF06A1E',GRAYA='FFF7F8FA',WHITE='FFFFFFFF',TOTBG='FFFFF1E6';
+    var bd={style:'thin',color:{argb:'FFE3E7EE'}}, border={top:bd,left:bd,bottom:bd,right:bd};
+    var wb=new ExcelJS.Workbook(), ws=wb.addWorksheet('월별 제품 매출',{views:[{state:'frozen',ySplit:2,xSplit:1}]});
+    ws.mergeCells(1,1,1,nC); var t=ws.getCell(1,1); t.value=_title(d);
+    t.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLACK}}; t.font={bold:true,color:{argb:WHITE},size:12}; t.alignment={vertical:'middle',horizontal:'left',indent:1}; ws.getRow(1).height=30;
+    var hr=ws.getRow(2); header.forEach(function(h,i){ var c=hr.getCell(i+1); c.value=h; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ORANGE}}; c.font={bold:true,color:{argb:WHITE},size:11}; c.alignment={vertical:'middle',horizontal:i===0?'left':'center'}; c.border=border; }); hr.height=22;
+    var tot={}; lines.forEach(function(l){tot[l]=0;});
+    d.months.forEach(function(m,ri){ var o=d.byMonth[m]||{}; var vals=[m].concat(lines.map(function(l){return Math.round(o[l]||0);})).concat([Math.round(o._t||0)]); var row=ws.getRow(3+ri);
+      vals.forEach(function(v,i){ var c=row.getCell(i+1); c.value=v; c.border=border; c.alignment={vertical:'middle',horizontal:i===0?'left':'right'}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb: ri%2?GRAYA:WHITE}}; if(i>0) c.numFmt='#,##0'; if(i===nC-1) c.font={bold:true}; });
+      lines.forEach(function(l){tot[l]+=(o[l]||0);}); row.height=18; });
+    var tr=ws.getRow(3+d.months.length); var tv=['합계'].concat(lines.map(function(l){return Math.round(tot[l]);})).concat([d.wTot]); var topB={style:'medium',color:{argb:ORANGE}};
+    tv.forEach(function(v,i){ var c=tr.getCell(i+1); c.value=v; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:TOTBG}}; c.font={bold:true,color:{argb:'FF7A3E12'}}; c.alignment={vertical:'middle',horizontal:i===0?'left':'right'}; c.border={top:topB,left:bd,bottom:bd,right:bd}; if(i>0) c.numFmt='#,##0'; }); tr.height=20;
+    ws.getColumn(1).width=8; for(var i=2;i<=nC;i++) ws.getColumn(i).width=14;
+    return wb.xlsx.writeBuffer().then(function(buf){ var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=_fname(d); document.body.appendChild(a); a.click(); setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},3000); if(typeof toast==='function') toast('엑셀 다운로드 완료'); });
+  }
+  document.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest&&e.target.closest('#sbaXlsx'); if(!b)return; e.preventDefault();
+    if(b.dataset.busy==='1')return;
+    var d=(typeof _sbaData==='function')?_sbaData():null;
     if(!d||!d.months.length){ if(typeof toast==='function') toast('내보낼 데이터가 없습니다.', true); return; }
     var old=b.textContent; b.dataset.busy='1'; b.textContent='⏳ 생성 중…';
     _loadExcelJS().then(function(EX){ return _styled(d,EX); }).catch(function(){ _fallback(d); }).finally(function(){ b.textContent=old; setTimeout(function(){b.dataset.busy='';},1500); });
