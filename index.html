@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 멤버스 판정을 대리점 마스터 글라스케어 여부 기준으로';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 대리점 현황에 branchsales 지부=본사(본사 직매) 대리점 추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5433,7 +5433,7 @@ function renderRDash(){
   }
   box.innerHTML=h;
 }
-function _dealerAgg(){   // ERP 데이터 기준(대리점 마스터 dealers.json + ERP 매출) — 보증서·글라스케어(관리자 홈페이지) 제외
+function _dealerAgg(){   // ERP 기준(대리점 마스터 dealers.json + ERP 매출 + branchSalesList 본사 직매) — 보증서·글라스케어(관리자 홈페이지) 제외
   const M={};
   const ens=n=>M[n]||(M[n]={name:n, store:'', jibu:'', code:'', member:false, membership:'', salesA:0, salesQ:0, erp:false, rank:'', tier:'', sido:'', sigungu:'', salesType:'', unuse:false, addr:'', tel:'', ceo:''});
   const _isJibuName=n=>{ const s=String(n||''); if(/지부|본사/.test(s)) return true; if(typeof _sToJibu==='function' && _sToJibu(s)) return true; return false; };
@@ -5441,6 +5441,27 @@ function _dealerAgg(){   // ERP 데이터 기준(대리점 마스터 dealers.jso
   if(typeof ERPD!=='undefined'&&ERPD&&Array.isArray(ERPD.dealers)){ ERPD.dealers.forEach(e=>{ const nm=String(e.name||'').trim(); if(!nm||_isJibuName(nm))return; const d=ens(nm); d.erp=true; if(e.code) d.code=e.code; d.store=String(e.custName||'').trim()||d.store; if(e.branch) d.jibu=e.branch; d.membership=String(e.membership||''); d.member=!!e.glasscare||(d.membership==='A01'); d.rank=e.rank||d.rank; d.tier=e.tier||d.tier; d.sido=e.sido||d.sido; d.sigungu=e.sigungu||d.sigungu; d.salesType=e.salesType||d.salesType; d.unuse=!!e.unuse; d.addr=e.addr||d.addr; d.tel=e.tel||d.tel; d.ceo=e.ceo||d.ceo; }); }
   // ② ERP 매출(대리점별) — 거래처명으로 마스터에 결합(매출/롤). ERP 데이터.
   if(typeof SALES!=='undefined'&&SALES&&SALES.dealers){ const sm=o=>{let s=0;for(let m=1;m<=12;m++)s+=(o&&o[m])||0;return s;}; Object.keys(SALES.dealers).forEach(n=>{ const nm=String(n||'').trim(); if(!nm||_isJibuName(nm))return; const d=M[nm]; if(!d)return; d.salesA=(d.salesA||0)+sm(sd_q(SALES.dealers[n],'ma')); d.salesQ=(d.salesQ||0)+sm(sd_q(SALES.dealers[n],'mq')); }); }
+  // ③ branchsales(지부→대리점) 중 지부=본사(본사 직매) 대리점 — 마스터에 없는 곳까지 리스트에 포함
+  if(typeof BSALE!=='undefined'&&BSALE&&Array.isArray(BSALE.rows)&&typeof _bsJibuOf==='function'){
+    const bsAgg={};
+    BSALE.rows.forEach(r=>{
+      if(_bsJibuOf(r)!=='본사')return;                                  // 지부=본사 행만
+      const nm=String(r.dealer||'').trim(); if(!nm||_isJibuName(nm))return;
+      const d=ens(nm); d.bs=true;
+      const o=bsAgg[nm]||(bsAgg[nm]={a:0,q:0}); o.a+=(r.a||0); o.q+=(r.q||0);
+      if(!d.erp){                                                       // 마스터에 없는 본사 직매 대리점 → branchsales 정보로 채움
+        if(!d.jibu) d.jibu='본사';
+        if(!d.store) d.store=String(r.cust||'').trim();
+        if(!d.code) d.code=String(r.dealerCode||'').trim();
+        if(!d.membership) d.membership=String(r.member||'');
+        if(!d.sido) d.sido=String(r.sido||'');
+        if(!d.sigungu) d.sigungu=String(r.sigungu||'');
+        if(typeof _bsIsMember==='function' && _bsIsMember(r)) d.member=true;
+      }
+    });
+    // 마스터에 없던 본사 직매 대리점은 매출·롤을 branchsales 합계로 채움
+    Object.keys(bsAgg).forEach(nm=>{ const d=M[nm]; if(d && d.bs && !d.erp && !d.salesA && !d.salesQ){ d.salesA=bsAgg[nm].a; d.salesQ=bsAgg[nm].q; d.bsSales=true; } });
+  }
   return Object.values(M);
 }
 function sd_q(sd,k){ return (sd&&sd[k])||{}; }
@@ -5469,7 +5490,7 @@ function _dealerDetailHtml(d){
     ${d.tel?row('연락처', escapeHtml(d.tel)):''}
     ${(d.rank||d.tier)?row('등급', '거래처 '+escapeHtml(d.rank||'-')+' · 시장 '+escapeHtml(d.tier||'-')):''}
     ${d.salesType?row('판매형태', escapeHtml(d.salesType)):''}
-    <div style="margin-top:12px;font-size:11.5px;color:var(--ink3);line-height:1.6">※ ERP 대리점 마스터 기준. 매출·롤은 ERP 매출(거래처명 매칭)이며, 지부 → 대리점 단위 롤 판매(멤버스/비멤버스 포함)는 branchSalesList 연동 후 이 화면에 추가됩니다.</div>
+    <div style="margin-top:12px;font-size:11.5px;color:var(--ink3);line-height:1.6">※ ${d.bsSales?'본사 직매 대리점(branchSalesList 기준). 매출·롤은 본사 → 대리점 롤 판매 합계입니다.':'ERP 대리점 마스터 기준. 매출·롤은 ERP 매출(거래처명 매칭)입니다.'}</div>
   </div>`;
 }
 function renderDealer(){
@@ -5498,7 +5519,7 @@ function renderDealer(){
   const kw=n=>{ n=n||0; return n>=1e8?(n/1e8).toFixed(1)+'억':(n>=1e4?Math.round(n/1e4).toLocaleString()+'만':String(Math.round(n))); };
   let t=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:860px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>매장명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${thl}>지역</th><th ${th}>매출</th><th ${th}>롤</th><th ${thl}>상태</th></tr>`;
   rows.forEach((d,i)=>{ const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.unuse?'<span style="color:var(--amber);font-weight:700">미사용</span>':'<span style="color:var(--dv2);font-weight:700">사용중</span>'; const region=[d.sido,d.sigungu].filter(Boolean).join(' ')||'-'; t+=`<tr data-di="${i}" style="cursor:pointer" title="클릭하면 상세 정보"><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.store||'-')}</td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${tdl}>${escapeHtml(region)}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${tdl}>${stat}</td></tr>`; });
-  t+=`</table></div><div class="cap" style="margin-top:8px;line-height:1.6">${won(rows.length)}곳 표시 · <b>ERP 대리점 마스터(branchCustList) 기준</b>. <b>매출·롤</b>=ERP 매출(대리점별, 거래처명 매칭). <b>멤버스</b>=대리점 마스터 글라스케어 여부(예). <b>상태</b>=ERP 사용여부. ※ 보증서·글라스케어(관리자 홈페이지) 결합은 제외했습니다. 지부별 대리점 롤 판매는 branchSalesList 연동 후 추가 예정.</div>`;
+  t+=`</table></div><div class="cap" style="margin-top:8px;line-height:1.6">${won(rows.length)}곳 표시 · <b>ERP 대리점 마스터(branchCustList) + branchSalesList 본사 직매</b> 기준. <b>매출·롤</b>=ERP 매출(거래처명 매칭, 본사 직매는 branchSalesList 합계). <b>멤버스</b>=대리점 마스터 글라스케어 여부(예). <b>상태</b>=ERP 사용여부. ※ branchsales에서 <b>지부=본사</b>인 대리점도 목록에 포함됩니다. 보증서·글라스케어(관리자 홈페이지) 결합은 제외.</div>`;
   box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터 (ERP)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
 }
 // ── 글라스케어 지부 분석: 월별 × 제품 가입 추이 ──
@@ -7788,7 +7809,7 @@ function setRView(v){
   else if(v==='warrReport') renderWarrReport();
   if(v==='dash') renderRDash();
   else if(v==='glass') renderGlass();
-  else if(v==='dealer'){ renderDealer(); if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='dealer') renderDealer(); }); } }
+  else if(v==='dealer'){ renderDealer(); if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!bsLoaded){ ensureBranchsales().then(()=>{ if(rview==='dealer') renderDealer(); }); } }
   else if(v==='search') renderMetric('search');
   else if(v==='yoy') renderYoY();
   else renderRevenue();
