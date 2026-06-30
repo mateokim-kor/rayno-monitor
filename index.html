@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 지부별 롤 보기 추가(지부×롤 매트릭스)+엑셀';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부별 롤 보기에 멤버스/비멤버스 두 줄 분할';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6751,18 +6751,22 @@ function branchSalesCard(){
     const MAXCOL=14; let lump=false;
     if(cols.length>MAXCOL){ cols=cols.slice(0,MAXCOL); lump=true; }
     const colSet=new Set(cols);
-    const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); let s=subOf(r); if(!colSet.has(s))s='기타'; const o=ag[j]||(ag[j]={j,c:{},t:0}); o.c[s]=(o.c[s]||0)+val(r); o.t+=val(r); });
-    const arr=Object.values(ag).filter(o=>o.t>0).sort((a,b)=>b.t-a.t);
+    const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); let s=subOf(r); if(!colSet.has(s))s='기타'; const bk=_bsIsMember(r)?'mem':'norm'; const o=ag[j]||(ag[j]={j,mem:{},norm:{},memT:0,normT:0}); o[bk][s]=(o[bk][s]||0)+val(r); o[bk+'T']+=val(r); });
+    const arr=Object.values(ag).map(o=>({...o,t:o.memT+o.normT})).filter(o=>o.t>0).sort((a,b)=>b.t-a.t);
     const dcols=lump?cols.concat(['기타']):cols;
-    const colTot={}; dcols.forEach(c=>colTot[c]=arr.reduce((s,o)=>s+(o.c[c]||0),0));
-    const grand=arr.reduce((s,o)=>s+o.t,0);
+    const colMem={}, colNorm={}; dcols.forEach(c=>{ colMem[c]=arr.reduce((s,o)=>s+(o.mem[c]||0),0); colNorm[c]=arr.reduce((s,o)=>s+(o.norm[c]||0),0); });
+    const grandMem=arr.reduce((s,o)=>s+o.memT,0), grandNorm=arr.reduce((s,o)=>s+o.normT,0);
     const thlS='style="text-align:left;padding:8px 10px;font-size:12px;font-weight:800;background:var(--ink);color:var(--bg);white-space:nowrap;position:sticky;left:0;z-index:1"';
     const tdlS='style="text-align:left;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;left:0;background:var(--card,#fff);font-weight:700"';
     if(!arr.length){ body='<div class="empty">데이터 없음</div>'; }
     else {
-      body=`<div class="cap" style="margin-bottom:6px"><b>지부 × 롤 종류별 ${unit}</b> · 어느 지부가 어떤 롤을 얼마나 팔았는지 한 표로${lump?' · 상위 '+MAXCOL+'개 롤 외는 기타로 합산':''}</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:${200+dcols.length*82}px"><tr><th ${thlS}>지부</th>${dcols.map(c=>`<th ${th}>${escapeHtml(c)}</th>`).join('')}<th ${th}>합계</th></tr>`;
-      arr.forEach(o=>{ body+=`<tr><td ${tdlS}>${escapeHtml(o.j)}</td>${dcols.map(c=>{ const v=o.c[c]||0; return `<td ${td}${v?'':' style="color:var(--ink4)"'}>${v?fmtV(v):'·'}</td>`; }).join('')}<td ${tdt}>${fmtV(o.t)}</td></tr>`; });
-      body+=`<tr><td ${tdlS}><b>합계</b></td>${dcols.map(c=>`<td ${tdt}>${fmtV(colTot[c])}</td>`).join('')}<td ${tdt}>${fmtV(grand)}</td></tr>`;
+      body=`<div class="cap" style="margin-bottom:6px"><b>지부 × 롤 종류별 ${unit}</b> · 지부마다 <b>멤버스·비멤버스 두 줄</b>, 어떤 롤을 얼마나 팔았는지 한 표로${lump?' · 상위 '+MAXCOL+'개 롤 외는 기타로 합산':''}</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:${280+dcols.length*78}px"><tr><th ${thlS}>지부</th><th ${thl}>구분</th>${dcols.map(c=>`<th ${th}>${escapeHtml(c)}</th>`).join('')}<th ${th}>합계</th></tr>`;
+      arr.forEach(o=>{
+        body+=`<tr><td ${tdlS} rowspan="2">${escapeHtml(o.j)}</td><td ${tdl} style="color:var(--amber);font-weight:700">멤버스</td>${dcols.map(c=>{ const v=o.mem[c]||0; return `<td ${td} style="color:${v?'var(--amber)':'var(--ink4)'}">${v?fmtV(v):'·'}</td>`; }).join('')}<td ${tdt} style="color:var(--amber)">${fmtV(o.memT)}</td></tr>`;
+        body+=`<tr><td ${tdl} style="color:var(--ink2)">비멤버스</td>${dcols.map(c=>{ const v=o.norm[c]||0; return `<td ${td}${v?'':' style="color:var(--ink4)"'}>${v?fmtV(v):'·'}</td>`; }).join('')}<td ${tdt}>${fmtV(o.normT)}</td></tr>`;
+      });
+      body+=`<tr style="border-top:2px solid var(--line2)"><td ${tdlS} rowspan="2"><b>전체</b></td><td ${tdl} style="color:var(--amber);font-weight:800">멤버스</td>${dcols.map(c=>`<td ${tdt} style="color:var(--amber)">${fmtV(colMem[c])}</td>`).join('')}<td ${tdt} style="color:var(--amber)">${fmtV(grandMem)}</td></tr>`;
+      body+=`<tr><td ${tdl} style="font-weight:800">비멤버스</td>${dcols.map(c=>`<td ${tdt}>${fmtV(colNorm[c])}</td>`).join('')}<td ${tdt}>${fmtV(grandNorm)}</td></tr>`;
       body+=`</table></div>`;
     }
   } else {
@@ -6800,14 +6804,19 @@ function _bsExportXlsx(){
     sheet='지부별'; fname=`레이노_롤판매_지부별_${jibuTag}_${monTag}.xlsx`;
   } else if(_bsView==='jibuRoll'){
     const subOf=r=>(typeof _filmCat==='function')?(_filmCat(r.mat).sub||r.mat):r.mat;
-    const sums={}; rows.forEach(r=>{ const s=subOf(r); sums[s]=(sums[s]||0)+(_bsMetric==='a'?r.a:r.q); });
+    const mv=r=>(_bsMetric==='a'?r.a:r.q);
+    const sums={}; rows.forEach(r=>{ const s=subOf(r); sums[s]=(sums[s]||0)+mv(r); });
     let cols=Object.keys(sums).filter(c=>sums[c]>0).sort((a,b)=>sums[b]-sums[a]);
     const colSet=new Set(cols);
-    const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); let s=subOf(r); if(!colSet.has(s))s='기타'; const o=ag[j]||(ag[j]={j,c:{},t:0}); const v=(_bsMetric==='a'?r.a:r.q); o.c[s]=(o.c[s]||0)+v; o.t+=v; });
-    const arr=Object.values(ag).filter(o=>o.t>0).sort((a,b)=>b.t-a.t);
-    aoa.push(['지부'].concat(cols, ['합계']));
-    arr.forEach(o=> aoa.push([o.j].concat(cols.map(c=>won(o.c[c]||0)), [won(o.t)])));
-    aoa.push(['합계'].concat(cols.map(c=>won(arr.reduce((s,o)=>s+(o.c[c]||0),0))), [won(arr.reduce((s,o)=>s+o.t,0))]));
+    const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); let s=subOf(r); if(!colSet.has(s))s='기타'; const bk=_bsIsMember(r)?'mem':'norm'; const o=ag[j]||(ag[j]={j,mem:{},norm:{},memT:0,normT:0}); o[bk][s]=(o[bk][s]||0)+mv(r); o[bk+'T']+=mv(r); });
+    const arr=Object.values(ag).map(o=>({...o,t:o.memT+o.normT})).filter(o=>o.t>0).sort((a,b)=>b.t-a.t);
+    aoa.push(['지부','구분'].concat(cols, ['합계']));
+    arr.forEach(o=>{
+      aoa.push([o.j,'멤버스'].concat(cols.map(c=>won(o.mem[c]||0)), [won(o.memT)]));
+      aoa.push(['','비멤버스'].concat(cols.map(c=>won(o.norm[c]||0)), [won(o.normT)]));
+    });
+    aoa.push(['전체','멤버스'].concat(cols.map(c=>won(arr.reduce((s,o)=>s+(o.mem[c]||0),0))), [won(arr.reduce((s,o)=>s+o.memT,0))]));
+    aoa.push(['','비멤버스'].concat(cols.map(c=>won(arr.reduce((s,o)=>s+(o.norm[c]||0),0))), [won(arr.reduce((s,o)=>s+o.normT,0))]));
     sheet='지부별롤'; fname=`레이노_롤판매_지부별롤_${jibuTag}_${monTag}.xlsx`;
   } else {
     arr.forEach(o=> aoa.push([o.sub, won(o.mem), won(o.norm), won(o.tot), o.tot?Math.round(o.mem/o.tot*100):0, won(o.memA), won(o.normA)]));
