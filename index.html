@@ -1753,7 +1753,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · 대리점 현황 기본 사용중 + 행 클릭 상세 모달';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 대리점 현황에 매장명(거래처명) 컬럼 추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5392,10 +5392,10 @@ function renderRDash(){
 }
 function _dealerAgg(){   // ERP 데이터 기준(대리점 마스터 dealers.json + ERP 매출) — 보증서·글라스케어(관리자 홈페이지) 제외
   const M={};
-  const ens=n=>M[n]||(M[n]={name:n, jibu:'', code:'', member:false, membership:'', salesA:0, salesQ:0, erp:false, rank:'', tier:'', sido:'', sigungu:'', salesType:'', unuse:false, addr:'', tel:'', ceo:''});
+  const ens=n=>M[n]||(M[n]={name:n, store:'', jibu:'', code:'', member:false, membership:'', salesA:0, salesQ:0, erp:false, rank:'', tier:'', sido:'', sigungu:'', salesType:'', unuse:false, addr:'', tel:'', ceo:''});
   const _isJibuName=n=>{ const s=String(n||''); if(/지부|본사/.test(s)) return true; if(typeof _sToJibu==='function' && _sToJibu(s)) return true; return false; };
   // ① ERP 대리점 마스터(branchCustList → dealers.json) — 유일한 대리점 모집단
-  if(typeof ERPD!=='undefined'&&ERPD&&Array.isArray(ERPD.dealers)){ ERPD.dealers.forEach(e=>{ const nm=String(e.name||'').trim(); if(!nm||_isJibuName(nm))return; const d=ens(nm); d.erp=true; if(e.code) d.code=e.code; if(e.branch) d.jibu=e.branch; d.membership=String(e.membership||''); d.member=(d.membership==='A01')||(!d.membership&&!!e.glasscare); d.rank=e.rank||d.rank; d.tier=e.tier||d.tier; d.sido=e.sido||d.sido; d.sigungu=e.sigungu||d.sigungu; d.salesType=e.salesType||d.salesType; d.unuse=!!e.unuse; d.addr=e.addr||d.addr; d.tel=e.tel||d.tel; d.ceo=e.ceo||d.ceo; }); }
+  if(typeof ERPD!=='undefined'&&ERPD&&Array.isArray(ERPD.dealers)){ ERPD.dealers.forEach(e=>{ const nm=String(e.name||'').trim(); if(!nm||_isJibuName(nm))return; const d=ens(nm); d.erp=true; if(e.code) d.code=e.code; d.store=String(e.custName||'').trim()||d.store; if(e.branch) d.jibu=e.branch; d.membership=String(e.membership||''); d.member=(d.membership==='A01')||(!d.membership&&!!e.glasscare); d.rank=e.rank||d.rank; d.tier=e.tier||d.tier; d.sido=e.sido||d.sido; d.sigungu=e.sigungu||d.sigungu; d.salesType=e.salesType||d.salesType; d.unuse=!!e.unuse; d.addr=e.addr||d.addr; d.tel=e.tel||d.tel; d.ceo=e.ceo||d.ceo; }); }
   // ② ERP 매출(대리점별) — 거래처명으로 마스터에 결합(매출/롤). ERP 데이터.
   if(typeof SALES!=='undefined'&&SALES&&SALES.dealers){ const sm=o=>{let s=0;for(let m=1;m<=12;m++)s+=(o&&o[m])||0;return s;}; Object.keys(SALES.dealers).forEach(n=>{ const nm=String(n||'').trim(); if(!nm||_isJibuName(nm))return; const d=M[nm]; if(!d)return; d.salesA=(d.salesA||0)+sm(sd_q(SALES.dealers[n],'ma')); d.salesQ=(d.salesQ||0)+sm(sd_q(SALES.dealers[n],'mq')); }); }
   return Object.values(M);
@@ -5416,6 +5416,7 @@ function _dealerDetailHtml(d){
       <div style="flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 14px"><div style="color:var(--ink3);font-size:11.5px">누적 롤(ERP)</div><div style="font-size:19px;font-weight:800">${d.salesQ?won(d.salesQ)+' 롤':'·'}</div></div>
     </div>
     ${row('코드', escapeHtml(d.code||'-'))}
+    ${d.store?row('매장명', escapeHtml(d.store)):''}
     ${row('담당 지부', escapeHtml(d.jibu||'-'))}
     ${row('구분', memBadge)}
     ${row('상태', stat)}
@@ -5438,7 +5439,7 @@ function renderDealer(){
   if(DLR.status==='use') rows=rows.filter(d=>!d.unuse); else if(DLR.status==='unuse') rows=rows.filter(d=>d.unuse);
   if(DLR.jibu!=='전체') rows=rows.filter(d=>d.jibu===DLR.jibu);
   if(DLR.member==='member') rows=rows.filter(d=>d.member); else if(DLR.member==='normal') rows=rows.filter(d=>!d.member);
-  if(DLR.q){ const q=DLR.q.toLowerCase(); rows=rows.filter(d=>d.name.toLowerCase().includes(q)||(d.code||'').toLowerCase().includes(q)); }
+  if(DLR.q){ const q=DLR.q.toLowerCase(); rows=rows.filter(d=>d.name.toLowerCase().includes(q)||(d.store||'').toLowerCase().includes(q)||(d.code||'').toLowerCase().includes(q)); }
   rows.sort((a,b)=>(b.salesA-a.salesA)||a.name.localeCompare(b.name,'ko'));
   _dlrRows=rows;
   const jibuList=[...new Set(all.map(d=>d.jibu).filter(Boolean))].sort();
@@ -5452,8 +5453,8 @@ function renderDealer(){
   const tdl='style="text-align:left;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const kw=n=>{ n=n||0; return n>=1e8?(n/1e8).toFixed(1)+'억':(n>=1e4?Math.round(n/1e4).toLocaleString()+'만':String(Math.round(n))); };
-  let t=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:760px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${thl}>지역</th><th ${th}>매출</th><th ${th}>롤</th><th ${thl}>상태</th></tr>`;
-  rows.forEach((d,i)=>{ const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.unuse?'<span style="color:var(--amber);font-weight:700">미사용</span>':'<span style="color:var(--dv2);font-weight:700">사용중</span>'; const region=[d.sido,d.sigungu].filter(Boolean).join(' ')||'-'; t+=`<tr data-di="${i}" style="cursor:pointer" title="클릭하면 상세 정보"><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${tdl}>${escapeHtml(region)}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${tdl}>${stat}</td></tr>`; });
+  let t=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:860px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>매장명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${thl}>지역</th><th ${th}>매출</th><th ${th}>롤</th><th ${thl}>상태</th></tr>`;
+  rows.forEach((d,i)=>{ const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.unuse?'<span style="color:var(--amber);font-weight:700">미사용</span>':'<span style="color:var(--dv2);font-weight:700">사용중</span>'; const region=[d.sido,d.sigungu].filter(Boolean).join(' ')||'-'; t+=`<tr data-di="${i}" style="cursor:pointer" title="클릭하면 상세 정보"><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.store||'-')}</td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${tdl}>${escapeHtml(region)}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${tdl}>${stat}</td></tr>`; });
   t+=`</table></div><div class="cap" style="margin-top:8px;line-height:1.6">${won(rows.length)}곳 표시 · <b>ERP 대리점 마스터(branchCustList) 기준</b>. <b>매출·롤</b>=ERP 매출(대리점별, 거래처명 매칭). <b>멤버스</b>=MemberShip 가입(A01). <b>상태</b>=ERP 사용여부. ※ 보증서·글라스케어(관리자 홈페이지) 결합은 제외했습니다. 지부별 대리점 롤 판매는 branchSalesList 연동 후 추가 예정.</div>`;
   box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터 (ERP)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
 }
@@ -7670,7 +7671,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   if(e.target.id==='glMore'){ _glDealerAll=!_glDealerAll; renderGlass(); return; }
   const _pf=e.target.closest('[data-pf]'); if(_pf){ const v=_pf.dataset.pf; if(v==='ALL'){ GV.prodSel=[]; } else { const s=new Set(GV.prodSel||[]); s.has(v)?s.delete(v):s.add(v); GV.prodSel=[...s]; } renderGlass(); return; }
   const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; renderDealer(); return; }
-  const _drRow=e.target.closest&&e.target.closest('#rDealer tr[data-di]'); if(_drRow){ const d=_dlrRows[+_drRow.dataset.di]; if(d&&typeof openExplain==='function') openExplain('🏢 '+escapeHtml(d.name), _dealerDetailHtml(d)); return; }
+  const _drRow=e.target.closest&&e.target.closest('#rDealer tr[data-di]'); if(_drRow){ const d=_dlrRows[+_drRow.dataset.di]; if(d&&typeof openExplain==='function') openExplain('🏢 '+escapeHtml(d.name)+(d.store?' <span style="font-size:12px;color:var(--ink3);font-weight:600">· '+escapeHtml(d.store)+'</span>':''), _dealerDetailHtml(d)); return; }
   if(e.target.id==='dlrSearchBtn'){ const q=document.getElementById('dlrQ'); DLR.q=q?q.value.trim():''; renderDealer(); return; }
   const _rsp=e.target.closest('#rdsPreset button'); if(_rsp){ _dfPreset(RDS,renderRDash,_rsp.dataset.rp); return; }
   const _rwp=e.target.closest('#rdwPreset button'); if(_rwp){ _dfPreset(RDW,renderRDash,_rwp.dataset.rp); return; }
