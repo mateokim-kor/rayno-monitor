@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 지부→대리점 롤판매 엑셀 다운로드(전체 데이터)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 글라스 지부분석에 월별 가입수·가입률 비교표 추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5482,6 +5482,41 @@ function _gbaData(){
   const monthLabels=months.map(m=>_anMlab(m,multiYear));
   return {avMonths,multiYear,presentLines,months,monthLabels,usedLines,totalSeries,lineSeries,byMonth,jibu:GBA.jibu,prod:(GBA.prod||[]).slice(),sel:(GBA.sel||[]).slice(),wTot:totalSeries.reduce((a,b)=>a+b,0),unit:'건',numFmt:'#,##0'};
 }
+function _gbaCompare(){
+  if(!(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows)) return null;
+  const dd=_gbaData(); if(!dd||!dd.months.length) return null;
+  const months=dd.months;                                  // YYYY-MM (월 필터 반영)
+  const branches = GBA.jibu ? [GBA.jibu] : _gbaBranches();
+  const sub={}, den={}; branches.forEach(b=>{ sub[b]={}; den[b]={}; });
+  GLASS.rows.forEach(r=>{ const b=String(r['담당지부']||'').trim(); if(GBA.jibu && b!==GBA.jibu)return; if(!sub[b])return; const ym=String(_glassDateStr(r)||'').slice(0,7); if(months.indexOf(ym)<0)return; sub[b][ym]=(sub[b][ym]||0)+1; });
+  if(typeof WARR!=='undefined'&&WARR&&WARR.rows){ WARR.rows.forEach(r=>{ if(!_glEligibleFront(r))return; const b=String(r['담당지부']||'').trim(); if(GBA.jibu&&b!==GBA.jibu)return; if(!den[b])return; const ym=String(warrDateStr(r)||'').slice(0,7); if(months.indexOf(ym)<0)return; den[b][ym]=(den[b][ym]||0)+1; }); }
+  return {months, branches, sub, den, hasWarr:(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)};
+}
+function _gbaCompareTable(){
+  const c=_gbaCompare(); if(!c||!c.months.length) return '';
+  const {months, sub, den, hasWarr}=c;
+  const mlab=ym=>parseInt(ym.slice(5,7),10)+'월';
+  const rowsArr=c.branches.map(b=>{ let t=0; months.forEach(m=>t+=(sub[b]&&sub[b][m])||0); return {b,t}; }).filter(x=>x.t>0).sort((x,y)=>y.t-x.t);
+  if(!rowsArr.length) return '';
+  const colSub=months.map(m=> rowsArr.reduce((s,x)=>s+((sub[x.b]&&sub[x.b][m])||0),0));
+  const colDen=months.map(m=> rowsArr.reduce((s,x)=>s+((den[x.b]&&den[x.b][m])||0),0));
+  const grand=colSub.reduce((a,b)=>a+b,0);
+  const rate=(s,d)=> d>0? (s/d*100).toFixed(1)+'%' : '—';
+  const thl='style="text-align:left;padding:8px 10px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap;position:sticky;left:0;z-index:1"';
+  const th='style="text-align:right;padding:8px 10px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
+  const tdl='style="text-align:left;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;left:0;background:var(--card,#fff)"';
+  const td='style="text-align:right;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  const tdt='style="text-align:right;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
+  const tdr='style="text-align:right;padding:7px 10px;font-size:12.5px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;color:var(--amber);font-weight:700"';
+  let h=`<div style="margin-top:18px"><h3 style="margin:0 0 6px;font-size:15px"><span class="dot"></span>월별 가입수 · 가입률 비교</h3><div class="cap" style="margin-bottom:8px">가입률 = 글라스케어 가입수 ÷ 대상 보증서수(얼티넘·스트라·팬텀 F95/F85·크로마9)${hasWarr?'':' · <span style="color:var(--neg)">보증서 데이터 없음 → 가입률 —</span>'}</div>`;
+  h+=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:${150+months.length*120}px">`;
+  h+=`<tr><th ${thl} rowspan="2">지부</th>${months.map(m=>`<th ${th} colspan="2" style="text-align:center;border-left:2px solid var(--bg)">${mlab(m)}</th>`).join('')}<th ${th} rowspan="2">합계 가입</th></tr>`;
+  h+=`<tr>${months.map(()=>`<th ${th} style="border-left:2px solid var(--bg)">가입수</th><th ${th}>가입률</th>`).join('')}</tr>`;
+  rowsArr.forEach(x=>{ h+=`<tr><td ${tdl}>${escapeHtml(x.b)}</td>`; let rt=0; months.forEach(m=>{ const s=(sub[x.b]&&sub[x.b][m])||0, d=(den[x.b]&&den[x.b][m])||0; rt+=s; h+=`<td ${td} style="border-left:2px solid var(--line)">${s.toLocaleString()}</td><td ${tdr}>${rate(s,d)}</td>`; }); h+=`<td ${tdt}>${rt.toLocaleString()}</td></tr>`; });
+  h+=`<tr><td ${tdl}><b>합계</b></td>`; months.forEach((m,i)=>{ h+=`<td ${tdt} style="border-left:2px solid var(--line)">${colSub[i].toLocaleString()}</td><td ${tdt}>${rate(colSub[i],colDen[i])}</td>`; }); h+=`<td ${tdt}>${grand.toLocaleString()}</td></tr>`;
+  h+=`</table></div></div>`;
+  return h;
+}
 function glassAnalysisCard(){
   if(!(typeof GLASS!=='undefined'&&GLASS&&GLASS.rows&&GLASS.rows.length)) return '';
   const branches=_gbaBranches();
@@ -5499,6 +5534,7 @@ function glassAnalysisCard(){
     </div>
     <div class="an-hint" id="gbaHint">${escapeHtml(hint)}</div>
     <div style="position:relative;height:340px;margin-top:6px"><canvas id="gbaChart"></canvas></div>
+    ${_gbaCompareTable()}
   </div>`;
 }
 function _gbaRenderChart(){
