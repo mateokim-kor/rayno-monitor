@@ -767,15 +767,23 @@
   .rep-note-ta:focus{border-color:var(--amber)}
   .rep-note-actions{display:flex;gap:8px;margin-top:10px}
 
-  /* 인쇄(PDF 저장) */
+  /* 인쇄(PDF 저장) — 리포트 문서로 추출 */
+  .rpt-print-head{display:none}
   @media print{
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important }
+    @page{ margin:14mm }
     body{background:#fff !important}
-    .nav, footer, #dash, #verify, #settings, #controls, #typeBar, #veriNote, #filterStatus{display:none !important}
-    #report{display:block !important}
-    .rep-period, #rpPdf, .rep-pickbtn, .rep-picker, .rep-note-edit, .rep-detail-row, .vc-srcbtn, .insight .viewbtn{display:none !important}
-    .card{break-inside:avoid; box-shadow:none !important; border:1px solid #ddd}
-    .rep-quotes,.rep-quote,.rep-trow,.insight{break-inside:avoid}
-    .modal-bg{display:none !important}
+    header, .erp-live, .nav, footer, #dash, #verify, #settings, #controls, #typeBar, #veriNote, #filterStatus{display:none !important}
+    .wrap{max-width:none !important;margin:0 !important;padding:0 !important}
+    #report{display:block !important;width:100% !important}
+    .rep-head, .rep-period, #rpPdf, #rpMail, .rep-pickbtn, .rep-picker, .rep-note-edit, .rep-detail-row, .vc-srcbtn, .insight .viewbtn{display:none !important}
+    .rpt-print-head{display:block !important;margin:0 0 16px;padding:0 0 12px;border-bottom:3px solid #1a1d24}
+    .rpt-ph-title{font-size:22px;font-weight:800;color:#1a1d24;letter-spacing:-.01em}
+    .rpt-ph-meta{font-size:12px;color:#555;margin-top:6px}
+    .card{break-inside:avoid;box-shadow:none !important;border:1px solid #ddd;margin-bottom:12px}
+    .rep-sec h3{break-after:avoid}
+    .rep-quotes,.rep-quote,.rep-trow,.insight,.rep-kpis,.rep-sentbar{break-inside:avoid}
+    .modal-bg, #xplBg, .xpl-bg{display:none !important}
   }
 
   .full{grid-column:1/-1}
@@ -1754,7 +1762,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 온라인 리포트 → 모니터링 리포트 명칭 변경';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 리포트 PDF 문서형 추출 + 대표 긍정/부정 기간 내로 제한';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3476,9 +3484,15 @@ function autoRep(set,sent,n){
     .slice(0,n);
 }
 function repRows(which,cur){
-  const sent=which==='pos'?'긍정':'부정'; const ids=getRep(which);
-  if(ids.length){ const byId=new Map(RAW.rows.map(r=>[r.id,r])); const sel=ids.map(id=>byId.get(id)).filter(Boolean); if(sel.length) return sel; }
-  return autoRep(cur,sent,3);
+  const sent=which==='pos'?'긍정':'부정';
+  const ids=getRep(which);
+  const byId=new Map(cur.map(r=>[r.id,r]));            // 조회 기간 내 게시물만
+  let sel=ids.map(id=>byId.get(id)).filter(Boolean);   // 관리자 선정 중 '기간 내'인 것만
+  if(sel.length<3){                                    // 부족하면 기간 내 자동 추천으로 채움
+    const have=new Set(sel.map(r=>r.id));
+    autoRep(cur,sent,8).forEach(r=>{ if(sel.length<3 && !have.has(r.id)){ sel.push(r); have.add(r.id); } });
+  }
+  return sel.slice(0,3);
 }
 function repCard(r){
   const sent=rsent(r); const cls=sent==='긍정'?'pos':sent==='부정'?'neg':'neu';
@@ -3495,7 +3509,9 @@ function repCard(r){
 function repSection(which,cur){
   const sent=which==='pos'?'긍정':'부정';
   const label=which==='pos'?'대표 긍정 게시물':'대표 부정 게시물';
-  const rows=repRows(which,cur); const selected=getRep(which).length>0;
+  const rows=repRows(which,cur);
+  const _curIds=new Set(cur.map(r=>r.id));
+  const selected=getRep(which).some(id=>_curIds.has(id));   // 기간 내 관리자 선정이 있을 때만
   const cards=rows.length?rows.map(repCard).join(''):`<div class="empty">${sent} 게시물이 없습니다.</div>`;
   const adminBtn=(auth==='admin')?`<button class="rep-pickbtn" data-pick="${which}">✏ 대표글 ${selected?'변경':'선택'}</button>`:'';
   return `<div class="card rep-sec">
@@ -3622,7 +3638,13 @@ function noteBlock(kind,title,autoText){
      <div class="rep-note" data-notebody="${kind}">${body}</div>
    </div>`;
 }
-function printReport(){ if(typeof window!=='undefined' && window.print) window.print(); }
+function printReport(){
+  if(typeof window==='undefined'||!window.print) return;
+  const prev=document.title;
+  try{ const lab=(typeof rpLabel==='function')?rpLabel(RP).replace(/[\s~]+/g,'_'):''; document.title=(effOwnBrand()||'RAYNO')+'_브랜드모니터링리포트'+(lab?'_'+lab:''); }catch(e){}
+  window.print();
+  setTimeout(()=>{ document.title=prev; }, 800);
+}
 
 // ── 전사 메일: 브랜드 모니터링 리포트 기반 자동 작성 ──
 function buildBrandEmail(){
@@ -4062,7 +4084,9 @@ function _renderReportImpl(){
      <div class="cap">제품 키워드가 등장한 글·댓글을 제품별로 집계했습니다. 한 글에 여러 제품이 나오면 각각에 반영됩니다.</div>
      ${_pEnt.length?`<table class="dtbl" style="width:100%;border-collapse:collapse;margin-top:6px;font-size:13px"><tr><th ${_pTh}>제품</th><th ${_pThr}>언급</th><th ${_pThr}>점유율</th><th ${_pTh}>감성(긍·부·중)</th></tr>${_pRows}</table>`:'<div class="empty">이 기간에 인식된 제품 언급이 없습니다. (제품 키워드는 설정 &gt; 언급 제품 키워드에서 조정)</div>'}
    </div>`;
-  box.innerHTML = head + insightBlock + deptBlock + summary + repPos + repNeg + trend + sov + productBlock + reasons + types + cafes + extra + advice + marketingBlock;
+  const _genDate=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+  const printHead=`<div class="rpt-print-head"><div class="rpt-ph-title">${escapeHtml(effOwnBrand()||'RAYNO')} 브랜드 모니터링 리포트</div><div class="rpt-ph-meta">분석 기간 <b>${escapeHtml(rpLabel(RP))}</b>${prevP?` · 비교 ${escapeHtml(rpLabel(prevP))}`:''} · 총 ${M.total.toLocaleString()}건 · 생성일 ${_genDate}</div></div>`;
+  box.innerHTML = printHead + head + insightBlock + deptBlock + summary + repPos + repNeg + trend + sov + productBlock + reasons + types + cafes + extra + advice + marketingBlock;
   bindReport();
 }
 
