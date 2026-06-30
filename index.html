@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 매출분석 헤더 중복 (B2C+B2B) 작은글씨 제거';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부별 행 클릭 → 그 지부 판매 롤 종류별 상세 모달';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6674,7 +6674,7 @@ function renderRevenue(){
 }
 /* ── 지부 → 대리점 롤 판매 (ERP branchSalesList) · 멤버스/비멤버스 ── */
 let BSALE=null, bsLoaded=false;
-let _bsJibu='전체', _bsView='dealer', _bsMetric='q', _bsRollOnly=true, _bsMonths=[], _bsDealerArr=[], _bsDealerN=10;   // 지부 선택 + 대리점별(상위 구매) 기본 · 대리점 10개씩
+let _bsJibu='전체', _bsView='dealer', _bsMetric='q', _bsRollOnly=true, _bsMonths=[], _bsDealerArr=[], _bsDealerN=10, _bsJibuArr=[];   // 지부 선택 + 대리점별(상위 구매) 기본 · 대리점 10개씩
 async function ensureBranchsales(){ if(bsLoaded)return; try{ const j=await cloudLoadJSON(SUPA.bsFile); if(j&&Array.isArray(j.rows)) BSALE=j; }catch(_){} bsLoaded=true; }
 function _bsIsMember(r){ return r.member==='A01' || r.memberName==='가입'; }
 function _bsMonthOf(r){ const ym=String(r.ym||''); return ym.length>=6?parseInt(ym.slice(4,6),10):0; }
@@ -6721,14 +6721,15 @@ function branchSalesCard(){
     const mcols=[...mset].sort((a,b)=>a-b);
     const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); const m=_bsMonthOf(r); const bk=_bsIsMember(r)?'mem':'norm'; const o=ag[j]||(ag[j]={j,mem:{},norm:{},memT:0,normT:0}); const v=val(r); o[bk][m]=(o[bk][m]||0)+v; o[bk+'T']+=v; });
     const arr=Object.values(ag).map(o=>({...o,tot:o.memT+o.normT})).filter(o=>o.tot>0).sort((a,b)=>b.tot-a.tot);
+    _bsJibuArr=arr;
     const colMem=mcols.map(m=>arr.reduce((s,o)=>s+(o.mem[m]||0),0));
     const colNorm=mcols.map(m=>arr.reduce((s,o)=>s+(o.norm[m]||0),0));
     const thlS='style="text-align:left;padding:8px 10px;font-size:12px;font-weight:800;background:var(--ink);color:var(--bg);white-space:nowrap;position:sticky;left:0;z-index:1"';
     const tdlS='style="text-align:left;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;left:0;background:var(--card,#fff);font-weight:700"';
-    body=`<div class="cap" style="margin-bottom:6px"><b>지부별 멤버스/비멤버스 월별 ${unit}</b> · 지부마다 멤버스·비멤버스 두 줄로, 월별로 비교</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:${220+mcols.length*70}px"><tr><th ${thlS}>지부</th><th ${thl}>구분</th>${mcols.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
-    arr.forEach(o=>{
-      body+=`<tr><td ${tdlS} rowspan="2">${escapeHtml(o.j)}</td><td ${tdl} style="color:var(--amber);font-weight:700">멤버스</td>${mcols.map(m=>`<td ${td} style="color:var(--amber)">${fmtV(o.mem[m]||0)}</td>`).join('')}<td ${tdt} style="color:var(--amber)">${fmtV(o.memT)}</td></tr>`;
-      body+=`<tr><td ${tdl} style="color:var(--ink2)">비멤버스</td>${mcols.map(m=>`<td ${td}>${fmtV(o.norm[m]||0)}</td>`).join('')}<td ${tdt}>${fmtV(o.normT)}</td></tr>`;
+    body=`<div class="cap" style="margin-bottom:6px"><b>지부별 멤버스/비멤버스 월별 ${unit}</b> · 지부마다 두 줄(멤버스·비멤버스), 월별 비교 · <b>지부 행을 클릭</b>하면 그 지부가 판 <b>롤 종류별 상세</b>가 열립니다</div><div class="iv-wrap"><table class="dtbl" id="bsJibuTbl" style="width:100%;border-collapse:collapse;min-width:${220+mcols.length*70}px"><tr><th ${thlS}>지부</th><th ${thl}>구분</th>${mcols.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
+    arr.forEach((o,i)=>{
+      body+=`<tr data-bsji="${i}" style="cursor:pointer" title="클릭: ${escapeHtml(o.j)} 롤 상세"><td ${tdlS} rowspan="2">${escapeHtml(o.j)} <span style="color:var(--ink3);font-weight:600;font-size:11px">▸</span></td><td ${tdl} style="color:var(--amber);font-weight:700">멤버스</td>${mcols.map(m=>`<td ${td} style="color:var(--amber)">${fmtV(o.mem[m]||0)}</td>`).join('')}<td ${tdt} style="color:var(--amber)">${fmtV(o.memT)}</td></tr>`;
+      body+=`<tr data-bsji="${i}" style="cursor:pointer"><td ${tdl} style="color:var(--ink2)">비멤버스</td>${mcols.map(m=>`<td ${td}>${fmtV(o.norm[m]||0)}</td>`).join('')}<td ${tdt}>${fmtV(o.normT)}</td></tr>`;
     });
     body+=`<tr style="border-top:2px solid var(--line2)"><td ${tdlS} rowspan="2"><b>전체</b></td><td ${tdl} style="color:var(--amber);font-weight:800">멤버스</td>${colMem.map(v=>`<td ${tdt} style="color:var(--amber)">${fmtV(v)}</td>`).join('')}<td ${tdt} style="color:var(--amber)">${fmtV(memV)}</td></tr>`;
     body+=`<tr><td ${tdl} style="font-weight:800">비멤버스</td>${colNorm.map(v=>`<td ${tdt}>${fmtV(v)}</td>`).join('')}<td ${tdt}>${fmtV(normV)}</td></tr>`;
@@ -6792,6 +6793,31 @@ function _bsExportXlsx(){
     XLSX.writeFile(wb, fname);
   }catch(e){ alert('엑셀 생성 실패: '+e.message); }
 }
+function _bsJibuModalHtml(i){
+  const J=_bsJibuArr[i]; if(!J) return '<div class="empty">데이터 없음</div>';
+  const jibu=J.j;
+  const rs=_bsRows().filter(r=>_bsJibuOf(r)===jibu);
+  const won=n=>Math.round(n||0).toLocaleString();
+  const ag={}; rs.forEach(r=>{ const sub=(typeof _filmCat==='function')?(_filmCat(r.mat).sub||r.mat):r.mat; const o=ag[sub]||(ag[sub]={sub, mq:0, nq:0, a:0}); if(_bsIsMember(r))o.mq+=r.q; else o.nq+=r.q; o.a+=r.a; });
+  const arr=Object.values(ag).map(o=>({...o,tot:o.mq+o.nq})).sort((a,b)=>b.tot-a.tot);
+  const totQ=arr.reduce((s,o)=>s+o.tot,0), totMem=arr.reduce((s,o)=>s+o.mq,0), totA=arr.reduce((s,o)=>s+o.a,0);
+  const thl='style="text-align:left;padding:8px 10px;font-size:11.5px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
+  const th='style="text-align:right;padding:8px 10px;font-size:11.5px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
+  const tdl='style="text-align:left;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line)"';
+  const td='style="text-align:right;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  const tdt=td+';font-weight:800;background:var(--bg2)';
+  let h=`<div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap">
+    <div style="flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 13px"><div style="color:var(--ink3);font-size:11.5px">총 롤 수량</div><div style="font-size:19px;font-weight:800">${won(totQ)} 롤</div></div>
+    <div style="flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 13px"><div style="color:var(--ink3);font-size:11.5px">멤버스 비중</div><div style="font-size:19px;font-weight:800;color:var(--amber)">${totQ?Math.round(totMem/totQ*100):0}%</div></div>
+    <div style="flex:1;min-width:120px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 13px"><div style="color:var(--ink3);font-size:11.5px">총 매출</div><div style="font-size:19px;font-weight:800">${won(totA)}원</div></div>
+  </div>
+  <div class="cap" style="margin-bottom:8px">어떤 롤을 얼마나 팔았는지 (롤 종류별·멤버스/비멤버스)</div>
+  <div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:460px"><tr><th ${thl}>롤(중분류)</th><th ${th}>멤버스</th><th ${th}>비멤버스</th><th ${th}>합계</th><th ${th}>금액</th></tr>`;
+  arr.forEach(o=>{ h+=`<tr><td ${tdl}>${escapeHtml(o.sub)}</td><td ${td} style="color:var(--amber);font-weight:700">${won(o.mq)}</td><td ${td}>${won(o.nq)}</td><td ${tdt}>${won(o.tot)}</td><td ${td}>${won(o.a)}원</td></tr>`; });
+  h+=`<tr><td ${tdl}><b>합계</b></td><td style="${tdt};color:var(--amber)">${won(totMem)}</td><td style="${tdt}">${won(totQ-totMem)}</td><td style="${tdt}">${won(totQ)}</td><td style="${tdt}">${won(totA)}원</td></tr></table></div>
+  <div style="margin-top:10px;font-size:11.5px;color:var(--ink3)">※ 현재 카드 필터(월·롤만) 기준. 롤만 OFF면 부자재도 포함됩니다.</div>`;
+  return h;
+}
 function _bsDealerModalHtml(i){
   const d=_bsDealerArr[i]; if(!d) return '<div class="empty">데이터 없음</div>';
   const key=d.key;
@@ -6829,6 +6855,7 @@ document.addEventListener('click', function(e){
   if(t.closest('#bsLessBtn')){ _bsDealerN=10; renderRevenue(); return; }
   const bm=t.closest('#bsMonSeg button[data-bm]'); if(bm){ const mm=parseInt(bm.dataset.bm,10)||0; if(mm===0){_bsMonths=[];}else{const i=_bsMonths.indexOf(mm); if(i>=0)_bsMonths.splice(i,1); else _bsMonths.push(mm);} _bsDealerN=10; renderRevenue(); return; }
   const drow=t.closest('#bsDealerTbl tr[data-bsi]'); if(drow){ const d=_bsDealerArr[+drow.dataset.bsi]; if(d&&typeof openExplain==='function') openExplain('🧾 '+escapeHtml(d.dealer)+' <span style="font-size:12px;color:var(--ink3);font-weight:600">· 산 롤 상세</span>', _bsDealerModalHtml(+drow.dataset.bsi)); return; }
+  const jrow=t.closest('#bsJibuTbl tr[data-bsji]'); if(jrow){ const J=_bsJibuArr[+jrow.dataset.bsji]; if(J&&typeof openExplain==='function') openExplain('🎞 '+escapeHtml(J.j)+' <span style="font-size:12px;color:var(--ink3);font-weight:600">· 판매 롤 상세</span>', _bsJibuModalHtml(+jrow.dataset.bsji)); return; }
 });
 function drawSalesCharts(){
   if(typeof Chart==='undefined'||!SALES||!SALES.channels) return;
