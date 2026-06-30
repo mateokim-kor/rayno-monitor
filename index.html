@@ -1753,7 +1753,7 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
 };
-const BUILD = '2026-06-29 · STRA700영문명 분류보정 + 글라스 배지 관리자홈페이지';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부/제품별 보증서 발급 현황 제목 카드 안으로';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6159,7 +6159,7 @@ function renderWarranty(){
   const _cR='var(--dv6)';
   const regCards=[ warrDistCard(recsProd,'담당지부','담당지부 구성',{color:_cR,n:12}), warrDistCard(recs,'대리점지역(도)','지역(도) 구성',{color:_cR,n:17}), warrDistCard(recs,'대리점지역(시군구)','시군구 TOP',{color:_cR,n:15}), warrDistCard(recs,'매장명','매장(대리점) TOP',{color:_cR,n:15}), warrDistCard(recs,'대리점구분','대리점 구분',{color:_cR}) ];
   const regBlock=regCards.some(Boolean)?_acc('시공지역 분석',_grid(regCards)):'';
-  const lineBlock=(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)?(_sec('지부/제품별 보증서 발급 현황')+'<div class="card">'+lineWarrCard(recs)+'</div>'):'';
+  const lineBlock=(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)?('<div class="card"><h3 style="margin:0 0 4px"><span class="dot"></span>지부/제품별 보증서 발급 현황</h3>'+lineWarrCard(recs)+'</div>'):'';
   const adminRow = admin ? `<div style="margin-bottom:16px;display:flex;justify-content:flex-end"><button class="acc-btn" id="warrExclToggle">집계 제외 관리 (${exRows.length})</button></div>` : '';
   box.innerHTML = cfgCard + controls + kpis + trendCard + lineBlock + jibuAnalysisCard()
     + (breakdownCards?`<div class="biz-grid">${breakdownCards}</div>`:'')
