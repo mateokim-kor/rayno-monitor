@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 지부→대리점 롤판매 카드 기본 지부영업 + 견고한 필터';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부→대리점 롤판매: 관리지부 선택+상위구매 대리점+롤 상세 드릴다운';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6638,7 +6638,7 @@ function renderRevenue(){
 }
 /* ── 지부 → 대리점 롤 판매 (ERP branchSalesList) · 멤버스/비멤버스 ── */
 let BSALE=null, bsLoaded=false;
-let _bsGrp='지부', _bsView='jibu', _bsMetric='q', _bsRollOnly=true, _bsMonths=[];   // 기본: 지부가 판 롤(멤버스/비멤버스)
+let _bsJibu='전체', _bsView='dealer', _bsMetric='q', _bsRollOnly=true, _bsMonths=[], _bsDealerArr=[];   // 지부 선택 + 대리점별(상위 구매) 기본
 async function ensureBranchsales(){ if(bsLoaded)return; try{ const j=await cloudLoadJSON(SUPA.bsFile); if(j&&Array.isArray(j.rows)) BSALE=j; }catch(_){} bsLoaded=true; }
 function _bsIsMember(r){ return r.member==='A01' || r.memberName==='가입'; }
 function _bsMonthOf(r){ const ym=String(r.ym||''); return ym.length>=6?parseInt(ym.slice(4,6),10):0; }
@@ -6648,8 +6648,7 @@ function _bsRows(){
   if(!BSALE||!Array.isArray(BSALE.rows)) return [];
   const mon=_bsMonths.slice();
   return BSALE.rows.filter(r=>{
-    if(_bsGrp==='지부' && r.grp==='본사') return false;   // 지부 영업 = 본사 직매가 아닌 모든 것
-    if(_bsGrp==='본사' && r.grp!=='본사') return false;
+    if(_bsJibu!=='전체' && _bsJibuOf(r)!==_bsJibu) return false;   // 선택 지부(또는 본사)가 관리하는 행만
     if(_bsRollOnly && !_bsRollChk(r)) return false;
     if(mon.length && mon.indexOf(_bsMonthOf(r))<0) return false;
     return true;
@@ -6664,7 +6663,8 @@ function branchSalesCard(){
   const fmtV=v=> _bsMetric==='a'? (Math.round(v).toLocaleString()+'원') : (Math.round(v).toLocaleString());
   const unit=_bsMetric==='a'?'매출':'롤';
   const avM=[...new Set(BSALE.rows.map(_bsMonthOf).filter(Boolean))].sort((a,b)=>a-b);
-  const grpSeg=`<div class="seg" id="bsGrpSeg"><button data-g="all" class="${_bsGrp==='all'?'on':''}">전체</button><button data-g="지부" class="${_bsGrp==='지부'?'on':''}">지부 영업</button><button data-g="본사" class="${_bsGrp==='본사'?'on':''}">본사 직매</button></div>`;
+  const _jibuOpts=['전체'].concat(SALES_JIBU,['본사']);
+  const jibuSel=`<span style="display:inline-flex;align-items:center;gap:6px"><span class="cap">관리 지부</span><select class="dt-select" id="bsJibuSel" style="max-width:160px">${_jibuOpts.map(j=>`<option ${_bsJibu===j?'selected':''}>${escapeHtml(j)}</option>`).join('')}</select></span>`;
   const viewSeg=`<div class="seg" id="bsViewSeg"><button data-v="jibu" class="${_bsView==='jibu'?'on':''}">지부별</button><button data-v="dealer" class="${_bsView==='dealer'?'on':''}">대리점별</button><button data-v="roll" class="${_bsView==='roll'?'on':''}">롤별</button></div>`;
   const metricSeg=`<div class="seg" id="bsMetricSeg"><button data-m2="q" class="${_bsMetric==='q'?'on':''}">수량</button><button data-m2="a" class="${_bsMetric==='a'?'on':''}">매출</button></div>`;
   const rollChk=`<button class="acc-btn" id="bsRollChk" style="${_bsRollOnly?'background:var(--amber);border-color:var(--amber);color:#fff':''}">롤만</button>`;
@@ -6687,10 +6687,12 @@ function branchSalesCard(){
     arr.forEach(o=>{ body+=`<tr><td ${tdl}>${escapeHtml(o.j)}</td><td ${td} style="color:var(--amber);font-weight:700">${fmtV(o.mem)}</td><td ${td}>${fmtV(o.norm)}</td><td ${tdt}>${fmtV(o.tot)}</td><td ${td}>${o.tot?Math.round(o.mem/o.tot*100):0}%</td></tr>`; });
     body+=`<tr><td ${tdl}><b>합계</b></td><td ${tdt} style="color:var(--amber)">${fmtV(memV)}</td><td ${tdt}>${fmtV(normV)}</td><td ${tdt}>${fmtV(totV)}</td><td ${tdt}>${pctM}%</td></tr></table></div>`;
   } else if(_bsView==='dealer'){
-    const ag={}; rows.forEach(r=>{ const k=(r.dealer||r.dealerCode||'(미상)'); const o=ag[k]||(ag[k]={dealer:r.dealer||k, store:r.cust, jibu:_bsJibuOf(r), member:false, q:0, a:0}); o.q+=r.q; o.a+=r.a; if(_bsIsMember(r))o.member=true; });
-    const arr=Object.values(ag).sort((a,b)=> _bsMetric==='a'? b.a-a.a : b.q-a.q).slice(0,100);
-    body=`<div class="cap" style="margin-bottom:6px">${unit} 상위 100개 대리점</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:680px"><tr><th ${th} style="text-align:center">#</th><th ${thl}>대리점</th><th ${thl}>매장(거래처)</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${th}>롤 수량</th><th ${th}>매출</th></tr>`;
-    arr.forEach((o,i)=>{ body+=`<tr><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(o.dealer)}</b></td><td ${tdl}>${escapeHtml(o.store||'-')}</td><td ${tdl}>${escapeHtml(o.jibu)}</td><td ${tdl}>${o.member?'<span style="color:var(--amber);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'}</td><td ${td}>${won(o.q)}</td><td ${td}>${won(o.a)}원</td></tr>`; });
+    const ag={}; rows.forEach(r=>{ const k=(r.dealerCode||r.dealer||'(미상)'); const o=ag[k]||(ag[k]={key:k, dealer:r.dealer||k, store:r.cust, jibu:_bsJibuOf(r), member:false, q:0, a:0}); o.q+=r.q; o.a+=r.a; if(_bsIsMember(r))o.member=true; });
+    const arr=Object.values(ag).sort((a,b)=> _bsMetric==='a'? b.a-a.a : b.q-a.q);
+    _bsDealerArr=arr;
+    const showN=Math.min(arr.length,200);
+    body=`<div class="cap" style="margin-bottom:6px"><b>상위 구매 대리점</b> (${unit} 순) · 행을 클릭하면 그 대리점이 산 <b>롤 상세(수량·금액)</b>가 열립니다 · ${arr.length.toLocaleString()}곳 중 상위 ${showN}</div><div class="iv-wrap"><table class="dtbl" id="bsDealerTbl" style="width:100%;border-collapse:collapse;min-width:700px"><tr><th ${th} style="text-align:center">#</th><th ${thl}>대리점</th><th ${thl}>매장(거래처)</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${th}>롤 수량</th><th ${th}>매출</th></tr>`;
+    arr.slice(0,showN).forEach((o,i)=>{ body+=`<tr data-bsi="${i}" style="cursor:pointer" title="클릭: 롤 상세"><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(o.dealer)}</b></td><td ${tdl}>${escapeHtml(o.store||'-')}</td><td ${tdl}>${escapeHtml(o.jibu)}</td><td ${tdl}>${o.member?'<span style="color:var(--amber);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'}</td><td ${td} style="font-weight:700">${won(o.q)}</td><td ${td}>${won(o.a)}원</td></tr>`; });
     body+=`</table></div>`;
   } else {
     const ag={}; rows.forEach(r=>{ const sub=(typeof _filmCat==='function')?(_filmCat(r.mat).sub||r.mat):r.mat; const o=ag[sub]||(ag[sub]={sub,mem:0,norm:0}); if(_bsIsMember(r))o.mem+=val(r); else o.norm+=val(r); });
@@ -6702,20 +6704,47 @@ function branchSalesCard(){
   const monLab=BSALE.months&&BSALE.months.length?(BSALE.months[0].slice(0,4)+' '+BSALE.months.map(x=>parseInt(x.slice(4,6),10)).join('·')+'월'):'';
   return `<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">${hh}<span class="cap">${escapeHtml(monLab)}</span></div>
-    <div class="cap" style="margin-bottom:10px"><b>지부가 멤버스 / 비멤버스 대리점에 판매한 롤 수</b> · ERP <b>branchSalesList</b> 기준 · 멤버스 = MemberShip <b>가입(A01)</b>. 기본은 <b>지부 영업</b>(지부가 판 것)만 · 본사 직매는 영업구분에서 전환.</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${grpSeg}${viewSeg}${metricSeg}${rollChk}</div>
+    <div class="cap" style="margin-bottom:10px"><b>지부(또는 본사)가 관리하는 대리점에 어떤 롤을 몇 롤(수량·금액) 팔았는지</b> · ERP <b>branchSalesList</b> 기준. <b>관리 지부</b>를 고르면 그 지부의 <b>상위 구매 대리점</b>이 정렬되고, 대리점을 클릭하면 <b>산 롤 상세</b>가 열립니다. (멤버스 = MemberShip 가입 A01)</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${jibuSel}${viewSeg}${metricSeg}${rollChk}</div>
     ${monSeg}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0">${kpis}</div>
     ${body}
   </div>`;
 }
+function _bsDealerModalHtml(i){
+  const d=_bsDealerArr[i]; if(!d) return '<div class="empty">데이터 없음</div>';
+  const key=d.key;
+  const rs=_bsRows().filter(r=>(r.dealerCode||r.dealer||'(미상)')===key);
+  const won=n=>Math.round(n||0).toLocaleString();
+  const ag={}; rs.forEach(r=>{ const sub=(typeof _filmCat==='function')?(_filmCat(r.mat).sub||r.mat):r.mat; const o=ag[r.mat]||(ag[r.mat]={mat:r.mat, sub, q:0, a:0}); o.q+=r.q; o.a+=r.a; });
+  const arr=Object.values(ag).sort((a,b)=>b.q-a.q);
+  const totQ=arr.reduce((s,o)=>s+o.q,0), totA=arr.reduce((s,o)=>s+o.a,0);
+  const thl='style="text-align:left;padding:8px 10px;font-size:11.5px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
+  const th='style="text-align:right;padding:8px 10px;font-size:11.5px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
+  const tdl='style="text-align:left;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line)"';
+  const td='style="text-align:right;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  const tdt=td+';font-weight:800;background:var(--bg2)';
+  let h=`<div style="display:flex;gap:12px;margin-bottom:10px">
+    <div style="flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 13px"><div style="color:var(--ink3);font-size:11.5px">총 롤 수량</div><div style="font-size:19px;font-weight:800;color:var(--amber)">${won(totQ)} 롤</div></div>
+    <div style="flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 13px"><div style="color:var(--ink3);font-size:11.5px">총 매출</div><div style="font-size:19px;font-weight:800">${won(totA)}원</div></div>
+  </div>
+  <div class="cap" style="margin-bottom:8px">${escapeHtml(d.jibu)} · ${d.member?'<b style="color:var(--amber)">Members</b>':'일반'} · ${escapeHtml(d.store||'')}</div>
+  <div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:420px"><tr><th ${thl}>롤(중분류)</th><th ${thl}>롤 코드</th><th ${th}>수량</th><th ${th}>금액</th></tr>`;
+  arr.forEach(o=>{ h+=`<tr><td ${tdl}>${escapeHtml(o.sub)}</td><td ${tdl} style="color:var(--ink3);font-size:11.5px">${escapeHtml(o.mat)}</td><td ${td}>${won(o.q)}</td><td ${td}>${won(o.a)}원</td></tr>`; });
+  h+=`<tr><td ${tdl}><b>합계</b></td><td ${tdl}></td><td style="${tdt}">${won(totQ)}</td><td style="${tdt}">${won(totA)}원</td></tr></table></div>
+  <div style="margin-top:10px;font-size:11.5px;color:var(--ink3)">※ 현재 카드 필터(지부·월·롤만) 기준. 롤만 OFF면 부자재도 포함됩니다.</div>`;
+  return h;
+}
+document.addEventListener('change', function(e){
+  if(e.target && e.target.id==='bsJibuSel'){ _bsJibu=e.target.value; renderRevenue(); }
+});
 document.addEventListener('click', function(e){
   const t=e.target; if(!t||!t.closest) return;
-  const g=t.closest('#bsGrpSeg button[data-g]'); if(g){ _bsGrp=g.dataset.g; renderRevenue(); return; }
   const v=t.closest('#bsViewSeg button[data-v]'); if(v){ _bsView=v.dataset.v; renderRevenue(); return; }
   const m2=t.closest('#bsMetricSeg button[data-m2]'); if(m2){ _bsMetric=m2.dataset.m2; renderRevenue(); return; }
   if(t.closest('#bsRollChk')){ _bsRollOnly=!_bsRollOnly; renderRevenue(); return; }
   const bm=t.closest('#bsMonSeg button[data-bm]'); if(bm){ const mm=parseInt(bm.dataset.bm,10)||0; if(mm===0){_bsMonths=[];}else{const i=_bsMonths.indexOf(mm); if(i>=0)_bsMonths.splice(i,1); else _bsMonths.push(mm);} renderRevenue(); return; }
+  const drow=t.closest('#bsDealerTbl tr[data-bsi]'); if(drow){ const d=_bsDealerArr[+drow.dataset.bsi]; if(d&&typeof openExplain==='function') openExplain('🧾 '+escapeHtml(d.dealer)+' <span style="font-size:12px;color:var(--ink3);font-weight:600">· 산 롤 상세</span>', _bsDealerModalHtml(+drow.dataset.bsi)); return; }
 });
 function drawSalesCharts(){
   if(typeof Chart==='undefined'||!SALES||!SALES.channels) return;
