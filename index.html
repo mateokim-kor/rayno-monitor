@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 지부별 제품판매 매트릭스에 판매롤(지부→대리점)+구매대비 판매율 컬럼';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · branchsales 지부별 엑셀을 화면과 동일한 월별 매트릭스로';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6858,13 +6858,24 @@ function _bsExportXlsx(){
     arr.forEach((o,i)=> body.push([i+1, o.dealer, o.store||'', o.jibu, o.member?'멤버스':'일반', won(o.q), won(o.a)]));
     sheet='대리점별'; viewLabel='대리점별'; fname=`레이노_롤판매_대리점별_${jibuTag}_${prodTag}_${monTag}.xlsx`; firstColW=8;
   } else if(_bsView==='jibu'){
-    const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); const o=ag[j]||(ag[j]={j,mem:0,norm:0,memA:0,normA:0}); if(_bsIsMember(r)){o.mem+=r.q;o.memA+=r.a;}else{o.norm+=r.q;o.normA+=r.a;} });
-    const arr=Object.values(ag).map(o=>({...o,tot:o.mem+o.norm,totA:o.memA+o.normA})).sort((a,b)=>b.tot-a.tot);
-    header=['지부','멤버스 롤','비멤버스 롤','합계 롤','멤버스 비중(%)','멤버스 매출','비멤버스 매출','합계 매출'];
-    arr.forEach(o=> body.push([o.j, won(o.mem), won(o.norm), won(o.tot), o.tot?Math.round(o.mem/o.tot*100):0, won(o.memA), won(o.normA), won(o.totA)]));
-    const T=arr.reduce((s,o)=>({mem:s.mem+o.mem,norm:s.norm+o.norm,memA:s.memA+o.memA,normA:s.normA+o.normA}),{mem:0,norm:0,memA:0,normA:0});
-    const tt=T.mem+T.norm; body.push(['전체', won(T.mem), won(T.norm), won(tt), tt?Math.round(T.mem/tt*100):0, won(T.memA), won(T.normA), won(T.memA+T.normA)]); totalRows.add(body.length-1);
-    sheet='지부별'; viewLabel='지부별'; fname=`레이노_롤판매_지부별_${jibuTag}_${prodTag}_${monTag}.xlsx`; firstColW=14;
+    const val=r=>(_bsMetric==='a'?r.a:r.q);
+    const mset=new Set(); rows.forEach(r=>{ const m=_bsMonthOf(r); if(m)mset.add(m); });
+    const mcols=[...mset].sort((a,b)=>a-b);
+    const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); const m=_bsMonthOf(r); const bk=_bsIsMember(r)?'mem':'norm'; const o=ag[j]||(ag[j]={j,mem:{},norm:{},memT:0,normT:0}); o[bk][m]=(o[bk][m]||0)+val(r); o[bk+'T']+=val(r); });
+    const arr=Object.values(ag).map(o=>({...o,tot:o.memT+o.normT})).filter(o=>o.tot>0).sort((a,b)=>b.tot-a.tot);
+    header=['지부','구분'].concat(mcols.map(m=>m+'월'),['합계']);
+    arr.forEach(o=>{
+      body.push([o.j,'멤버스'].concat(mcols.map(m=>won(o.mem[m]||0)),[won(o.memT)]));
+      body.push(['','비멤버스'].concat(mcols.map(m=>won(o.norm[m]||0)),[won(o.normT)]));
+      body.push(['','합계'].concat(mcols.map(m=>won((o.mem[m]||0)+(o.norm[m]||0))),[won(o.memT+o.normT)])); totalRows.add(body.length-1);
+    });
+    const colMem=mcols.map(m=>arr.reduce((s,o)=>s+(o.mem[m]||0),0));
+    const colNorm=mcols.map(m=>arr.reduce((s,o)=>s+(o.norm[m]||0),0));
+    const tMem=arr.reduce((s,o)=>s+o.memT,0), tNorm=arr.reduce((s,o)=>s+o.normT,0);
+    body.push(['전체','멤버스'].concat(colMem.map(won),[won(tMem)])); totalRows.add(body.length-1);
+    body.push(['','비멤버스'].concat(colNorm.map(won),[won(tNorm)])); totalRows.add(body.length-1);
+    body.push(['','합계'].concat(mcols.map((m,ci)=>won(colMem[ci]+colNorm[ci])),[won(tMem+tNorm)])); totalRows.add(body.length-1);
+    sheet='지부별'; viewLabel='지부별(월별)'; fname=`레이노_롤판매_지부별_${jibuTag}_${prodTag}_${monTag}.xlsx`; firstColW=14; freezeX=2;
   } else if(_bsView==='jibuRoll'){
     const subOf=r=>(typeof _filmCat==='function')?(_filmCat(r.mat).sub||r.mat):r.mat;
     const mv=r=>(_bsMetric==='a'?r.a:r.q);
