@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · branchsales 엑셀 스타일 통일(검정타이틀/주황헤더/합계강조)+롤별 버그수정';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부별 제품판매 매트릭스에 판매롤(지부→대리점)+구매대비 판매율 컬럼';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5251,17 +5251,25 @@ function salesJibuProdRankTable(){
     const qOf=(j,m)=>{ const pm=SALES.jibuProd[j]||{}; let q=0; Object.keys(pm).forEach(mat=>{ if(!_isRoll(mat))return; if(sel!=='__all'&&catOf(mat)!==sel)return; const oo=pm[mat]; const qq=(oo&&oo.q)||oo||{}; q+=(qq[m]||0); }); return q; };
     const mrows=JG.map(j=>{ const cells=Mcols.map(m=>qOf(j,m)); const tot=cells.reduce((s,v)=>s+v,0); return {j,cells,tot}; }).filter(r=>r.tot>0).sort((x,y)=>y.tot-x.tot);
     const colTot=Mcols.map((m,ci)=>mrows.reduce((s,r)=>s+r.cells[ci],0)); const grand=colTot.reduce((s,v)=>s+v,0);
+    // branchsales(지부→대리점) 판매 롤 — 같은 월·제품(라인) 기준
+    const _canon=s=>{ s=String(s||'').toUpperCase().replace(/\s+/g,''); if(s.includes('STRA')||s.includes('스트라'))return 'STRA'; if(s.includes('PHANTOM')||s.includes('팬텀'))return 'PHANTOM'; if(s.includes('ULTIUM')||s.includes('ULTINUM')||s.includes('ULTIMATE')||s.includes('얼티넘'))return 'ULTIUM'; if(s.includes('CHROMA')||s.includes('크로마'))return 'CHROMA'; if(s.includes('PANORAMA')||s.includes('파노라마'))return 'PANORAMA'; if(s.includes('SPECIAL')||s.includes('스페셜'))return 'SPECIAL'; return s||'기타'; };
+    const bsLoaded=(typeof BSALE!=='undefined'&&BSALE&&BSALE.rows&&BSALE.rows.length);
+    const bsByJibu={};
+    if(bsLoaded){ const selCanon=_canon(sel==='__all'?'':sel); BSALE.rows.forEach(r=>{ if(typeof _bsRollChk==='function'&&!_bsRollChk(r))return; const m=(typeof _bsMonthOf==='function')?_bsMonthOf(r):0; if(Mcols.indexOf(m)<0)return; if(sel!=='__all'){ const rc=_canon((typeof _bsProdOf==='function')?_bsProdOf(r):''); if(rc!==selCanon)return; } const j=(typeof _bsJibuOf==='function')?_bsJibuOf(r):null; if(!j)return; bsByJibu[j]=(bsByJibu[j]||0)+(r.q||0); }); }
+    const bsGrand=Object.values(bsByJibu).reduce((s,v)=>s+v,0);
+    const pctOf=(bs,tot)=> (bs>0&&tot>0)?(bs/tot*100).toFixed(1)+'%':'—';
     const roll=n=>n?Math.round(n).toLocaleString():'·';
     const thl='style="text-align:left;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap;position:sticky;left:0;z-index:1"';
     const th='style="text-align:right;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
     const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;left:0;background:var(--card,#fff)"';
     const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
     const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
-    let h=_jspMonSeg+seg+_jspViewSeg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> 지부 × 월 롤 판매 수량 · ${escapeHtml(_mLabel)} (단위: 롤)</div>`;
+    const tdb='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;color:var(--amber);font-weight:700"';
+    let h=_jspMonSeg+seg+_jspViewSeg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> 지부 × 월 롤 판매 수량 · ${escapeHtml(_mLabel)} (단위: 롤)${bsLoaded?' · <b>구매 대비 판매율 = 판매 롤(지부→대리점) ÷ 합계 × 100</b>':' · <span style="color:var(--ink3)">지부→대리점 데이터 로딩 중…</span>'}</div>`;
     if(!mrows.length) return h+'<div class="empty">선택한 제품의 지부별·월별 판매 데이터가 없습니다.</div>';
-    h+=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:${160+Mcols.length*60}px"><tr><th ${thl}>지부</th>${Mcols.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
-    mrows.forEach(r=>{ h+=`<tr><td ${tdl}>${escapeHtml(r.j)}</td>${r.cells.map(v=>`<td ${td}>${roll(v)}</td>`).join('')}<td ${tdt}>${roll(r.tot)}</td></tr>`; });
-    h+=`<tr class="t-tot"><td ${tdl}><b>합계</b></td>${colTot.map(v=>`<td ${td}><b>${roll(v)}</b></td>`).join('')}<td ${tdt}><b>${roll(grand)}</b></td></tr></table></div>`;
+    h+=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:${160+Mcols.length*60+300}px"><tr><th ${thl}>지부</th>${Mcols.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th><th ${th}>판매 롤<br>(지부→대리점)</th><th ${th}>구매 대비<br>판매율</th></tr>`;
+    mrows.forEach(r=>{ const bs=bsByJibu[r.j]||0; h+=`<tr><td ${tdl}>${escapeHtml(r.j)}</td>${r.cells.map(v=>`<td ${td}>${roll(v)}</td>`).join('')}<td ${tdt}>${roll(r.tot)}</td><td ${td}>${roll(bs)}</td><td ${tdb}>${pctOf(bs,r.tot)}</td></tr>`; });
+    h+=`<tr class="t-tot"><td ${tdl}><b>합계</b></td>${colTot.map(v=>`<td ${td}><b>${roll(v)}</b></td>`).join('')}<td ${tdt}><b>${roll(grand)}</b></td><td ${tdt}><b>${roll(bsGrand)}</b></td><td ${tdt}><b>${pctOf(bsGrand,grand)}</b></td></tr></table></div>`;
     return h;
   }
   const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; let q=0,a=0; Object.keys(pm).forEach(mat=>{ const oo=pm[mat]; if(sel==='__all'){ if(_isRoll(mat)) q+=sm(oo.q||oo); a+=sm(oo.a||{}); } else { if(!_isRoll(mat)||catOf(mat)!==sel)return; q+=sm(oo.q||oo); a+=sm(oo.a||{}); } }); return {j,q,a}; }).filter(r=>r.q>0||r.a>0).sort((x,y)=>y.q-x.q);
