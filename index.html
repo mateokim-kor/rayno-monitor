@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 대리점별 10개+더보기, 지부별 멤버스/비멤버스 월별 매트릭스';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 매출분석 헤더 중복 (B2C+B2B) 작은글씨 제거';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7567,7 +7567,7 @@ function _sbSyncActive(){
     let act=null;
     items.forEach(b=>{ const on=(b.dataset.k===key); b.classList.toggle('on',on); if(on)act=b; });
     const ht=document.getElementById('headerTitle'), hs=document.getElementById('headerSub');
-    if(act && ht){ const _ht=act.dataset.htitle||act.dataset.title||''; if(act.dataset.k==='rayno:revenue'){ ht.innerHTML=escapeHtml(_ht)+' <span style="font-size:.6em;font-weight:600;color:var(--ink2);vertical-align:middle">(B2C+B2B)</span>'; } else { ht.textContent=_ht; } if(hs) hs.textContent=act.dataset.desc||''; }
+    if(act && ht){ const _ht=act.dataset.htitle||act.dataset.title||''; ht.textContent=_ht; if(hs) hs.textContent=act.dataset.desc||''; }
   }catch(_){}
 }
 function _restoreNav(nav){
