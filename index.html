@@ -1752,8 +1752,9 @@ const SUPA = {
   commandFile: 'crawl_command.json',
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
+  bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 대리점 현황에 매장명(거래처명) 컬럼 추가';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 매출분석에 지부→대리점 롤판매(멤버스/비멤버스) 카드';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6622,6 +6623,7 @@ function renderRevenue(){
     + card(hhx('롤 판매 수 · 중분류별 (B2C / B2B)')+salesRollTable())
     + card(hhx('지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
     + card(hhx('지부별 제품 판매 순위 · 롤')+salesJibuProdRankTable())
+    + branchSalesCard()
     + card(hhx('시장 점유율 · '+lab)+salesShareTable())
     + (()=>{
         const _avM=_salesMonths(), _selM=_regMonths.filter(m=>_avM.indexOf(m)>=0).sort((a,b)=>a-b);
@@ -6634,6 +6636,87 @@ function renderRevenue(){
   drawSalesCharts();
   try{ _sbaRenderChart(); }catch(_){}
 }
+/* ── 지부 → 대리점 롤 판매 (ERP branchSalesList) · 멤버스/비멤버스 ── */
+let BSALE=null, bsLoaded=false;
+let _bsGrp='all', _bsView='jibu', _bsMetric='q', _bsRollOnly=true, _bsMonths=[];
+async function ensureBranchsales(){ if(bsLoaded)return; try{ const j=await cloudLoadJSON(SUPA.bsFile); if(j&&Array.isArray(j.rows)) BSALE=j; }catch(_){} bsLoaded=true; }
+function _bsIsMember(r){ return r.member==='A01' || r.memberName==='가입'; }
+function _bsMonthOf(r){ const ym=String(r.ym||''); return ym.length>=6?parseInt(ym.slice(4,6),10):0; }
+function _bsJibuOf(r){ if(r.grp==='본사') return '본사'; const j=(typeof _sToJibu==='function')?_sToJibu(r.branch):null; return j||r.branch||'기타'; }
+function _bsRollChk(r){ return typeof _parseFilm==='function' ? !!_parseFilm(r.mat) : true; }
+function _bsRows(){
+  if(!BSALE||!Array.isArray(BSALE.rows)) return [];
+  const mon=_bsMonths.slice();
+  return BSALE.rows.filter(r=>{
+    if(_bsGrp==='지부' && r.grp!=='지부') return false;
+    if(_bsGrp==='본사' && r.grp!=='본사') return false;
+    if(_bsRollOnly && !_bsRollChk(r)) return false;
+    if(mon.length && mon.indexOf(_bsMonthOf(r))<0) return false;
+    return true;
+  });
+}
+function branchSalesCard(){
+  const hh='<h3 style="margin:0"><span class="dot"></span>지부 → 대리점 롤 판매 · 멤버스/비멤버스</h3>';
+  if(!bsLoaded){ ensureBranchsales().then(()=>{ if(typeof rview!=='undefined'&&rview==='revenue') renderRevenue(); }); return `<div class="card">${hh}<div class="cap" style="margin-top:8px">데이터 불러오는 중…</div></div>`; }
+  if(!BSALE||!Array.isArray(BSALE.rows)||!BSALE.rows.length){ return `<div class="card">${hh}<div class="empty" style="margin-top:8px">branchsales.json이 아직 없습니다. 수집기 ⑧단계(branchSalesList) 실행 후 표시됩니다.</div></div>`; }
+  const rows=_bsRows();
+  const val=r=> _bsMetric==='a'? r.a : r.q;
+  const fmtV=v=> _bsMetric==='a'? (Math.round(v).toLocaleString()+'원') : (Math.round(v).toLocaleString());
+  const unit=_bsMetric==='a'?'매출':'롤';
+  const avM=[...new Set(BSALE.rows.map(_bsMonthOf).filter(Boolean))].sort((a,b)=>a-b);
+  const grpSeg=`<div class="seg" id="bsGrpSeg"><button data-g="all" class="${_bsGrp==='all'?'on':''}">전체</button><button data-g="지부" class="${_bsGrp==='지부'?'on':''}">지부 영업</button><button data-g="본사" class="${_bsGrp==='본사'?'on':''}">본사 직매</button></div>`;
+  const viewSeg=`<div class="seg" id="bsViewSeg"><button data-v="jibu" class="${_bsView==='jibu'?'on':''}">지부별</button><button data-v="dealer" class="${_bsView==='dealer'?'on':''}">대리점별</button><button data-v="roll" class="${_bsView==='roll'?'on':''}">롤별</button></div>`;
+  const metricSeg=`<div class="seg" id="bsMetricSeg"><button data-m2="q" class="${_bsMetric==='q'?'on':''}">수량</button><button data-m2="a" class="${_bsMetric==='a'?'on':''}">매출</button></div>`;
+  const rollChk=`<button class="acc-btn" id="bsRollChk" style="${_bsRollOnly?'background:var(--amber);border-color:var(--amber);color:#fff':''}">롤만</button>`;
+  const monSeg=`<div class="seg" id="bsMonSeg" style="flex-wrap:wrap;margin-top:8px"><button data-bm="0" class="${_bsMonths.length===0?'on':''}">전체월</button>${avM.map(m=>`<button data-bm="${m}" class="${_bsMonths.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div>`;
+  let memV=0, normV=0; rows.forEach(r=>{ const v=val(r); if(_bsIsMember(r))memV+=v; else normV+=v; });
+  const totV=memV+normV, pctM=totV?Math.round(memV/totV*100):0;
+  const kpi=(lab,v,sub,col)=>`<div style="background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:11px 13px"><div style="color:var(--ink3);font-size:11.5px">${lab}</div><div style="font-size:18px;font-weight:800;color:${col||'var(--ink)'}">${v}</div><div style="color:var(--ink3);font-size:11px">${sub||''}</div></div>`;
+  const kpis=[ kpi('총 '+unit, fmtV(totV), '전체'), kpi('멤버스', fmtV(memV), pctM+'% 비중','var(--amber)'), kpi('비멤버스', fmtV(normV), (100-pctM)+'% 비중'), kpi('멤버스 비중', pctM+'%', unit+' 기준') ].join('');
+  const thl='style="background:var(--ink);color:var(--bg);padding:8px 10px;font-size:12px;font-weight:800;text-align:left;white-space:nowrap"';
+  const th='style="background:var(--ink);color:var(--bg);padding:8px 10px;font-size:12px;font-weight:800;text-align:right;white-space:nowrap"';
+  const tdl='style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px"';
+  const td='style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px;font-variant-numeric:tabular-nums"';
+  const tdt='style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px;font-weight:800;background:var(--bg2)"';
+  const won=n=>Math.round(n||0).toLocaleString();
+  let body='';
+  if(_bsView==='jibu'){
+    const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); const o=ag[j]||(ag[j]={j,mem:0,norm:0}); if(_bsIsMember(r))o.mem+=val(r); else o.norm+=val(r); });
+    const arr=Object.values(ag).map(o=>({...o,tot:o.mem+o.norm})).filter(o=>o.tot>0).sort((a,b)=>b.tot-a.tot);
+    body=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:520px"><tr><th ${thl}>지부</th><th ${th}>멤버스</th><th ${th}>비멤버스</th><th ${th}>합계</th><th ${th}>멤버스 비중</th></tr>`;
+    arr.forEach(o=>{ body+=`<tr><td ${tdl}>${escapeHtml(o.j)}</td><td ${td} style="color:var(--amber);font-weight:700">${fmtV(o.mem)}</td><td ${td}>${fmtV(o.norm)}</td><td ${tdt}>${fmtV(o.tot)}</td><td ${td}>${o.tot?Math.round(o.mem/o.tot*100):0}%</td></tr>`; });
+    body+=`<tr><td ${tdl}><b>합계</b></td><td ${tdt} style="color:var(--amber)">${fmtV(memV)}</td><td ${tdt}>${fmtV(normV)}</td><td ${tdt}>${fmtV(totV)}</td><td ${tdt}>${pctM}%</td></tr></table></div>`;
+  } else if(_bsView==='dealer'){
+    const ag={}; rows.forEach(r=>{ const k=(r.dealer||r.dealerCode||'(미상)'); const o=ag[k]||(ag[k]={dealer:r.dealer||k, store:r.cust, jibu:_bsJibuOf(r), member:false, q:0, a:0}); o.q+=r.q; o.a+=r.a; if(_bsIsMember(r))o.member=true; });
+    const arr=Object.values(ag).sort((a,b)=> _bsMetric==='a'? b.a-a.a : b.q-a.q).slice(0,100);
+    body=`<div class="cap" style="margin-bottom:6px">${unit} 상위 100개 대리점</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:680px"><tr><th ${th} style="text-align:center">#</th><th ${thl}>대리점</th><th ${thl}>매장(거래처)</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${th}>롤 수량</th><th ${th}>매출</th></tr>`;
+    arr.forEach((o,i)=>{ body+=`<tr><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(o.dealer)}</b></td><td ${tdl}>${escapeHtml(o.store||'-')}</td><td ${tdl}>${escapeHtml(o.jibu)}</td><td ${tdl}>${o.member?'<span style="color:var(--amber);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'}</td><td ${td}>${won(o.q)}</td><td ${td}>${won(o.a)}원</td></tr>`; });
+    body+=`</table></div>`;
+  } else {
+    const ag={}; rows.forEach(r=>{ const sub=(typeof _filmCat==='function')?(_filmCat(r.mat).sub||r.mat):r.mat; const o=ag[sub]||(ag[sub]={sub,mem:0,norm:0}); if(_bsIsMember(r))o.mem+=val(r); else o.norm+=val(r); });
+    const arr=Object.values(ag).map(o=>({...o,tot:o.mem+o.norm})).filter(o=>o.tot>0).sort((a,b)=>b.tot-a.tot);
+    body=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:520px"><tr><th ${thl}>롤(중분류)</th><th ${th}>멤버스</th><th ${th}>비멤버스</th><th ${th}>합계</th><th ${th}>멤버스 비중</th></tr>`;
+    arr.forEach(o=>{ body+=`<tr><td ${tdl}>${escapeHtml(o.sub)}</td><td ${td} style="color:var(--amber);font-weight:700">${fmtV(o.mem)}</td><td ${td}>${fmtV(o.norm)}</td><td ${tdt}>${fmtV(o.tot)}</td><td ${td}>${o.tot?Math.round(o.mem/o.tot*100):0}%</td></tr>`; });
+    body+=`</table></div>`;
+  }
+  const monLab=BSALE.months&&BSALE.months.length?(BSALE.months[0].slice(0,4)+' '+BSALE.months.map(x=>parseInt(x.slice(4,6),10)).join('·')+'월'):'';
+  return `<div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">${hh}<span class="cap">${escapeHtml(monLab)}</span></div>
+    <div class="cap" style="margin-bottom:10px">ERP <b>branchSalesList</b> 기준 · 멤버스 = MemberShip <b>가입(A01)</b>. 영업구분(전체/지부/본사)·보기(지부·대리점·롤)·단위(수량/매출)·월로 좁혀 봅니다.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${grpSeg}${viewSeg}${metricSeg}${rollChk}</div>
+    ${monSeg}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0">${kpis}</div>
+    ${body}
+  </div>`;
+}
+document.addEventListener('click', function(e){
+  const t=e.target; if(!t||!t.closest) return;
+  const g=t.closest('#bsGrpSeg button[data-g]'); if(g){ _bsGrp=g.dataset.g; renderRevenue(); return; }
+  const v=t.closest('#bsViewSeg button[data-v]'); if(v){ _bsView=v.dataset.v; renderRevenue(); return; }
+  const m2=t.closest('#bsMetricSeg button[data-m2]'); if(m2){ _bsMetric=m2.dataset.m2; renderRevenue(); return; }
+  if(t.closest('#bsRollChk')){ _bsRollOnly=!_bsRollOnly; renderRevenue(); return; }
+  const bm=t.closest('#bsMonSeg button[data-bm]'); if(bm){ const mm=parseInt(bm.dataset.bm,10)||0; if(mm===0){_bsMonths=[];}else{const i=_bsMonths.indexOf(mm); if(i>=0)_bsMonths.splice(i,1); else _bsMonths.push(mm);} renderRevenue(); return; }
+});
 function drawSalesCharts(){
   if(typeof Chart==='undefined'||!SALES||!SALES.channels) return;
   const C=SALES.channels, M=_salesMonths(), sc=salesCfg(), ck=_ck();
