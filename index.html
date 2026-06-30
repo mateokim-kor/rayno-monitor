@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 지부별 롤 보기에 멤버스/비멤버스 두 줄 분할';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부대리점 롤판매 카드에 제품(롤) 칩 선택 추가(이미지 방식)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6674,17 +6674,29 @@ function renderRevenue(){
 }
 /* ── 지부 → 대리점 롤 판매 (ERP branchSalesList) · 멤버스/비멤버스 ── */
 let BSALE=null, bsLoaded=false;
-let _bsJibu='전체', _bsView='dealer', _bsMetric='q', _bsRollOnly=true, _bsMonths=[], _bsDealerArr=[], _bsDealerN=10, _bsJibuArr=[];   // 지부 선택 + 대리점별(상위 구매) 기본 · 대리점 10개씩
+let _bsJibu='전체', _bsView='dealer', _bsMetric='q', _bsRollOnly=true, _bsMonths=[], _bsDealerArr=[], _bsDealerN=10, _bsJibuArr=[], _bsProd='전체';   // 지부·제품 선택 + 대리점별 기본
 async function ensureBranchsales(){ if(bsLoaded)return; try{ const j=await cloudLoadJSON(SUPA.bsFile); if(j&&Array.isArray(j.rows)) BSALE=j; }catch(_){} bsLoaded=true; }
 function _bsIsMember(r){ return r.member==='A01' || r.memberName==='가입'; }
 function _bsMonthOf(r){ const ym=String(r.ym||''); return ym.length>=6?parseInt(ym.slice(4,6),10):0; }
 function _bsJibuOf(r){ if(r.grp==='본사') return '본사'; const j=(typeof _sToJibu==='function')?_sToJibu(r.branch):null; return j||r.branch||'기타'; }
 function _bsRollChk(r){ return typeof _parseFilm==='function' ? !!_parseFilm(r.mat) : true; }
+let _bsUseMid=null;   // 제품 라벨: ERP 중분류(_midOf)가 데이터에 맞으면 true(이미지와 동일 라벨), 아니면 _filmCat 대분류
+function _bsDecideProdMode(){
+  if(_bsUseMid!==null) return;
+  let ok=0,tot=0; ((BSALE&&BSALE.rows)||[]).forEach(x=>{ if(!_bsRollChk(x))return; tot++; const m=(typeof _midOf==='function')?_midOf(x.matCode||x.mat):'기타'; if(m&&m!=='기타')ok++; });
+  _bsUseMid = tot>0 && (ok/tot)>=0.5;
+}
+function _bsProdOf(r){
+  _bsDecideProdMode();
+  if(_bsUseMid){ const m=(typeof _midOf==='function')?_midOf(r.matCode||r.mat):'기타'; return (m&&m!=='기타')?m:'기타'; }
+  return (typeof _filmCat==='function')?(_filmCat(r.mat).major||'기타'):'기타';
+}
 function _bsRows(){
   if(!BSALE||!Array.isArray(BSALE.rows)) return [];
   const mon=_bsMonths.slice();
   return BSALE.rows.filter(r=>{
     if(_bsJibu!=='전체' && _bsJibuOf(r)!==_bsJibu) return false;   // 선택 지부(또는 본사)가 관리하는 행만
+    if(_bsProd!=='전체' && _bsProdOf(r)!==_bsProd) return false;   // 선택 제품(롤)만
     if(_bsRollOnly && !_bsRollChk(r)) return false;
     if(mon.length && mon.indexOf(_bsMonthOf(r))<0) return false;
     return true;
@@ -6703,6 +6715,12 @@ function branchSalesCard(){
   const jibuSel=`<span style="display:inline-flex;align-items:center;gap:6px"><span class="cap">관리 지부</span><select class="dt-select" id="bsJibuSel" style="max-width:160px">${_jibuOpts.map(j=>`<option ${_bsJibu===j?'selected':''}>${escapeHtml(j)}</option>`).join('')}</select></span>`;
   const viewSeg=`<div class="seg" id="bsViewSeg"><button data-v="jibu" class="${_bsView==='jibu'?'on':''}">지부별</button><button data-v="jibuRoll" class="${_bsView==='jibuRoll'?'on':''}">지부별 롤</button><button data-v="dealer" class="${_bsView==='dealer'?'on':''}">대리점별</button><button data-v="roll" class="${_bsView==='roll'?'on':''}">롤별</button></div>`;
   const metricSeg=`<div class="seg" id="bsMetricSeg"><button data-m2="q" class="${_bsMetric==='q'?'on':''}">수량</button><button data-m2="a" class="${_bsMetric==='a'?'on':''}">매출</button></div>`;
+  // 제품(롤) 칩 — 이미지처럼: 전체 + 데이터에 있는 제품들(롤만 기준, 판매량 순)
+  const _prodTot={}; ((BSALE&&BSALE.rows)||[]).forEach(r=>{ if(!_bsRollChk(r))return; const p=_bsProdOf(r); _prodTot[p]=(_prodTot[p]||0)+(r.q||0); });
+  const _prodList=Object.keys(_prodTot).filter(p=>p&&p!=='기타'&&_prodTot[p]>0).sort((a,b)=>_prodTot[b]-_prodTot[a]);
+  if(_prodTot['기타']>0) _prodList.push('기타');
+  if(_bsProd!=='전체' && _prodList.indexOf(_bsProd)<0) _bsProd='전체';
+  const prodSeg=`<div class="seg" id="bsProdSeg" style="flex-wrap:wrap"><button data-bp="전체" class="${_bsProd==='전체'?'on':''}">전체</button>${_prodList.map(p=>`<button data-bp="${escapeHtml(p)}" class="${_bsProd===p?'on':''}">${escapeHtml(p)}</button>`).join('')}</div>`;
   const rollChk=`<button class="acc-btn" id="bsRollChk" style="${_bsRollOnly?'background:var(--amber);border-color:var(--amber);color:#fff':''}">롤만</button>`;
   const monSeg=`<div class="seg" id="bsMonSeg" style="flex-wrap:wrap;margin-top:8px"><button data-bm="0" class="${_bsMonths.length===0?'on':''}">전체월</button>${avM.map(m=>`<button data-bm="${m}" class="${_bsMonths.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div>`;
   let memV=0, normV=0; rows.forEach(r=>{ const v=val(r); if(_bsIsMember(r))memV+=v; else normV+=v; });
@@ -6778,6 +6796,7 @@ function branchSalesCard(){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">${hh}<div style="display:flex;align-items:center;gap:10px"><span class="cap">${escapeHtml(monLab)}</span><button type="button" class="acc-btn" id="bsXlsxBtn" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="현재 보기·필터 전체 데이터를 엑셀로 다운로드">⬇ 엑셀 다운로드</button></div></div>
     <div class="cap" style="margin-bottom:10px"><b>지부(또는 본사)가 관리하는 대리점에 어떤 롤을 몇 롤(수량·금액) 팔았는지</b> · ERP <b>branchSalesList</b> 기준. <b>관리 지부</b>를 고르면 그 지부의 <b>상위 구매 대리점</b>이 정렬되고, 대리점을 클릭하면 <b>산 롤 상세</b>가 열립니다. (멤버스 = MemberShip 가입 A01)</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${jibuSel}${viewSeg}${metricSeg}${rollChk}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px"><span class="cap">제품(롤)</span>${prodSeg}</div>
     ${monSeg}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0">${kpis}</div>
     ${body}
@@ -6788,20 +6807,21 @@ function _bsExportXlsx(){
   const rows=_bsRows(); const won=n=>Math.round(n||0);
   const jibuTag=_bsJibu==='전체'?'전체지부':_bsJibu;
   const monTag=_bsMonths.length?(_bsMonths.slice().sort((a,b)=>a-b).join('·')+'월'):'전체월';
-  const head1=['지부→대리점 롤 판매', '관리지부: '+jibuTag, '기간: '+monTag, (_bsRollOnly?'롤만':'전체품목'), '출처: branchSalesList'];
+  const prodTag=_bsProd==='전체'?'전체제품':_bsProd;
+  const head1=['지부→대리점 롤 판매', '관리지부: '+jibuTag, '제품: '+prodTag, '기간: '+monTag, (_bsRollOnly?'롤만':'전체품목'), '출처: branchSalesList'];
   let aoa=[head1], sheet='', fname='';
   if(_bsView==='dealer'){
     const ag={}; rows.forEach(r=>{ const k=(r.dealerCode||r.dealer||'(미상)'); const o=ag[k]||(ag[k]={dealer:r.dealer||k, store:r.cust, jibu:_bsJibuOf(r), member:false, q:0, a:0}); o.q+=r.q; o.a+=r.a; if(_bsIsMember(r))o.member=true; });
     const arr=Object.values(ag).sort((a,b)=> _bsMetric==='a'? b.a-a.a : b.q-a.q);
     aoa.push(['순위','대리점','매장(거래처)','지부','구분','롤 수량','매출(원)']);
     arr.forEach((o,i)=> aoa.push([i+1, o.dealer, o.store||'', o.jibu, o.member?'멤버스':'일반', won(o.q), won(o.a)]));
-    sheet='대리점별'; fname=`레이노_롤판매_대리점별_${jibuTag}_${monTag}.xlsx`;
+    sheet='대리점별'; fname=`레이노_롤판매_대리점별_${jibuTag}_${prodTag}_${monTag}.xlsx`;
   } else if(_bsView==='jibu'){
     const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); const o=ag[j]||(ag[j]={j,mem:0,norm:0,memA:0,normA:0}); if(_bsIsMember(r)){o.mem+=r.q;o.memA+=r.a;}else{o.norm+=r.q;o.normA+=r.a;} });
     const arr=Object.values(ag).map(o=>({...o,tot:o.mem+o.norm,totA:o.memA+o.normA})).sort((a,b)=>b.tot-a.tot);
     aoa.push(['지부','멤버스 롤','비멤버스 롤','합계 롤','멤버스 비중(%)','멤버스 매출','비멤버스 매출','합계 매출']);
     arr.forEach(o=> aoa.push([o.j, won(o.mem), won(o.norm), won(o.tot), o.tot?Math.round(o.mem/o.tot*100):0, won(o.memA), won(o.normA), won(o.totA)]));
-    sheet='지부별'; fname=`레이노_롤판매_지부별_${jibuTag}_${monTag}.xlsx`;
+    sheet='지부별'; fname=`레이노_롤판매_지부별_${jibuTag}_${prodTag}_${monTag}.xlsx`;
   } else if(_bsView==='jibuRoll'){
     const subOf=r=>(typeof _filmCat==='function')?(_filmCat(r.mat).sub||r.mat):r.mat;
     const mv=r=>(_bsMetric==='a'?r.a:r.q);
@@ -6817,10 +6837,10 @@ function _bsExportXlsx(){
     });
     aoa.push(['전체','멤버스'].concat(cols.map(c=>won(arr.reduce((s,o)=>s+(o.mem[c]||0),0))), [won(arr.reduce((s,o)=>s+o.memT,0))]));
     aoa.push(['','비멤버스'].concat(cols.map(c=>won(arr.reduce((s,o)=>s+(o.norm[c]||0),0))), [won(arr.reduce((s,o)=>s+o.normT,0))]));
-    sheet='지부별롤'; fname=`레이노_롤판매_지부별롤_${jibuTag}_${monTag}.xlsx`;
+    sheet='지부별롤'; fname=`레이노_롤판매_지부별롤_${jibuTag}_${prodTag}_${monTag}.xlsx`;
   } else {
     arr.forEach(o=> aoa.push([o.sub, won(o.mem), won(o.norm), won(o.tot), o.tot?Math.round(o.mem/o.tot*100):0, won(o.memA), won(o.normA)]));
-    sheet='롤별'; fname=`레이노_롤판매_롤별_${jibuTag}_${monTag}.xlsx`;
+    sheet='롤별'; fname=`레이노_롤판매_롤별_${jibuTag}_${prodTag}_${monTag}.xlsx`;
   }
   try{
     const ws=XLSX.utils.aoa_to_sheet(aoa);
@@ -6884,6 +6904,7 @@ document.addEventListener('click', function(e){
   const t=e.target; if(!t||!t.closest) return;
   const v=t.closest('#bsViewSeg button[data-v]'); if(v){ _bsView=v.dataset.v; _bsDealerN=10; renderRevenue(); return; }
   const m2=t.closest('#bsMetricSeg button[data-m2]'); if(m2){ _bsMetric=m2.dataset.m2; _bsDealerN=10; renderRevenue(); return; }
+  const bp=t.closest('#bsProdSeg button[data-bp]'); if(bp){ _bsProd=bp.dataset.bp; _bsDealerN=10; renderRevenue(); return; }
   if(t.closest('#bsRollChk')){ _bsRollOnly=!_bsRollOnly; _bsDealerN=10; renderRevenue(); return; }
   if(t.closest('#bsXlsxBtn')){ _bsExportXlsx(); return; }
   if(t.closest('#bsMoreBtn')){ _bsDealerN+=20; renderRevenue(); return; }
