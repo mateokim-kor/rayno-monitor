@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 매출분석에 지부→대리점 롤판매(멤버스/비멤버스) 카드';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부→대리점 롤판매 카드 기본 지부영업 + 견고한 필터';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6638,7 +6638,7 @@ function renderRevenue(){
 }
 /* ── 지부 → 대리점 롤 판매 (ERP branchSalesList) · 멤버스/비멤버스 ── */
 let BSALE=null, bsLoaded=false;
-let _bsGrp='all', _bsView='jibu', _bsMetric='q', _bsRollOnly=true, _bsMonths=[];
+let _bsGrp='지부', _bsView='jibu', _bsMetric='q', _bsRollOnly=true, _bsMonths=[];   // 기본: 지부가 판 롤(멤버스/비멤버스)
 async function ensureBranchsales(){ if(bsLoaded)return; try{ const j=await cloudLoadJSON(SUPA.bsFile); if(j&&Array.isArray(j.rows)) BSALE=j; }catch(_){} bsLoaded=true; }
 function _bsIsMember(r){ return r.member==='A01' || r.memberName==='가입'; }
 function _bsMonthOf(r){ const ym=String(r.ym||''); return ym.length>=6?parseInt(ym.slice(4,6),10):0; }
@@ -6648,7 +6648,7 @@ function _bsRows(){
   if(!BSALE||!Array.isArray(BSALE.rows)) return [];
   const mon=_bsMonths.slice();
   return BSALE.rows.filter(r=>{
-    if(_bsGrp==='지부' && r.grp!=='지부') return false;
+    if(_bsGrp==='지부' && r.grp==='본사') return false;   // 지부 영업 = 본사 직매가 아닌 모든 것
     if(_bsGrp==='본사' && r.grp!=='본사') return false;
     if(_bsRollOnly && !_bsRollChk(r)) return false;
     if(mon.length && mon.indexOf(_bsMonthOf(r))<0) return false;
@@ -6683,7 +6683,7 @@ function branchSalesCard(){
   if(_bsView==='jibu'){
     const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); const o=ag[j]||(ag[j]={j,mem:0,norm:0}); if(_bsIsMember(r))o.mem+=val(r); else o.norm+=val(r); });
     const arr=Object.values(ag).map(o=>({...o,tot:o.mem+o.norm})).filter(o=>o.tot>0).sort((a,b)=>b.tot-a.tot);
-    body=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:520px"><tr><th ${thl}>지부</th><th ${th}>멤버스</th><th ${th}>비멤버스</th><th ${th}>합계</th><th ${th}>멤버스 비중</th></tr>`;
+    body=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:560px"><tr><th ${thl}>지부</th><th ${th}>멤버스 대리점</th><th ${th}>비멤버스 대리점</th><th ${th}>합계</th><th ${th}>멤버스 비중</th></tr>`;
     arr.forEach(o=>{ body+=`<tr><td ${tdl}>${escapeHtml(o.j)}</td><td ${td} style="color:var(--amber);font-weight:700">${fmtV(o.mem)}</td><td ${td}>${fmtV(o.norm)}</td><td ${tdt}>${fmtV(o.tot)}</td><td ${td}>${o.tot?Math.round(o.mem/o.tot*100):0}%</td></tr>`; });
     body+=`<tr><td ${tdl}><b>합계</b></td><td ${tdt} style="color:var(--amber)">${fmtV(memV)}</td><td ${tdt}>${fmtV(normV)}</td><td ${tdt}>${fmtV(totV)}</td><td ${tdt}>${pctM}%</td></tr></table></div>`;
   } else if(_bsView==='dealer'){
@@ -6702,7 +6702,7 @@ function branchSalesCard(){
   const monLab=BSALE.months&&BSALE.months.length?(BSALE.months[0].slice(0,4)+' '+BSALE.months.map(x=>parseInt(x.slice(4,6),10)).join('·')+'월'):'';
   return `<div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">${hh}<span class="cap">${escapeHtml(monLab)}</span></div>
-    <div class="cap" style="margin-bottom:10px">ERP <b>branchSalesList</b> 기준 · 멤버스 = MemberShip <b>가입(A01)</b>. 영업구분(전체/지부/본사)·보기(지부·대리점·롤)·단위(수량/매출)·월로 좁혀 봅니다.</div>
+    <div class="cap" style="margin-bottom:10px"><b>지부가 멤버스 / 비멤버스 대리점에 판매한 롤 수</b> · ERP <b>branchSalesList</b> 기준 · 멤버스 = MemberShip <b>가입(A01)</b>. 기본은 <b>지부 영업</b>(지부가 판 것)만 · 본사 직매는 영업구분에서 전환.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${grpSeg}${viewSeg}${metricSeg}${rollChk}</div>
     ${monSeg}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0">${kpis}</div>
