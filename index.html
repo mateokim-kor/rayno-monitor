@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 지부 모달에 상위 구매 대리점 표 추가';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · branchsales 엑셀 스타일 통일(검정타이틀/주황헤더/합계강조)+롤별 버그수정';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6805,26 +6805,58 @@ function branchSalesCard(){
     ${body}
   </div>`;
 }
+/* 공용 엑셀 스타일 내보내기: 검정 타이틀바 · 주황 헤더 · 교차행 · 합계 강조 · 틀고정 (ExcelJS, 실패 시 기본 서식 폴백) */
+function _xlsxStyledAOA(opts){
+  const title=opts.title||'', header=opts.header||[], body=opts.body||[];
+  const sheet=opts.sheet||'표', fname=opts.fname||'export.xlsx';
+  const totalRows=opts.totalRows||new Set();
+  const firstColW=opts.firstColW||18, freezeX=opts.freezeXCol||0;
+  let nC=header.length; body.forEach(r=>{ if(r.length>nC)nC=r.length; }); nC=Math.max(nC,1);
+  function _fallback(){
+    const aoa=[[title], header].concat(body);
+    const ws=XLSX.utils.aoa_to_sheet(aoa);
+    ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:Math.max(0,nC-1)}}];
+    ws['!cols']=new Array(nC).fill(0).map((_,i)=>({wch:i===0?firstColW:13}));
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,sheet); XLSX.writeFile(wb,fname);
+  }
+  function _load(){ return new Promise((res,rej)=>{ if(window.ExcelJS)return res(window.ExcelJS); const s=document.createElement('script'); s.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js'; s.onload=()=>window.ExcelJS?res(window.ExcelJS):rej(new Error('no')); s.onerror=()=>rej(new Error('cdn')); document.head.appendChild(s); }); }
+  function _styled(ExcelJS){
+    const BLACK='FF1A1D24',ORANGE='FFF06A1E',GRAYA='FFF7F8FA',WHITE='FFFFFFFF',TOTBG='FFFFF1E6';
+    const bd={style:'thin',color:{argb:'FFE3E7EE'}}, border={top:bd,left:bd,bottom:bd,right:bd};
+    const wb=new ExcelJS.Workbook(), ws=wb.addWorksheet(sheet,{views:[{state:'frozen',ySplit:2,xSplit:freezeX}]});
+    ws.mergeCells(1,1,1,Math.max(1,nC)); const t=ws.getCell(1,1); t.value=title;
+    t.fill={type:'pattern',pattern:'solid',fgColor:{argb:BLACK}}; t.font={bold:true,color:{argb:WHITE},size:12}; t.alignment={vertical:'middle',horizontal:'left',indent:1}; ws.getRow(1).height=30;
+    const hr=ws.getRow(2); for(let i=0;i<nC;i++){ const c=hr.getCell(i+1); c.value=header[i]||''; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:ORANGE}}; c.font={bold:true,color:{argb:WHITE},size:11}; c.alignment={vertical:'middle',horizontal:i===0?'left':'center',wrapText:true}; c.border=border; } hr.height=24;
+    body.forEach((r,ri)=>{ const row=ws.getRow(3+ri); const isTot=totalRows.has(ri);
+      for(let j=0;j<nC;j++){ const raw=(r[j]!=null)?r[j]:''; const c=row.getCell(j+1); c.value=raw; c.border=border; const isNum=(typeof raw==='number'); c.alignment={vertical:'middle',horizontal:j===0?'left':(isNum?'right':'center')}; if(isNum)c.numFmt='#,##0'; if(isTot){ c.font={bold:true}; c.fill={type:'pattern',pattern:'solid',fgColor:{argb:TOTBG}}; } else { c.fill={type:'pattern',pattern:'solid',fgColor:{argb: ri%2?GRAYA:WHITE}}; } }
+      row.height=18;
+    });
+    ws.getColumn(1).width=firstColW; for(let k=2;k<=nC;k++){ const c=ws.getColumn(k); let w=11; (header[k-1]?[String(header[k-1])]:[]).concat(body.map(r=>r[k-1])).forEach(v=>{ if(v!=null){ const L=String(v).length; if(L>w)w=L; } }); c.width=Math.min(Math.max(w+2,11),26); }
+    return wb.xlsx.writeBuffer().then(buf=>{ const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},3000); });
+  }
+  _load().then(EX=>_styled(EX)).catch(()=>{ try{_fallback();}catch(e){ alert('엑셀 생성 실패: '+e.message); } });
+}
 function _bsExportXlsx(){
   if(!BSALE||!Array.isArray(BSALE.rows)||typeof XLSX==='undefined'){ alert('엑셀 데이터를 불러올 수 없습니다.'); return; }
   const rows=_bsRows(); const won=n=>Math.round(n||0);
   const jibuTag=_bsJibu==='전체'?'전체지부':_bsJibu;
   const monTag=_bsMonths.length?(_bsMonths.slice().sort((a,b)=>a-b).join('·')+'월'):'전체월';
   const prodTag=_bsProd==='전체'?'전체제품':_bsProd;
-  const head1=['지부→대리점 롤 판매', '관리지부: '+jibuTag, '제품: '+prodTag, '기간: '+monTag, (_bsRollOnly?'롤만':'전체품목'), '출처: branchSalesList'];
-  let aoa=[head1], sheet='', fname='';
+  let header=[], body=[], totalRows=new Set(), sheet='', fname='', viewLabel='', firstColW=18, freezeX=1;
   if(_bsView==='dealer'){
     const ag={}; rows.forEach(r=>{ const k=(r.dealerCode||r.dealer||'(미상)'); const o=ag[k]||(ag[k]={dealer:r.dealer||k, store:r.cust, jibu:_bsJibuOf(r), member:false, q:0, a:0}); o.q+=r.q; o.a+=r.a; if(_bsIsMember(r))o.member=true; });
     const arr=Object.values(ag).sort((a,b)=> _bsMetric==='a'? b.a-a.a : b.q-a.q);
-    aoa.push(['순위','대리점','매장(거래처)','지부','구분','롤 수량','매출(원)']);
-    arr.forEach((o,i)=> aoa.push([i+1, o.dealer, o.store||'', o.jibu, o.member?'멤버스':'일반', won(o.q), won(o.a)]));
-    sheet='대리점별'; fname=`레이노_롤판매_대리점별_${jibuTag}_${prodTag}_${monTag}.xlsx`;
+    header=['순위','대리점','매장(거래처)','지부','구분','롤 수량','매출(원)'];
+    arr.forEach((o,i)=> body.push([i+1, o.dealer, o.store||'', o.jibu, o.member?'멤버스':'일반', won(o.q), won(o.a)]));
+    sheet='대리점별'; viewLabel='대리점별'; fname=`레이노_롤판매_대리점별_${jibuTag}_${prodTag}_${monTag}.xlsx`; firstColW=8;
   } else if(_bsView==='jibu'){
     const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); const o=ag[j]||(ag[j]={j,mem:0,norm:0,memA:0,normA:0}); if(_bsIsMember(r)){o.mem+=r.q;o.memA+=r.a;}else{o.norm+=r.q;o.normA+=r.a;} });
     const arr=Object.values(ag).map(o=>({...o,tot:o.mem+o.norm,totA:o.memA+o.normA})).sort((a,b)=>b.tot-a.tot);
-    aoa.push(['지부','멤버스 롤','비멤버스 롤','합계 롤','멤버스 비중(%)','멤버스 매출','비멤버스 매출','합계 매출']);
-    arr.forEach(o=> aoa.push([o.j, won(o.mem), won(o.norm), won(o.tot), o.tot?Math.round(o.mem/o.tot*100):0, won(o.memA), won(o.normA), won(o.totA)]));
-    sheet='지부별'; fname=`레이노_롤판매_지부별_${jibuTag}_${prodTag}_${monTag}.xlsx`;
+    header=['지부','멤버스 롤','비멤버스 롤','합계 롤','멤버스 비중(%)','멤버스 매출','비멤버스 매출','합계 매출'];
+    arr.forEach(o=> body.push([o.j, won(o.mem), won(o.norm), won(o.tot), o.tot?Math.round(o.mem/o.tot*100):0, won(o.memA), won(o.normA), won(o.totA)]));
+    const T=arr.reduce((s,o)=>({mem:s.mem+o.mem,norm:s.norm+o.norm,memA:s.memA+o.memA,normA:s.normA+o.normA}),{mem:0,norm:0,memA:0,normA:0});
+    const tt=T.mem+T.norm; body.push(['전체', won(T.mem), won(T.norm), won(tt), tt?Math.round(T.mem/tt*100):0, won(T.memA), won(T.normA), won(T.memA+T.normA)]); totalRows.add(body.length-1);
+    sheet='지부별'; viewLabel='지부별'; fname=`레이노_롤판매_지부별_${jibuTag}_${prodTag}_${monTag}.xlsx`; firstColW=14;
   } else if(_bsView==='jibuRoll'){
     const subOf=r=>(typeof _filmCat==='function')?(_filmCat(r.mat).sub||r.mat):r.mat;
     const mv=r=>(_bsMetric==='a'?r.a:r.q);
@@ -6833,23 +6865,25 @@ function _bsExportXlsx(){
     const colSet=new Set(cols);
     const ag={}; rows.forEach(r=>{ const j=_bsJibuOf(r); let s=subOf(r); if(!colSet.has(s))s='기타'; const bk=_bsIsMember(r)?'mem':'norm'; const o=ag[j]||(ag[j]={j,mem:{},norm:{},memT:0,normT:0}); o[bk][s]=(o[bk][s]||0)+mv(r); o[bk+'T']+=mv(r); });
     const arr=Object.values(ag).map(o=>({...o,t:o.memT+o.normT})).filter(o=>o.t>0).sort((a,b)=>b.t-a.t);
-    aoa.push(['지부','구분'].concat(cols, ['합계']));
+    header=['지부','구분'].concat(cols, ['합계']);
     arr.forEach(o=>{
-      aoa.push([o.j,'멤버스'].concat(cols.map(c=>won(o.mem[c]||0)), [won(o.memT)]));
-      aoa.push(['','비멤버스'].concat(cols.map(c=>won(o.norm[c]||0)), [won(o.normT)]));
+      body.push([o.j,'멤버스'].concat(cols.map(c=>won(o.mem[c]||0)), [won(o.memT)]));
+      body.push(['','비멤버스'].concat(cols.map(c=>won(o.norm[c]||0)), [won(o.normT)]));
     });
-    aoa.push(['전체','멤버스'].concat(cols.map(c=>won(arr.reduce((s,o)=>s+(o.mem[c]||0),0))), [won(arr.reduce((s,o)=>s+o.memT,0))]));
-    aoa.push(['','비멤버스'].concat(cols.map(c=>won(arr.reduce((s,o)=>s+(o.norm[c]||0),0))), [won(arr.reduce((s,o)=>s+o.normT,0))]));
-    sheet='지부별롤'; fname=`레이노_롤판매_지부별롤_${jibuTag}_${prodTag}_${monTag}.xlsx`;
+    body.push(['전체','멤버스'].concat(cols.map(c=>won(arr.reduce((s,o)=>s+(o.mem[c]||0),0))), [won(arr.reduce((s,o)=>s+o.memT,0))])); totalRows.add(body.length-1);
+    body.push(['','비멤버스'].concat(cols.map(c=>won(arr.reduce((s,o)=>s+(o.norm[c]||0),0))), [won(arr.reduce((s,o)=>s+o.normT,0))])); totalRows.add(body.length-1);
+    sheet='지부별롤'; viewLabel='지부별 롤'; fname=`레이노_롤판매_지부별롤_${jibuTag}_${prodTag}_${monTag}.xlsx`; firstColW=14;
   } else {
-    arr.forEach(o=> aoa.push([o.sub, won(o.mem), won(o.norm), won(o.tot), o.tot?Math.round(o.mem/o.tot*100):0, won(o.memA), won(o.normA)]));
-    sheet='롤별'; fname=`레이노_롤판매_롤별_${jibuTag}_${prodTag}_${monTag}.xlsx`;
+    const ag={}; rows.forEach(r=>{ const sub=(typeof _filmCat==='function')?(_filmCat(r.mat).sub||r.mat):r.mat; const o=ag[sub]||(ag[sub]={sub,mem:0,norm:0,memA:0,normA:0}); if(_bsIsMember(r)){o.mem+=r.q;o.memA+=r.a;}else{o.norm+=r.q;o.normA+=r.a;} });
+    const arr=Object.values(ag).map(o=>({...o,tot:o.mem+o.norm})).sort((a,b)=>b.tot-a.tot);
+    header=['롤(중분류)','멤버스 롤','비멤버스 롤','합계 롤','멤버스 비중(%)','멤버스 매출','비멤버스 매출'];
+    arr.forEach(o=> body.push([o.sub, won(o.mem), won(o.norm), won(o.tot), o.tot?Math.round(o.mem/o.tot*100):0, won(o.memA), won(o.normA)]));
+    const T=arr.reduce((s,o)=>({mem:s.mem+o.mem,norm:s.norm+o.norm,memA:s.memA+o.memA,normA:s.normA+o.normA}),{mem:0,norm:0,memA:0,normA:0});
+    const tt=T.mem+T.norm; body.push(['합계', won(T.mem), won(T.norm), won(tt), tt?Math.round(T.mem/tt*100):0, won(T.memA), won(T.normA)]); totalRows.add(body.length-1);
+    sheet='롤별'; viewLabel='롤별'; fname=`레이노_롤판매_롤별_${jibuTag}_${prodTag}_${monTag}.xlsx`; firstColW=16;
   }
-  try{
-    const ws=XLSX.utils.aoa_to_sheet(aoa);
-    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, sheet);
-    XLSX.writeFile(wb, fname);
-  }catch(e){ alert('엑셀 생성 실패: '+e.message); }
+  const title=`지부 → 대리점 롤 판매 · ${viewLabel}    |    관리지부: ${jibuTag} · 제품: ${prodTag} · 기간: ${monTag}${_bsRollOnly?' · 롤만':''}    |    ${new Date().toLocaleDateString('ko-KR')}`;
+  _xlsxStyledAOA({title, header, body, totalRows, sheet, fname, firstColW, freezeXCol:freezeX});
 }
 function _bsJibuModalHtml(i){
   const J=_bsJibuArr[i]; if(!J) return '<div class="empty">데이터 없음</div>';
