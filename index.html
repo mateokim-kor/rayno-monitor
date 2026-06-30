@@ -1762,7 +1762,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 보증서·매출 지부분석 차트도 막대형으로(글라스와 통일)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부분석 3차트(글라스·보증서·매출) 막대→선형 원복';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5573,12 +5573,11 @@ function _gbaRenderChart(){
   const cv=document.getElementById('gbaChart'); if(!cv) return;
   const d=_gbaData(); if(!d||!d.months.length) return;
   const prodActive=!!(GBA.prod&&GBA.prod.length);
-  makeChart('gbaChart', { type:'bar',
+  makeChart('gbaChart', { type:'line',
     data:{ labels:d.monthLabels, datasets:_anDatasets(d,(l)=>_JBA_COLOR[l]||'#888',prodActive) },
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{ position:'top' } },
-      datasets:{ bar:{ barPercentage:0.78, categoryPercentage:0.7, borderWidth:0, borderRadius:4, maxBarThickness:46 } },
-      scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } });
+      scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } } });
 }
 function renderGlass(){
   const box=document.getElementById('rGlass'); if(!box) return; const admin=(auth==='admin');
@@ -6133,12 +6132,11 @@ function _jbaRenderChart(){
   const cv=document.getElementById('jbaChart'); if(!cv) return;
   const d=_jbaData(); if(!d||!d.months.length) return;
   const prodActive=!!(JBA.prod&&JBA.prod.length);
-  makeChart('jbaChart', { type:'bar',
+  makeChart('jbaChart', { type:'line',
     data:{ labels:d.monthLabels, datasets:_anDatasets(d,(l)=>_JBA_COLOR[l]||'#888',prodActive) },
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{ position:'top' } },
-      datasets:{ bar:{ barPercentage:0.78, categoryPercentage:0.7, borderRadius:4, maxBarThickness:46 } },
-      scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } }, x:{ grid:{ display:false } } } } });
+      scales:{ y:{ beginAtZero:true, ticks:{ precision:0 } } } } });
 }
 function renderWarranty(){
   const box=document.getElementById('rWarranty');
@@ -6584,12 +6582,11 @@ function _sbaRenderChart(){
   const moneyTick=v=> v>=1e8?(v/1e8).toLocaleString()+'억': v>=1e4?(v/1e4).toLocaleString()+'만': (v||0).toLocaleString();
   const prodActive=!!(SBA.prod&&SBA.prod.length);
   const ds=_anDatasets(d,(l,i)=>_SBA_PAL[i%_SBA_PAL.length],prodActive);
-  makeChart('sbaChart', { type:'bar',
+  makeChart('sbaChart', { type:'line',
     data:{ labels:d.monthLabels, datasets:ds },
     options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
       plugins:{ legend:{position:'top'}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y||0).toLocaleString()+(qty?'롤':'원')}} },
-      datasets:{ bar:{ barPercentage:0.78, categoryPercentage:0.7, borderRadius:4, maxBarThickness:46 } },
-      scales:{ y:{ beginAtZero:true, ticks:{ callback: qty? (v=>(v||0).toLocaleString()) : moneyTick } }, x:{ grid:{ display:false } } } } });
+      scales:{ y:{ beginAtZero:true, ticks:{ callback: qty? (v=>(v||0).toLocaleString()) : moneyTick } } } } });
 }
 function renderRevenue(){
   const box=document.getElementById('rRevenue'); if(!box) return;
