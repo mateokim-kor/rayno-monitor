@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 지부별 월매트릭스에 멤버스+비멤버스 합계 행 추가';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부 모달에 상위 구매 대리점 표 추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6872,8 +6872,17 @@ function _bsJibuModalHtml(i){
   <div class="cap" style="margin-bottom:8px">어떤 롤을 얼마나 팔았는지 (롤 종류별·멤버스/비멤버스)</div>
   <div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:460px"><tr><th ${thl}>롤(중분류)</th><th ${th}>멤버스</th><th ${th}>비멤버스</th><th ${th}>합계</th><th ${th}>금액</th></tr>`;
   arr.forEach(o=>{ h+=`<tr><td ${tdl}>${escapeHtml(o.sub)}</td><td ${td} style="color:var(--amber);font-weight:700">${won(o.mq)}</td><td ${td}>${won(o.nq)}</td><td ${tdt}>${won(o.tot)}</td><td ${td}>${won(o.a)}원</td></tr>`; });
-  h+=`<tr><td ${tdl}><b>합계</b></td><td style="${tdt};color:var(--amber)">${won(totMem)}</td><td style="${tdt}">${won(totQ-totMem)}</td><td style="${tdt}">${won(totQ)}</td><td style="${tdt}">${won(totA)}원</td></tr></table></div>
-  <div style="margin-top:10px;font-size:11.5px;color:var(--ink3)">※ 현재 카드 필터(월·롤만) 기준. 롤만 OFF면 부자재도 포함됩니다.</div>`;
+  h+=`<tr><td ${tdl}><b>합계</b></td><td style="${tdt};color:var(--amber)">${won(totMem)}</td><td style="${tdt}">${won(totQ-totMem)}</td><td style="${tdt}">${won(totQ)}</td><td style="${tdt}">${won(totA)}원</td></tr></table></div>`;
+  // 상위 구매 대리점
+  const dag={}; rs.forEach(r=>{ const k=(r.dealerCode||r.dealer||'(미상)'); const o=dag[k]||(dag[k]={dealer:r.dealer||k, store:r.cust, member:false, q:0, a:0}); o.q+=r.q; o.a+=r.a; if(_bsIsMember(r))o.member=true; });
+  const darr=Object.values(dag).sort((a,b)=>b.q-a.q);
+  const dN=Math.min(darr.length,15);
+  h+=`<div class="cap" style="margin:18px 0 8px"><b>🏪 상위 구매 대리점</b> (롤 수량 순) · 전체 ${darr.length.toLocaleString()}곳 중 ${dN}곳${darr.length>dN?' · 전체는 <b>대리점별</b> 보기에서 (관리지부 = '+escapeHtml(jibu)+')':''}</div>`;
+  h+=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:480px"><tr><th ${th} style="text-align:center">#</th><th ${thl}>대리점</th><th ${thl}>매장</th><th ${thl}>구분</th><th ${th}>롤 수량</th><th ${th}>매출</th></tr>`;
+  if(!darr.length){ h+=`<tr><td ${tdl} colspan="6" style="color:var(--ink3)">데이터 없음</td></tr>`; }
+  darr.slice(0,dN).forEach((o,idx)=>{ h+=`<tr><td ${td} style="text-align:center;color:var(--ink3)">${idx+1}</td><td ${tdl}><b>${escapeHtml(o.dealer)}</b></td><td ${tdl}>${escapeHtml(o.store||'-')}</td><td ${tdl}>${o.member?'<span style="color:var(--amber);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'}</td><td ${tdt}>${won(o.q)}</td><td ${td}>${won(o.a)}원</td></tr>`; });
+  h+=`</table></div>
+  <div style="margin-top:10px;font-size:11.5px;color:var(--ink3)">※ 현재 카드 필터(제품·월·롤만) 기준. 롤만 OFF면 부자재도 포함됩니다.</div>`;
   return h;
 }
 function _bsDealerModalHtml(i){
