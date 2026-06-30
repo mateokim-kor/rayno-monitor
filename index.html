@@ -1754,7 +1754,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 지부대리점 롤판매 카드에 제품(롤) 칩 선택 추가(이미지 방식)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 지부별 월매트릭스에 멤버스+비멤버스 합계 행 추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6744,13 +6744,16 @@ function branchSalesCard(){
     const colNorm=mcols.map(m=>arr.reduce((s,o)=>s+(o.norm[m]||0),0));
     const thlS='style="text-align:left;padding:8px 10px;font-size:12px;font-weight:800;background:var(--ink);color:var(--bg);white-space:nowrap;position:sticky;left:0;z-index:1"';
     const tdlS='style="text-align:left;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);white-space:nowrap;position:sticky;left:0;background:var(--card,#fff);font-weight:700"';
-    body=`<div class="cap" style="margin-bottom:6px"><b>지부별 멤버스/비멤버스 월별 ${unit}</b> · 지부마다 두 줄(멤버스·비멤버스), 월별 비교 · <b>지부 행을 클릭</b>하면 그 지부가 판 <b>롤 종류별 상세</b>가 열립니다</div><div class="iv-wrap"><table class="dtbl" id="bsJibuTbl" style="width:100%;border-collapse:collapse;min-width:${220+mcols.length*70}px"><tr><th ${thlS}>지부</th><th ${thl}>구분</th>${mcols.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
+    body=`<div class="cap" style="margin-bottom:6px"><b>지부별 멤버스/비멤버스 월별 ${unit}</b> · 지부마다 세 줄(멤버스·비멤버스·합계), 월별 비교 · <b>지부 행을 클릭</b>하면 그 지부가 판 <b>롤 종류별 상세</b>가 열립니다</div><div class="iv-wrap"><table class="dtbl" id="bsJibuTbl" style="width:100%;border-collapse:collapse;min-width:${220+mcols.length*70}px"><tr><th ${thlS}>지부</th><th ${thl}>구분</th>${mcols.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th></tr>`;
+    const _sumCell='style="text-align:right;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:var(--bg2)"';
     arr.forEach((o,i)=>{
-      body+=`<tr data-bsji="${i}" style="cursor:pointer" title="클릭: ${escapeHtml(o.j)} 롤 상세"><td ${tdlS} rowspan="2">${escapeHtml(o.j)} <span style="color:var(--ink3);font-weight:600;font-size:11px">▸</span></td><td ${tdl} style="color:var(--amber);font-weight:700">멤버스</td>${mcols.map(m=>`<td ${td} style="color:var(--amber)">${fmtV(o.mem[m]||0)}</td>`).join('')}<td ${tdt} style="color:var(--amber)">${fmtV(o.memT)}</td></tr>`;
+      body+=`<tr data-bsji="${i}" style="cursor:pointer" title="클릭: ${escapeHtml(o.j)} 롤 상세"><td ${tdlS} rowspan="3">${escapeHtml(o.j)} <span style="color:var(--ink3);font-weight:600;font-size:11px">▸</span></td><td ${tdl} style="color:var(--amber);font-weight:700">멤버스</td>${mcols.map(m=>`<td ${td} style="color:var(--amber)">${fmtV(o.mem[m]||0)}</td>`).join('')}<td ${tdt} style="color:var(--amber)">${fmtV(o.memT)}</td></tr>`;
       body+=`<tr data-bsji="${i}" style="cursor:pointer"><td ${tdl} style="color:var(--ink2)">비멤버스</td>${mcols.map(m=>`<td ${td}>${fmtV(o.norm[m]||0)}</td>`).join('')}<td ${tdt}>${fmtV(o.normT)}</td></tr>`;
+      body+=`<tr data-bsji="${i}" style="cursor:pointer"><td ${tdl} style="font-weight:800">합계</td>${mcols.map(m=>`<td ${_sumCell}>${fmtV((o.mem[m]||0)+(o.norm[m]||0))}</td>`).join('')}<td ${_sumCell}>${fmtV(o.memT+o.normT)}</td></tr>`;
     });
-    body+=`<tr style="border-top:2px solid var(--line2)"><td ${tdlS} rowspan="2"><b>전체</b></td><td ${tdl} style="color:var(--amber);font-weight:800">멤버스</td>${colMem.map(v=>`<td ${tdt} style="color:var(--amber)">${fmtV(v)}</td>`).join('')}<td ${tdt} style="color:var(--amber)">${fmtV(memV)}</td></tr>`;
+    body+=`<tr style="border-top:2px solid var(--line2)"><td ${tdlS} rowspan="3"><b>전체</b></td><td ${tdl} style="color:var(--amber);font-weight:800">멤버스</td>${colMem.map(v=>`<td ${tdt} style="color:var(--amber)">${fmtV(v)}</td>`).join('')}<td ${tdt} style="color:var(--amber)">${fmtV(memV)}</td></tr>`;
     body+=`<tr><td ${tdl} style="font-weight:800">비멤버스</td>${colNorm.map(v=>`<td ${tdt}>${fmtV(v)}</td>`).join('')}<td ${tdt}>${fmtV(normV)}</td></tr>`;
+    body+=`<tr><td ${tdl} style="font-weight:800">합계</td>${mcols.map((m,ci)=>`<td ${_sumCell}>${fmtV((colMem[ci]||0)+(colNorm[ci]||0))}</td>`).join('')}<td ${_sumCell}>${fmtV(memV+normV)}</td></tr>`;
     body+=`</table></div>`;
   } else if(_bsView==='dealer'){
     const ag={}; rows.forEach(r=>{ const k=(r.dealerCode||r.dealer||'(미상)'); const o=ag[k]||(ag[k]={key:k, dealer:r.dealer||k, store:r.cust, jibu:_bsJibuOf(r), member:false, q:0, a:0}); o.q+=r.q; o.a+=r.a; if(_bsIsMember(r))o.member=true; });
