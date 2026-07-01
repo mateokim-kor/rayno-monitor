@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 검색량 최초 진입 시 최신 연도(2026) 기본 표시';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 성능: 대리점 집계 캐싱 + 표 페이지네이션 + 차트 애니 단축';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2627,7 +2627,7 @@ const pctBarPlugin = {
   }
 };
 
-function makeChart(id,cfg){ if(charts[id])charts[id].destroy(); charts[id]=new Chart(document.getElementById(id),cfg); }
+function makeChart(id,cfg){ if(charts[id])charts[id].destroy(); cfg=cfg||{}; cfg.options=cfg.options||{}; if(cfg.options.animation===undefined) cfg.options.animation={duration:280}; charts[id]=new Chart(document.getElementById(id),cfg); }
 
 function renderSentiment(rows){
   const s=rows.map(sentOf);
@@ -5437,7 +5437,9 @@ function renderRDash(){
   }
   box.innerHTML=h;
 }
+let _dealerAggCache=null;   // 집계 캐시(데이터 로드 시 무효화)
 function _dealerAgg(){   // ERP 기준(대리점 마스터 dealers.json + ERP 매출 + branchSalesList 본사 직매) — 보증서·글라스케어(관리자 홈페이지) 제외
+  if(_dealerAggCache) return _dealerAggCache;
   const M={};
   const ens=n=>M[n]||(M[n]={name:n, store:'', jibu:'', code:'', member:false, membership:'', salesA:0, salesQ:0, erp:false, rank:'', tier:'', sido:'', sigungu:'', salesType:'', unuse:false, addr:'', tel:'', ceo:''});
   const _isJibuName=n=>{ const s=String(n||''); if(/지부|본사/.test(s)) return true; if(typeof _sToJibu==='function' && _sToJibu(s)) return true; return false; };
@@ -5466,7 +5468,8 @@ function _dealerAgg(){   // ERP 기준(대리점 마스터 dealers.json + ERP �
     const norm={}; Object.values(M).forEach(d=>{ const n2=_bsNameNorm(d.name); if(n2&&!norm[n2])norm[n2]=d; const s2=_bsNameNorm(d.store); if(s2&&!norm[s2])norm[s2]=d; });
     Object.keys(bs).forEach(nm=>{ let d=M[nm]; if(!d) d=norm[_bsNameNorm(nm)]; if(d){ d.salesA=bs[nm].a; d.salesQ=bs[nm].q; d.bsMonthly=bs[nm].mon; d.bsSales=true; } });
   }
-  return Object.values(M);
+  _dealerAggCache=Object.values(M);
+  return _dealerAggCache;
 }
 function sd_q(sd,k){ return (sd&&sd[k])||{}; }
 function _dealerDetailHtml(d){
@@ -5523,8 +5526,9 @@ function renderDealer(){
   const td='style="text-align:right;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const kw=n=>{ n=n||0; return n>=1e8?(n/1e8).toFixed(1)+'억':(n>=1e4?Math.round(n/1e4).toLocaleString()+'만':String(Math.round(n))); };
   let t=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:860px"><tr><th ${th} style="text-align:center">No</th><th ${thl}>대리점명</th><th ${thl}>매장명</th><th ${thl}>코드</th><th ${thl}>지부</th><th ${thl}>구분</th><th ${thl}>지역</th><th ${th}>매출</th><th ${th}>롤</th><th ${thl}>상태</th></tr>`;
-  rows.forEach((d,i)=>{ const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.unuse?'<span style="color:var(--amber);font-weight:700">미사용</span>':'<span style="color:var(--dv2);font-weight:700">사용중</span>'; const region=[d.sido,d.sigungu].filter(Boolean).join(' ')||'-'; t+=`<tr data-di="${i}" style="cursor:pointer" title="클릭하면 상세 정보"><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.store||'-')}</td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${tdl}>${escapeHtml(region)}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${tdl}>${stat}</td></tr>`; });
-  t+=`</table></div><div class="cap" style="margin-top:8px;line-height:1.6">${won(rows.length)}곳 표시 · <b>ERP 대리점 마스터(branchCustList) + branchSalesList 본사 직매</b> 기준. <b>매출·롤</b>=지부→대리점 판매(branchSalesList) 누적. <b>멤버스</b>=대리점 마스터 글라스케어 여부(예). <b>상태</b>=ERP 사용여부. ※ branchsales에서 <b>지부=본사</b>인 대리점도 목록에 포함됩니다. 보증서·글라스케어(관리자 홈페이지) 결합은 제외.</div>`;
+  rows.slice(0,_dlrShow).forEach((d,i)=>{ const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.unuse?'<span style="color:var(--amber);font-weight:700">미사용</span>':'<span style="color:var(--dv2);font-weight:700">사용중</span>'; const region=[d.sido,d.sigungu].filter(Boolean).join(' ')||'-'; t+=`<tr data-di="${i}" style="cursor:pointer" title="클릭하면 상세 정보"><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.store||'-')}</td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${tdl}>${escapeHtml(region)}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${tdl}>${stat}</td></tr>`; });
+  const _more = rows.length>_dlrShow ? `<div style="text-align:center;margin-top:12px"><button class="acc-btn" id="dlrMore">더보기 (+${won(Math.min(300,rows.length-_dlrShow))} · 남은 ${won(rows.length-_dlrShow)}곳)</button></div>` : '';
+  t+=`</table></div>${_more}<div class="cap" style="margin-top:8px;line-height:1.6">${rows.length>_dlrShow?won(Math.min(_dlrShow,rows.length))+'곳 표시 / 총 '+won(rows.length)+'곳':won(rows.length)+'곳 표시'} · <b>ERP 대리점 마스터(branchCustList) + branchSalesList 본사 직매</b> 기준. <b>매출·롤</b>=지부→대리점 판매(branchSalesList) 누적. <b>멤버스</b>=대리점 마스터 글라스케어 여부(예). <b>상태</b>=ERP 사용여부. ※ branchsales에서 <b>지부=본사</b>인 대리점도 목록에 포함됩니다. 보증서·글라스케어(관리자 홈페이지) 결합은 제외.</div>`;
   box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터 (ERP)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
 }
 // ── 글라스케어 지부 분석: 월별 × 제품 가입 추이 ──
@@ -5912,10 +5916,11 @@ let _lwLine='ALL', _lwScope='jibu', _lwSub=[], _lwFrontOnly=false;   // 제품 �
 let JBA={ jibu:'', prod:[], sel:[] };   // 지부 분석(보증서): 지부·제품(복수)·월(복수)
 let GLASS=null, glassLoaded=false, _glScope='jibu', _glDealerAll=false, _glJibuDrill='';   // 글라스케어 가입
 let ERPD=null, erpdLoaded=false;   // ERP 대리점 마스터(dealers.json)
-async function ensureErpd(){ if(erpdLoaded)return; const j=await cloudLoadJSON(SUPA.dealerFile); if(j&&Array.isArray(j.dealers)){ ERPD=j; _bsGlassMap=null; } erpdLoaded=true; }
+async function ensureErpd(){ if(erpdLoaded)return; const j=await cloudLoadJSON(SUPA.dealerFile); if(j&&Array.isArray(j.dealers)){ ERPD=j; _bsGlassMap=null; _dealerAggCache=null; } erpdLoaded=true; }
 const GV={ from:'', to:'', scope:'all', preset:'all', prodSel:[], dateCol:'', _min:'', _max:'' };
 const DLR={ jibu:'전체', member:'all', status:'use', q:'' };   // 대리점 마스터 필터 (기본: 사용중만)
 let _dlrRows=[];   // 현재 렌더된 대리점 행(상세 모달 조회용)
+let _dlrShow=300;  // 표에 한 번에 그리는 행 수(더보기로 증가)
 const RD={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // (구) 대시보드 기간 필터
 const RDS={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDW={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' }, RDG={ scope:'all', from:'', to:'', preset:'all', _min:'', _max:'' };   // 대시보드 카드별 기간(매출/보증서/글라스)
 const RDJ={ sel:[] };   // 지부별 매출/롤 표 월 선택(빈=누적)
@@ -6320,7 +6325,7 @@ function _qcPick(){ let s=0; _salesActive().forEach(m=>s+=_qc(m)); return s; }
 function _sTotDisp(a){ let s=0; _salesDispMonths().forEach(m=>s+=(a&&a[m])||0); return s; }
 function _sTot(a){ let s=0; _salesMonths().forEach(m=>s+=(a&&a[m])||0); return s; }
 function _sPick(a){ let s=0; _salesActive().forEach(m=>s+=(a&&a[m])||0); return s; }
-async function ensureSales(){ if(salesLoaded)return; const j=await cloudLoadJSON(SUPA.salesFile); if(j&&j.prodAll&&j.ver>=7){ SALES=j; SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; } salesLoaded=true; }
+async function ensureSales(){ if(salesLoaded)return; const j=await cloudLoadJSON(SUPA.salesFile); if(j&&j.prodAll&&j.ver>=7){ SALES=j; SALES.inputs=SALES.inputs||{}; SALES.inputs.cap=SALES.inputs.cap||{}; SALES.inputs.carSales=SALES.inputs.carSales||{}; SALES.inputs.itemType=SALES.inputs.itemType||{}; _dealerAggCache=null; } salesLoaded=true; }
 function _salesRows(buf){
   const b=new Uint8Array(buf);
   if(b.length>=2&&b[0]===0xFF&&b[1]===0xFE) return new TextDecoder('utf-16le').decode(b).split(/\r\n|\n/).map(l=>l.split('\t'));
@@ -6743,7 +6748,7 @@ function renderRevenue(){
 /* ── 지부 → 대리점 롤 판매 (ERP branchSalesList) · 멤버스/비멤버스 ── */
 let BSALE=null, bsLoaded=false;
 let _bsJibu='전체', _bsView='dealer', _bsMetric='q', _bsRollOnly=true, _bsMonths=[], _bsDealerArr=[], _bsDealerN=10, _bsJibuArr=[], _bsProd='전체';   // 지부·제품 선택 + 대리점별 기본
-async function ensureBranchsales(){ if(bsLoaded)return; try{ const j=await cloudLoadJSON(SUPA.bsFile); if(j&&Array.isArray(j.rows)) BSALE=j; }catch(_){} bsLoaded=true; }
+async function ensureBranchsales(){ if(bsLoaded)return; try{ const j=await cloudLoadJSON(SUPA.bsFile); if(j&&Array.isArray(j.rows)){ BSALE=j; _dealerAggCache=null; } }catch(_){} bsLoaded=true; }
 let _bsGlassMap=null;   // 대리점명(정규화) → 글라스케어 여부(대리점 마스터 GlassCareYn)
 function _bsNameNorm(s){ return String(s||'').replace(/\(주\)|（주）|주식회사/g,'').replace(/\s+/g,'').trim(); }
 function _bsGlassMember(r){
@@ -8217,9 +8222,10 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   if(e.target.id==='glDrillBg'){ _glJibuDrill=''; renderGlass(); return; }
   if(e.target.id==='glMore'){ _glDealerAll=!_glDealerAll; renderGlass(); return; }
   const _pf=e.target.closest('[data-pf]'); if(_pf){ const v=_pf.dataset.pf; if(v==='ALL'){ GV.prodSel=[]; } else { const s=new Set(GV.prodSel||[]); s.has(v)?s.delete(v):s.add(v); GV.prodSel=[...s]; } renderGlass(); return; }
-  const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; renderDealer(); return; }
+  if(e.target.id==='dlrMore'){ _dlrShow+=300; renderDealer(); return; }
+  const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; _dlrShow=300; renderDealer(); return; }
   const _drRow=e.target.closest&&e.target.closest('#rDealer tr[data-di]'); if(_drRow){ const d=_dlrRows[+_drRow.dataset.di]; if(d&&typeof openExplain==='function') openExplain('🏢 '+escapeHtml(d.name)+(d.store?' <span style="font-size:12px;color:var(--ink3);font-weight:600">· '+escapeHtml(d.store)+'</span>':''), _dealerDetailHtml(d)); return; }
-  if(e.target.id==='dlrSearchBtn'){ const q=document.getElementById('dlrQ'); DLR.q=q?q.value.trim():''; renderDealer(); return; }
+  if(e.target.id==='dlrSearchBtn'){ const q=document.getElementById('dlrQ'); DLR.q=q?q.value.trim():''; _dlrShow=300; renderDealer(); return; }
   const _rsp=e.target.closest('#rdsPreset button'); if(_rsp){ _dfPreset(RDS,renderRDash,_rsp.dataset.rp); return; }
   const _rwp=e.target.closest('#rdwPreset button'); if(_rwp){ _dfPreset(RDW,renderRDash,_rwp.dataset.rp); return; }
   const _rgp=e.target.closest('#rdgPreset button'); if(_rgp){ _dfPreset(RDG,renderRDash,_rgp.dataset.rp); return; }
@@ -8339,8 +8345,8 @@ document.getElementById('raynoApp').addEventListener('change', e=>{
   if(e.target.id==='gbaFrom'){ GBA.from=e.target.value; if(GBA.from&&GBA.to&&GBA.to<GBA.from)GBA.to=GBA.from; GBA.scope='range'; GBA.preset='custom'; renderGlass(); return; }
   if(e.target.id==='gbaTo'){ GBA.to=e.target.value; if(GBA.from&&GBA.to&&GBA.to<GBA.from)GBA.from=GBA.to; GBA.scope='range'; GBA.preset='custom'; renderGlass(); return; }
   if(e.target.id==='gvTo'){ GV.to=e.target.value; if(GV.from&&GV.to&&GV.to<GV.from)GV.from=GV.to; GV.scope='range'; GV.preset='custom'; renderGlass(); return; }
-  if(e.target.id==='dlrJibu'){ DLR.jibu=e.target.value; renderDealer(); return; }
-  if(e.target.id==='dlrMember'){ DLR.member=e.target.value; renderDealer(); return; }
+  if(e.target.id==='dlrJibu'){ DLR.jibu=e.target.value; _dlrShow=300; renderDealer(); return; }
+  if(e.target.id==='dlrMember'){ DLR.member=e.target.value; _dlrShow=300; renderDealer(); return; }
   if(e.target.id==='dlrQ'){ DLR.q=e.target.value.trim(); renderDealer(); return; }
   if(e.target.id==='wrAnchor'){ WR.anchor=e.target.value; renderWarrReport(); }
 });
