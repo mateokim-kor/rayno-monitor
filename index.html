@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 검색 키워드 직접 추가·수정(rename)·삭제';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 검색량 키워드×월 매트릭스(전년대비 표시+전월대비 hover)+프리셋 24키워드';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5137,7 +5137,8 @@ async function cloudSaveJSON(file,obj){
     toast('⚠ 저장 실패: '+_cloudErr, true); return false;
   }
 }
-function _bizMigrate(){ if(!BIZ||typeof BIZ!=='object')BIZ={rows:[]}; BIZ.rows=Array.isArray(BIZ.rows)?BIZ.rows:[]; if(!Array.isArray(BIZ.searchKeywords)||!BIZ.searchKeywords.length) BIZ.searchKeywords=['레이노','레이노 썬팅','루마','버텍스','브이쿨']; BIZ.rows.forEach(r=>{ if(!r.searches||typeof r.searches!=='object')r.searches={}; if(r.search!=null&&r.searches['레이노']==null)r.searches['레이노']=r.search; }); }
+const _SW_PRESET=['레이노','레이노썬팅','레이노스트라','레이노스트라700','레이노스트라900','레이노얼티넘XP','레이노F95','레이노S9','버텍스','루마썬팅','루마버텍스','후퍼옵틱','레인보우썬팅','솔라가드','브이쿨','글라스틴트','허버캠프','3M썬팅','블박포디','테라룩스','테라룩스썬팅','스미스클럽','티나인','칼튼윈'];
+function _bizMigrate(){ if(!BIZ||typeof BIZ!=='object')BIZ={rows:[]}; BIZ.rows=Array.isArray(BIZ.rows)?BIZ.rows:[]; if(!Array.isArray(BIZ.searchKeywords)||!BIZ.searchKeywords.length) BIZ.searchKeywords=_SW_PRESET.slice(); BIZ.rows.forEach(r=>{ if(!r.searches||typeof r.searches!=='object')r.searches={}; if(r.search!=null&&r.searches['레이노']==null)r.searches['레이노']=r.search; }); }
 async function ensureBiz(){ if(bizLoaded)return; const j=await cloudLoadJSON(SUPA.bizFile); if(j&&j.rows)BIZ=j; _bizMigrate(); bizLoaded=true; }
 async function ensureWarr(){ if(warrLoaded)return; const j=await cloudLoadJSON(SUPA.warrFile); if(j&&j.rows){ WARR=j; WARR.columns=WARR.columns||[]; warrDedupe(); ensureWarrCfg(); } warrLoaded=true; }
 async function ensureGlass(){ if(glassLoaded)return; const j=await cloudLoadJSON(SUPA.glassFile); if(j&&j.rows){ GLASS=j; GLASS.columns=GLASS.columns||[]; } glassLoaded=true; }
@@ -7669,20 +7670,36 @@ function renderSearch(){
   const admin=(auth==='admin');
   const kws=BIZ.searchKeywords.slice();
   const rows=(BIZ.rows||[]).filter(r=>r.searches && kws.some(k=>r.searches[k]!=null));
-  const desc=rows.slice().sort((a,b)=>b.ym.localeCompare(a.ym));
   const asc=rows.slice().sort((a,b)=>a.ym.localeCompare(b.ym));
   const dot=i=>`<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${_SW_COLORS[i%_SW_COLORS.length]}"></span>`;
+  const missing=_SW_PRESET.filter(k=>kws.indexOf(k)<0).length;
   const kwCard = admin?`<div class="card"><h3><span class="dot"></span>검색 키워드 <span class="rep-sub2">레이노 + 경쟁사 · 직접 추가·수정·삭제</span></h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px">${kws.map((k,i)=>`<span style="display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:5px 8px 5px 13px">${dot(i)}<input class="sw-kwedit" data-kw="${escapeHtml(k)}" value="${escapeHtml(k)}" title="클릭해 이름 수정" style="border:none;background:none;font-size:13px;font-weight:600;color:var(--ink);min-width:40px;width:${Math.min(Math.max(k.length,4)+1,18)}ch;outline:none"><button class="sw-kwdel" data-kw="${escapeHtml(k)}" title="키워드 삭제" style="border:none;background:none;color:var(--ink3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button></span>`).join('')}</div>
-    <div class="set-add"><input id="swKwInput" placeholder="경쟁사 키워드 추가 (예: 브이쿨)" style="max-width:240px"><button class="viewbtn" id="swKwAdd">＋ 키워드</button></div>
+    <div class="set-add"><input id="swKwInput" placeholder="경쟁사 키워드 추가 (예: 브이쿨)" style="max-width:240px"><button class="viewbtn" id="swKwAdd">＋ 키워드</button>${missing?`<button class="viewbtn" id="swPreset" style="margin-left:6px">기본 세트 불러오기 (+${missing})</button>`:''}</div>
     <div class="cap" style="margin-top:8px">키워드를 <b>직접 클릭해 이름을 수정</b>하거나, ＋ 추가 · × 삭제할 수 있어요(수정하면 월별 값도 함께 이동). 각 키워드의 월별 검색량은 아래 표에서 입력하고 <b>저장</b>하세요.</div></div>`:'';
   const chart=`<div class="card"><h3><span class="dot"></span>브랜드·경쟁사 검색량 추이</h3>${asc.length?'<div class="biz-chart"><canvas id="swChart"></canvas></div>':'<div class="empty">데이터가 없습니다.'+(admin?' 아래에서 키워드/월을 추가하세요.':'')+'</div>'}</div>`;
-  const head=`<tr><th>연월</th>${kws.map((k,i)=>`<th style="text-align:right;white-space:nowrap">${dot(i)} ${escapeHtml(k)}</th>`).join('')}${admin?'<th></th>':''}</tr>`;
-  const body = desc.length ? desc.map(r=>`<tr><td>${r.ym}</td>${kws.map(k=>`<td class="num">${admin?`<input class="sw-val" data-ym="${r.ym}" data-kw="${escapeHtml(k)}" value="${r.searches[k]!=null?r.searches[k]:''}" inputmode="numeric" style="width:88px">`:(r.searches[k]!=null?r.searches[k].toLocaleString():'-')}</td>`).join('')}${admin?`<td style="text-align:right"><button class="set-del-btn sw-delrow" data-ym="${r.ym}">삭제</button></td>`:''}</tr>`).join('')
-    : `<tr><td colspan="${kws.length+(admin?2:1)}"><div class="empty">데이터가 없습니다.${admin?' 아래에서 월을 추가하세요.':''}</div></td></tr>`;
+  // ── 매트릭스: 키워드(행) × 월(열) · 셀 = 네이버 검색량 + 전년대비, 전월대비는 hover ──
+  const yms=[...new Set((BIZ.rows||[]).map(r=>r.ym))].sort();
+  const rowByYm={}; (BIZ.rows||[]).forEach(r=>rowByYm[r.ym]=r);
+  const getV=(k,ym)=>{ const r=rowByYm[ym]; return (r&&r.searches&&r.searches[k]!=null)?r.searches[k]:null; };
+  const pyYm=ym=>{const a=ym.split('-');return (parseInt(a[0],10)-1)+'-'+a[1];};
+  const pmYm=ym=>{const a=ym.split('-');let y=+a[0],m=+a[1]-1;if(m<1){m=12;y--;}return y+'-'+String(m).padStart(2,'0');};
+  const lab=ym=>{const a=ym.split('-');return `${a[0].slice(2)}.${a[1]}`;};
+  const diff=d=> d==null?'<span style="color:var(--ink3);font-size:10px">·</span>':`<span style="font-size:10px;font-weight:700;color:${d>0?'#16a34a':(d<0?'#dc2626':'var(--ink3)')}">${d>0?'▲':(d<0?'▼':'')}${Math.abs(d).toLocaleString()}</span>`;
+  const stickyTh='style="text-align:left;position:sticky;left:0;background:var(--amber);color:#fff;z-index:3;white-space:nowrap"';
+  const th='style="text-align:right;white-space:nowrap;background:var(--amber);color:#fff"';
+  const stickyTd='style="text-align:left;position:sticky;left:0;background:var(--card);z-index:1;white-space:nowrap;border-right:1px solid var(--line)"';
+  let matrix;
+  if(!yms.length || !kws.length){ matrix=`<div class="empty">${admin?'키워드와 월을 추가한 뒤 검색량을 입력하세요.':'데이터가 없습니다.'}</div>`; }
+  else {
+    const head=`<tr><th ${stickyTh}>키워드</th>${yms.map(ym=>`<th ${th}>${lab(ym)}<div style="font-weight:400;font-size:9.5px;opacity:.85">네이버·전년비</div></th>`).join('')}</tr>`;
+    const body=kws.map((k,i)=>`<tr><td ${stickyTd}><span style="font-weight:${i===0?'800':'600'};font-size:12.5px">${dot(i)} ${escapeHtml(k)}</span></td>${yms.map(ym=>{ const v=getV(k,ym); const py=getV(k,pyYm(ym)); const pm=getV(k,pmYm(ym)); const yoy=(v!=null&&py!=null)?v-py:null; const mom=(v!=null&&pm!=null)?v-pm:null; const tip=`${escapeHtml(k)} ${lab(ym)} · 전월대비 ${mom==null?'-':(mom>0?'+':'')+mom.toLocaleString()}`; return `<td class="num" title="${tip}" style="text-align:right;white-space:nowrap;padding:5px 8px;border-bottom:1px solid var(--line)">${admin?`<input class="sw-val" data-ym="${ym}" data-kw="${escapeHtml(k)}" value="${v!=null?v:''}" inputmode="numeric" title="${tip}" style="width:66px;text-align:right;font-weight:700">`:`<b style="font-size:12.5px">${v!=null?v.toLocaleString():'-'}</b>`}<div style="margin-top:1px">${diff(yoy)}</div></td>`; }).join('')}</tr>`).join('');
+    matrix=`<div class="tbl-wrap" style="overflow-x:auto"><table style="border-collapse:collapse">${'<thead>'+head+'</thead>'}<tbody>${body}</tbody></table></div>
+      <div class="cap" style="margin-top:8px">셀 = <b>네이버 검색량</b> + <b style="color:#16a34a">▲</b>/<b style="color:#dc2626">▼</b> <b>전년 동월 대비</b>. <b>셀에 커서를 올리면 전월대비</b>가 표시됩니다. (전년대비는 전년 같은 달 데이터가 있어야 계산돼요)</div>`;
+  }
   const addRow = admin?`<div class="set-add" style="margin-top:14px"><input id="swYm" type="month" style="max-width:170px"><button class="viewbtn" id="swAdd">＋ 월 추가</button></div>`:'';
   const saveBar = admin?`<div class="set-savebar" style="position:static;margin-top:14px"><button class="vc-save" id="swSave">저장</button><span class="vc-status">키워드별 월 검색량 입력/수정 후 저장하세요. 같은 월은 덮어쓰기됩니다.</span></div>`:'';
-  box.innerHTML = kwCard + chart + `<div class="card"><h3><span class="dot"></span>검색량 월별 표 <span class="rep-sub2">${admin?'수기 입력':'읽기 전용'}</span></h3><div class="tbl-wrap" style="overflow-x:auto"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>${addRow}${saveBar}</div>`;
+  box.innerHTML = kwCard + chart + `<div class="card"><h3><span class="dot"></span>검색량 추이 표 <span class="rep-sub2">키워드 × 월 · ${admin?'수기 입력':'읽기 전용'}</span></h3>${matrix}${addRow}${saveBar}</div>`;
   if(asc.length) drawSearchChart('swChart', asc, kws);
 }
 function drawSearchChart(id, rows, kws){
@@ -8188,6 +8205,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
     renderMetric(field==='search'?'search':'revenue'); toast('저장되었습니다'); return; }
   // 검색량(다중 키워드)
   if(e.target.id==='swKwAdd'){ const inp=document.getElementById('swKwInput'); const v=((inp&&inp.value)||'').trim(); if(!v){ toast('키워드를 입력하세요.',true); return; } _bizMigrate(); collectSearch(); if(BIZ.searchKeywords.indexOf(v)<0){ BIZ.searchKeywords.push(v); toast('키워드 추가: '+v); } else { toast('이미 있는 키워드입니다.',true); } renderSearch(); return; }
+  if(e.target.id==='swPreset'){ _bizMigrate(); collectSearch(); let n=0; _SW_PRESET.forEach(k=>{ if(BIZ.searchKeywords.indexOf(k)<0){ BIZ.searchKeywords.push(k); n++; } }); toast(n?('기본 키워드 '+n+'개 추가'):'이미 모두 있습니다.'); renderSearch(); return; }
   const _swkd=e.target.closest('.sw-kwdel');
   if(_swkd){ const k=_swkd.dataset.kw; _bizMigrate(); collectSearch(); const i=BIZ.searchKeywords.indexOf(k); if(i>=0)BIZ.searchKeywords.splice(i,1); (BIZ.rows||[]).forEach(r=>{ if(r.searches) delete r.searches[k]; }); toast('키워드 삭제: '+k); renderSearch(); return; }
   if(e.target.id==='swAdd'){ collectSearch(); const ym=(document.getElementById('swYm').value||'').trim(); if(!ym){ toast('연월을 선택하세요.',true); return; } BIZ.rows=BIZ.rows||[]; let r=BIZ.rows.find(x=>x.ym===ym); if(!r){ r={ym,searches:{}}; BIZ.rows.push(r); } if(!r.searches)r.searches={}; BIZ.rows.sort((a,b)=>a.ym.localeCompare(b.ym)); renderSearch(); return; }
