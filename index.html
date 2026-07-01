@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 검색량 붙여넣기 일괄 입력(키워드×월)';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 검색량: 칼튼윈 제거 + 연도/월 필터 + 연도 데이터 삭제';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5137,7 +5137,8 @@ async function cloudSaveJSON(file,obj){
     toast('⚠ 저장 실패: '+_cloudErr, true); return false;
   }
 }
-const _SW_PRESET=['레이노','레이노썬팅','레이노스트라','레이노스트라700','레이노스트라900','레이노얼티넘XP','레이노F95','레이노S9','버텍스','루마썬팅','루마버텍스','후퍼옵틱','레인보우썬팅','솔라가드','브이쿨','글라스틴트','허버캠프','3M썬팅','블박포디','테라룩스','테라룩스썬팅','스미스클럽','티나인','칼튼윈'];
+const _SW_PRESET=['레이노','레이노썬팅','레이노스트라','레이노스트라700','레이노스트라900','레이노얼티넘XP','레이노F95','레이노S9','버텍스','루마썬팅','루마버텍스','후퍼옵틱','레인보우썬팅','솔라가드','브이쿨','글라스틴트','허버캠프','3M썬팅','블박포디','테라룩스','테라룩스썬팅','스미스클럽','티나인'];
+let SWF={year:'', months:[]};   // 검색량 필터: 연도(''=전체)·월(빈배열=전체)
 function _ymAdd(ym,n){ const a=String(ym).split('-'); let y=+a[0], m=(+a[1]-1)+n; y+=Math.floor(m/12); m=((m%12)+12)%12; return y+'-'+String(m+1).padStart(2,'0'); }
 function _bizMigrate(){ if(!BIZ||typeof BIZ!=='object')BIZ={rows:[]}; BIZ.rows=Array.isArray(BIZ.rows)?BIZ.rows:[]; if(!Array.isArray(BIZ.searchKeywords)||!BIZ.searchKeywords.length) BIZ.searchKeywords=_SW_PRESET.slice(); BIZ.rows.forEach(r=>{ if(!r.searches||typeof r.searches!=='object')r.searches={}; if(r.search!=null&&r.searches['레이노']==null)r.searches['레이노']=r.search; }); }
 async function ensureBiz(){ if(bizLoaded)return; const j=await cloudLoadJSON(SUPA.bizFile); if(j&&j.rows)BIZ=j; _bizMigrate(); bizLoaded=true; }
@@ -7680,8 +7681,11 @@ function renderSearch(){
     <div class="cap" style="margin-top:8px">키워드를 <b>직접 클릭해 이름을 수정</b>하거나, ＋ 추가 · × 삭제할 수 있어요(수정하면 월별 값도 함께 이동). 각 키워드의 월별 검색량은 아래 표에서 입력하고 <b>저장</b>하세요.</div></div>`:'';
   const chart=`<div class="card"><h3><span class="dot"></span>브랜드·경쟁사 검색량 추이</h3>${asc.length?'<div class="biz-chart"><canvas id="swChart"></canvas></div>':'<div class="empty">데이터가 없습니다.'+(admin?' 아래에서 키워드/월을 추가하세요.':'')+'</div>'}</div>`;
   // ── 매트릭스: 키워드(행) × 월(열) · 셀 = 네이버 검색량 + 전년대비, 전월대비는 hover ──
-  const yms=[...new Set((BIZ.rows||[]).map(r=>r.ym))].sort();
+  const allYms=[...new Set((BIZ.rows||[]).map(r=>r.ym))].sort();
   const rowByYm={}; (BIZ.rows||[]).forEach(r=>rowByYm[r.ym]=r);
+  const years=[...new Set(allYms.map(y=>y.split('-')[0]))].sort();
+  if(SWF.year && years.indexOf(SWF.year)<0) SWF.year='';
+  const yms=allYms.filter(ym=>{ if(SWF.year && !ym.startsWith(SWF.year+'-')) return false; if(SWF.months.length && SWF.months.indexOf(+ym.split('-')[1])<0) return false; return true; });
   const getV=(k,ym)=>{ const r=rowByYm[ym]; return (r&&r.searches&&r.searches[k]!=null)?r.searches[k]:null; };
   const pyYm=ym=>{const a=ym.split('-');return (parseInt(a[0],10)-1)+'-'+a[1];};
   const pmYm=ym=>{const a=ym.split('-');let y=+a[0],m=+a[1]-1;if(m<1){m=12;y--;}return y+'-'+String(m).padStart(2,'0');};
@@ -7690,6 +7694,12 @@ function renderSearch(){
   const stickyTh='style="text-align:left;position:sticky;left:0;background:var(--amber);color:#fff;z-index:3;white-space:nowrap"';
   const th='style="text-align:right;white-space:nowrap;background:var(--amber);color:#fff"';
   const stickyTd='style="text-align:left;position:sticky;left:0;background:var(--card);z-index:1;white-space:nowrap;border-right:1px solid var(--line)"';
+  const monthsPresent=[...new Set(allYms.filter(ym=>!SWF.year||ym.startsWith(SWF.year+'-')).map(ym=>+ym.split('-')[1]))].sort((a,b)=>a-b);
+  const filterBar = allYms.length?`<div style="display:flex;gap:10px 14px;flex-wrap:wrap;align-items:center;margin:2px 0 14px">
+    <span style="display:inline-flex;align-items:center;gap:6px"><span class="cap">연도</span><select class="dt-select" id="swYearSel" style="max-width:120px"><option value="">전체</option>${years.map(y=>`<option value="${y}" ${SWF.year===y?'selected':''}>${y}년</option>`).join('')}</select></span>
+    <span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="cap">월</span><div class="seg" id="swMonSel" style="flex-wrap:wrap">${['all'].concat(monthsPresent).map(m=>`<button data-m="${m}" class="${(m==='all'?!SWF.months.length:SWF.months.indexOf(m)>=0)?'on':''}">${m==='all'?'전체':m+'월'}</button>`).join('')}</div></span>
+    ${(admin&&SWF.year)?`<button class="set-del-btn" id="swDelYear" data-y="${SWF.year}">${SWF.year}년 데이터 삭제</button>`:''}
+  </div>`:'';
   let matrix;
   if(!yms.length || !kws.length){ matrix=`<div class="empty">${admin?'키워드와 월을 추가한 뒤 검색량을 입력하세요.':'데이터가 없습니다.'}</div>`; }
   else {
@@ -7705,7 +7715,7 @@ function renderSearch(){
     <div class="set-add" style="margin:10px 0"><span class="cap">값1(첫 열)의 월</span><input id="swBulkYm" type="month" value="2026-01" style="max-width:160px"></div>
     <textarea id="swBulkText" rows="6" placeholder="레이노 4000 3980 4490 4500 4250&#10;레이노썬팅 4450 4870 6550 6180 6170" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:10px;font-size:13px;font-family:ui-monospace,Menlo,monospace;background:var(--card);color:var(--ink)"></textarea>
     <div style="margin-top:10px"><button class="vc-save" id="swBulkApply">붙여넣기 불러오기</button> <span class="vc-status">불러온 뒤 위 표에서 확인하고 <b>저장</b>을 눌러야 클라우드에 반영됩니다.</span></div></div>`:'';
-  box.innerHTML = kwCard + chart + `<div class="card"><h3><span class="dot"></span>검색량 추이 표 <span class="rep-sub2">키워드 × 월 · ${admin?'수기 입력':'읽기 전용'}</span></h3>${matrix}${addRow}${saveBar}</div>` + bulkCard;
+  box.innerHTML = kwCard + chart + `<div class="card"><h3><span class="dot"></span>검색량 추이 표 <span class="rep-sub2">키워드 × 월 · ${admin?'수기 입력':'읽기 전용'}</span></h3>${filterBar}${matrix}${addRow}${saveBar}</div>` + bulkCard;
   if(asc.length) drawSearchChart('swChart', asc, kws);
 }
 function drawSearchChart(id, rows, kws){
@@ -8218,6 +8228,10 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const _swdr=e.target.closest('.sw-delrow');
   if(_swdr){ const ym=_swdr.dataset.ym; collectSearch(); const r=(BIZ.rows||[]).find(x=>x.ym===ym); if(r&&r.searches){ (BIZ.searchKeywords||[]).forEach(k=>delete r.searches[k]); } renderSearch(); return; }
   if(e.target.id==='swSave'){ collectSearch(); await saveBiz(); renderSearch(); toast('저장되었습니다'); return; }
+  // 검색량 월 필터 · 연도 삭제
+  const _swm=e.target.closest && e.target.closest('#swMonSel button[data-m]');
+  if(_swm){ const m=_swm.dataset.m; if(m==='all'){ SWF.months=[]; } else { const mm=+m; const i=SWF.months.indexOf(mm); if(i>=0)SWF.months.splice(i,1); else SWF.months.push(mm); } renderSearch(); return; }
+  if(e.target.id==='swDelYear'){ const y=e.target.dataset.y; if(!y)return; _bizMigrate(); collectSearch(); BIZ.rows=(BIZ.rows||[]).filter(r=>!String(r.ym).startsWith(y+'-')); SWF.year=''; SWF.months=[]; toast(y+'년 데이터 삭제 — 저장을 눌러 반영하세요'); renderSearch(); return; }
   if(e.target.id==='swBulkApply'){ _bizMigrate(); collectSearch();
     const start=(document.getElementById('swBulkYm').value||'').trim(); if(!/^\d{4}-\d{2}$/.test(start)){ toast('값1(첫 열)의 월을 선택하세요.',true); return; }
     const txt=(document.getElementById('swBulkText')&&document.getElementById('swBulkText').value)||'';
@@ -8235,6 +8249,7 @@ document.getElementById('raynoApp').addEventListener('keydown', e=>{
   if(e.target.classList && e.target.classList.contains('sw-kwedit') && e.key==='Enter'){ e.preventDefault(); e.target.blur(); }
 });
 document.getElementById('raynoApp').addEventListener('change', e=>{
+  if(e.target.id==='swYearSel'){ SWF.year=e.target.value; SWF.months=[]; renderSearch(); return; }
   // 검색 키워드 이름 수정(rename) — 값도 함께 이동
   const _ke=e.target.closest && e.target.closest('.sw-kwedit');
   if(_ke){ const oldK=_ke.dataset.kw, newK=(_ke.value||'').trim(); if(!newK||newK===oldK){ renderSearch(); return; } _bizMigrate(); if(BIZ.searchKeywords.indexOf(newK)>=0){ toast('이미 있는 키워드입니다.',true); renderSearch(); return; } collectSearch(); const i=BIZ.searchKeywords.indexOf(oldK); if(i>=0)BIZ.searchKeywords[i]=newK; (BIZ.rows||[]).forEach(r=>{ if(r.searches&&r.searches[oldK]!=null){ r.searches[newK]=r.searches[oldK]; delete r.searches[oldK]; } }); toast('키워드 수정: '+oldK+' → '+newK); renderSearch(); return; }
