@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 칼트윈 + 검색량 차트 순위/집중비교 모드';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 검색량 최초 진입 시 최신 연도(2026) 기본 표시';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7676,6 +7676,7 @@ function renderSearch(){
   const dot=i=>`<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${_SW_COLORS[i%_SW_COLORS.length]}"></span>`;
   // 필터(연도/월) 유효성 + 예측
   const _yrs=[...new Set(asc.map(r=>r.ym.split('-')[0]))].sort();
+  if(!SWF._init){ SWF._init=true; if(_yrs.length) SWF.year=_yrs[_yrs.length-1]; }   // 최초 진입 시 최신 연도 기본(빈 과거월 숨김)
   if(SWF.year && _yrs.indexOf(SWF.year)<0) SWF.year='';
   const _pass=ym=>{ if(SWF.year && !ym.startsWith(SWF.year+'-')) return false; if(SWF.months.length && SWF.months.indexOf(+ym.split('-')[1])<0) return false; return true; };
   const chartRows=asc.filter(r=>_pass(r.ym));
