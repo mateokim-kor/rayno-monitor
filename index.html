@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 검색량 분석 다중 키워드(레이노+경쟁사) 지원';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 검색 키워드 직접 추가·수정(rename)·삭제';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7672,10 +7672,10 @@ function renderSearch(){
   const desc=rows.slice().sort((a,b)=>b.ym.localeCompare(a.ym));
   const asc=rows.slice().sort((a,b)=>a.ym.localeCompare(b.ym));
   const dot=i=>`<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${_SW_COLORS[i%_SW_COLORS.length]}"></span>`;
-  const kwCard = admin?`<div class="card"><h3><span class="dot"></span>검색 키워드 <span class="rep-sub2">레이노 + 경쟁사</span></h3>
-    <div style="display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 12px">${kws.map((k,i)=>`<span style="display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:5px 7px 5px 13px;font-size:13px;font-weight:600">${dot(i)}${escapeHtml(k)}<button class="sw-kwdel" data-kw="${escapeHtml(k)}" title="키워드 삭제" style="border:none;background:none;color:var(--ink3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button></span>`).join('')}</div>
-    <div class="set-add"><input id="swKwInput" placeholder="키워드 추가 (예: 브이쿨)" style="max-width:230px"><button class="viewbtn" id="swKwAdd">＋ 키워드</button></div>
-    <div class="cap" style="margin-top:8px">레이노와 경쟁사 키워드를 함께 관리하세요. 각 키워드의 월별 검색량은 아래 표에서 입력합니다.</div></div>`:'';
+  const kwCard = admin?`<div class="card"><h3><span class="dot"></span>검색 키워드 <span class="rep-sub2">레이노 + 경쟁사 · 직접 추가·수정·삭제</span></h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px">${kws.map((k,i)=>`<span style="display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:5px 8px 5px 13px">${dot(i)}<input class="sw-kwedit" data-kw="${escapeHtml(k)}" value="${escapeHtml(k)}" title="클릭해 이름 수정" style="border:none;background:none;font-size:13px;font-weight:600;color:var(--ink);min-width:40px;width:${Math.min(Math.max(k.length,4)+1,18)}ch;outline:none"><button class="sw-kwdel" data-kw="${escapeHtml(k)}" title="키워드 삭제" style="border:none;background:none;color:var(--ink3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button></span>`).join('')}</div>
+    <div class="set-add"><input id="swKwInput" placeholder="경쟁사 키워드 추가 (예: 브이쿨)" style="max-width:240px"><button class="viewbtn" id="swKwAdd">＋ 키워드</button></div>
+    <div class="cap" style="margin-top:8px">키워드를 <b>직접 클릭해 이름을 수정</b>하거나, ＋ 추가 · × 삭제할 수 있어요(수정하면 월별 값도 함께 이동). 각 키워드의 월별 검색량은 아래 표에서 입력하고 <b>저장</b>하세요.</div></div>`:'';
   const chart=`<div class="card"><h3><span class="dot"></span>브랜드·경쟁사 검색량 추이</h3>${asc.length?'<div class="biz-chart"><canvas id="swChart"></canvas></div>':'<div class="empty">데이터가 없습니다.'+(admin?' 아래에서 키워드/월을 추가하세요.':'')+'</div>'}</div>`;
   const head=`<tr><th>연월</th>${kws.map((k,i)=>`<th style="text-align:right;white-space:nowrap">${dot(i)} ${escapeHtml(k)}</th>`).join('')}${admin?'<th></th>':''}</tr>`;
   const body = desc.length ? desc.map(r=>`<tr><td>${r.ym}</td>${kws.map(k=>`<td class="num">${admin?`<input class="sw-val" data-ym="${r.ym}" data-kw="${escapeHtml(k)}" value="${r.searches[k]!=null?r.searches[k]:''}" inputmode="numeric" style="width:88px">`:(r.searches[k]!=null?r.searches[k].toLocaleString():'-')}</td>`).join('')}${admin?`<td style="text-align:right"><button class="set-del-btn sw-delrow" data-ym="${r.ym}">삭제</button></td>`:''}</tr>`).join('')
@@ -8197,8 +8197,13 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
 });
 document.getElementById('raynoApp').addEventListener('keydown', e=>{
   if(e.target.id==='mtVal' && e.key==='Enter'){ e.preventDefault(); const a=document.getElementById('mtAdd'); if(a)a.click(); }
+  if(e.target.id==='swKwInput' && e.key==='Enter'){ e.preventDefault(); const a=document.getElementById('swKwAdd'); if(a)a.click(); }
+  if(e.target.classList && e.target.classList.contains('sw-kwedit') && e.key==='Enter'){ e.preventDefault(); e.target.blur(); }
 });
 document.getElementById('raynoApp').addEventListener('change', e=>{
+  // 검색 키워드 이름 수정(rename) — 값도 함께 이동
+  const _ke=e.target.closest && e.target.closest('.sw-kwedit');
+  if(_ke){ const oldK=_ke.dataset.kw, newK=(_ke.value||'').trim(); if(!newK||newK===oldK){ renderSearch(); return; } _bizMigrate(); if(BIZ.searchKeywords.indexOf(newK)>=0){ toast('이미 있는 키워드입니다.',true); renderSearch(); return; } collectSearch(); const i=BIZ.searchKeywords.indexOf(oldK); if(i>=0)BIZ.searchKeywords[i]=newK; (BIZ.rows||[]).forEach(r=>{ if(r.searches&&r.searches[oldK]!=null){ r.searches[newK]=r.searches[oldK]; delete r.searches[oldK]; } }); toast('키워드 수정: '+oldK+' → '+newK); renderSearch(); return; }
   if(e.target.classList && e.target.classList.contains('moSel')){ const px=e.target.dataset.mopx, rg=_dfReg(px); if(rg){ const ym=e.target.value; if(ym==='__all'){ rg.st.scope='all'; rg.st.preset='all'; rg.st.from=''; rg.st.to=''; } else if(ym){ const a=ym.split('-'), last=new Date(+a[0],+a[1],0).getDate(); rg.st.from=ym+'-01'; rg.st.to=ym+'-'+String(last).padStart(2,'0'); rg.st.scope='range'; rg.st.preset='month'; } rg.render(); } return; }
   if(e.target.id==='warrLabelSel'){ warrLabelCol=e.target.value; renderWarranty(); return; }
   if(e.target.id==='wvBranch'){ WV.branch=e.target.value; renderWarranty(); }
