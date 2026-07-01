@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 대리점 상세에 월별 지부→대리점 판매(매출/롤) 표 추가';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 검색량 분석 다중 키워드(레이노+경쟁사) 지원';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -4876,7 +4876,7 @@ function applyAuthUI(){
   const admin=(auth==='admin');
   document.querySelectorAll('.admin-only').forEach(el=>{ el.style.display = admin ? '' : 'none'; });
   const sw=document.getElementById('appSwitcher'); if(sw) sw.style.display='flex';
-  if(workspace==='rayno' && raynoUnlocked){ renderWarranty(); renderMetric('search'); renderRevenue(); applyRaynoAuth(); }   // 권한 바뀌면 모든 레이노 화면 갱신
+  if(workspace==='rayno' && raynoUnlocked){ renderWarranty(); renderSearch(); renderRevenue(); applyRaynoAuth(); }   // 권한 바뀌면 모든 레이노 화면 갱신
   document.getElementById('adminBtn').style.display  = admin ? 'none' : '';  // 로그인 버튼: 비로그인 방문자
   document.getElementById('logoutBtn').style.display = admin ? '' : 'none';  // 로그아웃: 관리자
   document.getElementById('adminFlag').style.display = admin ? 'inline-flex' : 'none';
@@ -5137,7 +5137,8 @@ async function cloudSaveJSON(file,obj){
     toast('⚠ 저장 실패: '+_cloudErr, true); return false;
   }
 }
-async function ensureBiz(){ if(bizLoaded)return; const j=await cloudLoadJSON(SUPA.bizFile); if(j&&j.rows)BIZ=j; bizLoaded=true; }
+function _bizMigrate(){ if(!BIZ||typeof BIZ!=='object')BIZ={rows:[]}; BIZ.rows=Array.isArray(BIZ.rows)?BIZ.rows:[]; if(!Array.isArray(BIZ.searchKeywords)||!BIZ.searchKeywords.length) BIZ.searchKeywords=['레이노','레이노 썬팅','루마','버텍스','브이쿨']; BIZ.rows.forEach(r=>{ if(!r.searches||typeof r.searches!=='object')r.searches={}; if(r.search!=null&&r.searches['레이노']==null)r.searches['레이노']=r.search; }); }
+async function ensureBiz(){ if(bizLoaded)return; const j=await cloudLoadJSON(SUPA.bizFile); if(j&&j.rows)BIZ=j; _bizMigrate(); bizLoaded=true; }
 async function ensureWarr(){ if(warrLoaded)return; const j=await cloudLoadJSON(SUPA.warrFile); if(j&&j.rows){ WARR=j; WARR.columns=WARR.columns||[]; warrDedupe(); ensureWarrCfg(); } warrLoaded=true; }
 async function ensureGlass(){ if(glassLoaded)return; const j=await cloudLoadJSON(SUPA.glassFile); if(j&&j.rows){ GLASS=j; GLASS.columns=GLASS.columns||[]; } glassLoaded=true; }
 async function ensureYoy(){ if(yoyLoaded)return; try{ const j=await cloudLoadJSON(SUPA.yoyFile); if(j) YOY=j; }catch(_){ } yoyLoaded=true; }
@@ -7658,7 +7659,41 @@ function renderMetric(view){
 function collectMetric(field){ document.querySelectorAll('#'+(field==='search'?'rSearch':'rRevenue')+' .mt-val').forEach(inp=>{
   const r=(BIZ.rows||[]).find(x=>x.ym===inp.dataset.ym); if(r) r[field]=parseNum(inp.value); }); }
 function bizUpsert(ym, field, val){ BIZ.rows=BIZ.rows||[]; let r=BIZ.rows.find(x=>x.ym===ym); if(!r){ r={ym}; BIZ.rows.push(r); } r[field]=val; BIZ.rows.sort((a,b)=>a.ym.localeCompare(b.ym)); }
-async function saveBiz(){ BIZ.version=1; BIZ.rows=(BIZ.rows||[]).filter(r=>r.search!=null||r.revenue!=null); await cloudSaveJSON(SUPA.bizFile,BIZ); }
+async function saveBiz(){ BIZ.version=1; _bizMigrate(); BIZ.rows.forEach(r=>{ if(r.searches){ if(r.searches['레이노']!=null) r.search=r.searches['레이노']; } }); BIZ.rows=(BIZ.rows||[]).filter(r=>r.revenue!=null || (r.searches&&Object.keys(r.searches).some(k=>r.searches[k]!=null))); await cloudSaveJSON(SUPA.bizFile,BIZ); }
+
+// ── 브랜드·경쟁사 검색량(다중 키워드) ──
+const _SW_COLORS=['#f4911c','#3f78c7','#e0562f','#12b886','#7048e8','#e64980','#1098ad','#f59f00','#495057','#ae3ec9'];
+function renderSearch(){
+  const box=document.getElementById('rSearch'); if(!box) return;
+  _bizMigrate();
+  const admin=(auth==='admin');
+  const kws=BIZ.searchKeywords.slice();
+  const rows=(BIZ.rows||[]).filter(r=>r.searches && kws.some(k=>r.searches[k]!=null));
+  const desc=rows.slice().sort((a,b)=>b.ym.localeCompare(a.ym));
+  const asc=rows.slice().sort((a,b)=>a.ym.localeCompare(b.ym));
+  const dot=i=>`<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${_SW_COLORS[i%_SW_COLORS.length]}"></span>`;
+  const kwCard = admin?`<div class="card"><h3><span class="dot"></span>검색 키워드 <span class="rep-sub2">레이노 + 경쟁사</span></h3>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 12px">${kws.map((k,i)=>`<span style="display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:5px 7px 5px 13px;font-size:13px;font-weight:600">${dot(i)}${escapeHtml(k)}<button class="sw-kwdel" data-kw="${escapeHtml(k)}" title="키워드 삭제" style="border:none;background:none;color:var(--ink3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button></span>`).join('')}</div>
+    <div class="set-add"><input id="swKwInput" placeholder="키워드 추가 (예: 브이쿨)" style="max-width:230px"><button class="viewbtn" id="swKwAdd">＋ 키워드</button></div>
+    <div class="cap" style="margin-top:8px">레이노와 경쟁사 키워드를 함께 관리하세요. 각 키워드의 월별 검색량은 아래 표에서 입력합니다.</div></div>`:'';
+  const chart=`<div class="card"><h3><span class="dot"></span>브랜드·경쟁사 검색량 추이</h3>${asc.length?'<div class="biz-chart"><canvas id="swChart"></canvas></div>':'<div class="empty">데이터가 없습니다.'+(admin?' 아래에서 키워드/월을 추가하세요.':'')+'</div>'}</div>`;
+  const head=`<tr><th>연월</th>${kws.map((k,i)=>`<th style="text-align:right;white-space:nowrap">${dot(i)} ${escapeHtml(k)}</th>`).join('')}${admin?'<th></th>':''}</tr>`;
+  const body = desc.length ? desc.map(r=>`<tr><td>${r.ym}</td>${kws.map(k=>`<td class="num">${admin?`<input class="sw-val" data-ym="${r.ym}" data-kw="${escapeHtml(k)}" value="${r.searches[k]!=null?r.searches[k]:''}" inputmode="numeric" style="width:88px">`:(r.searches[k]!=null?r.searches[k].toLocaleString():'-')}</td>`).join('')}${admin?`<td style="text-align:right"><button class="set-del-btn sw-delrow" data-ym="${r.ym}">삭제</button></td>`:''}</tr>`).join('')
+    : `<tr><td colspan="${kws.length+(admin?2:1)}"><div class="empty">데이터가 없습니다.${admin?' 아래에서 월을 추가하세요.':''}</div></td></tr>`;
+  const addRow = admin?`<div class="set-add" style="margin-top:14px"><input id="swYm" type="month" style="max-width:170px"><button class="viewbtn" id="swAdd">＋ 월 추가</button></div>`:'';
+  const saveBar = admin?`<div class="set-savebar" style="position:static;margin-top:14px"><button class="vc-save" id="swSave">저장</button><span class="vc-status">키워드별 월 검색량 입력/수정 후 저장하세요. 같은 월은 덮어쓰기됩니다.</span></div>`:'';
+  box.innerHTML = kwCard + chart + `<div class="card"><h3><span class="dot"></span>검색량 월별 표 <span class="rep-sub2">${admin?'수기 입력':'읽기 전용'}</span></h3><div class="tbl-wrap" style="overflow-x:auto"><table><thead>${head}</thead><tbody>${body}</tbody></table></div>${addRow}${saveBar}</div>`;
+  if(asc.length) drawSearchChart('swChart', asc, kws);
+}
+function drawSearchChart(id, rows, kws){
+  if(!document.getElementById(id)) return;
+  makeChart(id,{ type:'line',
+    data:{ labels:rows.map(r=>r.ym), datasets:kws.map((k,i)=>({ label:k, data:rows.map(r=>(r.searches&&r.searches[k]!=null)?r.searches[k]:null), borderColor:_SW_COLORS[i%_SW_COLORS.length], backgroundColor:_SW_COLORS[i%_SW_COLORS.length]+'22', borderWidth:2, pointRadius:2.5, tension:.3, spanGaps:true, fill:false })) },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'top'}, tooltip:{callbacks:{label:c=>c.dataset.label+': '+(c.parsed.y!=null?c.parsed.y.toLocaleString():'-')}} },
+      scales:{ x:{grid:{display:false}}, y:{beginAtZero:true, grid:{color:_ck().grid}, ticks:{callback:v=>v>=10000?(v/10000).toLocaleString()+'만':v.toLocaleString()}} } } });
+}
+function collectSearch(){ document.querySelectorAll('#rSearch .sw-val').forEach(inp=>{ const ym=inp.dataset.ym, k=inp.dataset.kw; let r=(BIZ.rows||[]).find(x=>x.ym===ym); if(!r){ r={ym,searches:{}}; BIZ.rows.push(r);} if(!r.searches)r.searches={}; const v=parseNum(inp.value); if(v==null) delete r.searches[k]; else r.searches[k]=v; }); }
 
 // ── 워크스페이스 전환 + 잠금 ──
 const CAFE_VIEW_IDS=['nav','dash','controls','typeBar','veriNote','filterStatus','verify','report','promo','emptyState','drop'];
@@ -7811,7 +7846,7 @@ function setRView(v){
   if(v==='dash') renderRDash();
   else if(v==='glass') renderGlass();
   else if(v==='dealer'){ renderDealer(); if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!bsLoaded){ ensureBranchsales().then(()=>{ if(rview==='dealer') renderDealer(); }); } }
-  else if(v==='search') renderMetric('search');
+  else if(v==='search') renderSearch();
   else if(v==='yoy') renderYoY();
   else renderRevenue();
 }
@@ -8151,6 +8186,14 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
     const r=(BIZ.rows||[]).find(x=>x.ym===ym); if(r){ r[field]=null; } renderMetric(field==='search'?'search':'revenue'); return; }
   if(e.target.id==='mtSave'){ const field=e.target.dataset.field; collectMetric(field); await saveBiz();
     renderMetric(field==='search'?'search':'revenue'); toast('저장되었습니다'); return; }
+  // 검색량(다중 키워드)
+  if(e.target.id==='swKwAdd'){ const inp=document.getElementById('swKwInput'); const v=((inp&&inp.value)||'').trim(); if(!v){ toast('키워드를 입력하세요.',true); return; } _bizMigrate(); collectSearch(); if(BIZ.searchKeywords.indexOf(v)<0){ BIZ.searchKeywords.push(v); toast('키워드 추가: '+v); } else { toast('이미 있는 키워드입니다.',true); } renderSearch(); return; }
+  const _swkd=e.target.closest('.sw-kwdel');
+  if(_swkd){ const k=_swkd.dataset.kw; _bizMigrate(); collectSearch(); const i=BIZ.searchKeywords.indexOf(k); if(i>=0)BIZ.searchKeywords.splice(i,1); (BIZ.rows||[]).forEach(r=>{ if(r.searches) delete r.searches[k]; }); toast('키워드 삭제: '+k); renderSearch(); return; }
+  if(e.target.id==='swAdd'){ collectSearch(); const ym=(document.getElementById('swYm').value||'').trim(); if(!ym){ toast('연월을 선택하세요.',true); return; } BIZ.rows=BIZ.rows||[]; let r=BIZ.rows.find(x=>x.ym===ym); if(!r){ r={ym,searches:{}}; BIZ.rows.push(r); } if(!r.searches)r.searches={}; BIZ.rows.sort((a,b)=>a.ym.localeCompare(b.ym)); renderSearch(); return; }
+  const _swdr=e.target.closest('.sw-delrow');
+  if(_swdr){ const ym=_swdr.dataset.ym; collectSearch(); const r=(BIZ.rows||[]).find(x=>x.ym===ym); if(r&&r.searches){ (BIZ.searchKeywords||[]).forEach(k=>delete r.searches[k]); } renderSearch(); return; }
+  if(e.target.id==='swSave'){ collectSearch(); await saveBiz(); renderSearch(); toast('저장되었습니다'); return; }
 });
 document.getElementById('raynoApp').addEventListener('keydown', e=>{
   if(e.target.id==='mtVal' && e.key==='Enter'){ e.preventDefault(); const a=document.getElementById('mtAdd'); if(a)a.click(); }
