@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 성능: 대리점 집계 캐싱 + 표 페이지네이션 + 차트 애니 단축';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 긍정률/부정률을 중립 제외(긍정+부정 기준)로 통일';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2258,8 +2258,8 @@ function _dayShift(ymd,n){ const d=new Date(ymd+'T00:00:00'); d.setDate(d.getDat
 function briefStats(rows){
   let pos=0,neg=0,neu=0,posts=0,cmts=0;
   rows.forEach(r=>{ r.isPost?posts++:cmts++; const s=sentOf(r); if(s==='긍정')pos++; else if(s==='부정')neg++; else if(s==='중립')neu++; });
-  const cl=pos+neg+neu; const pr=cl?pos/cl*100:0, nr=cl?neg/cl*100:0;
-  return {total:rows.length,posts,cmts,pos,neg,neu,posRate:pr,negRate:nr,net:pr-nr};
+  const cl=pos+neg; const pr=cl?pos/cl*100:0, nr=cl?neg/cl*100:0;   // 긍정률=긍정÷(긍정+부정), 중립 제외
+  return {total:rows.length,posts,cmts,pos,neg,neu,classified:pos+neg+neu,posRate:pr,negRate:nr,net:pr-nr};
 }
 function _briefOrbSvg(){
   let dots='';
@@ -2317,17 +2317,17 @@ function _weeklyInsights(){
   if(topTheme){ line2=topTheme+' 이슈가 증가했어요.';
     let best='',bn=0; ISSUE[topTheme].forEach(k=>{ let n=0; recNegTxt.forEach(t=>{ if(t.indexOf(k.toLowerCase())>=0)n++; }); if(n>bn){bn=n;best=k;} }); kwForDesc=best;
   } else line2='큰 이슈 없이 안정적이에요.';
-  const cl=recPos+recNeg+recNeu||1; const pr=Math.round(recPos/cl*100);
+  const cl=(recPos+recNeg)||1; const pr=Math.round(recPos/cl*100);   // 긍정률=중립 제외
   const desc = topTheme
     ? `긍정 반응은 유지되고 있으나, ${topTheme}${kwForDesc?` ‘${escapeHtml(kwForDesc)}’`:''} 관련 언급이 확산되고 있습니다. 주요 이슈를 확인하고 선제 대응을 권장합니다.`
-    : `최근 7일 특별한 리스크 신호는 보이지 않습니다. 긍정 비중 ${pr}%로 안정적인 흐름이에요.`;
+    : `최근 7일 특별한 리스크 신호는 보이지 않습니다. 긍정률 ${pr}%(중립 제외)로 안정적인 흐름이에요.`;
   const slides=[{eb:'이번 주 인사이트', badge:'WEEKLY SUMMARY', head:escapeHtml(line1)+'<br>'+escapeHtml(line2), desc}];
   if(recN>0){
-    const cl2=recPos+recNeg+recNeu||1, pr2=Math.round(recPos/cl2*100);
+    const cl2=(recPos+recNeg)||1, pr2=Math.round(recPos/cl2*100);   // 긍정률=중립 제외(전주와 동일 기준)
     let s2;
     if(prevN>0){ const ppr=Math.round(prevPos/((prevPos+prevNeg)||1)*100); const dp=pr2-Math.round(recPos/cl2*100)+0; const diff=pr2-ppr; s2=Math.abs(diff)<3?'전주와 비슷한 수준이에요.':(diff>0?`전주 대비 +${diff}%p 올랐어요.`:`전주 대비 ${diff}%p 내렸어요.`); }
     else s2='이번 주 여론 흐름이에요.';
-    slides.push({eb:'여론 동향', badge:'SENTIMENT', head:`긍정 비중은 ${pr2}%,<br>${escapeHtml(s2)}`, desc:`최근 7일 긍정 ${recPos} · 부정 ${recNeg} · 중립 ${recNeu}건이 집계됐어요.`});
+    slides.push({eb:'여론 동향', badge:'SENTIMENT', head:`긍정률은 ${pr2}%,<br>${escapeHtml(s2)}`, desc:`최근 7일 긍정 ${recPos} · 부정 ${recNeg} · 중립 ${recNeu}건이 집계됐어요.`});
   }
   const kwTop=Object.entries(kwAll).sort((a,b)=>b[1]-a[1])[0];
   if(kwTop && kwTop[1]>=2){
@@ -2532,7 +2532,8 @@ function renderKPIs(rows){
   const neg=sents.filter(s=>s==='부정').length;
   const neu=sents.filter(s=>s==='중립').length;
   const classified=pos+neg+neu;
-  const rate= classified? (pos/classified*100).toFixed(1):'0.0';
+  const opin=pos+neg;   // 의견 있는 글(긍정+부정)
+  const rate= opin? (pos/opin*100).toFixed(1):'0.0';   // 긍정률=긍정÷(긍정+부정), 중립 제외
   const cafes=new Set(considered.map(r=>r.cafe)).size;
 
   const cards=[
@@ -2541,7 +2542,7 @@ function renderKPIs(rows){
     {lab:'긍정',    val:pos,  meta:classified?`${(pos/classified*100).toFixed(1)}%`:'-', cls:'k-pos', sent:'긍정', icon:'smile'},
     {lab:'부정',    val:neg,  meta:classified?`${(neg/classified*100).toFixed(1)}%`:'-', cls:'k-neg', sent:'부정', icon:'frown'},
     {lab:'중립',    val:neu,  meta:classified?`${(neu/classified*100).toFixed(1)}%`:'-', cls:'k-neu', sent:'중립', icon:'meh'},
-    {lab:'긍정률',  val:rate+'%', meta:`분류 ${classified.toLocaleString()}건 · ${cafes}개 카페`, cls:'k-plain', sent:null, icon:'trend'},
+    {lab:'긍정률',  val:rate+'%', meta:`긍정+부정 ${opin.toLocaleString()}건 기준 · 중립 제외`, cls:'k-plain', sent:null, icon:'trend'},
   ];
   document.getElementById('kpis').innerHTML = cards.map(c=>{
     const clickable = !!c.sent;
@@ -2753,7 +2754,7 @@ function renderCafe(rows){
     if(s==='긍정')m[c].pos++; else if(s==='부정')m[c].neg++; else if(s==='중립')m[c].neu++;
   });
   const ent=Object.entries(m).map(([c,v])=>{
-    const cl=v.pos+v.neg+v.neu, rate=cl?v.pos/cl*100:0;
+    const cl=v.pos+v.neg, rate=cl?v.pos/cl*100:0;   // 긍정률=긍정÷(긍정+부정), 중립 제외
     return {c,...v,total:v.post+v.cmt,rate};
   }).sort((a,b)=>b.total-a.total || b.post-a.post);
 
@@ -3446,7 +3447,7 @@ function rpMetrics(set){
   const total=set.length, posts=set.filter(r=>r.isPost).length, cmts=total-posts;
   const s=set.map(rsent);
   const pos=s.filter(x=>x==='긍정').length, neg=s.filter(x=>x==='부정').length, neu=s.filter(x=>x==='중립').length;
-  const classified=pos+neg+neu, posRate=classified?pos/classified*100:0, negRate=classified?neg/classified*100:0;
+  const classified=pos+neg+neu, opin=pos+neg, posRate=opin?pos/opin*100:0, negRate=opin?neg/opin*100:0;   // 긍정률/부정률=중립 제외
   return {total,posts,cmts,pos,neg,neu,classified,posRate,negRate,net:posRate-negRate,cafes:new Set(set.map(r=>r.cafe)).size};
 }
 function rpBrandCounts(set){
