@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 긍정률/부정률을 중립 제외(긍정+부정 기준)로 통일';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 롤 미구매인데 글라스케어·보증서 발행 대리점 점검 카드';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5502,6 +5502,18 @@ function _dealerDetailHtml(d){
     <div style="margin-top:12px;font-size:11.5px;color:var(--ink3);line-height:1.6">※ 매출·롤은 <b>지부 → 대리점 판매(branchSalesList)</b> 누적입니다.${d.bsSales?' (본사 직매 포함)':''} 대리점 마스터(branchCustList) 기준.</div>
   </div>`;
 }
+// 롤 구매(branchsales)한 대리점명 집합(정규화)
+function _rollBuyerSet(){ const s=new Set(); ((typeof BSALE!=='undefined'&&BSALE&&BSALE.rows)||[]).forEach(r=>{ if((r.q||0)>0||(r.a||0)>0){ const n=_bsNameNorm(r.dealer); if(n)s.add(n); } }); return s; }
+// 롤 구매는 없는데 글라스케어/보증서가 발행된 매장(대리점) — 매장명 기준 매칭
+function _dealerIssueNoBuy(){
+  const buyers=_rollBuyerSet();
+  const gcol=((typeof GLASS!=='undefined'&&GLASS&&GLASS.columns)||[]).includes('매장명(대리점명)')?'매장명(대리점명)':'매장명';
+  const map={};
+  const add=(raw,kind,jibu)=>{ const nm=String(raw||'').trim(); if(!nm)return; const n=_bsNameNorm(nm); if(!n||buyers.has(n))return; const o=map[n]||(map[n]={name:nm,glass:0,warr:0,jibu:jibu||''}); o[kind]++; if(!o.jibu&&jibu)o.jibu=jibu; };
+  ((typeof GLASS!=='undefined'&&GLASS&&GLASS.rows)||[]).forEach(r=>add(r[gcol],'glass',String(r['담당지부']||'').trim()));
+  ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>add(r['매장명'],'warr',String(r['담당지부']||'').trim()));
+  return Object.values(map).sort((a,b)=>(b.glass+b.warr)-(a.glass+a.warr));
+}
 function renderDealer(){
   const box=document.getElementById('rDealer'); if(!box) return;
   const all=_dealerAgg();
@@ -5530,7 +5542,21 @@ function renderDealer(){
   rows.slice(0,_dlrShow).forEach((d,i)=>{ const badge=d.member?'<span style="color:var(--dv2);font-weight:700">Members</span>':'<span style="color:var(--ink3)">일반</span>'; const stat=d.unuse?'<span style="color:var(--amber);font-weight:700">미사용</span>':'<span style="color:var(--dv2);font-weight:700">사용중</span>'; const region=[d.sido,d.sigungu].filter(Boolean).join(' ')||'-'; t+=`<tr data-di="${i}" style="cursor:pointer" title="클릭하면 상세 정보"><td ${td} style="text-align:center;color:var(--ink3)">${i+1}</td><td ${tdl}><b>${escapeHtml(d.name)}</b></td><td ${tdl}>${escapeHtml(d.store||'-')}</td><td ${tdl}>${escapeHtml(d.code||'-')}</td><td ${tdl}>${escapeHtml(d.jibu||'-')}</td><td ${tdl}>${badge}</td><td ${tdl}>${escapeHtml(region)}</td><td ${td} style="font-weight:700">${d.salesA?kw(d.salesA):'·'}</td><td ${td}>${d.salesQ?won(d.salesQ):'·'}</td><td ${tdl}>${stat}</td></tr>`; });
   const _more = rows.length>_dlrShow ? `<div style="text-align:center;margin-top:12px"><button class="acc-btn" id="dlrMore">더보기 (+${won(Math.min(300,rows.length-_dlrShow))} · 남은 ${won(rows.length-_dlrShow)}곳)</button></div>` : '';
   t+=`</table></div>${_more}<div class="cap" style="margin-top:8px;line-height:1.6">${rows.length>_dlrShow?won(Math.min(_dlrShow,rows.length))+'곳 표시 / 총 '+won(rows.length)+'곳':won(rows.length)+'곳 표시'} · <b>ERP 대리점 마스터(branchCustList) + branchSalesList 본사 직매</b> 기준. <b>매출·롤</b>=지부→대리점 판매(branchSalesList) 누적. <b>멤버스</b>=대리점 마스터 글라스케어 여부(예). <b>상태</b>=ERP 사용여부. ※ branchsales에서 <b>지부=본사</b>인 대리점도 목록에 포함됩니다. 보증서·글라스케어(관리자 홈페이지) 결합은 제외.</div>`;
-  box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터 (ERP)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>`;
+  const _gwReady=(typeof glassLoaded!=='undefined'&&glassLoaded)||(typeof warrLoaded!=='undefined'&&warrLoaded);
+  let nbCard='';
+  if(_gwReady){
+    const nb=_dealerIssueNoBuy();
+    const nbl='style="text-align:left;padding:8px 10px;font-size:11px;font-weight:800;background:#b23b3b;color:#fff;white-space:nowrap"';
+    const nbr='style="text-align:right;padding:8px 10px;font-size:11px;font-weight:800;background:#b23b3b;color:#fff;white-space:nowrap"';
+    const ndl='style="text-align:left;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line)"';
+    const ndr='style="text-align:right;padding:7px 10px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+    const nbShow=nb.slice(0,200);
+    let nt = nb.length ? `<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:560px"><tr><th ${nbl}>매장(대리점)명</th><th ${nbl}>담당지부</th><th ${nbr}>글라스케어 발행</th><th ${nbr}>보증서 발행</th></tr>${nbShow.map(o=>`<tr><td ${ndl}><b>${escapeHtml(o.name)}</b></td><td ${ndl}>${escapeHtml(o.jibu||'-')}</td><td ${ndr}>${o.glass?won(o.glass)+'건':'·'}</td><td ${ndr}>${o.warr?won(o.warr)+'건':'·'}</td></tr>`).join('')}</table></div>${nb.length>200?`<div class="cap" style="margin-top:6px">상위 200곳 표시 / 총 ${won(nb.length)}곳</div>`:''}` : '<div class="empty">롤 구매가 없는데 글라스케어·보증서가 발행된 대리점이 없습니다. 👍</div>';
+    nbCard=`<div class="card"><h3 style="margin:0 0 6px"><span class="dot" style="background:#b23b3b"></span>⚠️ 롤 미구매인데 글라스케어·보증서 발행 <span class="rep-sub2">${won(nb.length)}곳</span></h3><div class="cap" style="margin-bottom:10px">지부→대리점 <b>롤 구매 기록(branchSalesList)이 전혀 없는데</b> 글라스케어 가입 또는 품질보증서가 발행된 매장이에요. 정품 롤 미구매 발행 가능성을 점검하세요. <b>매장(대리점)명으로 매칭</b>하므로 철자가 다르면 실제 구매가 있어도 잡힐 수 있어요.</div>${nt}</div>`;
+  } else {
+    nbCard=`<div class="card"><h3 style="margin:0 0 6px"><span class="dot" style="background:#b23b3b"></span>⚠️ 롤 미구매인데 글라스케어·보증서 발행</h3><div class="empty">글라스케어·보증서 데이터를 불러오는 중… (잠시 후 자동 표시)</div></div>`;
+  }
+  box.innerHTML=`<div class="card"><h3 style="margin:0 0 12px"><span class="dot"></span>대리점 마스터 (ERP)</h3><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${kpis.join('')}</div></div><div class="card">${filters}${t}</div>${nbCard}`;
 }
 // ── 글라스케어 지부 분석: 월별 × 제품 가입 추이 ──
 let GBA={ jibu:'', prod:[], sel:[] };
@@ -7945,7 +7971,7 @@ function setRView(v){
   else if(v==='warrReport') renderWarrReport();
   if(v==='dash') renderRDash();
   else if(v==='glass') renderGlass();
-  else if(v==='dealer'){ renderDealer(); if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!bsLoaded){ ensureBranchsales().then(()=>{ if(rview==='dealer') renderDealer(); }); } }
+  else if(v==='dealer'){ renderDealer(); if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!bsLoaded){ ensureBranchsales().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!glassLoaded){ ensureGlass().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!warrLoaded){ ensureWarr().then(()=>{ if(rview==='dealer') renderDealer(); }); } }
   else if(v==='search') renderSearch();
   else if(v==='yoy') renderYoY();
   else renderRevenue();
