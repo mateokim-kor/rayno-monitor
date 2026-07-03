@@ -1773,7 +1773,7 @@ const SUPA = {
   bsFile: 'branchsales.json',
   todayFile: 'today_sales.json',
 };
-const BUILD = '2026-07-03 · 매출 분석 상단 오늘 매출 카드(전사/B2C/B2B/기타 · salesDailyList)';   // 배포 버전 확인용
+const BUILD = '2026-07-03 · 월 비교에서 B2C 수량 행 제거';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7304,7 +7304,7 @@ function salesCompareCard(){
   const C=SALES.channels, A=_salesCmpA, B=_salesCmpB, won=n=>Math.round(n||0).toLocaleString();
   const rollOf=m=>{ let q=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; q+=SALES.prodAll[p].mq[m]||0; }); return q; };
   const ent=m=>C.B2C.ma[m]+C.B2B.ma[m]+C['별도채널'].ma[m];
-  const rows=[ {n:'전사 매출액',f:ent,u:'원'},{n:'B2C 매출',f:m=>C.B2C.ma[m],u:'원'},{n:'B2B 매출',f:m=>C.B2B.ma[m],u:'원'},{n:'B2C+B2B 합계',f:m=>C.B2C.ma[m]+C.B2B.ma[m],u:'원'},{n:'B2C 수량',f:m=>C.B2C.mq[m],u:''},{n:'롤 판매 수',f:rollOf,u:'롤'},{n:'품질보증서',f:m=>_qc(m),u:'건'} ];
+  const rows=[ {n:'전사 매출액',f:ent,u:'원'},{n:'B2C 매출',f:m=>C.B2C.ma[m],u:'원'},{n:'B2B 매출',f:m=>C.B2B.ma[m],u:'원'},{n:'B2C+B2B 합계',f:m=>C.B2C.ma[m]+C.B2B.ma[m],u:'원'},{n:'롤 판매 수',f:rollOf,u:'롤'},{n:'품질보증서',f:m=>_qc(m),u:'건'} ];
   const opt=sel=>ms.map(m=>`<option value="${m}"${sel===m?' selected':''}>${m}월</option>`).join('');
   const thl=`class="l"`, th=``, tdl=`class="l"`, td=``;
   const ss=`style="padding:5px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;font-weight:700"`;
