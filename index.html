@@ -1772,7 +1772,7 @@ const SUPA = {
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
 };
-const BUILD = '2026-06-29 · 매출 분석에 채널별 매출(전사/B2C/B2B/기타) 막대 카드 추가';   // 배포 버전 확인용
+const BUILD = '2026-06-29 · 채널 막대 카드 원복(일별 매출 데이터 없음)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6770,7 +6770,6 @@ function renderRevenue(){
 
   box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
     + sel
-    + `<div class="card" style="margin-bottom:13px"><h3 style="margin:0 0 4px"><span class="dot"></span>채널별 매출 <span class="rep-sub2">${escapeHtml(lab)}</span></h3><div class="cap" style="margin:0 0 8px">전사 = B2C + B2B + 기타(별도채널) · 단위 억원${cut?'':' · 월을 선택하면 해당 월 기준'}</div><div class="biz-chart" style="height:280px"><canvas id="cChBar"></canvas></div></div>`
     + salesKPI()
     + charts
     + salesCompareCard()
@@ -6789,22 +6788,7 @@ function renderRevenue(){
       })()
     + salesAnalysisCard();
   drawSalesCharts();
-  try{ drawChannelBar(); }catch(_){}
   try{ _sbaRenderChart(); }catch(_){}
-}
-function drawChannelBar(){
-  if(!document.getElementById('cChBar')) return;
-  if(typeof SALES==='undefined'||!SALES||!SALES.channels) return;
-  const C=SALES.channels, pick=g=>(C[g]?_sPick(C[g].ma):0);
-  const b2c=pick('B2C'), b2b=pick('B2B'), etc=C['별도채널']?pick('별도채널'):0, all=b2c+b2b+etc;
-  const labels=['전사','B2C','B2B','기타'], vals=[all,b2c,b2b,etc];
-  const colors=['#f4911c','#3f78c7','#2f9e6f','#8a6bd8'];
-  makeChart('cChBar',{ type:'bar',
-    data:{ labels, datasets:[{ data:vals, backgroundColor:colors, borderRadius:8, maxBarThickness:80 }] },
-    options:{ responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>fmtKRW(c.parsed.y)}} },
-      scales:{ x:{grid:{display:false}, ticks:{font:{size:13,weight:'700'}}}, y:{beginAtZero:true, ticks:{callback:v=>(v/1e8).toFixed(0)+'억'}} } },
-    plugins:[{ id:'chBarLbl', afterDatasetsDraw(ch){ const ctx=ch.ctx, meta=ch.getDatasetMeta(0); if(!meta)return; ctx.save(); ctx.textAlign='center'; ctx.font='800 14px Pretendard,-apple-system,sans-serif'; meta.data.forEach((bar,i)=>{ const v=vals[i]; if(v==null)return; const txt=(v/1e8).toFixed(1)+'억'; const h=(bar.base||0)-bar.y; if(h>26){ ctx.fillStyle='#fff'; ctx.fillText(txt, bar.x, bar.y+18); } else { ctx.fillStyle='#333'; ctx.fillText(txt, bar.x, bar.y-6); } }); ctx.restore(); } }] });
 }
 /* ── 지부 → 대리점 롤 판매 (ERP branchSalesList) · 멤버스/비멤버스 ── */
 let BSALE=null, bsLoaded=false;
