@@ -1771,8 +1771,9 @@ const SUPA = {
   promoFile: 'promo.json',
   dealerFile: 'dealers.json',
   bsFile: 'branchsales.json',
+  todayFile: 'today_sales.json',
 };
-const BUILD = '2026-06-29 · 채널 막대 카드 원복(일별 매출 데이터 없음)';   // 배포 버전 확인용
+const BUILD = '2026-07-03 · 매출 분석 상단 오늘 매출 카드(전사/B2C/B2B/기타 · salesDailyList)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6681,6 +6682,7 @@ function renderRevenue(){
     box.innerHTML=`<div class="empty" style="padding:46px 18px;text-align:center;color:var(--ink2)">아직 매출 데이터가 없습니다.<br>${admin?'우측 상단 <b>＋ 매출 ERP</b> 버튼으로 ERP 원본 파일(.XLS)을 올려주세요.':'관리자가 ERP 파일을 올리면 표시됩니다.'}</div>`;
     return;
   }
+  if(!todayLoaded){ ensureToday().then(()=>{ if(typeof rview!=='undefined'&&rview==='revenue') renderRevenue(); }); }
   const inp=SALES.inputs, M=_salesMonths(), cut=_salesCut();
   _salesSel=_salesSel.filter(m=>M.indexOf(m)>=0);
   const m0=(_salesSel.length===1?_salesSel[0]:0);
@@ -6769,6 +6771,7 @@ function renderRevenue(){
   let s8=`<button id="salesRepCopy" class="acc-btn" style="margin-bottom:8px">📋 리포트 복사</button><pre id="salesRepText" style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:inherit;font-size:13px;color:var(--ink);margin:0">${rep.replace(/</g,'&lt;')}</pre>`;
 
   box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
+    + _todayCard()
     + sel
     + salesKPI()
     + charts
@@ -6790,6 +6793,17 @@ function renderRevenue(){
   drawSalesCharts();
   try{ _sbaRenderChart(); }catch(_){}
 }
+/* ── 오늘 매출 (ERP salesDailyList · 부서 B2C/B2B/기타) ── */
+let TODAY=null, todayLoaded=false;
+async function ensureToday(){ if(todayLoaded)return; try{ const j=await cloudLoadJSON(SUPA.todayFile); if(j&&j.date!=null) TODAY=j; }catch(_){} todayLoaded=true; }
+function _todayCard(){
+  if(!TODAY) return '';
+  const won=n=>Math.round(n||0).toLocaleString();
+  const chip=(lab,v,col)=>`<div style="flex:1;min-width:90px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:9px 12px"><div style="font-size:11px;color:var(--ink3)">${lab}</div><div style="font-size:16px;font-weight:800;color:${col}">${won(v)}<span style="font-size:11px;font-weight:500;color:var(--ink3)"> 원</span></div></div>`;
+  const upd=TODAY.updatedAt?new Date(TODAY.updatedAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}):'';
+  return `<div class="card" style="margin-bottom:13px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap"><span class="dot"></span><b style="font-size:14px">오늘 매출</b><span style="font-size:12px;color:var(--ink3)">${escapeHtml(TODAY.dateLabel||TODAY.date)}</span>${(TODAY.total||0)===0?'<span style="font-size:11px;color:var(--ink3)">· 아직 등록된 매출 없음</span>':''}<span style="margin-left:auto;font-size:11px;color:var(--ink3)">순수 매출(001) 기준${upd?' · '+upd+' 갱신':''}</span></div><div style="display:flex;gap:9px;flex-wrap:wrap"><div style="flex:1.3;min-width:130px;background:linear-gradient(135deg,#f4911c,#e0781a);border-radius:10px;padding:10px 14px;color:#fff"><div style="font-size:11px;opacity:.92">전사</div><div style="font-size:20px;font-weight:800">${won(TODAY.total)}<span style="font-size:11px;font-weight:500;opacity:.85"> 원</span></div></div>${chip('B2C',TODAY.b2c,'#3f78c7')}${chip('B2B',TODAY.b2b,'#2f9e6f')}${chip('기타',TODAY.etc,'#8a6bd8')}</div></div>`;
+}
+
 /* ── 지부 → 대리점 롤 판매 (ERP branchSalesList) · 멤버스/비멤버스 ── */
 let BSALE=null, bsLoaded=false;
 let _bsJibu='전체', _bsView='dealer', _bsMetric='q', _bsRollOnly=true, _bsMonths=[], _bsDealerArr=[], _bsDealerN=10, _bsJibuArr=[], _bsProd='전체';   // 지부·제품 선택 + 대리점별 기본
