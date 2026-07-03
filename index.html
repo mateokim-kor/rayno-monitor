@@ -1773,7 +1773,7 @@ const SUPA = {
   bsFile: 'branchsales.json',
   todayFile: 'today_sales.json',
 };
-const BUILD = '2026-07-03 · 롤 판매수 B2C+B2B 합계 행 검정색';   // 배포 버전 확인용
+const BUILD = '2026-07-03 · 월별 종합에 판매 롤 수 행 + 월 비교 라벨 판매 롤 수로';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7307,7 +7307,7 @@ function salesCompareCard(){
   const C=SALES.channels, A=_salesCmpA, B=_salesCmpB, won=n=>Math.round(n||0).toLocaleString();
   const rollOf=m=>{ let q=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; q+=SALES.prodAll[p].mq[m]||0; }); return q; };
   const ent=m=>C.B2C.ma[m]+C.B2B.ma[m]+C['별도채널'].ma[m];
-  const rows=[ {n:'전사 매출액',f:ent,u:'원'},{n:'B2C 매출',f:m=>C.B2C.ma[m],u:'원'},{n:'B2B 매출',f:m=>C.B2B.ma[m],u:'원'},{n:'B2C+B2B 합계',f:m=>C.B2C.ma[m]+C.B2B.ma[m],u:'원'},{n:'롤 판매 수',f:rollOf,u:'롤'},{n:'품질보증서',f:m=>_qc(m),u:'건'} ];
+  const rows=[ {n:'전사 매출액',f:ent,u:'원'},{n:'B2C 매출',f:m=>C.B2C.ma[m],u:'원'},{n:'B2B 매출',f:m=>C.B2B.ma[m],u:'원'},{n:'B2C+B2B 합계',f:m=>C.B2C.ma[m]+C.B2B.ma[m],u:'원'},{n:'판매 롤 수',f:rollOf,u:'롤'},{n:'품질보증서',f:m=>_qc(m),u:'건'} ];
   const opt=sel=>ms.map(m=>`<option value="${m}"${sel===m?' selected':''}>${m}월</option>`).join('');
   const thl=`class="l"`, th=``, tdl=`class="l"`, td=``;
   const ss=`style="padding:5px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;font-weight:700"`;
@@ -7324,6 +7324,7 @@ function salesSummaryTable(){
   const won=n=>n?Math.round(n).toLocaleString():'';
   const ent=m=>C.B2C.ma[m]+C.B2B.ma[m]+C['별도채널'].ma[m], b2c=m=>C.B2C.ma[m], b2b=m=>C.B2B.ma[m], bb=m=>b2c(m)+b2b(m);
   const sum=f=>{let s=0;MM.forEach(m=>s+=f(m));return s;};
+  const roll=m=>{ let q=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; q+=SALES.prodAll[p].mq[m]||0; }); return q; };
   const entT=sum(ent), b2cT=sum(b2c), b2bT=sum(b2b), bbT=b2cT+b2bT;
   const pc=(a,b)=>b?(a/b*100).toFixed(2)+'%':'';
   const thl=`class="l"`, th=``, tdl=`class="l"`, td=``, tdt=`style="font-weight:800;background:rgba(244,145,28,.14)"`;
@@ -7332,6 +7333,7 @@ function salesSummaryTable(){
     {n:'B2C', f:b2c, t:b2cT, note:pc(b2cT,bbT)},
     {n:'B2B', f:b2b, t:b2bT, note:pc(b2bT,bbT)},
     {n:'B2C + B2B 합계', f:bb, t:bbT, note:pc(bbT,entT), hi:1},
+    {n:'판매 롤 수', f:roll, t:sum(roll), note:''},
     {n:'품질보증서', f:m=>_qc(m), t:sum(m=>_qc(m)), note:''},
     {n:'신차등록', f:m=>_sNum(sc.carReg[m]||0), t:sum(m=>_sNum(sc.carReg[m]||0)), note:''},
   ];
