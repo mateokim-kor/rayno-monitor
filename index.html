@@ -1773,7 +1773,7 @@ const SUPA = {
   bsFile: 'branchsales.json',
   todayFile: 'today_sales.json',
 };
-const BUILD = '2026-07-03 · 오늘 매출 카드에 전일 대비 추가';   // 배포 버전 확인용
+const BUILD = '2026-07-03 · 롤 판매 중분류 B2C+B2B 합계 행 검정 글씨';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7526,7 +7526,8 @@ function salesRollTable(){
   let h=`<div class="iv-wrap"><table class="iv"><tr><th class="l">구분</th>${M.map(m=>`<th>${m}월</th>`).join('')}${showT?`<th>합계</th>`:''}</tr>`;
   h+=sec('B2C',b2c,'2.','B2C')+sec('B2B',b2b,'3.','B2B');
   const gt=_sMz(); for(let m=1;m<=12;m++) gt[m]=st1[m]+st2[m];
-  h+=`<tr class="grand"><td class="l">4. B2C + B2B 합계</td>${cell(gt)}</tr>`;
+  const _gtS='style="color:var(--ink);font-weight:800;font-size:13px;padding:13px 14px;background:var(--bg2)"';
+  h+=`<tr style="border-top:2px solid var(--ink)"><td class="l" ${_gtS}>4. B2C + B2B 합계</td>${M.map(m=>`<td ${_gtS}>${roll(gt[m]||0)}</td>`).join('')}${showT?`<td ${_gtS}>${roll(_sTotDisp(gt))}</td>`:''}</tr>`;
   h+=`</table></div><div style="font-size:11px;color:var(--ink2);margin-top:8px"><b>중분류 행을 클릭</b>하면 품목별(F95·스트라900 등) 판매수가 펼쳐지고, 가장 많이 팔린 품목엔 <b style="color:var(--amber)">TOP</b> 표시가 붙어요 · 필름 롤 수량만 집계(기타품목·일반·제외 제외) · 분류 조정은 설정 → 매출 설정의 ‘품목 분류’</div>`;
   return h;
 }
