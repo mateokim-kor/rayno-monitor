@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-06 · 점유율 분석 메뉴 + Pages 재배포 트리거';   // 배포 버전 확인용
+const BUILD = '2026-07-06 · 점유율 표 셀 클릭 산출식 팝업 복구(리스너 raynoApp로)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7261,7 +7261,8 @@ function salesReportText(){
   return M.map(m=>block(m)).join('\n\n') + '\n\n' + block(0);
 }
 async function _salesSave(){ if(auth==='admin') cloudSaveJSON(SUPA.salesFile,SALES); }
-document.getElementById('rRevenue').addEventListener('change', e=>{
+document.getElementById('raynoApp').addEventListener('change', e=>{
+  // (매출·점유율 공통) rRevenue + rShare 모두 커버
   if(!SALES) return; SALES.inputs=SALES.inputs||{cap:{},carSales:{},itemType:{}};
   const t=e.target;
   if(t.id==='salesCmpA'){ _salesCmpA=parseInt(t.value,10)||0; renderRevenue(); return; }
@@ -7279,7 +7280,8 @@ document.getElementById('rRevenue').addEventListener('change', e=>{
   _rv.addEventListener('mousemove', e=>{ const rp=_hp(e); if(!rp) return; const pop=document.getElementById('regionPop'); if(pop&&pop.style.display!=='none'){ const px=Math.min(e.clientX+14, innerWidth-300), py=Math.min(e.clientY+8, innerHeight-160); pop.style.left=Math.max(8,px)+'px'; pop.style.top=Math.max(8,py)+'px'; } });
   _rv.addEventListener('mouseout', e=>{ const rp=e.target.closest&&e.target.closest('[data-region]'); if(!rp) return; const to=e.relatedTarget; if(to&&to.closest&&to.closest('[data-region]')) return; const pop=document.getElementById('regionPop'); if(pop) pop.style.display='none'; });
 })();
-document.getElementById('rRevenue').addEventListener('click', e=>{
+document.getElementById('raynoApp').addEventListener('click', e=>{
+  // (매출·점유율 공통) rRevenue + rShare 모두 커버 — 셀렉터 기반이라 다른 뷰 영향 없음
   const t=e.target;
   const _rollB=t.closest&&t.closest('[data-rollmid]');
   if(_rollB){ const key=_rollB.dataset.rollmid; _rollExp[key]=!_rollExp[key]; _rollB.classList.toggle('on', _rollExp[key]);
