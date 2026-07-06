@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-06 · 렉 최적화(차트 애니 off·2초루프 정지·mousemove 스로틀)';   // 배포 버전 확인용
+const BUILD = '2026-07-06 · 점유율 보증서 기준에 신차/전체 건수 함께 표시';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6802,12 +6802,13 @@ function renderShare(){
   const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
   const M=_salesMonths(), cut=_salesCut(), lab=_salesLabel();
   const sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${lab} · 월을 여러 개 누르면 합산</span></div>`;
+  const won=n=>Math.round(n||0).toLocaleString();
   const _crp=_natCarRegPick(), _shFmt=v=> v!=null? v.toFixed(1)+'%':'—';
   const _shW=_crp>0? _qcNewPick()/_crp*100 : null;
   const _shD=_crp>0? _dealerPick()/_crp*100 : null;
   const _shS=_crp>0? (_rollCarsPick('B2C')+_rollCarsPick('B2B'))/_crp*100 : null;
   const charts=`<div class="sales-charts" style="margin-bottom:13px">`
-    + chartCard('cShareWarr','시장 점유율 (보증서 기준)',lab+' · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 신차 실시공 ÷ 신차 등록</span>')
+    + chartCard('cShareWarr','시장 점유율 (보증서 기준)',lab+' · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 신차 실시공 '+won(_qcNewPick())+'건 <span style="opacity:.8">(전체 '+won(_qcPick())+'건)</span> ÷ 신차 등록 · 신차만 집계</span>')
     + chartCard('cShareDealer','시장 점유율 (대리점 판매 기준)',lab+' · <b style="color:#f4911c">'+_shFmt(_shD)+'</b> <span style="color:var(--ink3)">· 대리점 롤×시공대수 ÷ 신차 등록</span>')
     + chartCard('cShareSales','시장 점유율 (ERP 판매 기준)',lab+' · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· ERP 롤×시공대수 ÷ 신차 등록</span>')
     + `</div>`;
@@ -7363,7 +7364,7 @@ function salesKPI(){
     + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도 · 별도채널 포함', spEnt)
     + kpi('B2C+B2B 합계', eok(bbT)+'억', entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'', spBB)
     + kpi('롤 판매수량', won(rollQ)+' 롤', '제외 항목 미포함', spRoll)
-    + kpi('시장 점유율 (보증서 기준)', share, crT?`신차 시공 ${won(wT)} ÷ 신차 등록 ${won(crT)}`:'설정에서 신차 등록 입력', spShare)
+    + kpi('시장 점유율 (보증서 기준)', share, crT?`신차 시공 ${won(wT)} <span style="color:var(--ink3)">(전체 ${won(_qcPick())})</span> ÷ 신차 등록 ${won(crT)}`:'설정에서 신차 등록 입력', spShare)
     + `</div>`;
 }
 function salesCompareCard(){
