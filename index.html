@@ -1521,6 +1521,7 @@
     <div class="nav" id="raynoNav">
       <button class="nav-btn on" data-rview="dash"><span data-txt="tabRDash">대시보드</span></button>
       <button class="nav-btn" data-rview="revenue"><span data-txt="tabRevenue">매출 현황</span></button>
+      <button class="nav-btn" data-rview="share"><span>점유율 분석</span></button>
       <button class="nav-btn" data-rview="yoy"><span>YoY 실적 비교</span></button>
       <button class="nav-btn" data-rview="warranty"><span data-txt="tabWarranty">품질보증서 현황</span></button>
       <button class="nav-btn" data-rview="glass"><span data-txt="tabGlass">글라스케어 현황</span></button>
@@ -1546,6 +1547,7 @@
     <div id="rDealer" style="display:none"></div>
     <div id="rGlass" style="display:none"></div>
     <div id="rRevenue"></div>
+    <div id="rShare" style="display:none"></div>
     <div id="rYoY" style="display:none"></div>
     <input type="file" id="warrFileInput" accept=".xlsx,.xls" hidden>
     <input type="file" id="salesFileInput" accept=".xls,.xlsx,.csv,.txt" hidden><input type="file" id="salesPrevFileInput" accept=".xls,.xlsx,.csv,.txt" hidden>
@@ -1774,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-06 · 일별 기반 기간 매출 카드(이번주/지난주/최근7·30·90일/직접지정 + 기간 대비)';   // 배포 버전 확인용
+const BUILD = '2026-07-06 · 점유율 분석 탭 신설 — 매출 현황에서 점유율 카드 전부 이동';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6716,18 +6718,10 @@ function renderRevenue(){
 
   // ── 차트 대시보드 ──
   const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
-  // 시장 점유율(선택 기간) 헤드라인 — 월 선택에 따라 변동
-  const _crp=_natCarRegPick(), _shFmt=v=> v!=null? v.toFixed(1)+'%':'—';   // 신차 카드와 동일 분모
-  const _shW=_crp>0? _qcNewPick()/_crp*100 : null;   // 보증서=신차 실시공만
-  const _shD=_crp>0? _dealerPick()/_crp*100 : null;
-  const _shS=_crp>0? (_rollCarsPick('B2C')+_rollCarsPick('B2B'))/_crp*100 : null;
   let charts=`<div class="sales-charts" style="margin-bottom:13px">`
     + chartCard('cRevTrend','월별 매출 추이','채널별 매출(원)')
     + chartCard('cChannel','매출 구성 · '+lab,'매출 비중')
     + chartCard('cProdTop','판매 롤 TOP · '+lab,'롤 중분류별 판매수량')
-    + chartCard('cShareWarr','시장 점유율 (보증서 기준)',lab+' · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 신차 실시공 ÷ 신차 등록 · 막대=계산식</span>')
-    + chartCard('cShareDealer','시장 점유율 (대리점 판매 기준)',lab+' · <b style="color:#f4911c">'+_shFmt(_shD)+'</b> <span style="color:var(--ink3)">· 대리점 롤×시공대수 ÷ 신차 등록</span>')
-    + chartCard('cShareSales','시장 점유율 (ERP 판매 기준)',lab+' · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· ERP 롤×시공대수 ÷ 신차 등록</span>')
     + `</div>`;
 
   let s1=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>채널</th><th ${th}>판매수량</th><th ${th}>매출액(원)</th><th ${th}>구성비</th></tr>`;
@@ -6793,17 +6787,40 @@ function renderRevenue(){
     + card(hhx('지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
     + card(hhx('지부별 제품 판매 순위 · 롤')+salesJibuProdRankTable())
     + branchSalesCard()
-    + card(hhx('시장 점유율 · '+lab)+salesShareTable())
-    + (()=>{
-        const _avM=_salesMonths(), _selM=_regMonths.filter(m=>_avM.indexOf(m)>=0).sort((a,b)=>a-b);
-        const _mkMs=(k)=>`<div class="an-filt" style="margin-bottom:9px">${_msField(k,'월', _avM.map(m=>({v:m,t:m+'월'})), _selM)}</div>`;
-        const _sv=_salesSel; _salesSel=_selM.slice();
-        let out=''; try{ out = card(hh('지역별 시장 점유율')+_mkMs('regMon')+salesRegionMap()) + card(hh('확장 기회 지역')+_mkMs('regMonB')+whiteSpaceCard()); } finally { _salesSel=_sv; }
-        return out;
-      })()
     + salesAnalysisCard();
   drawSalesCharts();
   try{ _sbaRenderChart(); }catch(_){}
+}
+function renderShare(){
+  const box=document.getElementById('rShare'); if(!box) return;
+  if(!salesLoaded){ ensureSales().then(()=>{ if(rview==='share') renderShare(); }); }
+  if(!warrLoaded){ ensureWarr().then(()=>{ if(rview==='share') renderShare(); }); }
+  const hasSales=!!(SALES&&SALES.channels);
+  if(!hasSales){ box.innerHTML='<div class="empty" style="padding:46px 18px;text-align:center;color:var(--ink2)">매출 데이터가 로드되면 점유율이 표시됩니다.<br>관리자가 ERP 파일을 올리면 표시됩니다.</div>'; return; }
+  const card=s=>`<div class="card">${s}</div>`;
+  const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
+  const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
+  const M=_salesMonths(), cut=_salesCut(), lab=_salesLabel();
+  const sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${lab} · 월을 여러 개 누르면 합산</span></div>`;
+  const _crp=_natCarRegPick(), _shFmt=v=> v!=null? v.toFixed(1)+'%':'—';
+  const _shW=_crp>0? _qcNewPick()/_crp*100 : null;
+  const _shD=_crp>0? _dealerPick()/_crp*100 : null;
+  const _shS=_crp>0? (_rollCarsPick('B2C')+_rollCarsPick('B2B'))/_crp*100 : null;
+  const charts=`<div class="sales-charts" style="margin-bottom:13px">`
+    + chartCard('cShareWarr','시장 점유율 (보증서 기준)',lab+' · <b style="color:#16a34a">'+_shFmt(_shW)+'</b> <span style="color:var(--ink3)">· 신차 실시공 ÷ 신차 등록</span>')
+    + chartCard('cShareDealer','시장 점유율 (대리점 판매 기준)',lab+' · <b style="color:#f4911c">'+_shFmt(_shD)+'</b> <span style="color:var(--ink3)">· 대리점 롤×시공대수 ÷ 신차 등록</span>')
+    + chartCard('cShareSales','시장 점유율 (ERP 판매 기준)',lab+' · <b style="color:#3b82f6">'+_shFmt(_shS)+'</b> <span style="color:var(--ink3)">· ERP 롤×시공대수 ÷ 신차 등록</span>')
+    + `</div>`;
+  const region=(()=>{
+    const _avM=_salesMonths(), _selM=_regMonths.filter(m=>_avM.indexOf(m)>=0).sort((a,b)=>a-b);
+    const _mkMs=(k)=>`<div class="an-filt" style="margin-bottom:9px">${_msField(k,'월', _avM.map(m=>({v:m,t:m+'월'})), _selM)}</div>`;
+    const _sv=_salesSel; _salesSel=_selM.slice();
+    let out=''; try{ out = card(hh('지역별 시장 점유율')+_mkMs('regMon')+salesRegionMap()) + card(hh('확장 기회 지역')+_mkMs('regMonB')+whiteSpaceCard()); } finally { _salesSel=_sv; }
+    return out;
+  })();
+  box.innerHTML = `<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">시장 점유율 분석 · 분모 = 월 차량 출고 대수(신차등록) · ⚙ <b>설정 → 매출 설정</b>에서 신차등록·대리점 판매·롤당 시공대수 입력 (롤당 기본 10대, 모노카본 17대)</div>`
+    + sel + charts + card(hh('시장 점유율 · '+lab)+salesShareTable()) + region;
+  drawSalesCharts();
 }
 /* ── 일별 매출 6개월 (ERP salesDailyList · 기간 집계) ── */
 let DAILY=null, dailyLoaded=false;
@@ -7269,7 +7286,7 @@ document.getElementById('rRevenue').addEventListener('click', e=>{
     const box=document.getElementById('rRevenue'); box.querySelectorAll('.roll-sub').forEach(r=>{ if(r.dataset.rollsub===key) r.style.display=_rollExp[key]?'':'none'; });
     return; }
   const segB=t.closest&&t.closest('#salesMonthSeg button[data-m]');
-  if(segB){ const mm=parseInt(segB.dataset.m,10)||0; if(mm===0){ _salesSel=[]; } else { const i=_salesSel.indexOf(mm); if(i>=0)_salesSel.splice(i,1); else _salesSel.push(mm); } renderRevenue(); return; }
+  if(segB){ const mm=parseInt(segB.dataset.m,10)||0; if(mm===0){ _salesSel=[]; } else { const i=_salesSel.indexOf(mm); if(i>=0)_salesSel.splice(i,1); else _salesSel.push(mm); } (rview==='share'?renderShare:renderRevenue)(); return; }
   const jspB=t.closest&&t.closest('#jspSeg button[data-cat]');
   if(jspB){ _jspSel=jspB.dataset.cat; renderRevenue(); return; }
   const jspvB=t.closest&&t.closest('#jspViewSeg button[data-jv]');
@@ -7277,7 +7294,7 @@ document.getElementById('rRevenue').addEventListener('click', e=>{
   const jspmB=t.closest&&t.closest('#jspMonthSeg button[data-m]');
   if(jspmB){ const mm=parseInt(jspmB.dataset.m,10)||0; if(mm===0){ _jspMonths=[]; } else { const i=_jspMonths.indexOf(mm); if(i>=0)_jspMonths.splice(i,1); else _jspMonths.push(mm); } renderRevenue(); return; }
   const rmB=t.closest&&t.closest('#regMonthSeg button[data-m]');
-  if(rmB){ const mm=parseInt(rmB.dataset.m,10)||0; if(mm===0){ _regMonths=[]; } else { const i=_regMonths.indexOf(mm); if(i>=0)_regMonths.splice(i,1); else _regMonths.push(mm); } renderRevenue(); return; }
+  if(rmB){ const mm=parseInt(rmB.dataset.m,10)||0; if(mm===0){ _regMonths=[]; } else { const i=_regMonths.indexOf(mm); if(i>=0)_regMonths.splice(i,1); else _regMonths.push(mm); } (rview==='share'?renderShare:renderRevenue)(); return; }
   const rmModeB=t.closest&&t.closest('#regModeSeg button[data-rm]');
   if(rmModeB){ _regMode=rmModeB.dataset.rm; renderRevenue(); return; }
   if(t.closest&&t.closest('#scApply')){ const f=document.getElementById('scFrom'),to=document.getElementById('scTo'); _scFrom=f?f.value:''; _scTo=to?to.value:''; if(_scFrom&&_scTo&&_scTo<_scFrom){const x=_scFrom;_scFrom=_scTo;_scTo=x;} renderRevenue(); return; }
@@ -8021,7 +8038,7 @@ function renderWarrReport(){
 
   box.innerHTML = headCard + kpiCard + insightCard + (moverCard?`<div class="biz-grid">${moverCard}${dailyCard}</div>`:dailyCard) + compGrid;
 }
-const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', dealer:'rDealer', search:'rSearch', revenue:'rRevenue', yoy:'rYoY'};
+const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', dealer:'rDealer', search:'rSearch', revenue:'rRevenue', share:'rShare', yoy:'rYoY'};
 function _saveNav(){ try{ localStorage.setItem('rayno_nav', JSON.stringify({ ws:workspace, cv:(typeof state!=='undefined'&&state&&state.view)||'dash', rv:rview })); }catch(e){} }
 function _sbSyncActive(){
   try{
@@ -8058,6 +8075,7 @@ function setRView(v){
   else if(v==='dealer'){ renderDealer(); if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!bsLoaded){ ensureBranchsales().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!glassLoaded){ ensureGlass().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!warrLoaded){ ensureWarr().then(()=>{ if(rview==='dealer') renderDealer(); }); } }
   else if(v==='search') renderSearch();
   else if(v==='yoy') renderYoY();
+  else if(v==='share') renderShare();
   else renderRevenue();
 }
 function _fmtUpl(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d.getTime())) return ''; const p=n=>String(n).padStart(2,'0'); const rel=_relDays(v); return `최근 업로드 ${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${rel?' · '+rel:''}`; }
@@ -9786,7 +9804,7 @@ boot();
     case 'lwSub':   return {get:function(){return _lwSub;}, render:renderWarranty, applyOn:'close'};
     case 'glScope': return {single:true, get:function(){return [_glScope];}, set:function(v){_glScope=v;_glDealerAll=false;_glJibuDrill='';}, render:renderGlass};
     case 'gvProd':  return {get:function(){return GV.prodSel;}, render:renderGlass, applyOn:'close'};
-    case 'regMon':  case 'regMonB': return {get:function(){return _regMonths;}, cast:num, render:renderRevenue, applyOn:'close'};
+    case 'regMon':  case 'regMonB': return {get:function(){return _regMonths;}, cast:num, render:()=>(rview==='share'?renderShare:renderRevenue)(), applyOn:'close'};
   } return null; }
   var dirtyKey=null;
   function setCnt(ms){ var key=ms.dataset.ms, r=reg(key); var c=ms.querySelector('.ms-cnt'); if(!c||!r)return; if(r.single){ var on=ms.querySelector('.ms-opt.on'); c.textContent=on?on.textContent.trim().replace(/\s+\d[\d,]*$/,''):'전체'; } else { var a=r.get(); c.textContent=(a&&a.length)?(a.length+'개'):'전체'; } }
