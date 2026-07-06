@@ -1773,7 +1773,7 @@ const SUPA = {
   bsFile: 'branchsales.json',
   todayFile: 'today_sales.json',
 };
-const BUILD = '2026-07-03 · 월별 종합에 판매 롤 수 행 + 월 비교 라벨 판매 롤 수로';   // 배포 버전 확인용
+const BUILD = '2026-07-03 · 매출 핵심 기간을 월 프리셋(전체/최근3·6·12개월)으로 수정, 미래날짜 제거, 표 연동';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5212,6 +5212,13 @@ function _dateBar(prefix, st, minD, maxD){
     +`<button class="acc-btn" id="${prefix}Apply">조회</button>`
     +mo;
 }
+function _salesCorePresets(){
+  const av=_salesMonths(); const isAll=!_scoreSel.length; const sel=new Set(isAll?av:_scoreSel);
+  const recent=n=>av.slice(-n);
+  const eq=a=>{ const s=new Set(a); return s.size===sel.size && [...s].every(m=>sel.has(m)); };
+  const btn=(v,l,on)=>`<button data-scp="${v}" class="${on?'on':''}">${l}</button>`;
+  return `<div class="seg" id="scPreset">${btn('all','전체',isAll)}${btn('3','최근 3개월',!isAll&&eq(recent(3)))}${btn('6','최근 6개월',!isAll&&eq(recent(6)))}${btn('12','최근 12개월',!isAll&&eq(recent(12)))}</div>`;
+}
 function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; const mx=st._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
 function _dfApply(st, render, fp, tp){ const f=document.getElementById(fp),t=document.getElementById(tp); st.from=f?f.value:''; st.to=t?t.value:''; if(st.from&&st.to&&st.to<st.from){const x=st.from;st.from=st.to;st.to=x;} st.scope='range'; st.preset='custom'; render(); }
 function _dfReg(px){ if(px==='gv')return{st:GV,render:renderGlass}; if(px==='wv')return{st:WV,render:renderWarranty}; if(px==='rds')return{st:RDS,render:renderRDash}; if(px==='rdw')return{st:RDW,render:renderRDash}; if(px==='rdg')return{st:RDG,render:renderRDash}; if(px==='lw')return{st:LWV,render:renderWarranty}; if(px==='jba')return{st:JBA,render:renderWarranty}; if(px==='gba')return{st:GBA,render:renderGlass}; return null; }
@@ -5386,21 +5393,19 @@ function renderRDash(){
   let h=_summaryHero();
   if(hasSales){
     const C=SALES.channels, ms=_salesMonths();
-    const sMin=ms.length?`${yr}-${String(Math.min.apply(null,ms)).padStart(2,'0')}-01`:'';
-    const sMax=ms.length?`${yr}-${String(Math.max.apply(null,ms)).padStart(2,'0')}-28`:'';
-    RDS._min=sMin; RDS._max=sMax;
-    const rng=RDS.scope==='range', fromS=rng?(RDS.from||sMin):sMin, toS=rng?(RDS.to||sMax):sMax;
-    const fM=rng?+String(fromS).slice(5,7):0, tM=rng?+String(toS).slice(5,7):0;
-    const pm=rng?ms.filter(m=>m>=fM&&m<=tM):ms;
+    _scoreSel=_scoreSel.filter(m=>ms.indexOf(m)>=0);
+    const pm=_scoreSel.length?_scoreSel.slice().sort((a,b)=>a-b):ms;
     const ch=(c,m)=>(C[c]&&C[c].ma[m])||0, psum=c=>pm.reduce((s,m)=>s+ch(c,m),0);
-    const lbl=rng?`${fromS} ~ ${toS}`:'전체 누적';
+    const lbl=!_scoreSel.length?'전체 누적':(pm.length===1?pm[0]+'월':`${pm[0]}~${pm[pm.length-1]}월`);
     const cards=[
       _dcard('전사 매출', eok(psum('B2C')+psum('B2B')+psum('별도채널'))+'억', lbl,'var(--dv4)',_sparkbar(ms.map(m=>ch('B2C',m)+ch('B2B',m)+ch('별도채널',m)),'var(--dv4)',{label:'전사 매출',fmt:v=>eok(v)+'억',months:ms})),
       _dcard('B2C', eok(psum('B2C'))+'억', lbl,'var(--dv1)',_sparkbar(ms.map(m=>ch('B2C',m)),'var(--dv1)',{label:'B2C',fmt:v=>eok(v)+'억',months:ms})),
       _dcard('B2B', eok(psum('B2B'))+'억', lbl,'var(--dv2)',_sparkbar(ms.map(m=>ch('B2B',m)),'var(--dv2)',{label:'B2B',fmt:v=>eok(v)+'억',months:ms}))
     ];
-    h+=`<div class="card">${cardHead('매출 핵심', _dateBar('rds',RDS,sMin,sMax))}${grid(cards)}<div class="cap" style="margin-top:8px">매출은 월 단위라 기간에 포함되는 월로 집계됩니다.</div></div>`;
-    h+=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월별 매출 현황</h3>${salesSummaryTable()}</div>`;
+    h+=`<div class="card">${cardHead('매출 핵심', _salesCorePresets())}${grid(cards)}<div class="cap" style="margin-top:8px">매출은 월 단위라 <b>${lbl}</b> 기준으로 집계됩니다 · 데이터가 있는 달만 대상</div></div>`;
+    const _sv=_salesSel; _salesSel=_scoreSel.slice();   // 월별 표에만 동일 기간 적용(전역은 복원)
+    let _summaryTbl=''; try{ _summaryTbl=salesSummaryTable(); } finally { _salesSel=_sv; }
+    h+=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월별 매출 현황</h3>${_summaryTbl}</div>`;
     const _avM=_salesMonths(), _selM=new Set(RDJ.sel||[]);
     const monthTab=`<div class="seg rdj-month" style="flex-wrap:wrap"><button data-rm="all" class="${_selM.size===0?'on':''}">누적</button>${_avM.map(m=>`<button data-rm="${m}" class="${_selM.has(m)?'on':''}">${m}월</button>`).join('')}</div>`;
     const rdjMonths=_selM.size?[..._selM].sort((x,y)=>x-y):_avM;
@@ -6356,7 +6361,7 @@ function renderWarranty(){
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
 // ════════════════ 매출(ERP) 분석 ════════════════
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
-let SALES=null, salesLoaded=false, _rollExp={}, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _jspView='rank', _regMonths=[], _regMode='share', _scFrom='', _scTo='', _scAll=false;   // _salesSel: 선택 월 배열(빈 배열=누적)
+let SALES=null, salesLoaded=false, _rollExp={}, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _jspView='rank', _regMonths=[], _regMode='share', _scFrom='', _scTo='', _scAll=false, _scoreSel=[];   // _salesSel: 선택 월 배열(빈 배열=누적) · _scoreSel: 매출 핵심 전용 월 선택
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -8291,6 +8296,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; _dlrShow=300; renderDealer(); return; }
   const _drRow=e.target.closest&&e.target.closest('#rDealer tr[data-di]'); if(_drRow){ const d=_dlrRows[+_drRow.dataset.di]; if(d&&typeof openExplain==='function') openExplain('🏢 '+escapeHtml(d.name)+(d.store?' <span style="font-size:12px;color:var(--ink3);font-weight:600">· '+escapeHtml(d.store)+'</span>':''), _dealerDetailHtml(d)); return; }
   if(e.target.id==='dlrSearchBtn'){ const q=document.getElementById('dlrQ'); DLR.q=q?q.value.trim():''; _dlrShow=300; renderDealer(); return; }
+  const _scpB=e.target.closest('#scPreset button[data-scp]'); if(_scpB){ const v=_scpB.dataset.scp; const av=_salesMonths(); _scoreSel=(v==='all')?[]:av.slice(-parseInt(v,10)); renderRDash(); return; }
   const _rsp=e.target.closest('#rdsPreset button'); if(_rsp){ _dfPreset(RDS,renderRDash,_rsp.dataset.rp); return; }
   const _rwp=e.target.closest('#rdwPreset button'); if(_rwp){ _dfPreset(RDW,renderRDash,_rwp.dataset.rp); return; }
   const _rgp=e.target.closest('#rdgPreset button'); if(_rgp){ _dfPreset(RDG,renderRDash,_rgp.dataset.rp); return; }
