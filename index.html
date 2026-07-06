@@ -1773,7 +1773,7 @@ const SUPA = {
   bsFile: 'branchsales.json',
   todayFile: 'today_sales.json',
 };
-const BUILD = '2026-07-03 · 매출 핵심 기간을 월 프리셋(전체/최근3·6·12개월)으로 수정, 미래날짜 제거, 표 연동';   // 배포 버전 확인용
+const BUILD = '2026-07-03 · 날짜 프리셋 오늘 클램프(미래 방지) + 전체 기간필터 점검';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5219,7 +5219,7 @@ function _salesCorePresets(){
   const btn=(v,l,on)=>`<button data-scp="${v}" class="${on?'on':''}">${l}</button>`;
   return `<div class="seg" id="scPreset">${btn('all','전체',isAll)}${btn('3','최근 3개월',!isAll&&eq(recent(3)))}${btn('6','최근 6개월',!isAll&&eq(recent(6)))}${btn('12','최근 12개월',!isAll&&eq(recent(12)))}</div>`;
 }
-function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; const mx=st._max; if(mx){ const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
+function _dfPreset(st, render, v){ if(v==='all'){ st.scope='all'; st.preset='all'; } else { st.preset=v; st.scope='range'; let mx=st._max; if(mx){ const _t=new Date(); const _today=_t.getFullYear()+'-'+String(_t.getMonth()+1).padStart(2,'0')+'-'+String(_t.getDate()).padStart(2,'0'); if(mx>_today) mx=_today; const to=new Date(mx+'T00:00:00'), from=new Date(to.getTime()-(parseInt(v,10)-1)*86400000), f=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); st.to=f(to); st.from=f(from); } } render(); }
 function _dfApply(st, render, fp, tp){ const f=document.getElementById(fp),t=document.getElementById(tp); st.from=f?f.value:''; st.to=t?t.value:''; if(st.from&&st.to&&st.to<st.from){const x=st.from;st.from=st.to;st.to=x;} st.scope='range'; st.preset='custom'; render(); }
 function _dfReg(px){ if(px==='gv')return{st:GV,render:renderGlass}; if(px==='wv')return{st:WV,render:renderWarranty}; if(px==='rds')return{st:RDS,render:renderRDash}; if(px==='rdw')return{st:RDW,render:renderRDash}; if(px==='rdg')return{st:RDG,render:renderRDash}; if(px==='lw')return{st:LWV,render:renderWarranty}; if(px==='jba')return{st:JBA,render:renderWarranty}; if(px==='gba')return{st:GBA,render:renderGlass}; return null; }
 function _moSelect(px, st, months, inline){
