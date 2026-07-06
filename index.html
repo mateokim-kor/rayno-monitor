@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-06 · 점유율 표 셀 클릭 산출식 팝업 복구(리스너 raynoApp로)';   // 배포 버전 확인용
+const BUILD = '2026-07-06 · 렉 최적화(차트 애니 off·2초루프 정지·mousemove 스로틀)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2632,7 +2632,7 @@ const pctBarPlugin = {
   }
 };
 
-function makeChart(id,cfg){ if(charts[id])charts[id].destroy(); cfg=cfg||{}; cfg.options=cfg.options||{}; if(cfg.options.animation===undefined) cfg.options.animation={duration:280}; charts[id]=new Chart(document.getElementById(id),cfg); }
+function makeChart(id,cfg){ if(charts[id])charts[id].destroy(); cfg=cfg||{}; cfg.options=cfg.options||{}; if(cfg.options.animation===undefined) cfg.options.animation=false; if(cfg.options.responsiveAnimationDuration===undefined) cfg.options.responsiveAnimationDuration=0; charts[id]=new Chart(document.getElementById(id),cfg); }
 
 function renderSentiment(rows){
   const s=rows.map(sentOf);
@@ -7331,7 +7331,8 @@ function _scPick(o){ let s=0; _salesActive().forEach(m=>s+=_sNum((o&&o[m])||0));
   function ensure(){ if(!tip){ tip=document.createElement('div'); tip.id='sparkTip';
     tip.style.cssText='position:fixed;z-index:9999;pointer-events:none;background:#16171a;color:#fff;font-size:11.5px;line-height:1.4;padding:6px 9px;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.28);opacity:0;transition:opacity .08s;white-space:nowrap';
     (document.body||document.documentElement).appendChild(tip); } return tip; }
-  document.addEventListener('mousemove', e=>{
+  let _spRAF=false, _spEv=null;
+  document.addEventListener('mousemove', e=>{ _spEv=e; if(_spRAF) return; _spRAF=true; requestAnimationFrame(()=>{ _spRAF=false; const e=_spEv; if(!e) return;
     const r=e.target&&e.target.closest&&e.target.closest('.spark-pt');
     if(!r){ if(tip) tip.style.opacity=0; return; }
     const t=ensure(), l=r.getAttribute('data-l'), v=r.getAttribute('data-v'), m=r.getAttribute('data-m'), mo=r.getAttribute('data-mo');
@@ -7339,7 +7340,7 @@ function _scPick(o){ let s=0; _salesActive().forEach(m=>s+=_sNum((o&&o[m])||0));
     const moL=(function(){ if(!mo) return ''; if(mo.length===7 && mo.charAt(4)==='-') return mo.slice(0,4)+'년 '+(+mo.slice(5,7))+'월'; if(/^[0-9]{1,2}$/.test(mo)) return (+mo)+'월'; return mo; })();
     t.innerHTML=`${l?`<b style="color:#ffce00">${l}</b>`:''}${moL?`<span style="color:#9aa0a6">${l?' · ':''}${moL}</span>`:''}${(l||moL)?'<br>':''}${v}${mh}`;
     t.style.opacity=1; t.style.left=Math.min(e.clientX+12, innerWidth-170)+'px'; t.style.top=(e.clientY-8)+'px';
-  }, {passive:true});
+  }); }, {passive:true});
 })();
 function salesKPI(){
   if(!SALES||!SALES.channels) return '';
@@ -9483,11 +9484,12 @@ boot();
     injectCSS(); ensure();
     window.__erpLivePing=function(){ try{render();}catch(_){} };   // 탭 전환 즉시 라벨 갱신용
     setInterval(tick, 60000);                          // 네트워크 조회: 60초(현재 워크스페이스만)
+    var _liveN=0;
     setInterval(function(){                             // 탭 전환 감지: 캐시 즉시표시 + 새로조회
+      if(document.hidden) return;                       // 숨김 탭에선 렌더/조회 안 함(렉·배터리 절약)
       var ws=wsNow();
-      if(ws==='cafe' || ws==='rayno'){
-        if(ws!==_shownWs){ _shownWs=ws; render(); tick(); } else render();
-      } else render();
+      if(ws!==_shownWs){ _shownWs=ws; render(); tick(); return; }   // 워크스페이스 바뀔 때만 즉시 갱신
+      if((ws==='cafe'||ws==='rayno') && (++_liveN%5===0)) render();  // 라벨 갱신은 10초마다(2s×5)
     }, 2000);
     setTimeout(tick, 1200);
   }
