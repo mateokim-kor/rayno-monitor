@@ -398,11 +398,11 @@
   mark.hl-neg{background:rgba(224,56,43,.13);color:#8a1410;border-radius:3px;padding:0 2px;font-weight:800;box-shadow:inset 0 -2px 0 rgba(224,56,43,.4)}
   mark.hl-user{border-radius:3px;padding:0 2px;cursor:pointer;font-weight:800;box-decoration-break:clone;-webkit-box-decoration-break:clone}
   mark.hl-user.hl-y{background:linear-gradient(180deg,transparent 8%,#ffe14d 8%,#ffd60a 88%,transparent 88%);color:#3a2e00}
-  mark.hl-user.hl-r{background:linear-gradient(180deg,transparent 8%,#ffa09b 8%,#ff7b75 88%,transparent 88%);color:#5e1411}
+  mark.hl-user.hl-r{background:linear-gradient(180deg,transparent 8%,#ff9ecb 8%,#ff3d94 88%,transparent 88%);color:#1a1a1f}
   mark.hl-user:hover{outline:1px dashed rgba(0,0,0,.3)}
   #hlPop{position:absolute;z-index:9999;display:none;gap:5px;background:#1d1d1f;border-radius:11px;padding:6px;box-shadow:0 8px 26px rgba(0,0,0,.32)}
   #hlPop button{border:0;border-radius:8px;padding:7px 11px;font-family:var(--font);font-size:12.5px;font-weight:800;cursor:pointer;line-height:1}
-  #hlPop .hp-y{background:#ffd60a;color:#3a2e00} #hlPop .hp-r{background:#ff7b75;color:#3a0d0a} #hlPop .hp-x{background:#3a3a3c;color:#fff}
+  #hlPop .hp-y{background:#ffd60a;color:#3a2e00} #hlPop .hp-r{background:#ff3d94;color:#fff} #hlPop .hp-x{background:#3a3a3c;color:#fff}
   .modal-hl{background:var(--bg2);border:1px solid var(--line2);color:var(--ink3);font-family:var(--font);font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:980px;cursor:pointer;white-space:nowrap;transition:.15s}
   .modal-hl.on{background:rgba(31,158,99,.12);border-color:var(--pos);color:#15784a}
   .rec-body{font-size:13px;line-height:1.7;color:var(--ink2);white-space:pre-wrap;word-break:break-word}
@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-06 · 점유율 보증서 기준에 신차/전체 건수 함께 표시';   // 배포 버전 확인용
+const BUILD = '2026-07-07 · 사용자 하이라이트 빨강 → 핫핑크(글씨 대비 개선)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -3080,7 +3080,7 @@ document.getElementById('modalHlBtn').addEventListener('click', e=>{ HL_ON=!HL_O
 // ── 글마다 드래그 하이라이트(관리자) — 본문에서 원하는 부분을 끌어서 형광펜 표시 ──
 let hlPending=null;
 const hlPop=document.createElement('div'); hlPop.id='hlPop';
-hlPop.innerHTML='<button class="hp-y" data-hlc="y">🟡 형광</button><button class="hp-r" data-hlc="r">🔴 표시</button><button class="hp-x" data-hlx="1">취소</button>';
+hlPop.innerHTML='<button class="hp-y" data-hlc="y">🟡 형광</button><button class="hp-r" data-hlc="r">🩷 표시</button><button class="hp-x" data-hlx="1">취소</button>';
 document.body.appendChild(hlPop);
 function hideHlPop(){ hlPop.style.display='none'; hlPending=null; }
 document.addEventListener('mouseup', e=>{
