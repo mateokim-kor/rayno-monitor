@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-07 · 사용자 하이라이트 색 #f8d5dc(연핑크)';   // 배포 버전 확인용
+const BUILD = '2026-07-07 · 품질보증서 2025년 포함(수집기 2025+2026) + 24개월 표시';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6270,7 +6270,7 @@ function renderWarranty(){
       return `<div class="wv-fall-row">${allChip}</div><div class="wv-fgrps">${groupsHtml}</div>`; })() : '';
   const frontSum = WV.fronts.length ? (WV.fronts.length===1?escapeHtml(WV.fronts[0]):WV.fronts.length+'개 선택') : '전체';
   const frontRow = fc ? `<div class="wv-frow"><div class="wv-fhead"><span class="wv-flbl">전면 제품</span><span class="wv-fsum">${frontSum}</span><span class="wv-ftoggle" data-fopen="1">${_warrFrontOpen?'접기 ▲':'펼치기 ▾'}</span></div>${_warrFrontOpen?`<div class="wv-fhint">제품을 누르면 선택돼요. <b>여러 개</b> 누르면 모두 포함, 다시 누르면 해제.</div><div class="wv-fchips" id="wvFronts">${frontChips}</div>`:''}</div>` : '';
-  const allMonths=[...new Set(all.map(r=>warrDateStr(r).slice(0,7)).filter(s=>/^\d{4}-\d{2}$/.test(s)))].sort().reverse().slice(0,12);
+  const allMonths=[...new Set(all.map(r=>warrDateStr(r).slice(0,7)).filter(s=>/^\d{4}-\d{2}$/.test(s)))].sort().reverse().slice(0,24);
   const monthChips=_moSelect('wv', WV, allMonths);
   const controls=`
     <div class="card">
