@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-07 · 품질보증서 2025년 포함(수집기 2025+2026) + 24개월 표시';   // 배포 버전 확인용
+const BUILD = '2026-07-07 · 매출 분석에 연도 전환(2025/2026) 추가';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6368,7 +6368,8 @@ function renderWarranty(){
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
 // ════════════════ 매출(ERP) 분석 ════════════════
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
-let SALES=null, salesLoaded=false, _rollExp={}, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _jspView='rank', _regMonths=[], _regMode='share', _scFrom='', _scTo='', _scAll=false, _scoreSel=[];   // _salesSel: 선택 월 배열(빈 배열=누적) · _scoreSel: 매출 핵심 전용 월 선택
+let SALES=null, salesLoaded=false, _rollExp={}, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _jspView='rank', _regMonths=[], _regMode='share', _scFrom='', _scTo='', _scAll=false, _scoreSel=[], _salesYear='cur';   // _salesSel: 선택 월 배열(빈 배열=누적) · _scoreSel: 매출 핵심 전용 월 선택 · _salesYear: cur=올해/prev=작년
+function _prevSalesObj(S){ if(!S||!S.prev) return null; const p=S.prev; return { months:p.months||[], channels:p.channels||{}, jibu:p.jibu||{}, dealers:p.dealers||{}, prodAll:p.prodAll||{}, prodList:Object.keys(p.prodAll||{}), inputs:S.inputs||{}, updatedAt:S.updatedAt, ver:S.ver, prodList2:null, prev:null, __isPrev:true }; }
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -6696,6 +6697,11 @@ function renderRevenue(){
   }
   if(!todayLoaded){ ensureToday().then(()=>{ if(typeof rview!=='undefined'&&rview==='revenue') renderRevenue(); }); }
   if(!dailyLoaded){ ensureDaily().then(()=>{ if(typeof rview!=='undefined'&&rview==='revenue') renderRevenue(); }); }
+  const _realSALES=SALES;
+  const _hasPrevYr=!!(_realSALES.prev && (_realSALES.prev.months||[]).length);
+  const _yrPrevN=(new Date()).getFullYear()-1, _yrCurN=_yrPrevN+1;
+  const _viewPrev=(_salesYear==='prev' && _hasPrevYr);
+  if(_viewPrev){ const pv=_prevSalesObj(_realSALES); if(pv) SALES=pv; }
   const inp=SALES.inputs, M=_salesMonths(), cut=_salesCut();
   _salesSel=_salesSel.filter(m=>M.indexOf(m)>=0);
   const m0=(_salesSel.length===1?_salesSel[0]:0);
@@ -6714,7 +6720,8 @@ function renderRevenue(){
   const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
   const hhx=t=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${t}</h3><button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(t)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button></div>`;
   const lab=_salesLabel();
-  let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
+  const _yrSeg = _hasPrevYr ? `<div class="seg" id="salesYearSeg" style="margin-right:4px"><button data-yr="cur" class="${!_viewPrev?'on':''}">${_yrCurN}</button><button data-yr="prev" class="${_viewPrev?'on':''}">${_yrPrevN}</button></div>` : '';
+  let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">${_yrSeg}<div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${_viewPrev?`<b style="color:var(--amber)">${_yrPrevN}년(작년)</b> · `:''}${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
 
   // ── 차트 대시보드 ──
   const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
@@ -6776,8 +6783,8 @@ function renderRevenue(){
   let s8=`<button id="salesRepCopy" class="acc-btn" style="margin-bottom:8px">📋 리포트 복사</button><pre id="salesRepText" style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:inherit;font-size:13px;color:var(--ink);margin:0">${rep.replace(/</g,'&lt;')}</pre>`;
 
   box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
-    + _todayCard()
-    + _periodSalesCard()
+    + _todayCard2(_viewPrev)
+    + _periodSalesCard2(_viewPrev)
     + sel
     + salesKPI()
     + charts
@@ -6790,6 +6797,7 @@ function renderRevenue(){
     + salesAnalysisCard();
   drawSalesCharts();
   try{ _sbaRenderChart(); }catch(_){}
+  SALES=_realSALES;
 }
 function renderShare(){
   const box=document.getElementById('rShare'); if(!box) return;
@@ -6860,6 +6868,8 @@ function _psControls(){
 /* ── 오늘 매출 (ERP salesDailyList · 부서 B2C/B2B/기타) ── */
 let TODAY=null, todayLoaded=false;
 async function ensureToday(){ if(todayLoaded)return; try{ const j=await cloudLoadJSON(SUPA.todayFile); if(j&&j.date!=null) TODAY=j; }catch(_){} todayLoaded=true; }
+function _todayCard2(prev){ return prev?'':_todayCard(); }
+function _periodSalesCard2(prev){ return prev?'':_periodSalesCard(); }
 function _todayCard(){
   if(!TODAY) return '';
   const won=n=>Math.round(n||0).toLocaleString();
@@ -7288,6 +7298,7 @@ document.getElementById('raynoApp').addEventListener('click', e=>{
   if(_rollB){ const key=_rollB.dataset.rollmid; _rollExp[key]=!_rollExp[key]; _rollB.classList.toggle('on', _rollExp[key]);
     const box=document.getElementById('rRevenue'); box.querySelectorAll('.roll-sub').forEach(r=>{ if(r.dataset.rollsub===key) r.style.display=_rollExp[key]?'':'none'; });
     return; }
+  const _ysB=t.closest&&t.closest('#salesYearSeg button[data-yr]'); if(_ysB){ _salesYear=_ysB.dataset.yr; _salesSel=[]; _scoreSel=[]; renderRevenue(); return; }
   const segB=t.closest&&t.closest('#salesMonthSeg button[data-m]');
   if(segB){ const mm=parseInt(segB.dataset.m,10)||0; if(mm===0){ _salesSel=[]; } else { const i=_salesSel.indexOf(mm); if(i>=0)_salesSel.splice(i,1); else _salesSel.push(mm); } (rview==='share'?renderShare:renderRevenue)(); return; }
   const jspB=t.closest&&t.closest('#jspSeg button[data-cat]');
