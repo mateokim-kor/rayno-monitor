@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 지역별 점유율 보증서 기준: 매장명 조인 적용(신차) + 옛 대리점지역(도) 컬럼검사 제거';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 지역별 점유율 전국합계를 상단 카드와 일치(미매칭 신차보증서를 지역미상 행으로 포함)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6551,12 +6551,12 @@ function salesRegionStats(){
   const sel=_salesSel.length?_salesActive():null;
   const sumM=o=>{ let s=0; for(const m in (o||{})){ if(sel&&sel.indexOf(+m)<0) continue; s+=_sNum(o[m]); } return s; };
   if(_regMode==='warr'){
-    const warr={}, car={}; let tWarr=0, tCar=0;
+    const warr={}, car={}; let tWarr=0, tCar=0, unmatched=0;
     const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]);
-    rows.forEach(r=>{ if(!_warrIsNew(r)) return; if(sel){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(sel.indexOf(mm)<0) return; } const k=_warrRegOf(r).doKey; if(!k) return; warr[k]=(warr[k]||0)+1; tWarr++; });
+    rows.forEach(r=>{ if(!_warrIsNew(r)) return; if(sel){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(sel.indexOf(mm)<0) return; } const k=_warrRegOf(r).doKey; if(!k){ unmatched++; return; } warr[k]=(warr[k]||0)+1; tWarr++; });
     const by={};
     _REGION_KEYS.forEach(k=>{ const c=sumM((reg[k]||{}).carReg); car[k]=c; tCar+=c; by[k]= c>0 ? ((warr[k]||0)/c*100) : null; });
-    return {mode:'warr', warr, car, by, tWarr, tCar, cap:rcap};
+    return {mode:'warr', warr, car, by, tWarr, tCar, unmatched, cap:rcap};
   }
   const by={},roll={},car={}; let tRoll=0,tCar=0;
   _REGION_KEYS.forEach(k=>{ const rr=reg[k]||{}; const r=sumM(rr.roll), c=sumM(rr.carReg); roll[k]=r; car[k]=c; tRoll+=r; tCar+=c; by[k]=c>0?(r*rcap/c*100):0; });
@@ -6620,7 +6620,7 @@ function salesRegionMap(){
         + `<div class="hm-region"><div class="hm-region-map">${svg}</div><div class="hm-region-tbl">${table}</div></div>`;
     }
     // 품질보증서 기준 (보증서 실시공 ÷ 지역 신차등록)
-    const {warr, car, by, tWarr, tCar}=st;
+    const {warr, car, by, tWarr, tCar, unmatched}=st;
     // 지역은 매장명→대리점 마스터 조인(_warrRegOf)으로 도출 — 예전 '대리점지역(도)' 컬럼 검사 제거
     if(!tWarr) return `<div class="empty">선택한 기간에 지역이 매칭된 보증서 시공 데이터가 없습니다.</div>`;
     const anyCar=tCar>0;
@@ -6634,10 +6634,12 @@ function salesRegionMap(){
         +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${c?c.toLocaleString():'<span style="color:var(--ink3)">—</span>'}</td>`
         +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;font-weight:800;color:var(--amber)">${sh!=null?sh.toFixed(2)+'%':'—'}</td>`
         +bar(c>0?sh:w, maxV)+`</tr>`; }).join('');
-    const totSh=tCar>0?(tWarr/tCar*100):null;
-    const table=`<table class="dtbl" style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>보증서</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}`
-      +`<tr><td style="padding:7px 9px;font-weight:800;background:var(--bg2)">총합계</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tWarr.toLocaleString()}건</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tCar?tCar.toLocaleString():'—'}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2);color:var(--amber)">${totSh!=null?totSh.toFixed(2)+'%':'—'}</td><td style="background:var(--bg2)"></td></tr></table>`;
-    return `<div class="cap" style="margin-bottom:10px">품질보증서 <b>실시공 건수</b> ÷ 지역 <b>신차 등록</b> 기준${anyCar?` · 전국 점유율 <b style="color:var(--amber)">${(totSh||0).toFixed(2)}%</b>`:` · 신차 등록 미입력 — 시공 건수만 표시(설정에서 신차등록 입력 시 점유율)`} · 지도에 마우스를 올리면 상세</div>`
+    const _unm=unmatched||0; const tWarrAll=tWarr+_unm;
+    const totSh=tCar>0?(tWarrAll/tCar*100):null;   // 전국 카드와 동일 기준(신차 보증서 전체 ÷ 신차등록)
+    const _unmRow = _unm>0 ? `<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink2)">지역미상 <span style="font-size:10px;color:var(--ink3)">(대리점 매칭 안됨)</span></td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink2)">${_unm.toLocaleString()}건</td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink3)">—</td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink3)">—</td><td style="border-bottom:1px solid var(--line)"></td></tr>` : '';
+    const table=`<table class="dtbl" style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>보증서</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}${_unmRow}`
+      +`<tr><td style="padding:7px 9px;font-weight:800;background:var(--bg2)">총합계</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tWarrAll.toLocaleString()}건</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tCar?tCar.toLocaleString():'—'}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2);color:var(--amber)">${totSh!=null?totSh.toFixed(2)+'%':'—'}</td><td style="background:var(--bg2)"></td></tr></table>`;
+    return `<div class="cap" style="margin-bottom:10px">품질보증서 <b>실시공 건수</b> ÷ 지역 <b>신차 등록</b> 기준${anyCar?` · 전국 점유율 <b style="color:var(--amber)">${(totSh||0).toFixed(2)}%</b>${_unm>0?` <span style="color:var(--ink3)">(지역미상 ${_unm.toLocaleString()}건 포함 · 상단 카드와 동일 기준)</span>`:''}`:` · 신차 등록 미입력 — 시공 건수만 표시(설정에서 신차등록 입력 시 점유율)`} · 지도에 마우스를 올리면 상세</div>`
       + `<div class="hm-region"><div class="hm-region-map">${svg}</div><div class="hm-region-tbl">${table}</div></div>`;
   })();
   return modeSeg+body;
