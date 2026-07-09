@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 매출 분석 5개 표 각각 연도 토글([2026][2025]) 독립 전환 · 상단 일괄 토글 제거';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 품질보증서 탭 작년(2025) 상세 lazy 로드(warranty_prev.json 병합) — 지부/제품별 등 2025 지원';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5148,6 +5148,8 @@ function _ymAdd(ym,n){ const a=String(ym).split('-'); let y=+a[0], m=(+a[1]-1)+n
 function _bizMigrate(){ if(!BIZ||typeof BIZ!=='object')BIZ={rows:[]}; BIZ.rows=Array.isArray(BIZ.rows)?BIZ.rows:[]; if(!Array.isArray(BIZ.searchKeywords)||!BIZ.searchKeywords.length) BIZ.searchKeywords=_SW_PRESET.slice(); BIZ.rows.forEach(r=>{ if(!r.searches||typeof r.searches!=='object')r.searches={}; if(r.search!=null&&r.searches['레이노']==null)r.searches['레이노']=r.search; }); }
 async function ensureBiz(){ if(bizLoaded)return; const j=await cloudLoadJSON(SUPA.bizFile); if(j&&j.rows)BIZ=j; _bizMigrate(); bizLoaded=true; }
 async function ensureWarr(){ if(warrLoaded)return; const j=await cloudLoadJSON(SUPA.warrFile); if(j&&j.rows){ WARR=j; WARR.columns=WARR.columns||[]; warrDedupe(); ensureWarrCfg(); _dealerAggCache=null; } warrLoaded=true; }
+let WARR_PREV=null, _warrPrevLoaded=false, _warrPrevLoading=false;
+async function ensureWarrPrev(){ if(_warrPrevLoaded||_warrPrevLoading) return; _warrPrevLoading=true; try{ const j=await cloudLoadJSON('warranty_prev.json'); if(j&&j.rows) WARR_PREV=j; }catch(_){ } _warrPrevLoaded=true; _warrPrevLoading=false; if(typeof rview!=='undefined'&&rview==='warranty'&&typeof renderWarranty==='function'){ try{ renderWarranty(); }catch(_){ } } }
 async function ensureGlass(){ if(glassLoaded)return; const j=await cloudLoadJSON(SUPA.glassFile); if(j&&j.rows){ GLASS=j; GLASS.columns=GLASS.columns||[]; _dealerAggCache=null; } glassLoaded=true; }
 async function ensureYoy(){ if(yoyLoaded)return; try{ const j=await cloudLoadJSON(SUPA.yoyFile); if(j) YOY=j; }catch(_){ } yoyLoaded=true; }
 function parseGlassWB(wb){
@@ -6239,6 +6241,10 @@ function _jbaRenderChart(){
 }
 function renderWarranty(){
   const box=document.getElementById('rWarranty');
+  if(!_warrPrevLoaded) ensureWarrPrev();   // 작년(2025) 보증서 상세 lazy 로드(1회)
+  const _warrRowsReal=(WARR&&WARR.rows)||[];
+  if(WARR && WARR_PREV && WARR_PREV.rows && WARR_PREV.rows.length){ WARR.rows=_warrRowsReal.concat(WARR_PREV.rows); }
+  try{
   const all=(WARR.rows||[]);
   const cfgCard=(auth==='admin'&&warrCfgOpen&&all.length)?warrCfgHTML():'';
   if(!all.length){ box.innerHTML=cfgCard+warrEmptyHTML(); return; }
@@ -6363,6 +6369,7 @@ function renderWarranty(){
     + custBlock + vehBlock + prodBlock + regBlock
     + adminRow + exPanel;
   try{ _jbaRenderChart(); }catch(_){}
+  } finally { if(WARR) WARR.rows=_warrRowsReal; }
 }
 
 // ── 검색량 / 매출: 수기 입력(월별 표) ──
