@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 지부→대리점 롤 카드 연도 필터(작년 토글 연동) + 작년 매출 뷰 jibuProd/chMat';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 매출 분석 표 헤더에 작년 연도 표시(2025) + 지부 롤 카드 연도필터';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6718,8 +6718,9 @@ function renderRevenue(){
   const tdl=`style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px"`;
   const td=`style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px"`;
   const card=s=>`<div class="card">${s}</div>`;
-  const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
-  const hhx=t=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${t}</h3><button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(t)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button></div>`;
+  const _yrTag = _viewPrev ? ` <span style="color:var(--amber);font-size:12px;font-weight:800">· ${_yrPrevN}년(작년)</span>` : '';
+  const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}${_yrTag}</h3>`;
+  const hhx=t=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${t}${_yrTag}</h3><button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(t)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button></div>`;
   const lab=_salesLabel();
   const _yrSeg = `<div class="seg" id="salesYearSeg" style="margin-right:4px"><button data-yr="cur" class="${!_prevSelected?'on':''}">${_yrCurN}</button><button data-yr="prev" class="${_prevSelected?'on':''}"${!_hasPrevYr?` title="작년(${_yrPrevN}) 매출 데이터가 아직 없습니다"`:''}>${_yrPrevN}</button></div>`;
   let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">${_yrSeg}<div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${_viewPrev?`<b style="color:var(--amber)">${_yrPrevN}년(작년)</b> · `:''}${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
