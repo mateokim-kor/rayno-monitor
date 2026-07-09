@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 작년 지부표: jibuProd 비었을 때 오해되는 0 대신 명확 안내 + 연도 표시';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 매출 분석 5개 표 각각 연도 토글([2026][2025]) 독립 전환 · 상단 일괄 토글 제거';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6370,6 +6370,11 @@ function renderWarranty(){
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
 let SALES=null, salesLoaded=false, _rollExp={}, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _jspView='rank', _regMonths=[], _regMode='share', _scFrom='', _scTo='', _scAll=false, _scoreSel=[], _salesYear='cur';   // _salesSel: 선택 월 배열(빈 배열=누적) · _scoreSel: 매출 핵심 전용 월 선택 · _salesYear: cur=올해/prev=작년
 function _prevSalesObj(S){ if(!S||!S.prev) return null; const p=S.prev; return { months:p.months||[], channels:p.channels||{}, jibu:p.jibu||{}, dealers:p.dealers||{}, prodAll:p.prodAll||{}, jibuProd:p.jibuProd||{}, chMat:p.chMat||{}, prodList:Object.keys(p.prodAll||{}), inputs:S.inputs||{}, updatedAt:S.updatedAt, ver:S.ver, prodList2:null, prev:null, __isPrev:true }; }
+  // ── 카드별 연도(올해/작년) 독립 토글 ──
+  let _cardYr={sum:'cur',roll:'cur',jibu:'cur',jprod:'cur',bs:'cur'};
+  function _withYear(key,fn){ const _real=SALES; const hasPrev=!!(_real&&_real.prev&&(_real.prev.months||[]).length); const up=(_cardYr&&_cardYr[key]==='prev'&&hasPrev); if(up){ const pv=_prevSalesObj(_real); if(pv) SALES=pv; } try{ return fn(); } finally{ SALES=_real; } }
+  function _cyrSeg(key){ const y=(new Date()).getFullYear(); const isPrev=!!(_cardYr&&_cardYr[key]==='prev'); return `<div class="seg cyr-seg" data-cyk="${key}" style="transform:scale(.85);transform-origin:left center;margin:0"><button type="button" data-cyv="cur" class="${!isPrev?'on':''}">${y}</button><button type="button" data-cyv="prev" class="${isPrev?'on':''}">${y-1}</button></div>`; }
+  function _cardHdr(title,key,xlsx){ return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${title}</h3>${_cyrSeg(key)}</div>${xlsx?`<button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(title)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button>`:''}</div>`; }
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -6700,9 +6705,7 @@ function renderRevenue(){
   const _realSALES=SALES;
   const _hasPrevYr=!!(_realSALES.prev && (_realSALES.prev.months||[]).length);
   const _yrPrevN=(new Date()).getFullYear()-1, _yrCurN=_yrPrevN+1;
-  const _prevSelected=(_salesYear==='prev');
-  const _viewPrev=(_prevSelected && _hasPrevYr);
-  if(_viewPrev){ const pv=_prevSalesObj(_realSALES); if(pv) SALES=pv; }
+  // (연도는 카드별 토글 _cardYr로 개별 처리 — 상단 일괄 토글 제거)
   const inp=SALES.inputs, M=_salesMonths(), cut=_salesCut();
   _salesSel=_salesSel.filter(m=>M.indexOf(m)>=0);
   const m0=(_salesSel.length===1?_salesSel[0]:0);
@@ -6718,22 +6721,10 @@ function renderRevenue(){
   const tdl=`style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:13px"`;
   const td=`style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--line);font-size:13px"`;
   const card=s=>`<div class="card">${s}</div>`;
-  const _yrTag = _viewPrev ? ` <span style="color:var(--amber);font-size:12px;font-weight:800">· ${_yrPrevN}년(작년)</span>` : '';
-  const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}${_yrTag}</h3>`;
-  const hhx=t=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${t}${_yrTag}</h3><button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(t)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button></div>`;
+  const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
+  const hhx=t=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${t}</h3><button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(t)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button></div>`;
   const lab=_salesLabel();
-  const _yrSeg = `<div class="seg" id="salesYearSeg" style="margin-right:4px"><button data-yr="cur" class="${!_prevSelected?'on':''}">${_yrCurN}</button><button data-yr="prev" class="${_prevSelected?'on':''}"${!_hasPrevYr?` title="작년(${_yrPrevN}) 매출 데이터가 아직 없습니다"`:''}>${_yrPrevN}</button></div>`;
-  let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">${_yrSeg}<div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${_viewPrev?`<b style="color:var(--amber)">${_yrPrevN}년(작년)</b> · `:''}${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
-
-  // 작년 선택인데 작년 데이터가 없으면: 토글은 유지하되 안내 + 업로드 유도(현재연도를 작년으로 오표시 방지)
-  if(_prevSelected && !_hasPrevYr){
-    const upBtn = admin ? `<button type="button" id="salesPrevUploadEmpty" class="acc-btn" style="background:#f4911c;border-color:#f4911c;color:#fff;font-weight:700;margin-top:14px">＋ ${_yrPrevN}년 매출 업로드</button>` : '';
-    box.innerHTML = card(`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="dot"></span><b style="font-size:14px">매출 분석</b>${_yrSeg}<span style="color:var(--ink2);font-size:12px">${_yrPrevN}년(작년) 보기</span></div>`)
-      + `<div class="card" style="text-align:center;padding:42px 20px"><div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:7px">${_yrPrevN}년 매출 데이터가 아직 없어요</div><div style="font-size:13px;line-height:1.65;color:var(--ink2)">${admin?`아래 버튼(또는 상단 <b>＋ 전년 매출</b>)으로 <b>${_yrPrevN}년 ERP 원본(.XLS)</b>을 한 번만 올리면<br>이 자리에 작년 매출·차트·표가 그대로 뜨고, 위 <b>[${_yrCurN}] / [${_yrPrevN}]</b> 토글로 언제든 전환돼요.<br><span style="color:var(--ink3)">작년치는 바뀌지 않으니 한 번만 올리면 끝입니다.</span>`:`관리자가 ${_yrPrevN}년 매출 데이터를 올리면 여기에 표시됩니다.`}</div>${upBtn}</div>`;
-    if(admin){ var _peb=document.getElementById('salesPrevUploadEmpty'); if(_peb) _peb.onclick=function(){ var i=document.getElementById('salesPrevFileInput'); if(i) i.click(); }; }
-    SALES=_realSALES;
-    return;
-  }
+  let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산 · <b style="color:var(--amber)">각 표의 [연도] 버튼</b>으로 작년 전환</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
 
   // ── 차트 대시보드 ──
   const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
@@ -6795,16 +6786,16 @@ function renderRevenue(){
   let s8=`<button id="salesRepCopy" class="acc-btn" style="margin-bottom:8px">📋 리포트 복사</button><pre id="salesRepText" style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:inherit;font-size:13px;color:var(--ink);margin:0">${rep.replace(/</g,'&lt;')}</pre>`;
 
   box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
-    + _todayCard2(_viewPrev)
-    + _periodSalesCard2(_viewPrev)
+    + _todayCard2(false)
+    + _periodSalesCard2(false)
     + sel
     + salesKPI()
     + charts
     + salesCompareCard()
-    + card(hhx('세일즈 데이터 · 월별 종합 (단위: 원, VAT 별도)')+salesSummaryTable())
-    + card(hhx('롤 판매 수 · 중분류별 (B2C / B2B)')+salesRollTable())
-    + card(hhx('지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)')+salesJibuRollTable())
-    + card(hhx('지부별 제품 판매 순위 · 롤')+salesJibuProdRankTable())
+    + card(_cardHdr('세일즈 데이터 · 월별 종합 (단위: 원, VAT 별도)','sum',true)+_withYear('sum',()=>salesSummaryTable()))
+    + card(_cardHdr('롤 판매 수 · 중분류별 (B2C / B2B)','roll',true)+_withYear('roll',()=>salesRollTable()))
+    + card(_cardHdr('지부 세일즈 데이터 · B2C (롤 판매 수 · 매출액 · 점유율)','jibu',true)+_withYear('jibu',()=>salesJibuRollTable()))
+    + card(_cardHdr('지부별 제품 판매 순위 · 롤','jprod',true)+_withYear('jprod',()=>salesJibuProdRankTable()))
     + branchSalesCard()
     + salesAnalysisCard();
   drawSalesCharts();
@@ -6930,7 +6921,7 @@ function _bsProdOf(r){
   if(_bsUseMid){ const m=(typeof _midOf==='function')?_midOf(r.matCode||r.mat):'기타'; return (m&&m!=='기타')?m:'기타'; }
   return (typeof _filmCat==='function')?(_filmCat(r.mat).major||'기타'):'기타';
 }
-function _bsYearN(){ const y=(new Date()).getFullYear(); return (typeof _salesYear!=='undefined'&&_salesYear==='prev')?(y-1):y; }
+function _bsYearN(){ const y=(new Date()).getFullYear(); return (_cardYr&&_cardYr.bs==='prev')?(y-1):y; }
 function _bsRowYr(r){ return String((r&&r.ym)||'').slice(0,4); }
 function _bsRows(){
   if(!BSALE||!Array.isArray(BSALE.rows)) return [];
@@ -6945,7 +6936,7 @@ function _bsRows(){
   });
 }
 function branchSalesCard(){
-  const hh=`<h3 style="margin:0"><span class="dot"></span>지부 → 대리점 롤 판매 · 멤버스/비멤버스${_bsYearN()!==(new Date()).getFullYear()?` <span style="color:var(--amber);font-size:12px">· ${_bsYearN()}년(작년)</span>`:''}</h3>`;
+  const hh=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 3px"><h3 style="margin:0"><span class="dot"></span>지부 → 대리점 롤 판매 · 멤버스/비멤버스</h3>${_cyrSeg('bs')}</div>`;
   if(!bsLoaded){ ensureBranchsales().then(()=>{ if(typeof rview!=='undefined'&&rview==='revenue') renderRevenue(); }); return `<div class="card">${hh}<div class="cap" style="margin-top:8px">데이터 불러오는 중…</div></div>`; }
   if(!BSALE||!Array.isArray(BSALE.rows)||!BSALE.rows.length){ return `<div class="card">${hh}<div class="empty" style="margin-top:8px">branchsales.json이 아직 없습니다. 수집기 ⑧단계(branchSalesList) 실행 후 표시됩니다.</div></div>`; }
   const rows=_bsRows();
@@ -7314,7 +7305,7 @@ document.getElementById('raynoApp').addEventListener('click', e=>{
   if(_rollB){ const key=_rollB.dataset.rollmid; _rollExp[key]=!_rollExp[key]; _rollB.classList.toggle('on', _rollExp[key]);
     const box=document.getElementById('rRevenue'); box.querySelectorAll('.roll-sub').forEach(r=>{ if(r.dataset.rollsub===key) r.style.display=_rollExp[key]?'':'none'; });
     return; }
-  const _ysB=t.closest&&t.closest('#salesYearSeg button[data-yr]'); if(_ysB){ _salesYear=_ysB.dataset.yr; _salesSel=[]; _scoreSel=[]; renderRevenue(); return; }
+  const _cyB=t.closest&&t.closest('.cyr-seg button[data-cyv]'); if(_cyB){ const seg=_cyB.closest('.cyr-seg'); if(seg&&seg.dataset.cyk){ _cardYr[seg.dataset.cyk]=_cyB.dataset.cyv; if(seg.dataset.cyk==='sum'||seg.dataset.cyk==='jibu'){ _salesSel=[]; } renderRevenue(); return; } }
   const segB=t.closest&&t.closest('#salesMonthSeg button[data-m]');
   if(segB){ const mm=parseInt(segB.dataset.m,10)||0; if(mm===0){ _salesSel=[]; } else { const i=_salesSel.indexOf(mm); if(i>=0)_salesSel.splice(i,1); else _salesSel.push(mm); } (rview==='share'?renderShare:renderRevenue)(); return; }
   const jspB=t.closest&&t.closest('#jspSeg button[data-cat]');
