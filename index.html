@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 지역별 점유율 기준토글(보증서/ERP) 버그 수정 — 현재 뷰 재렌더(share)';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 지역별 점유율 보증서 기준: 매장명 조인 적용(신차) + 옛 대리점지역(도) 컬럼검사 제거';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6553,7 +6553,7 @@ function salesRegionStats(){
   if(_regMode==='warr'){
     const warr={}, car={}; let tWarr=0, tCar=0;
     const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]);
-    rows.forEach(r=>{ if(sel){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(sel.indexOf(mm)<0) return; } const k=_regionKey(r['대리점지역(도)']); if(!k) return; warr[k]=(warr[k]||0)+1; tWarr++; });
+    rows.forEach(r=>{ if(!_warrIsNew(r)) return; if(sel){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(sel.indexOf(mm)<0) return; } const k=_warrRegOf(r).doKey; if(!k) return; warr[k]=(warr[k]||0)+1; tWarr++; });
     const by={};
     _REGION_KEYS.forEach(k=>{ const c=sumM((reg[k]||{}).carReg); car[k]=c; tCar+=c; by[k]= c>0 ? ((warr[k]||0)/c*100) : null; });
     return {mode:'warr', warr, car, by, tWarr, tCar, cap:rcap};
@@ -6621,9 +6621,8 @@ function salesRegionMap(){
     }
     // 품질보증서 기준 (보증서 실시공 ÷ 지역 신차등록)
     const {warr, car, by, tWarr, tCar}=st;
-    const hasCol=(typeof WARR!=='undefined'&&WARR&&WARR.columns&&WARR.columns.includes('대리점지역(도)'));
-    if(!hasCol) return `<div class="empty">품질보증서에 ‘대리점지역(도)’ 정보가 없어 지역별로 표시할 수 없습니다.</div>`;
-    if(!tWarr) return `<div class="empty">선택한 기간에 보증서 시공 데이터가 없습니다.</div>`;
+    // 지역은 매장명→대리점 마스터 조인(_warrRegOf)으로 도출 — 예전 '대리점지역(도)' 컬럼 검사 제거
+    if(!tWarr) return `<div class="empty">선택한 기간에 지역이 매칭된 보증서 시공 데이터가 없습니다.</div>`;
     const anyCar=tCar>0;
     const fillV=k=> anyCar ? (by[k]||0) : (warr[k]||0);
     const maxV=Math.max(0.0001,..._REGION_KEYS.map(k=>fillV(k)));
