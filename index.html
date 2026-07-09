@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 작년 매출 뷰에 지부×제품(jibuProd)·롤중분류(chMat) 포함 — 지부 세일즈/제품순위/롤 표 2025 표시';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 지부→대리점 롤 카드 연도 필터(작년 토글 연동) + 작년 매출 뷰 jibuProd/chMat';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6929,10 +6929,13 @@ function _bsProdOf(r){
   if(_bsUseMid){ const m=(typeof _midOf==='function')?_midOf(r.matCode||r.mat):'기타'; return (m&&m!=='기타')?m:'기타'; }
   return (typeof _filmCat==='function')?(_filmCat(r.mat).major||'기타'):'기타';
 }
+function _bsYearN(){ const y=(new Date()).getFullYear(); return (typeof _salesYear!=='undefined'&&_salesYear==='prev')?(y-1):y; }
+function _bsRowYr(r){ return String((r&&r.ym)||'').slice(0,4); }
 function _bsRows(){
   if(!BSALE||!Array.isArray(BSALE.rows)) return [];
-  const mon=_bsMonths.slice();
+  const mon=_bsMonths.slice(); const yr=String(_bsYearN());
   return BSALE.rows.filter(r=>{
+    if(_bsRowYr(r)!==yr) return false;                            // 매출 분석 연도 토글(올해/작년)에 맞춰 연도 필터
     if(_bsJibu!=='전체' && _bsJibuOf(r)!==_bsJibu) return false;   // 선택 지부(또는 본사)가 관리하는 행만
     if(_bsProd!=='전체' && _bsProdOf(r)!==_bsProd) return false;   // 선택 제품(롤)만
     if(_bsRollOnly && !_bsRollChk(r)) return false;
@@ -6941,20 +6944,21 @@ function _bsRows(){
   });
 }
 function branchSalesCard(){
-  const hh='<h3 style="margin:0"><span class="dot"></span>지부 → 대리점 롤 판매 · 멤버스/비멤버스</h3>';
+  const hh=`<h3 style="margin:0"><span class="dot"></span>지부 → 대리점 롤 판매 · 멤버스/비멤버스${_bsYearN()!==(new Date()).getFullYear()?` <span style="color:var(--amber);font-size:12px">· ${_bsYearN()}년(작년)</span>`:''}</h3>`;
   if(!bsLoaded){ ensureBranchsales().then(()=>{ if(typeof rview!=='undefined'&&rview==='revenue') renderRevenue(); }); return `<div class="card">${hh}<div class="cap" style="margin-top:8px">데이터 불러오는 중…</div></div>`; }
   if(!BSALE||!Array.isArray(BSALE.rows)||!BSALE.rows.length){ return `<div class="card">${hh}<div class="empty" style="margin-top:8px">branchsales.json이 아직 없습니다. 수집기 ⑧단계(branchSalesList) 실행 후 표시됩니다.</div></div>`; }
   const rows=_bsRows();
   const val=r=> _bsMetric==='a'? r.a : r.q;
   const fmtV=v=> _bsMetric==='a'? (Math.round(v).toLocaleString()+'원') : (Math.round(v).toLocaleString());
   const unit=_bsMetric==='a'?'매출':'롤';
-  const avM=[...new Set(BSALE.rows.map(_bsMonthOf).filter(Boolean))].sort((a,b)=>a-b);
+  const _bsYrN=String(_bsYearN());
+  const avM=[...new Set(BSALE.rows.filter(r=>_bsRowYr(r)===_bsYrN).map(_bsMonthOf).filter(Boolean))].sort((a,b)=>a-b);
   const _jibuOpts=['전체'].concat(SALES_JIBU,['본사']);
   const jibuSel=`<span style="display:inline-flex;align-items:center;gap:6px"><span class="cap">관리 지부</span><select class="dt-select" id="bsJibuSel" style="max-width:160px">${_jibuOpts.map(j=>`<option ${_bsJibu===j?'selected':''}>${escapeHtml(j)}</option>`).join('')}</select></span>`;
   const viewSeg=`<div class="seg" id="bsViewSeg"><button data-v="jibu" class="${_bsView==='jibu'?'on':''}">지부별</button><button data-v="jibuRoll" class="${_bsView==='jibuRoll'?'on':''}">지부별 롤</button><button data-v="dealer" class="${_bsView==='dealer'?'on':''}">대리점별</button><button data-v="roll" class="${_bsView==='roll'?'on':''}">롤별</button></div>`;
   const metricSeg=`<div class="seg" id="bsMetricSeg"><button data-m2="q" class="${_bsMetric==='q'?'on':''}">수량</button><button data-m2="a" class="${_bsMetric==='a'?'on':''}">매출</button></div>`;
   // 제품(롤) 칩 — 이미지처럼: 전체 + 데이터에 있는 제품들(롤만 기준, 판매량 순)
-  const _prodTot={}; ((BSALE&&BSALE.rows)||[]).forEach(r=>{ if(!_bsRollChk(r))return; const p=_bsProdOf(r); _prodTot[p]=(_prodTot[p]||0)+(r.q||0); });
+  const _prodTot={}; ((BSALE&&BSALE.rows)||[]).forEach(r=>{ if(_bsRowYr(r)!==_bsYrN)return; if(!_bsRollChk(r))return; const p=_bsProdOf(r); _prodTot[p]=(_prodTot[p]||0)+(r.q||0); });
   const _prodList=Object.keys(_prodTot).filter(p=>p&&p!=='기타'&&_prodTot[p]>0).sort((a,b)=>_prodTot[b]-_prodTot[a]);
   if(_prodTot['기타']>0) _prodList.push('기타');
   if(_bsProd!=='전체' && _prodList.indexOf(_bsProd)<0) _bsProd='전체';
