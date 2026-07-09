@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 확장/지역 점유율 지역조인 완료(매장명 매칭, 커버리지 88%) · 진단 패널 제거';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 지역별 점유율 기준토글(보증서/ERP) 버그 수정 — 현재 뷰 재렌더(share)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7331,7 +7331,7 @@ document.getElementById('raynoApp').addEventListener('click', e=>{
   const rmB=t.closest&&t.closest('#regMonthSeg button[data-m]');
   if(rmB){ const mm=parseInt(rmB.dataset.m,10)||0; if(mm===0){ _regMonths=[]; } else { const i=_regMonths.indexOf(mm); if(i>=0)_regMonths.splice(i,1); else _regMonths.push(mm); } (rview==='share'?renderShare:renderRevenue)(); return; }
   const rmModeB=t.closest&&t.closest('#regModeSeg button[data-rm]');
-  if(rmModeB){ _regMode=rmModeB.dataset.rm; renderRevenue(); return; }
+  if(rmModeB){ _regMode=rmModeB.dataset.rm; (rview==='share'?renderShare:renderRevenue)(); return; }
   if(t.closest&&t.closest('#scApply')){ const f=document.getElementById('scFrom'),to=document.getElementById('scTo'); _scFrom=f?f.value:''; _scTo=to?to.value:''; if(_scFrom&&_scTo&&_scTo<_scFrom){const x=_scFrom;_scFrom=_scTo;_scTo=x;} renderRevenue(); return; }
   if(t.closest&&t.closest('#scReset')){ _scFrom=''; _scTo=''; renderRevenue(); return; }
   if(t.closest&&t.closest('#scMore')){ _scAll=!_scAll; renderRevenue(); return; }
