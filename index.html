@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · [임시] 확장 기회 지역 진단 패널(월필터·코드매칭·지역해석 카운트+샘플)';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 확장/지역 점유율: 보증서-마스터 지역조인을 대리점코드→매장명(정규화) 매칭으로 변경(코드체계 상이)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7460,23 +7460,24 @@ function _carRegPick(){ return _scPick(salesCfg().carReg); }
 // ── 신차 장착 점유율 (보증서 신차 ÷ 신차등록, 2-트랙) ──
 function _warrIsNew(r){ const s=String(r['신차/중고차']||'').trim(); return s==='신차'||s.indexOf('신차')===0; }
 let _dlrRegionCache=null;
-function _dealerRegionMap(){   // 대리점코드 → {doKey, sgg} (마스터 sido/주소에서 추출)
+function _dealerRegionMap(){   // 정규화 매장명 → {doKey, sgg} (보증서 대리점코드 체계가 마스터와 달라 이름으로 매칭)
   if(_dlrRegionCache) return _dlrRegionCache;
   const m=new Map();
   if(typeof ERPD!=='undefined' && ERPD && Array.isArray(ERPD.dealers)){
-    ERPD.dealers.forEach(d=>{ const code=String(d.code||'').trim(); if(!code) return;
+    ERPD.dealers.forEach(d=>{
       const doKey=_regionKey(d.sido)||_regionKey(d.addr);   // 시·도명 우선, 없으면 주소 앞부분에서
       let sgg=String(d.sigungu||'').trim();
       if(!sgg && d.addr){ const p=String(d.addr).trim().split(/\s+/); if(p.length>=2) sgg=p[1]; }   // 주소 2번째 토큰(시/군/구)
-      m.set(code,{doKey,sgg});
+      const reg={doKey,sgg};
+      [d.name,d.agentName,d.custName].forEach(nm=>{ const key=_bsNameNorm(nm); if(key && !m.has(key)) m.set(key,reg); });
     });
   }
   _dlrRegionCache=m; return m;
 }
-function _warrRegOf(r){   // 보증서 1건 → {doKey, sgg}. 수동엑셀 지역필드 우선, 없으면 대리점코드→마스터 조인
+function _warrRegOf(r){   // 보증서 1건 → {doKey, sgg}. 수동엑셀 지역필드 우선, 없으면 매장명→마스터 조인(코드 체계가 달라 이름 매칭)
   let doKey=_regionKey(r['대리점지역(도)']);
   let sgg=String(r['대리점지역(시군구)']||'').trim();
-  if(!doKey){ const rm=_dealerRegionMap().get(String(r['대리점코드']||'').trim()); if(rm){ doKey=rm.doKey; if(!sgg) sgg=rm.sgg; } }
+  if(!doKey){ const rm=_dealerRegionMap().get(_bsNameNorm(r['매장명'])); if(rm){ doKey=rm.doKey; if(!sgg) sgg=rm.sgg; } }
   return {doKey, sgg};
 }
 function _warrNewByRegion(){ // 활성 월 기준 신차 보증서: {regionKey:count}, total
@@ -7569,8 +7570,8 @@ function whiteSpaceCard(){
   if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '<div class="empty">품질보증서 데이터가 없습니다.</div>';
   const G=_warrGeoStats();
   const nw=_warrNewByRegion();
-  const _dbg=(()=>{ const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]); const act=_salesActive(); const dm=_dealerRegionMap(); let pm=0,cm=0,rr=0; rows.forEach(r=>{ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(act.indexOf(mm)>=0)pm++; if(dm.has(String(r['대리점코드']||'').trim()))cm++; if(_warrRegOf(r).doKey)rr++; }); const erpdN=(typeof ERPD!=='undefined'&&ERPD&&ERPD.dealers)?ERPD.dealers.length:0; const sw=rows.slice(0,3).map(r=>({일자:r['시공일자'],코드:r['대리점코드'],지부:r['담당지부']})); const sd=((typeof ERPD!=='undefined'&&ERPD&&ERPD.dealers)?ERPD.dealers:[]).slice(0,2).map(d=>({code:d.code,sido:d.sido,sigungu:d.sigungu,addr:(d.addr||'').slice(0,18)})); return {total:rows.length,act,pm,cm,rr,erpdN,sw,sd}; })();
-  const _dbgHtml=`<div style="background:#1e1e28;color:#e8e8e8;border-radius:8px;padding:10px 12px;font-size:11px;font-family:monospace;margin-bottom:12px;line-height:1.65;white-space:pre-wrap;overflow-x:auto">🔧 진단(임시)\n보증서 총 ${_dbg.total}건 · 활성월 ${JSON.stringify(_dbg.act)} · 마스터 ${_dbg.erpdN}개\n월필터통과 ${_dbg.pm} · 코드매칭 ${_dbg.cm} · 지역해석 ${_dbg.rr}\n보증서샘플 ${JSON.stringify(_dbg.sw)}\n마스터샘플 ${JSON.stringify(_dbg.sd)}</div>`;
+  const _dbg=(()=>{ const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]); const act=_salesActive(); const dm=_dealerRegionMap(); let pm=0,cm=0,rr=0; rows.forEach(r=>{ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(act.indexOf(mm)>=0)pm++; if(dm.has(_bsNameNorm(r['매장명'])))cm++; if(_warrRegOf(r).doKey)rr++; }); const erpdN=(typeof ERPD!=='undefined'&&ERPD&&ERPD.dealers)?ERPD.dealers.length:0; const sw=rows.slice(0,3).map(r=>({매장:r['매장명'],지부:r['담당지부']})); const sd=((typeof ERPD!=='undefined'&&ERPD&&ERPD.dealers)?ERPD.dealers:[]).slice(0,2).map(d=>({name:d.name,sido:d.sido,addr:(d.addr||'').slice(0,16)})); return {total:rows.length,act,pm,cm,rr,erpdN,sw,sd}; })();
+  const _dbgHtml=`<div style="background:#1e1e28;color:#e8e8e8;border-radius:8px;padding:10px 12px;font-size:11px;font-family:monospace;margin-bottom:12px;line-height:1.65;white-space:pre-wrap;overflow-x:auto">🔧 진단(임시)\n보증서 총 ${_dbg.total}건 · 활성월 ${JSON.stringify(_dbg.act)} · 마스터 ${_dbg.erpdN}개\n월필터통과 ${_dbg.pm} · 이름매칭 ${_dbg.cm} · 지역해석 ${_dbg.rr}\n보증서샘플 ${JSON.stringify(_dbg.sw)}\n마스터샘플 ${JSON.stringify(_dbg.sd)}</div>`;
   let html=_dbgHtml+`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>시장 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
 
   // 시·도: 점유율 낮은 순(약한 시장 먼저)
