@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 지역별 점유율 전국합계를 상단 카드와 일치(미매칭 신차보증서를 지역미상 행으로 포함)';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · [임시] 지역미상 원인 진단(매장명없음/이름불일치/지역없음 + TOP 목록)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7571,7 +7571,9 @@ function whiteSpaceCard(){
   if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '<div class="empty">품질보증서 데이터가 없습니다.</div>';
   const G=_warrGeoStats();
   const nw=_warrNewByRegion();
-  let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>시장 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
+  const _um=(()=>{ const dm=_dealerRegionMap(); const act=_salesActive(); const noMatch={},noRegion={}; let cN=0,cM=0,cR=0; ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{ if(!_warrIsNew(r))return; const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(act.indexOf(mm)<0)return; if(_warrRegOf(r).doKey)return; const raw=String(r['매장명']||'').trim(); const key=_bsNameNorm(raw); if(!key){cN++;return;} if(!dm.has(key)){cM++;noMatch[raw]=(noMatch[raw]||0)+1;} else {cR++;noRegion[raw]=(noRegion[raw]||0)+1;} }); const top=(o,n)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n).map(([k,v])=>`${k}(${v})`).join(', '); return {cN,cM,cR, tM:top(noMatch,18), tR:top(noRegion,10)}; })();
+  const _umHtml=`<div style="background:#2a1e1e;color:#f0e0e0;border-radius:8px;padding:10px 12px;font-size:11px;font-family:monospace;margin-bottom:12px;line-height:1.7;white-space:pre-wrap;overflow-x:auto">🔧 지역미상 진단(임시)\n매장명없음 ${_um.cN}건 · 이름불일치 ${_um.cM}건 · 매칭됐으나 지역없음 ${_um.cR}건\n[이름불일치 TOP] ${_um.tM||'(없음)'}\n[지역없음 TOP] ${_um.tR||'(없음)'}</div>`;
+  let html=_umHtml+`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>시장 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
 
   // 시·도: 점유율 낮은 순(약한 시장 먼저)
   const sds=_REGION_KEYS.map(k=>{ const s=G.sido[k]||{inst:0,dealers:new Set(),sgg:new Set()}; const ni=nw.byRegion[k]||0; const reg=_regionCarRegPick(k); return {k, inst:s.inst, dealers:s.dealers.size, sgg:s.sgg.size, sh: reg>0? ni/reg*100 : null}; })
