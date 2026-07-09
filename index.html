@@ -1521,7 +1521,7 @@
     <div class="nav" id="raynoNav">
       <button class="nav-btn on" data-rview="dash"><span data-txt="tabRDash">대시보드</span></button>
       <button class="nav-btn" data-rview="revenue"><span data-txt="tabRevenue">매출 현황</span></button>
-      <button class="nav-btn" data-rview="share"><span>점유율 분석</span></button>
+      <button class="nav-btn" data-rview="share"><span>점유율 분석(미완성)</span></button>
       <button class="nav-btn" data-rview="yoy"><span>YoY 실적 비교</span></button>
       <button class="nav-btn" data-rview="warranty"><span data-txt="tabWarranty">품질보증서 현황</span></button>
       <button class="nav-btn" data-rview="glass"><span data-txt="tabGlass">글라스케어 현황</span></button>
@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 지부/제품별 보증서 발급 현황: 날짜범위 대신 연도([2026][2025])·월 버튼 필터';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 점유율 분석 탭 제목 → 점유율 분석(미완성)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -9232,7 +9232,7 @@ function _applySidebarLayout(){
       {h:'레이노 데이터', items:[
         {t:'데이터 대시보드', ic:'data', k:'rayno:dash', d:'레이노 영업·품질 데이터를 한눈에 봅니다', go:()=>goRayno('dash')},
         {t:'매출 분석', ic:'chart', k:'rayno:revenue', ht:'매출 분석 (B2C+B2B)', d:'채널·지부·대리점별 매출을 분석합니다', go:()=>goRayno('revenue')},
-        {t:'점유율 분석', ic:'chart', k:'rayno:share', ht:'시장 점유율 분석', d:'보증서·판매 기준 시장 점유율과 지역별 점유율을 분석합니다', go:()=>goRayno('share')},
+        {t:'점유율 분석(미완성)', ic:'chart', k:'rayno:share', ht:'시장 점유율 분석', d:'보증서·판매 기준 시장 점유율과 지역별 점유율을 분석합니다', go:()=>goRayno('share')},
         {t:'YoY 실적 비교', ic:'chart', k:'rayno:yoy', d:'매출·보증서·글라스케어를 전년과 비교합니다', go:()=>goRayno('yoy')},
         {t:'품질보증서', ic:'shield', k:'rayno:warranty', d:'보증서 발급 현황과 시공 데이터를 분석합니다', go:()=>goRayno('warranty')},
         {t:'글라스케어 현황', ic:'sparkle', k:'rayno:glass', d:'글라스케어 시공·판매 현황을 분석합니다', go:()=>goRayno('glass')},
