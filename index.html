@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-07 · 매출 분석에 연도 전환(2025/2026) 추가';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 매출 연도 토글 상시 표시 + 작년 데이터 없을 때 업로드 안내';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6700,7 +6700,8 @@ function renderRevenue(){
   const _realSALES=SALES;
   const _hasPrevYr=!!(_realSALES.prev && (_realSALES.prev.months||[]).length);
   const _yrPrevN=(new Date()).getFullYear()-1, _yrCurN=_yrPrevN+1;
-  const _viewPrev=(_salesYear==='prev' && _hasPrevYr);
+  const _prevSelected=(_salesYear==='prev');
+  const _viewPrev=(_prevSelected && _hasPrevYr);
   if(_viewPrev){ const pv=_prevSalesObj(_realSALES); if(pv) SALES=pv; }
   const inp=SALES.inputs, M=_salesMonths(), cut=_salesCut();
   _salesSel=_salesSel.filter(m=>M.indexOf(m)>=0);
@@ -6720,8 +6721,18 @@ function renderRevenue(){
   const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
   const hhx=t=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${t}</h3><button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(t)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button></div>`;
   const lab=_salesLabel();
-  const _yrSeg = _hasPrevYr ? `<div class="seg" id="salesYearSeg" style="margin-right:4px"><button data-yr="cur" class="${!_viewPrev?'on':''}">${_yrCurN}</button><button data-yr="prev" class="${_viewPrev?'on':''}">${_yrPrevN}</button></div>` : '';
+  const _yrSeg = `<div class="seg" id="salesYearSeg" style="margin-right:4px"><button data-yr="cur" class="${!_prevSelected?'on':''}">${_yrCurN}</button><button data-yr="prev" class="${_prevSelected?'on':''}"${!_hasPrevYr?` title="작년(${_yrPrevN}) 매출 데이터가 아직 없습니다"`:''}>${_yrPrevN}</button></div>`;
   let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">${_yrSeg}<div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${_viewPrev?`<b style="color:var(--amber)">${_yrPrevN}년(작년)</b> · `:''}${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
+
+  // 작년 선택인데 작년 데이터가 없으면: 토글은 유지하되 안내 + 업로드 유도(현재연도를 작년으로 오표시 방지)
+  if(_prevSelected && !_hasPrevYr){
+    const upBtn = admin ? `<button type="button" id="salesPrevUploadEmpty" class="acc-btn" style="background:#f4911c;border-color:#f4911c;color:#fff;font-weight:700;margin-top:14px">＋ ${_yrPrevN}년 매출 업로드</button>` : '';
+    box.innerHTML = card(`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span class="dot"></span><b style="font-size:14px">매출 분석</b>${_yrSeg}<span style="color:var(--ink2);font-size:12px">${_yrPrevN}년(작년) 보기</span></div>`)
+      + `<div class="card" style="text-align:center;padding:42px 20px"><div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:7px">${_yrPrevN}년 매출 데이터가 아직 없어요</div><div style="font-size:13px;line-height:1.65;color:var(--ink2)">${admin?`아래 버튼(또는 상단 <b>＋ 전년 매출</b>)으로 <b>${_yrPrevN}년 ERP 원본(.XLS)</b>을 한 번만 올리면<br>이 자리에 작년 매출·차트·표가 그대로 뜨고, 위 <b>[${_yrCurN}] / [${_yrPrevN}]</b> 토글로 언제든 전환돼요.<br><span style="color:var(--ink3)">작년치는 바뀌지 않으니 한 번만 올리면 끝입니다.</span>`:`관리자가 ${_yrPrevN}년 매출 데이터를 올리면 여기에 표시됩니다.`}</div>${upBtn}</div>`;
+    if(admin){ var _peb=document.getElementById('salesPrevUploadEmpty'); if(_peb) _peb.onclick=function(){ var i=document.getElementById('salesPrevFileInput'); if(i) i.click(); }; }
+    SALES=_realSALES;
+    return;
+  }
 
   // ── 차트 대시보드 ──
   const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
