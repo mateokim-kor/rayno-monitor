@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 확장 기회 지역/지역 점유율: 보증서 대리점코드→대리점 마스터 지역 조인(API데이터엔 지역필드 없음)';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · [임시] 확장 기회 지역 진단 패널(월필터·코드매칭·지역해석 카운트+샘플)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7569,7 +7569,9 @@ function whiteSpaceCard(){
   if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '<div class="empty">품질보증서 데이터가 없습니다.</div>';
   const G=_warrGeoStats();
   const nw=_warrNewByRegion();
-  let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>시장 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
+  const _dbg=(()=>{ const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]); const act=_salesActive(); const dm=_dealerRegionMap(); let pm=0,cm=0,rr=0; rows.forEach(r=>{ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(act.indexOf(mm)>=0)pm++; if(dm.has(String(r['대리점코드']||'').trim()))cm++; if(_warrRegOf(r).doKey)rr++; }); const erpdN=(typeof ERPD!=='undefined'&&ERPD&&ERPD.dealers)?ERPD.dealers.length:0; const sw=rows.slice(0,3).map(r=>({일자:r['시공일자'],코드:r['대리점코드'],지부:r['담당지부']})); const sd=((typeof ERPD!=='undefined'&&ERPD&&ERPD.dealers)?ERPD.dealers:[]).slice(0,2).map(d=>({code:d.code,sido:d.sido,sigungu:d.sigungu,addr:(d.addr||'').slice(0,18)})); return {total:rows.length,act,pm,cm,rr,erpdN,sw,sd}; })();
+  const _dbgHtml=`<div style="background:#1e1e28;color:#e8e8e8;border-radius:8px;padding:10px 12px;font-size:11px;font-family:monospace;margin-bottom:12px;line-height:1.65;white-space:pre-wrap;overflow-x:auto">🔧 진단(임시)\n보증서 총 ${_dbg.total}건 · 활성월 ${JSON.stringify(_dbg.act)} · 마스터 ${_dbg.erpdN}개\n월필터통과 ${_dbg.pm} · 코드매칭 ${_dbg.cm} · 지역해석 ${_dbg.rr}\n보증서샘플 ${JSON.stringify(_dbg.sw)}\n마스터샘플 ${JSON.stringify(_dbg.sd)}</div>`;
+  let html=_dbgHtml+`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>시장 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
 
   // 시·도: 점유율 낮은 순(약한 시장 먼저)
   const sds=_REGION_KEYS.map(k=>{ const s=G.sido[k]||{inst:0,dealers:new Set(),sgg:new Set()}; const ni=nw.byRegion[k]||0; const reg=_regionCarRegPick(k); return {k, inst:s.inst, dealers:s.dealers.size, sgg:s.sgg.size, sh: reg>0? ni/reg*100 : null}; })
