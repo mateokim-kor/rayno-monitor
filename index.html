@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 매출 분석 표 헤더에 작년 연도 표시(2025) + 지부 롤 카드 연도필터';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 작년 지부표: jibuProd 비었을 때 오해되는 0 대신 명확 안내 + 연도 표시';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7630,7 +7630,8 @@ function salesRollTable(){
 
 // Table B — 지부 세일즈 데이터(B2C): 월별 롤 판매 수 + 매출액 + 구성비
 function salesJibuRollTable(monthsArg){
-  if(!SALES||!SALES.jibuProd) return '<div style="color:var(--ink2);font-size:13px">ERP 재업로드 후 표시됩니다.</div>';
+  const _jpHas = SALES && SALES.jibuProd && Object.values(SALES.jibuProd).some(pm=>pm&&Object.keys(pm).length);
+  if(!SALES||!SALES.jibuProd||!_jpHas){ const _py=(new Date()).getFullYear()-1; return `<div class="empty" style="padding:24px 16px;text-align:center;color:var(--ink2);font-size:13px">${SALES&&SALES.__isPrev?`<b style="color:var(--ink)">${_py}년 지부별 상세(제품×지부)가 아직 없습니다.</b><br>총매출은 들어왔지만 지부 분해 데이터가 비어 있어요.<br><span style="color:var(--ink3)">수집기 <b>수정본(erp_collector.py)</b>으로 교체·데몬 재시작하면 채워집니다. (또는 <b>＋ 전년 매출</b>로 ${_py} ERP 재업로드)</span>`:'ERP 재업로드 후 표시됩니다.'}</div>`; }
   const M=(monthsArg&&monthsArg.length)?monthsArg:_salesDispMonths(), JG=SALES_JIBU.concat(['본사']), C=SALES.channels;
   const roll=n=>n?Math.round(n).toLocaleString():'0', won=n=>n?Math.round(n).toLocaleString():'0';
   function jr(j){ const q=_sMz(),a=_sMz(); const pm=SALES.jibuProd[j]||{}; Object.keys(pm).forEach(mat=>{ const o=pm[mat]; const oq=o.q||o, oa=o.a||_sMz(); const rl=_isRoll(mat); for(let m=1;m<=12;m++){ if(rl)q[m]+=oq[m]||0; a[m]+=oa[m]||0; } }); return {q,a}; }
