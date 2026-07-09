@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 점유율 분석 탭 제목 → 점유율 분석(미완성)';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 확장 기회 지역/지역 점유율: 보증서 대리점코드→대리점 마스터 지역 조인(API데이터엔 지역필드 없음)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -5976,7 +5976,7 @@ let _lwLine='ALL', _lwScope='jibu', _lwSub=[], _lwFrontOnly=false, _lwYear=(new 
 let JBA={ jibu:'', prod:[], sel:[] };   // 지부 분석(보증서): 지부·제품(복수)·월(복수)
 let GLASS=null, glassLoaded=false, _glScope='jibu', _glDealerAll=false, _glJibuDrill='';   // 글라스케어 가입
 let ERPD=null, erpdLoaded=false;   // ERP 대리점 마스터(dealers.json)
-async function ensureErpd(){ if(erpdLoaded)return; const j=await cloudLoadJSON(SUPA.dealerFile); if(j&&Array.isArray(j.dealers)){ ERPD=j; _bsGlassMap=null; _dealerAggCache=null; } erpdLoaded=true; }
+async function ensureErpd(){ if(erpdLoaded)return; const j=await cloudLoadJSON(SUPA.dealerFile); if(j&&Array.isArray(j.dealers)){ ERPD=j; _bsGlassMap=null; _dealerAggCache=null; _dlrRegionCache=null; } erpdLoaded=true; }
 const GV={ from:'', to:'', scope:'all', preset:'all', prodSel:[], dateCol:'', _min:'', _max:'' };
 const DLR={ jibu:'전체', member:'all', status:'use', q:'' };   // 대리점 마스터 필터 (기본: 사용중만)
 let _dlrRows=[];   // 현재 렌더된 대리점 행(상세 모달 조회용)
@@ -6819,6 +6819,7 @@ function renderShare(){
   const box=document.getElementById('rShare'); if(!box) return;
   if(!salesLoaded){ ensureSales().then(()=>{ if(rview==='share') renderShare(); }); }
   if(!warrLoaded){ ensureWarr().then(()=>{ if(rview==='share') renderShare(); }); }
+  if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='share') renderShare(); }); }   // 대리점 마스터(지역 조인용)
   const hasSales=!!(SALES&&SALES.channels);
   if(!hasSales){ box.innerHTML='<div class="empty" style="padding:46px 18px;text-align:center;color:var(--ink2)">매출 데이터가 로드되면 점유율이 표시됩니다.<br>관리자가 ERP 파일을 올리면 표시됩니다.</div>'; return; }
   const card=s=>`<div class="card">${s}</div>`;
@@ -7458,13 +7459,33 @@ function _carRegPick(){ return _scPick(salesCfg().carReg); }
 
 // ── 신차 장착 점유율 (보증서 신차 ÷ 신차등록, 2-트랙) ──
 function _warrIsNew(r){ const s=String(r['신차/중고차']||'').trim(); return s==='신차'||s.indexOf('신차')===0; }
+let _dlrRegionCache=null;
+function _dealerRegionMap(){   // 대리점코드 → {doKey, sgg} (마스터 sido/주소에서 추출)
+  if(_dlrRegionCache) return _dlrRegionCache;
+  const m=new Map();
+  if(typeof ERPD!=='undefined' && ERPD && Array.isArray(ERPD.dealers)){
+    ERPD.dealers.forEach(d=>{ const code=String(d.code||'').trim(); if(!code) return;
+      const doKey=_regionKey(d.sido)||_regionKey(d.addr);   // 시·도명 우선, 없으면 주소 앞부분에서
+      let sgg=String(d.sigungu||'').trim();
+      if(!sgg && d.addr){ const p=String(d.addr).trim().split(/\s+/); if(p.length>=2) sgg=p[1]; }   // 주소 2번째 토큰(시/군/구)
+      m.set(code,{doKey,sgg});
+    });
+  }
+  _dlrRegionCache=m; return m;
+}
+function _warrRegOf(r){   // 보증서 1건 → {doKey, sgg}. 수동엑셀 지역필드 우선, 없으면 대리점코드→마스터 조인
+  let doKey=_regionKey(r['대리점지역(도)']);
+  let sgg=String(r['대리점지역(시군구)']||'').trim();
+  if(!doKey){ const rm=_dealerRegionMap().get(String(r['대리점코드']||'').trim()); if(rm){ doKey=rm.doKey; if(!sgg) sgg=rm.sgg; } }
+  return {doKey, sgg};
+}
 function _warrNewByRegion(){ // 활성 월 기준 신차 보증서: {regionKey:count}, total
   const R={}; let total=0; const act=_salesActive();
   ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{
     if(!_warrIsNew(r)) return;
     const mm=parseInt(String(r['시공일자']||'').slice(5,7),10);
     if(act.indexOf(mm)<0) return;
-    total++; const k=_regionKey(r['대리점지역(도)']); if(k) R[k]=(R[k]||0)+1;
+    total++; const k=_warrRegOf(r).doKey; if(k) R[k]=(R[k]||0)+1;
   });
   return {byRegion:R, total};
 }
@@ -7481,8 +7502,8 @@ function _warrGeoStats(){
   const act=_salesActive(); const sido={}, sgg={};
   ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{
     const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(act.indexOf(mm)<0) return;
-    const k=_regionKey(r['대리점지역(도)']); if(!k) return;
-    const sg=String(r['대리점지역(시군구)']||'').trim();
+    const _rg=_warrRegOf(r); const k=_rg.doKey; if(!k) return;
+    const sg=_rg.sgg;
     const dealer=String(r['대리점코드']||r['매장명']||'').trim();
     const s=sido[k]||(sido[k]={inst:0,dealers:new Set(),sgg:new Set()});
     s.inst++; if(dealer)s.dealers.add(dealer); if(sg)s.sgg.add(sg);
