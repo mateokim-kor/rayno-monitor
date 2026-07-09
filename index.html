@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 매출 연도 토글 상시 표시 + 작년 데이터 없을 때 업로드 안내';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 작년 매출 뷰에 지부×제품(jibuProd)·롤중분류(chMat) 포함 — 지부 세일즈/제품순위/롤 표 2025 표시';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6369,7 +6369,7 @@ function renderWarranty(){
 // ════════════════ 매출(ERP) 분석 ════════════════
 const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카보드','빅필드컴퍼니','엔드리스','휴보스','동성윈텍','바이널랩'];
 let SALES=null, salesLoaded=false, _rollExp={}, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _jspView='rank', _regMonths=[], _regMode='share', _scFrom='', _scTo='', _scAll=false, _scoreSel=[], _salesYear='cur';   // _salesSel: 선택 월 배열(빈 배열=누적) · _scoreSel: 매출 핵심 전용 월 선택 · _salesYear: cur=올해/prev=작년
-function _prevSalesObj(S){ if(!S||!S.prev) return null; const p=S.prev; return { months:p.months||[], channels:p.channels||{}, jibu:p.jibu||{}, dealers:p.dealers||{}, prodAll:p.prodAll||{}, prodList:Object.keys(p.prodAll||{}), inputs:S.inputs||{}, updatedAt:S.updatedAt, ver:S.ver, prodList2:null, prev:null, __isPrev:true }; }
+function _prevSalesObj(S){ if(!S||!S.prev) return null; const p=S.prev; return { months:p.months||[], channels:p.channels||{}, jibu:p.jibu||{}, dealers:p.dealers||{}, prodAll:p.prodAll||{}, jibuProd:p.jibuProd||{}, chMat:p.chMat||{}, prodList:Object.keys(p.prodAll||{}), inputs:S.inputs||{}, updatedAt:S.updatedAt, ver:S.ver, prodList2:null, prev:null, __isPrev:true }; }
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -6472,7 +6472,7 @@ function handleSalesPrevFile(file){
     const agg=aggregateSales(_salesRows(e.target.result));
     if(!agg){ toast('전년 매출 데이터를 인식하지 못했습니다 — '+(window.__salesErr||'ERP 원본 파일인지 확인하세요'),true); return; }
     if(!SALES||!SALES.prodAll){ toast('먼저 올해 매출(＋ 매출 ERP)을 올려주세요.',true); return; }
-    SALES.prev={ months:agg.months, channels:agg.channels, jibu:agg.jibu, dealers:agg.dealers, prodAll:agg.prodAll };
+    SALES.prev={ months:agg.months, channels:agg.channels, jibu:agg.jibu, dealers:agg.dealers, prodAll:agg.prodAll, jibuProd:agg.jibuProd, chMat:agg.chMat };
     await cloudSaveJSON(SUPA.salesFile,SALES); renderRevenue(); updateUploadDates();
     const tot=_salesTotalOver(SALES.prev, agg.months||[]);
     toast('전년 매출 반영 · '+(tot/1e8).toFixed(1)+'억 · '+(agg.months||[]).length+'개월');
