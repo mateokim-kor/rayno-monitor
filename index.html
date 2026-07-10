@@ -8132,15 +8132,39 @@ function setRView(v){
   Object.values(RVIEW_BOX).forEach(id=>{const el=document.getElementById(id); if(el)el.style.display='none';});
   const el=document.getElementById(RVIEW_BOX[v]); if(el) el.style.display='block';
   applyRaynoAuth();                      // 편집 버튼은 관리자에게만
+  // 데이터·설정·테마가 그대로면 이전 렌더를 재사용해 재렌더/차트 재생성을 건너뜀(탭 전환 렉 완화).
+  // 필터 변경은 각 render()를 직접 호출하므로 화면은 항상 최신. 서명이 상태에서 파생되어 stale 위험 없음(불일치=재렌더).
+  const _sig=_rviewSig();
+  if(!(el && el.__rdone && el.__rsig===_sig)) _renderRViewStamped(v);
+  if(v==='dealer'){   // 대리점: 관련 데이터가 아직 안 왔으면 로드 후 다시 그림
+    if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='dealer') _renderRViewStamped('dealer'); }); }
+    if(!bsLoaded){ ensureBranchsales().then(()=>{ if(rview==='dealer') _renderRViewStamped('dealer'); }); }
+    if(!glassLoaded){ ensureGlass().then(()=>{ if(rview==='dealer') _renderRViewStamped('dealer'); }); }
+    if(!warrLoaded){ ensureWarr().then(()=>{ if(rview==='dealer') _renderRViewStamped('dealer'); }); }
+  }
+}
+function _dispatchRView(v){
   if(v==='warranty') renderWarranty();
   else if(v==='warrReport') renderWarrReport();
-  if(v==='dash') renderRDash();
+  else if(v==='dash') renderRDash();
   else if(v==='glass') renderGlass();
-  else if(v==='dealer'){ renderDealer(); if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!bsLoaded){ ensureBranchsales().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!glassLoaded){ ensureGlass().then(()=>{ if(rview==='dealer') renderDealer(); }); } if(!warrLoaded){ ensureWarr().then(()=>{ if(rview==='dealer') renderDealer(); }); } }
+  else if(v==='dealer') renderDealer();
   else if(v==='search') renderSearch();
   else if(v==='yoy') renderYoY();
   else if(v==='share') renderShare();
   else renderRevenue();
+}
+function _renderRViewStamped(v){ _dispatchRView(v); const b=document.getElementById(RVIEW_BOX[v]); if(b){ b.__rsig=_rviewSig(); b.__rdone=1; } }
+function _rviewSig(){
+  const gv=(x,k)=>{ try{ return String((x&&x[k])||''); }catch(_){ return ''; } };
+  const nr=x=>{ try{ return (x&&x.rows&&x.rows.length)||0; }catch(_){ return 0; } };
+  const nd=x=>{ try{ return (x&&x.dealers&&x.dealers.length)||0; }catch(_){ return 0; } };
+  let inp=''; try{ inp=JSON.stringify((typeof SALES!=='undefined'&&SALES&&SALES.inputs)||0); }catch(_){}
+  let wexc=0; try{ wexc=(typeof WARR!=='undefined'&&WARR&&WARR.config&&WARR.config.excluded&&WARR.config.excluded.length)||0; }catch(_){}
+  let th=''; try{ th=document.documentElement.getAttribute('data-theme')||''; }catch(_){}
+  let cy=''; try{ const c=(typeof _cardYr!=='undefined'&&_cardYr)||{}; cy=[c.sum,c.roll,c.jibu,c.jprod,c.bs].join(','); }catch(_){}
+  const W=(typeof WARR!=='undefined')?WARR:null, S=(typeof SALES!=='undefined')?SALES:null, B=(typeof BSALE!=='undefined')?BSALE:null, G=(typeof GLASS!=='undefined')?GLASS:null, E=(typeof ERPD!=='undefined')?ERPD:null;
+  return [gv(W,'updatedAt'),nr(W),wexc, gv(S,'updatedAt'),inp, gv(B,'updatedAt'),nr(B), gv(G,'updatedAt'),nr(G), gv(E,'updatedAt'),nd(E), (typeof auth!=='undefined'?auth:''), th, cy].join('~');
 }
 function _fmtUpl(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d.getTime())) return ''; const p=n=>String(n).padStart(2,'0'); const rel=_relDays(v); return `최근 업로드 ${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${rel?' · '+rel:''}`; }
 function _setUpl(id,v){ const el=document.getElementById(id); if(!el) return; if(v){ el.textContent='🕒'; el.title=_fmtUpl(v); } else { el.textContent=''; el.title=''; } }
