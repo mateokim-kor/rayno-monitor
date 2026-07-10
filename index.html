@@ -3067,6 +3067,7 @@ document.addEventListener('click', e=>{ if(!e.target.closest('#briefCopyBtn')) r
 document.getElementById('modalClose').addEventListener('click', closeDetail);
 document.getElementById('xplClose').addEventListener('click', closeExplain);
 document.getElementById('xplBg').addEventListener('click', e=>{ if(e.target.id==='xplBg') closeExplain(); });
+document.getElementById('xplBody').addEventListener('click', e=>{ const _yb=e.target.closest&&e.target.closest('.dlr-yseg button[data-dyv]'); if(_yb&&_dlrModalD&&typeof _dealerDetailHtml==='function'){ _cardYr.dlr=_yb.dataset.dyv; document.getElementById('xplBody').innerHTML=_dealerDetailHtml(_dlrModalD); } });
 document.getElementById('modalBg').addEventListener('click', e=>{ if(e.target.id==='modalBg') closeDetail(); });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeDetail(); });
 document.getElementById('modalSearch').addEventListener('input', e=>renderModalList(e.target.value));
@@ -5454,6 +5455,7 @@ function renderRDash(){
   box.innerHTML=h;
 }
 let _dealerAggCache=null;   // 집계 캐시(데이터 로드 시 무효화)
+let _dlrModalD=null;   // 현재 열린 대리점 상세 모달 대상(연도 토글 재렌더용)
 function _dealerAgg(){   // ERP 기준(대리점 마스터 dealers.json + ERP 매출 + branchSalesList 본사 직매) — 보증서·글라스케어(관리자 홈페이지) 제외
   if(_dealerAggCache) return _dealerAggCache;
   const M={};
@@ -5479,9 +5481,9 @@ function _dealerAgg(){   // ERP 기준(대리점 마스터 dealers.json + ERP �
   }
   // ③ 누적 매출·롤 = 지부 → 대리점 판매(branchSalesList) 합계 + 월별 — 대리점명으로 매칭(정규화 폴백)
   if(typeof BSALE!=='undefined'&&BSALE&&Array.isArray(BSALE.rows)){
-    const bs={}; BSALE.rows.forEach(r=>{ const nm=String(r.dealer||'').trim(); if(!nm)return; const o=bs[nm]||(bs[nm]={a:0,q:0,mon:{}}); o.a+=(r.a||0); o.q+=(r.q||0); const m=(typeof _bsMonthOf==='function')?_bsMonthOf(r):0; if(m){ const mm=o.mon[m]||(o.mon[m]={a:0,q:0}); mm.a+=(r.a||0); mm.q+=(r.q||0); } });
+    const bs={}; BSALE.rows.forEach(r=>{ const nm=String(r.dealer||'').trim(); if(!nm)return; const o=bs[nm]||(bs[nm]={a:0,q:0,mon:{},yr:{}}); o.a+=(r.a||0); o.q+=(r.q||0); const m=(typeof _bsMonthOf==='function')?_bsMonthOf(r):0; const y=(typeof _bsRowYr==='function')?_bsRowYr(r):''; if(m){ const mm=o.mon[m]||(o.mon[m]={a:0,q:0}); mm.a+=(r.a||0); mm.q+=(r.q||0); if(y){ const yo=o.yr[y]||(o.yr[y]={a:0,q:0,mon:{}}); yo.a+=(r.a||0); yo.q+=(r.q||0); const y2=yo.mon[m]||(yo.mon[m]={a:0,q:0}); y2.a+=(r.a||0); y2.q+=(r.q||0); } } });
     const norm={}; Object.values(M).forEach(d=>{ const n2=_bsNameNorm(d.name); if(n2&&!norm[n2])norm[n2]=d; const s2=_bsNameNorm(d.store); if(s2&&!norm[s2])norm[s2]=d; });
-    Object.keys(bs).forEach(nm=>{ let d=M[nm]; if(!d) d=norm[_bsNameNorm(nm)]; if(d){ d.salesA=bs[nm].a; d.salesQ=bs[nm].q; d.bsMonthly=bs[nm].mon; d.bsSales=true; } });
+    Object.keys(bs).forEach(nm=>{ let d=M[nm]; if(!d) d=norm[_bsNameNorm(nm)]; if(d){ d.salesA=bs[nm].a; d.salesQ=bs[nm].q; d.bsMonthly=bs[nm].mon; d.bsYr=bs[nm].yr; d.bsSales=true; } });
   }
   // ④ 관리자 홈페이지(글라스케어·보증서) 대리점 — ERP에 없으면 추가, 이미 있으면 '관리자에도 있음' 표시(이름 정규화로 중복 제거)
   {
@@ -5512,12 +5514,14 @@ function _dealerDetailHtml(d){
     :'<span style="color:var(--ink3)">일반</span> <span style="color:var(--ink3);font-size:11px">'+_memBasis+'</span>';
   const stat=d.unuse?'<span style="color:var(--amber);font-weight:800">미사용</span>':'<span style="color:var(--dv2);font-weight:800">사용중</span>';
   const row=(k,v)=>`<div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)"><div style="flex:0 0 92px;color:var(--ink3);font-size:12.5px">${k}</div><div style="flex:1;font-size:13.5px;color:var(--ink)">${v}</div></div>`;
+  const _dY=(new Date()).getFullYear(); const _dPrev=(_cardYr&&_cardYr.dlr==='prev'); const _dSelY=_dPrev?String(_dY-1):String(_dY); const _dYr=(d.bsYr&&d.bsYr[_dSelY])||{a:0,q:0,mon:{}}; const _dSeg=`<div class="seg dlr-yseg" style="transform:scale(.85);transform-origin:left center;margin:0"><button type="button" data-dyv="cur" class="${!_dPrev?'on':''}">${_dY}</button><button type="button" data-dyv="prev" class="${_dPrev?'on':''}">${_dY-1}</button></div>`;
   return `<div style="font-size:13px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;flex-wrap:wrap"><div style="font-size:12px;color:var(--ink3);font-weight:700">지부 → 대리점 판매 · 연도</div>${_dSeg}</div>
     <div style="display:flex;gap:12px;margin-bottom:8px">
-      <div style="flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 14px"><div style="color:var(--ink3);font-size:11.5px">누적 매출(지부→대리점)</div><div style="font-size:19px;font-weight:800;color:var(--amber)">${d.salesA?kw(d.salesA):'·'}</div></div>
-      <div style="flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 14px"><div style="color:var(--ink3);font-size:11.5px">누적 롤(지부→대리점)</div><div style="font-size:19px;font-weight:800">${d.salesQ?won(d.salesQ)+' 롤':'·'}</div></div>
+      <div style="flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 14px"><div style="color:var(--ink3);font-size:11.5px">${_dSelY} 매출(지부→대리점)</div><div style="font-size:19px;font-weight:800;color:var(--amber)">${_dYr.a?kw(_dYr.a):'·'}</div></div>
+      <div style="flex:1;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:12px 14px"><div style="color:var(--ink3);font-size:11.5px">${_dSelY} 롤(지부→대리점)</div><div style="font-size:19px;font-weight:800">${_dYr.q?won(_dYr.q)+' 롤':'·'}</div></div>
     </div>
-    ${(()=>{ const mon=d.bsMonthly||{}; const ms=Object.keys(mon).map(Number).sort((a,b)=>a-b); if(!ms.length) return ''; const thl='text-align:left;padding:7px 10px;font-size:11px;font-weight:800;background:var(--amber);color:#fff'; const thr='text-align:right;padding:7px 10px;font-size:11px;font-weight:800;background:var(--amber);color:#fff'; const tdl='text-align:left;padding:6px 10px;font-size:12.5px;border-bottom:1px solid var(--line)'; const tdr='text-align:right;padding:6px 10px;font-size:12.5px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums'; const tq=ms.reduce((s,m)=>s+(mon[m].q||0),0), ta=ms.reduce((s,m)=>s+(mon[m].a||0),0); return `<div style="margin:2px 0 12px"><div style="font-size:12px;color:var(--ink3);margin-bottom:6px;font-weight:700">월별 지부 → 대리점 판매</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th style="${thl}">월</th><th style="${thr}">롤</th><th style="${thr}">매출</th></tr>${ms.map(m=>`<tr><td style="${tdl}">${m}월</td><td style="${tdr}">${won(mon[m].q||0)}</td><td style="${tdr}">${won(mon[m].a||0)}원</td></tr>`).join('')}<tr><td style="${tdl};font-weight:800;background:rgba(244,145,28,.08)">합계</td><td style="${tdr};font-weight:800;background:rgba(244,145,28,.08)">${won(tq)}</td><td style="${tdr};font-weight:800;background:rgba(244,145,28,.08)">${won(ta)}원</td></tr></table></div></div>`; })()}
+    ${(()=>{ const mon=_dYr.mon||{}; const ms=Object.keys(mon).map(Number).sort((a,b)=>a-b); if(!ms.length) return `<div style="margin:2px 0 12px;padding:14px;text-align:center;color:var(--ink3);font-size:12.5px;background:var(--bg2);border:1px solid var(--line);border-radius:10px">${_dSelY}년 지부 → 대리점 판매 기록이 없어요.</div>`; const thl='text-align:left;padding:7px 10px;font-size:11px;font-weight:800;background:var(--amber);color:#fff'; const thr='text-align:right;padding:7px 10px;font-size:11px;font-weight:800;background:var(--amber);color:#fff'; const tdl='text-align:left;padding:6px 10px;font-size:12.5px;border-bottom:1px solid var(--line)'; const tdr='text-align:right;padding:6px 10px;font-size:12.5px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums'; const tq=ms.reduce((s,m)=>s+(mon[m].q||0),0), ta=ms.reduce((s,m)=>s+(mon[m].a||0),0); return `<div style="margin:2px 0 12px"><div style="font-size:12px;color:var(--ink3);margin-bottom:6px;font-weight:700">${_dSelY}년 월별 지부 → 대리점 판매</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th style="${thl}">월</th><th style="${thr}">롤</th><th style="${thr}">매출</th></tr>${ms.map(m=>`<tr><td style="${tdl}">${m}월</td><td style="${tdr}">${won(mon[m].q||0)}</td><td style="${tdr}">${won(mon[m].a||0)}원</td></tr>`).join('')}<tr><td style="${tdl};font-weight:800;background:rgba(244,145,28,.08)">합계</td><td style="${tdr};font-weight:800;background:rgba(244,145,28,.08)">${won(tq)}</td><td style="${tdr};font-weight:800;background:rgba(244,145,28,.08)">${won(ta)}원</td></tr></table></div></div>`; })()}
     ${row('코드', escapeHtml(d.code||'-'))}
     ${d.store?row('매장명', escapeHtml(d.store)):''}
     ${row('담당 지부', escapeHtml(d.jibu||'-'))}
@@ -5531,7 +5535,7 @@ function _dealerDetailHtml(d){
     ${d.tel?row('연락처', escapeHtml(d.tel)):''}
     ${(d.rank||d.tier)?row('등급', '거래처 '+escapeHtml(d.rank||'-')+' · 시장 '+escapeHtml(d.tier||'-')):''}
     ${d.salesType?row('판매형태', escapeHtml(d.salesType)):''}
-    <div style="margin-top:12px;font-size:11.5px;color:var(--ink3);line-height:1.6">※ 매출·롤은 <b>지부 → 대리점 판매(branchSalesList)</b> 누적입니다.${d.bsSales?' (본사 직매 포함)':''} 대리점 마스터(branchCustList) 기준.</div>
+    <div style="margin-top:12px;font-size:11.5px;color:var(--ink3);line-height:1.6">※ 매출·롤은 <b>지부 → 대리점 판매(branchSalesList)</b> 누적입니다(위 연도 토글 기준).${d.bsSales?' (본사 직매 포함)':''} 대리점 마스터(branchCustList) 기준.</div>
   </div>`;
 }
 // 롤 구매(branchsales)한 대리점명 집합(정규화)
@@ -6384,7 +6388,7 @@ const SALES_JIBU=['레인보우케이','모빌리언','엘케이글로벌','카�
 let SALES=null, salesLoaded=false, _rollExp={}, _salesSel=[], _salesCmpA=0, _salesCmpB=0, _jspSel='__all', _jspMonths=[], _jspView='rank', _regMonths=[], _regMode='share', _scFrom='', _scTo='', _scAll=false, _scoreSel=[], _salesYear='cur';   // _salesSel: 선택 월 배열(빈 배열=누적) · _scoreSel: 매출 핵심 전용 월 선택 · _salesYear: cur=올해/prev=작년
 function _prevSalesObj(S){ if(!S||!S.prev) return null; const p=S.prev; return { months:p.months||[], channels:p.channels||{}, jibu:p.jibu||{}, dealers:p.dealers||{}, prodAll:p.prodAll||{}, jibuProd:p.jibuProd||{}, chMat:p.chMat||{}, prodList:Object.keys(p.prodAll||{}), inputs:S.inputs||{}, updatedAt:S.updatedAt, ver:S.ver, prodList2:null, prev:null, __isPrev:true }; }
   // ── 카드별 연도(올해/작년) 독립 토글 ──
-  let _cardYr={sum:'cur',roll:'cur',jibu:'cur',jprod:'cur',bs:'cur'};
+  let _cardYr={sum:'cur',roll:'cur',jibu:'cur',jprod:'cur',bs:'cur',dlr:'cur'};
   function _withYear(key,fn){ const _real=SALES; const hasPrev=!!(_real&&_real.prev&&(_real.prev.months||[]).length); const up=(_cardYr&&_cardYr[key]==='prev'&&hasPrev); if(up){ const pv=_prevSalesObj(_real); if(pv) SALES=pv; } try{ return fn(); } finally{ SALES=_real; } }
   function _cyrSeg(key){ const y=(new Date()).getFullYear(); const isPrev=!!(_cardYr&&_cardYr[key]==='prev'); return `<div class="seg cyr-seg" data-cyk="${key}" style="transform:scale(.85);transform-origin:left center;margin:0"><button type="button" data-cyv="cur" class="${!isPrev?'on':''}">${y}</button><button type="button" data-cyv="prev" class="${isPrev?'on':''}">${y-1}</button></div>`; }
   function _cardHdr(title,key,xlsx){ return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${title}</h3>${_cyrSeg(key)}</div>${xlsx?`<button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(title)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button>`:''}</div>`; }
@@ -8415,7 +8419,7 @@ document.getElementById('raynoApp').addEventListener('click', async e=>{
   const _pf=e.target.closest('[data-pf]'); if(_pf){ const v=_pf.dataset.pf; if(v==='ALL'){ GV.prodSel=[]; } else { const s=new Set(GV.prodSel||[]); s.has(v)?s.delete(v):s.add(v); GV.prodSel=[...s]; } renderGlass(); return; }
   if(e.target.id==='dlrMore'){ _dlrShow+=300; renderDealer(); return; }
   const _db=e.target.closest('#dlrStatus button'); if(_db){ DLR.status=_db.dataset.st; _dlrShow=300; renderDealer(); return; }
-  const _drRow=e.target.closest&&e.target.closest('#rDealer tr[data-di]'); if(_drRow){ const d=_dlrRows[+_drRow.dataset.di]; if(d&&typeof openExplain==='function') openExplain('🏢 '+escapeHtml(d.name)+(d.store?' <span style="font-size:12px;color:var(--ink3);font-weight:600">· '+escapeHtml(d.store)+'</span>':''), _dealerDetailHtml(d)); return; }
+  const _drRow=e.target.closest&&e.target.closest('#rDealer tr[data-di]'); if(_drRow){ const d=_dlrRows[+_drRow.dataset.di]; if(d&&typeof openExplain==='function'){ _dlrModalD=d; _cardYr.dlr='cur'; openExplain('🏢 '+escapeHtml(d.name)+(d.store?' <span style="font-size:12px;color:var(--ink3);font-weight:600">· '+escapeHtml(d.store)+'</span>':''), _dealerDetailHtml(d)); } return; }
   if(e.target.id==='dlrSearchBtn'){ const q=document.getElementById('dlrQ'); DLR.q=q?q.value.trim():''; _dlrShow=300; renderDealer(); return; }
   const _psB=e.target.closest('#psPreset button[data-ps]'); if(_psB){ PSV.preset=_psB.dataset.ps; if(PSV.preset==='custom'&&!PSV.from){ const t=new Date(), f=new Date(); f.setDate(f.getDate()-6); const s=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); PSV.from=s(f); PSV.to=s(t); } renderRevenue(); return; }
   if(e.target.id==='psApply'){ const f=document.getElementById('psFrom'), t=document.getElementById('psTo'); PSV.from=f?f.value:''; PSV.to=t?t.value:''; if(PSV.from&&PSV.to&&PSV.to<PSV.from){const x=PSV.from;PSV.from=PSV.to;PSV.to=x;} PSV.preset='custom'; renderRevenue(); return; }
