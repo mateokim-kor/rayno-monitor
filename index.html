@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · [임시] 26년5월 보증서 검증(시공일자 vs 보증서등록일 vs 신차판정)';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 점유율 신차 기준을 공식 발행량에 맞춤(중고제외+보증서등록일) · 검증중';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -6553,7 +6553,7 @@ function salesRegionStats(){
   if(_regMode==='warr'){
     const warr={}, car={}; let tWarr=0, tCar=0, unmatched=0;
     const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]);
-    rows.forEach(r=>{ if(!_warrIsNew(r)) return; if(sel){ const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(sel.indexOf(mm)<0) return; } const k=_warrRegOf(r).doKey; if(!k){ unmatched++; return; } warr[k]=(warr[k]||0)+1; tWarr++; });
+    rows.forEach(r=>{ if(!_warrIsNew(r)) return; if(sel){ const mm=_warrMonth(r); if(sel.indexOf(mm)<0) return; } const k=_warrRegOf(r).doKey; if(!k){ unmatched++; return; } warr[k]=(warr[k]||0)+1; tWarr++; });
     const by={};
     _REGION_KEYS.forEach(k=>{ const c=sumM((reg[k]||{}).carReg); car[k]=c; tCar+=c; by[k]= c>0 ? ((warr[k]||0)/c*100) : null; });
     return {mode:'warr', warr, car, by, tWarr, tCar, unmatched, cap:rcap};
@@ -7445,7 +7445,7 @@ function salesSummaryTable(){
 // ── 설정 워크스페이스: 매출 설정 ──
 // 품질보증서 월별 건수: 프로그램의 품질보증서(WARR) 데이터에서 시공일자 기준 자동 집계 (없으면 수기값)
 function _qc(m){ if(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length){ return _warrByJibu(m).total; } return _sNum(((salesCfg().warranty)||{})[m]||0); }
-function _qcNew(m){ if(!(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)) return _sNum(((salesCfg().warranty)||{})[m]||0); if(!(WARR.columns&&WARR.columns.includes('신차/중고차'))) return _qc(m); let n=0; WARR.rows.forEach(r=>{ if(!_warrIsNew(r))return; const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(mm===m)n++; }); return n; }  // 신차 보증서만(중고 제외), 컬럼 없으면 전체로 폴백
+function _qcNew(m){ if(!(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length)) return _sNum(((salesCfg().warranty)||{})[m]||0); if(!(WARR.columns&&WARR.columns.includes('신차/중고차'))) return _qc(m); let n=0; WARR.rows.forEach(r=>{ if(!_warrIsNew(r))return; const mm=_warrMonth(r); if(mm===m)n++; }); return n; }  // 신차 보증서만(중고 제외), 컬럼 없으면 전체로 폴백
 function _qcNewPick(){ let s=0; _salesActive().forEach(m=>s+=_qcNew(m)); return s; }
 function _qcTot(){ let s=0; _salesMonths().forEach(m=>s+=_qc(m)); return s; }
 
@@ -7459,7 +7459,8 @@ function _dealerPick(){ let s=0; _salesActive().forEach(m=>s+=_dealerCars(m)); r
 function _carRegPick(){ return _scPick(salesCfg().carReg); }
 
 // ── 신차 장착 점유율 (보증서 신차 ÷ 신차등록, 2-트랙) ──
-function _warrIsNew(r){ const s=String(r['신차/중고차']||'').trim(); return s==='신차'||s.indexOf('신차')===0; }
+function _warrIsNew(r){ const s=String(r['신차/중고차']||'').trim(); return !(s==='중고차'||s.indexOf('중고')===0); }   // 중고차 아니면 신차(빈값 포함) — 공식 발행량 기준
+function _warrMonth(r){ let s=String(r['보증서등록일']||'').trim(); if(!s) s=String(r['시공일자']||'').trim(); return s.length>=7?parseInt(s.slice(5,7),10):0; }   // 보증서등록일(발행일) 월, 없으면 시공일자
 let _dlrRegionCache=null;
 function _dealerRegionMap(){   // 정규화 매장명 → {doKey, sgg} (보증서 대리점코드 체계가 마스터와 달라 이름으로 매칭)
   if(_dlrRegionCache) return _dlrRegionCache;
@@ -7485,7 +7486,7 @@ function _warrNewByRegion(){ // 활성 월 기준 신차 보증서: {regionKey:c
   const R={}; let total=0; const act=_salesActive();
   ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{
     if(!_warrIsNew(r)) return;
-    const mm=parseInt(String(r['시공일자']||'').slice(5,7),10);
+    const mm=_warrMonth(r);
     if(act.indexOf(mm)<0) return;
     total++; const k=_warrRegOf(r).doKey; if(k) R[k]=(R[k]||0)+1;
   });
@@ -7503,7 +7504,7 @@ function _b2bAutoCars(){ return _b2bCarsBy(_RE_MONO)+_b2bCarsBy(_RE_PRESTO); }
 function _warrGeoStats(){
   const act=_salesActive(); const sido={}, sgg={};
   ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>{
-    const mm=parseInt(String(r['시공일자']||'').slice(5,7),10); if(act.indexOf(mm)<0) return;
+    const mm=_warrMonth(r); if(act.indexOf(mm)<0) return;
     const _rg=_warrRegOf(r); const k=_rg.doKey; if(!k) return;
     const sg=_rg.sgg;
     const dealer=String(r['대리점코드']||r['매장명']||'').trim();
@@ -7571,8 +7572,8 @@ function whiteSpaceCard(){
   if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '<div class="empty">품질보증서 데이터가 없습니다.</div>';
   const G=_warrGeoStats();
   const nw=_warrNewByRegion();
-  const _v5=(()=>{ const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]); const mo=v=>{const s=String(v||'');return s.length>=7?parseInt(s.slice(5,7),10):0;}; const yr=v=>String(v||'').slice(0,4); let a=0,b=0,c=0,onlyI=0,onlyE=0,badDate=0; const nc={}; rows.forEach(r=>{ const instMay=(yr(r['시공일자'])==='2026'&&mo(r['시공일자'])===5); const issMay=(yr(r['보증서등록일'])==='2026'&&mo(r['보증서등록일'])===5); const nw2=_warrIsNew(r); if(nw2){ if(instMay)a++; if(issMay)b++; if(instMay&&!issMay)onlyI++; if(issMay&&!instMay)onlyE++; if(!String(r['시공일자']||'').trim())badDate++; } if(instMay){ c++; const v=(String(r['신차/중고차']||'').trim())||'(빈값)'; nc[v]=(nc[v]||0)+1; } }); const ncs=Object.entries(nc).sort((x,y)=>y[1]-x[1]).map(([k,v])=>`${k}:${v}`).join(', '); return {a,b,c,onlyI,onlyE,badDate,ncs}; })();
-  const _v5Html=`<div style="background:#1e2a1e;color:#e0f0e0;border-radius:8px;padding:10px 12px;font-size:11px;font-family:monospace;margin-bottom:12px;line-height:1.7;white-space:pre-wrap;overflow-x:auto">🔧 26년5월 보증서 검증(임시)\n① 신차·시공일자5월 (우리 방식) ${_v5.a}건\n② 신차·보증서등록일5월 ${_v5.b}건\n③ 전체(신차+중고)·시공일자5월 ${_v5.c}건\n시공5월O/등록5월X ${_v5.onlyI}건 · 시공5월X/등록5월O ${_v5.onlyE}건 · 신차인데 시공일자빈값 ${_v5.badDate}건\n[시공5월 신차/중고 값분포] ${_v5.ncs}</div>`;
+  const _v5=(()=>{ const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]); const mo=v=>{const s=String(v||'');return s.length>=7?parseInt(s.slice(5,7),10):0;}; const yr=v=>String(v||'').slice(0,4); let a=0,b=0,c=0,onlyI=0,onlyE=0,badDate=0; const nc={}; rows.forEach(r=>{ const instMay=(yr(r['시공일자'])==='2026'&&mo(r['시공일자'])===5); const issMay=(yr(r['보증서등록일'])==='2026'&&mo(r['보증서등록일'])===5); const nw2=_warrIsNew(r); if(nw2){ if(instMay)a++; if(issMay)b++; if(instMay&&!issMay)onlyI++; if(issMay&&!instMay)onlyE++; if(!String(r['시공일자']||'').trim())badDate++; } if(instMay){ c++; const v=(String(r['신차/중고차']||'').trim())||'(빈값)'; nc[v]=(nc[v]||0)+1; } }); const ncs=Object.entries(nc).sort((x,y)=>y[1]-x[1]).map(([k,v])=>`${k}:${v}`).join(', '); return {a,b,c,onlyI,onlyE,badDate,ncs,qc5:(typeof _qcNew==='function'?_qcNew(5):null)}; })();
+  const _v5Html=`<div style="background:#1e2a1e;color:#e0f0e0;border-radius:8px;padding:10px 12px;font-size:11px;font-family:monospace;margin-bottom:12px;line-height:1.7;white-space:pre-wrap;overflow-x:auto">🔧 26년5월 보증서 검증(임시)\n▶ 실제 프로그램 집계 _qcNew(5) = ${_v5.qc5}건  (공식 목표 4836)\n① (중고제외)·시공일자5월 ${_v5.a}건\n② 신차·보증서등록일5월 ${_v5.b}건\n③ 전체(신차+중고)·시공일자5월 ${_v5.c}건\n시공5월O/등록5월X ${_v5.onlyI}건 · 시공5월X/등록5월O ${_v5.onlyE}건 · 신차인데 시공일자빈값 ${_v5.badDate}건\n[시공5월 신차/중고 값분포] ${_v5.ncs}</div>`;
   let html=_v5Html+`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>시장 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
 
   // 시·도: 점유율 낮은 순(약한 시장 먼저)
