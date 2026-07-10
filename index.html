@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 지역미상 진단 패널 제거 (지역조인 88% + 지역미상 행으로 총합 상단 일치 · API 대기)';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · [임시] 26년5월 보증서 검증(시공일자 vs 보증서등록일 vs 신차판정)';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -7571,7 +7571,9 @@ function whiteSpaceCard(){
   if(typeof WARR==='undefined'||!WARR||!WARR.rows||!WARR.rows.length) return '<div class="empty">품질보증서 데이터가 없습니다.</div>';
   const G=_warrGeoStats();
   const nw=_warrNewByRegion();
-  let html=`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>시장 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
+  const _v5=(()=>{ const rows=((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]); const mo=v=>{const s=String(v||'');return s.length>=7?parseInt(s.slice(5,7),10):0;}; const yr=v=>String(v||'').slice(0,4); let a=0,b=0,c=0,onlyI=0,onlyE=0,badDate=0; const nc={}; rows.forEach(r=>{ const instMay=(yr(r['시공일자'])==='2026'&&mo(r['시공일자'])===5); const issMay=(yr(r['보증서등록일'])==='2026'&&mo(r['보증서등록일'])===5); const nw2=_warrIsNew(r); if(nw2){ if(instMay)a++; if(issMay)b++; if(instMay&&!issMay)onlyI++; if(issMay&&!instMay)onlyE++; if(!String(r['시공일자']||'').trim())badDate++; } if(instMay){ c++; const v=(String(r['신차/중고차']||'').trim())||'(빈값)'; nc[v]=(nc[v]||0)+1; } }); const ncs=Object.entries(nc).sort((x,y)=>y[1]-x[1]).map(([k,v])=>`${k}:${v}`).join(', '); return {a,b,c,onlyI,onlyE,badDate,ncs}; })();
+  const _v5Html=`<div style="background:#1e2a1e;color:#e0f0e0;border-radius:8px;padding:10px 12px;font-size:11px;font-family:monospace;margin-bottom:12px;line-height:1.7;white-space:pre-wrap;overflow-x:auto">🔧 26년5월 보증서 검증(임시)\n① 신차·시공일자5월 (우리 방식) ${_v5.a}건\n② 신차·보증서등록일5월 ${_v5.b}건\n③ 전체(신차+중고)·시공일자5월 ${_v5.c}건\n시공5월O/등록5월X ${_v5.onlyI}건 · 시공5월X/등록5월O ${_v5.onlyE}건 · 신차인데 시공일자빈값 ${_v5.badDate}건\n[시공5월 신차/중고 값분포] ${_v5.ncs}</div>`;
+  let html=_v5Html+`<div style="font-size:12px;color:var(--ink2);margin-bottom:11px;line-height:1.55">확장·대리점 개설 후보 지역. <b>시·도</b>는 신차 등록 대비 <b>시장 점유율이 낮을수록</b> 침투 여지가 큽니다. <b>시군구</b>는 <b>대리점당 시공이 많을수록</b>(대리점이 바쁨) 추가 개설 여력이 있다는 신호입니다. (시군구 신차 등록이 없어 시군구 점유율 대신 시공 밀도·대리점 커버리지로 봅니다.)</div>`;
 
   // 시·도: 점유율 낮은 순(약한 시장 먼저)
   const sds=_REGION_KEYS.map(k=>{ const s=G.sido[k]||{inst:0,dealers:new Set(),sgg:new Set()}; const ni=nw.byRegion[k]||0; const reg=_regionCarRegPick(k); return {k, inst:s.inst, dealers:s.dealers.size, sgg:s.sgg.size, sh: reg>0? ni/reg*100 : null}; })
