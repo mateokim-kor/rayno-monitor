@@ -1776,7 +1776,7 @@ const SUPA = {
   todayFile: 'today_sales.json',
   dailyFile: 'daily_sales.json',
 };
-const BUILD = '2026-07-09 · 점유율 신차기준 공식맞춤 완료(중고제외+발행일, 5월 4835) · 검증박스 제거';   // 배포 버전 확인용
+const BUILD = '2026-07-09 · 품질보증서 탭 신차 집계도 공식 기준(중고제외=신차, 빈값 포함)으로 통일 — 점유율과 일치';   // 배포 버전 확인용
 const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
@@ -2917,7 +2917,7 @@ function shareExplain(kind, m){
     formula='그 달 <b>신차 보증서 실시공(신차만, 중고 제외)</b> ÷ <b>신차 등록(월 출고 대수)</b> × 100';
     calc = cr>0 ? `${N(inst)}건 ÷ ${N(cr)}대 × 100 = <b style="color:#16a34a">${F(inst/cr*100)}%</b>`
                 : `신차 실시공 ${N(inst)}건 — 신차 등록이 입력되지 않아 계산할 수 없습니다.`;
-    note='보증서의 신차/중고차=신차 건만 집계합니다(중고 제외). 그래서 전체 시공 기준보다 낮게 나옵니다. 신차 등록은 설정 → 매출에서 입력.';
+    note='보증서에서 중고차만 제외하고 집계합니다(=신차, 미기재분 포함). 그래서 전체 시공 기준보다 낮게 나옵니다. 신차 등록은 설정 → 매출에서 입력.';
   } else if(kind==='dealer'){
     const rolls=_sNum((scc.dealerSales||{})[m]||0), cap=_sNum(scc.regionCap||0)||10, cars=rolls*cap;
     title='시장 점유율 · 대리점 판매 ('+ml+')';
@@ -6349,7 +6349,7 @@ function renderWarranty(){
   const _acc=(t,c)=>`<details class="warr-acc"><summary class="warr-sec"><span class="dot"></span>${t}<span class="warr-chev">▾</span></summary>${c}</details>`;
   const custBlock=(custKpi||custCards.some(Boolean))?_acc('시공고객 분석',custKpi+_grid(custCards)):'';
   // 차량
-  const newR=_warrHas('신차/중고차')?_warrRatio(recs,'신차/중고차',v=>v.indexOf('신차')===0):null;
+  const newR=_warrHas('신차/중고차')?(()=>{ let y=0,t=0; recs.forEach(r=>{ t++; if(_warrIsNew(r))y++; }); return {y,t,pct:t?y/t*100:0}; })():null;   // 중고차만 제외(=신차, 미기재 포함) · 점유율/공식과 동일 기준
   const impR=_warrHas('수입/국산')?_warrRatio(recs,'수입/국산',v=>/수입/.test(v)):null;
   const _cV='var(--dv3)';
   const vehCards=[ warrDistCard(recs,'제조사','제조사 TOP',{color:_cV,n:12}), warrDistCard(recs,'모델명','모델 TOP',{color:_cV,n:12}), warrDistCard(recs,'차종','차종 구성',{color:_cV}), warrDistCard(recs,'수입/국산','수입/국산',{color:_cV}), warrDistCard(recs,'신차/중고차','신차/중고',{color:_cV}) ];
