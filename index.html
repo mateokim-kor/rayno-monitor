@@ -8219,7 +8219,36 @@ function _rviewSig(){
   // ★ 설정값 전체(STORE.config)를 서명에 포함 — 지역별 세일즈 입력(salesCfg.region: 롤 판매·신차 등록),
   //    월 선택, 표시 문구 등 설정에서 바꾼 게 반드시 화면에 반영되도록. (빠뜨리면 옛 화면이 그대로 남음)
   let cfg=''; try{ cfg=JSON.stringify((typeof STORE!=='undefined'&&STORE&&STORE.config)||0); }catch(_){}
-  let ssel=''; try{ ssel=JSON.stringify((typeof _salesSel!=='undefined'&&_salesSel)||0); }catch(_){}   // 월 선택 상태
+  let ssel='';
+  try{
+    // 화면 상태 전체를 서명에 포함. 이 값들은 대부분 헬퍼(salesRegionStats 등)를 통해 간접 참조되므로
+    // "어느 변수가 어느 탭에 영향 주는지" 일일이 열거하면 반드시 빠뜨림 → 전부 넣어 원천 차단.
+    // (_regMode: 롤판매/보증서 기준 토글 — 매출·점유율 양쪽에 있어 탭 간 stale의 주범)
+    const U=v=>(v===undefined?0:v);
+    ssel=JSON.stringify([
+      U(typeof _salesSel!=='undefined'?_salesSel:undefined),
+      U(typeof _regMode!=='undefined'?_regMode:undefined),
+      U(typeof _regMonths!=='undefined'?_regMonths:undefined),
+      U(typeof _salesYear!=='undefined'?_salesYear:undefined),
+      U(typeof _salesCmpA!=='undefined'?_salesCmpA:undefined),
+      U(typeof _salesCmpB!=='undefined'?_salesCmpB:undefined),
+      U(typeof _jspSel!=='undefined'?_jspSel:undefined),
+      U(typeof _jspMonths!=='undefined'?_jspMonths:undefined),
+      U(typeof _jspView!=='undefined'?_jspView:undefined),
+      U(typeof _scFrom!=='undefined'?_scFrom:undefined),
+      U(typeof _scTo!=='undefined'?_scTo:undefined),
+      U(typeof _scAll!=='undefined'?_scAll:undefined),
+      U(typeof _scoreSel!=='undefined'?_scoreSel:undefined),
+      U(typeof _rollExp!=='undefined'?_rollExp:undefined),
+      U(typeof _lwLine!=='undefined'?_lwLine:undefined),
+      U(typeof _lwScope!=='undefined'?_lwScope:undefined),
+      U(typeof _lwSub!=='undefined'?_lwSub:undefined),
+      U(typeof _lwFrontOnly!=='undefined'?_lwFrontOnly:undefined),
+      U(typeof _lwYear!=='undefined'?_lwYear:undefined),
+      U(typeof _lwMonth!=='undefined'?_lwMonth:undefined),
+      U(typeof _lwMode!=='undefined'?_lwMode:undefined)
+    ]);
+  }catch(_){ ssel=String(Math.random()); }   // 읽기 실패 시엔 캐시를 쓰지 않음(안전 우선)
   const W=(typeof WARR!=='undefined')?WARR:null, S=(typeof SALES!=='undefined')?SALES:null, B=(typeof BSALE!=='undefined')?BSALE:null, G=(typeof GLASS!=='undefined')?GLASS:null, E=(typeof ERPD!=='undefined')?ERPD:null;
   return [gv(W,'updatedAt'),nr(W),wexc, gv(S,'updatedAt'),inp, gv(B,'updatedAt'),nr(B), gv(G,'updatedAt'),nr(G), gv(E,'updatedAt'),nd(E), (typeof auth!=='undefined'?auth:''), th, cy, cfg, ssel].join('~');
 }
