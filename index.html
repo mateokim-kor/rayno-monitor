@@ -1089,7 +1089,7 @@
   .rsb-brand{display:flex;flex-direction:column;align-items:center;gap:7px;padding:6px 8px 13px;margin-bottom:6px;border-bottom:1px solid #262a32;background:none;border-left:none;border-right:none;border-top:none;width:100%;cursor:pointer;text-align:center}
   .rsb-brand:hover{opacity:.85}
   .rsb-logo{width:130px;height:auto;display:block;filter:brightness(0) invert(1)}
-  .rsb-app{display:block;white-space:nowrap;font-size:13px;font-weight:700;color:#fff;line-height:1.2}
+  .rsb-app{display:block;white-space:nowrap;font-size:13px;font-weight:700;color:#fff;line-height:1.2;letter-spacing:normal}
   .rsb-nm{font-weight:800;font-size:18px;letter-spacing:.04em;color:#fff}
   /* 그룹 네비 */
   .rsb-nav{display:flex;flex-direction:column;gap:1px;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#33363d transparent}
@@ -9356,33 +9356,10 @@ function _applySidebarLayout(){
       ]},
     ];
     /* _sbSyncActive 는 전역으로 이동됨 */
-/* 사이드바 브랜드: 로고와 '레이노 인사이트 랩'의 가로 길이를 일치시킴.
-   글자 크기를 고정하면 폰트(Pretendard/시스템 폴백)에 따라 폭이 달라지므로,
-   로고 폭(130px)을 기준으로 자간을 계산해 글자가 정확히 그 폭을 채우도록 함. */
-function _sbFitBrand(brand){
-  if(!brand) return;
-  const logo=brand.querySelector('.rsb-logo'), app=brand.querySelector('.rsb-app');
-  if(!logo||!app) return;
-  const fit=()=>{
-    const W=logo.getBoundingClientRect().width; if(!W) return;
-    app.style.letterSpacing='0px'; app.style.marginRight='0px';
-    const nat=app.getBoundingClientRect().width;
-    const n=(app.textContent||'').length;
-    if(n>1 && nat>0){
-      const ls=(W-nat)/(n-1);              // 글자 사이에만 분배 → 글자가 정확히 로고 폭을 차지
-      app.style.letterSpacing=ls+'px';
-      app.style.marginRight=(-ls)+'px';    // 마지막 글자 뒤 자간 상쇄 → 중앙정렬 어긋남 방지
-    }
-  };
-  fit();
-  if(logo.complete===false) logo.addEventListener('load', fit, {once:true});   // 로고 이미지 로드 후 재계산
-  try{ if(document.fonts&&document.fonts.ready) document.fonts.ready.then(fit).catch(()=>{}); }catch(_){}   // 폰트 로드 후 재계산
-}
     const brand=document.createElement('button'); brand.type='button'; brand.className='rsb-brand';
     brand.innerHTML = (logoSrc ? '<img class="rsb-logo" src="'+logoSrc+'" alt="RAYNO">' : '<span class="rsb-nm">RAYNO</span>')
       + '<span class="rsb-app">레이노 인사이트 랩</span>';
     aside.appendChild(brand);
-    _sbFitBrand(brand);   // 로고 폭에 맞춰 앱 이름의 자간을 계산 → 가로 길이 일치(폰트가 달라도 자동으로 맞음)
     const navWrap=document.createElement('div'); navWrap.className='rsb-nav'; aside.appendChild(navWrap);
     const allItems=[]; let adminGrp=null;
     NAVCFG.forEach(sec=>{
