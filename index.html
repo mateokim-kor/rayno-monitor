@@ -8216,8 +8216,12 @@ function _rviewSig(){
   let wexc=0; try{ wexc=(typeof WARR!=='undefined'&&WARR&&WARR.config&&WARR.config.excluded&&WARR.config.excluded.length)||0; }catch(_){}
   let th=''; try{ th=document.documentElement.getAttribute('data-theme')||''; }catch(_){}
   let cy=''; try{ const c=(typeof _cardYr!=='undefined'&&_cardYr)||{}; cy=[c.sum,c.roll,c.jibu,c.jprod,c.bs].join(','); }catch(_){}
+  // ★ 설정값 전체(STORE.config)를 서명에 포함 — 지역별 세일즈 입력(salesCfg.region: 롤 판매·신차 등록),
+  //    월 선택, 표시 문구 등 설정에서 바꾼 게 반드시 화면에 반영되도록. (빠뜨리면 옛 화면이 그대로 남음)
+  let cfg=''; try{ cfg=JSON.stringify((typeof STORE!=='undefined'&&STORE&&STORE.config)||0); }catch(_){}
+  let ssel=''; try{ ssel=JSON.stringify((typeof _salesSel!=='undefined'&&_salesSel)||0); }catch(_){}   // 월 선택 상태
   const W=(typeof WARR!=='undefined')?WARR:null, S=(typeof SALES!=='undefined')?SALES:null, B=(typeof BSALE!=='undefined')?BSALE:null, G=(typeof GLASS!=='undefined')?GLASS:null, E=(typeof ERPD!=='undefined')?ERPD:null;
-  return [gv(W,'updatedAt'),nr(W),wexc, gv(S,'updatedAt'),inp, gv(B,'updatedAt'),nr(B), gv(G,'updatedAt'),nr(G), gv(E,'updatedAt'),nd(E), (typeof auth!=='undefined'?auth:''), th, cy].join('~');
+  return [gv(W,'updatedAt'),nr(W),wexc, gv(S,'updatedAt'),inp, gv(B,'updatedAt'),nr(B), gv(G,'updatedAt'),nr(G), gv(E,'updatedAt'),nd(E), (typeof auth!=='undefined'?auth:''), th, cy, cfg, ssel].join('~');
 }
 function _fmtUpl(v){ if(!v) return ''; const d=new Date(v); if(isNaN(d.getTime())) return ''; const p=n=>String(n).padStart(2,'0'); const rel=_relDays(v); return `최근 업로드 ${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}${rel?' · '+rel:''}`; }
 function _setUpl(id,v){ const el=document.getElementById(id); if(!el) return; if(v){ el.textContent='🕒'; el.title=_fmtUpl(v); } else { el.textContent=''; el.title=''; } }
