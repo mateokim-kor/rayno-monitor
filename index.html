@@ -6596,6 +6596,28 @@ function _regionKeyRaw(raw){
   for(const f in FULL){ if(s.indexOf(f)===0) return FULL[f]; }
   return null;
 }
+// ── 지역별 롤 판매: ERP 지부→대리점 판매(BSALE)에서 자동 집계 ──
+//   지역 = ERP가 주는 시·도(sido = StateCD_Name) 1순위 → 비어있으면 매장명→대리점 마스터 조인으로 보강.
+//   ★ BSALE에는 작년 데이터도 함께 들어있으므로 반드시 연도로 걸러야 함(안 그러면 작년+올해가 합산됨).
+let _bsRegCache=null, _bsRegKey='';
+function _bsRegionRolls(sel){
+  if(!(typeof BSALE!=='undefined' && BSALE && Array.isArray(BSALE.rows) && BSALE.rows.length)) return null;   // ERP 없으면 null → 수기입력 폴백
+  const yr=String((new Date()).getFullYear());
+  const key=yr+'|'+(sel?sel.join(','):'*')+'|'+BSALE.rows.length+'|'+(BSALE.updatedAt||'');
+  if(_bsRegCache && _bsRegKey===key) return _bsRegCache;                    // 재계산 캐시(데이터·기간 바뀌면 자동 무효화)
+  const by={}; let total=0, matched=0, unknown=0;
+  BSALE.rows.forEach(r=>{
+    if(_bsRowYr(r)!==yr) return;                                            // 연도 필터
+    const m=_bsMonthOf(r); if(sel && sel.indexOf(m)<0) return;              // 선택 월 필터
+    const q=_sNum(r.q||0); if(!q) return;
+    total+=q;
+    let k=_regionKey(r.sido);                                               // ① ERP 시·도
+    if(!k){ const rm=_dealerRegionMap().get(_bsNameNorm(r.dealer)); if(rm) k=rm.doKey; }   // ② 매장명 조인 백업
+    if(k){ by[k]=(by[k]||0)+q; matched+=q; } else unknown+=q;
+  });
+  _bsRegKey=key; _bsRegCache={by, total, matched, unknown};
+  return _bsRegCache;
+}
 function salesRegionStats(){
   const sc=salesCfg(), reg=sc.region||{}, rcap=(_sNum(sc.regionCap||0)||10);
   const sel=_salesSel.length?_salesActive():null;
@@ -6609,8 +6631,10 @@ function salesRegionStats(){
     return {mode:'warr', warr, car, by, tWarr, tCar, unmatched, cap:rcap};
   }
   const by={},roll={},car={}; let tRoll=0,tCar=0;
-  _REGION_KEYS.forEach(k=>{ const rr=reg[k]||{}; const r=sumM(rr.roll), c=sumM(rr.carReg); roll[k]=r; car[k]=c; tRoll+=r; tCar+=c; by[k]=c>0?(r*rcap/c*100):0; });
-  return {mode:'share', by, roll, car, tRoll, tCar, cap:rcap, total:tRoll};
+  const erp=_bsRegionRolls(sel);                                            // ERP 자동 집계(있으면 우선, 없으면 수기입력 폴백)
+  _REGION_KEYS.forEach(k=>{ const rr=reg[k]||{}; const r=erp?(erp.by[k]||0):sumM(rr.roll), c=sumM(rr.carReg); roll[k]=r; car[k]=c; tRoll+=r; tCar+=c; by[k]=c>0?(r*rcap/c*100):0; });
+  const unknown = erp ? erp.unknown : 0;                                    // 지역 매칭 안 된 롤(전국 합계에는 포함 → 상단 카드와 어긋나지 않게)
+  return {mode:'share', by, roll, car, tRoll:tRoll+unknown, tRollMatched:tRoll, tCar, cap:rcap, total:tRoll, src: erp?'erp':'manual', unknown};
 }
 
 function _pathCenter(d){ const n=(String(d).match(/-?\d+\.?\d*/g)||[]).map(Number); let sx=0,sy=0,c=0; for(let i=0;i+1<n.length;i+=2){ sx+=n[i]; sy+=n[i+1]; c++; } return c?{x:sx/c,y:sy/c}:{x:0,y:0}; }
@@ -6653,8 +6677,9 @@ function salesRegionMap(){
   const body=(()=>{
     const st=salesRegionStats();
     if(st.mode==='share'){
-      const {by,roll,car,tRoll,tCar,cap}=st;
-      if(tRoll<=0&&tCar<=0) return `<div class="empty">지역별 세일즈 데이터가 없습니다. ⚙ 설정 → 매출 설정 → <b>지역별 세일즈 입력</b>에서 입력하세요.</div>`;
+      const {by,roll,car,tRoll,tCar,cap,src,unknown}=st;
+      const _isErp = src==='erp';
+      if(tRoll<=0&&tCar<=0) return `<div class="empty">${_isErp?'선택한 기간에 지부→대리점 판매(ERP) 데이터가 없습니다.':'지역별 세일즈 데이터가 없습니다. ⚙ 설정 → 매출 설정 → <b>지역별 세일즈 입력</b>에서 입력하세요.'}</div>`;
       const maxSh=Math.max(0.0001,..._REGION_KEYS.map(k=>by[k]||0));
       const svg=_regionSVG(k=>by[k]||0, k=>`${k} · 점유율 ${(by[k]||0).toFixed(2)}% (롤 ${(roll[k]||0).toLocaleString()} / 신차 ${(car[k]||0).toLocaleString()})`, k=>`data-roll="${roll[k]||0}" data-car="${car[k]||0}" data-cap="${cap}" data-share="${(by[k]||0).toFixed(2)}"`);
       const entries=_REGION_KEYS.map(k=>[k, by[k]||0]).sort((a,b)=>b[1]-a[1]).filter(e=>(roll[e[0]]||car[e[0]]));
@@ -6663,10 +6688,14 @@ function salesRegionMap(){
         +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right">${(car[k]||0).toLocaleString()}</td>`
         +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;font-weight:800;color:var(--amber)">${sh.toFixed(2)}%</td>`
         +bar(sh,maxSh)+`</tr>`).join('');
+      const _unm=unknown||0;
+      const _unmRow = _unm>0 ? `<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink2)">지역미상 <span style="font-size:10px;color:var(--ink3)">(대리점 지역 없음)</span></td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink2)">${_unm.toLocaleString()}</td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink3)">—</td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink3)">—</td><td style="border-bottom:1px solid var(--line)"></td></tr>` : '';
       const totSh=tCar>0?(tRoll*cap/tCar*100):0;
-      const table=`<table class="dtbl" style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>롤 판매</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}`
+      const table=`<table class="dtbl" style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>롤 판매</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}${_unmRow}`
         +`<tr><td style="padding:7px 9px;font-weight:800;background:var(--bg2)">총합계</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tRoll.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tCar.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2);color:var(--amber)">${totSh.toFixed(2)}%</td><td style="background:var(--bg2)"></td></tr></table>`;
-      return `<div class="cap" style="margin-bottom:10px">롤 판매 × 롤당 <b>${cap}대</b> ÷ 신차 등록 기준 · 전국 점유율 <b style="color:var(--amber)">${totSh.toFixed(2)}%</b> · 지도에 마우스를 올리면 상세 (데이터는 ⚙설정에서 입력)</div>`
+      return `<div class="cap" style="margin-bottom:10px">롤 판매 × 롤당 <b>${cap}대</b> ÷ 신차 등록 기준 · 전국 점유율 <b style="color:var(--amber)">${totSh.toFixed(2)}%</b>`
+        + (_isErp ? ` · 롤 판매는 <b>ERP 지부→대리점 판매</b>에서 자동 집계(올해 기준)${_unm>0?` <span style="color:var(--ink3)">· 지역미상 ${_unm.toLocaleString()}롤 포함</span>`:''} · 신차 등록만 ⚙설정에서 입력` : ` · 데이터는 ⚙설정에서 입력`)
+        + ` · 지도에 마우스를 올리면 상세</div>`
         + `<div class="hm-region"><div class="hm-region-map">${svg}</div><div class="hm-region-tbl">${table}</div></div>`;
     }
     // 품질보증서 기준 (보증서 실시공 ÷ 지역 신차등록)
@@ -6871,6 +6900,7 @@ function renderShare(){
   if(!salesLoaded){ ensureSales().then(()=>{ if(rview==='share') renderShare(); }); }
   if(!warrLoaded){ ensureWarr().then(()=>{ if(rview==='share') renderShare(); }); }
   if(!erpdLoaded){ ensureErpd().then(()=>{ if(rview==='share') renderShare(); }); }   // 대리점 마스터(지역 조인용)
+  if(!bsLoaded){ ensureBranchsales().then(()=>{ _bsRegCache=null; if(rview==='share') renderShare(); }); }   // 지부→대리점 판매(ERP) — 지역별 롤 판매 자동 집계용
   const hasSales=!!(SALES&&SALES.channels);
   if(!hasSales){ box.innerHTML='<div class="empty" style="padding:46px 18px;text-align:center;color:var(--ink2)">매출 데이터가 로드되면 점유율이 표시됩니다.<br>관리자가 ERP 파일을 올리면 표시됩니다.</div>'; return; }
   const card=s=>`<div class="card">${s}</div>`;
