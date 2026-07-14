@@ -6623,18 +6623,19 @@ function _bsRegionRolls(sel){
   const yr=String((new Date()).getFullYear());
   const key=yr+'|'+(sel?sel.join(','):'*')+'|'+BSALE.rows.length+'|'+(BSALE.updatedAt||'');
   if(_bsRegCache && _bsRegKey===key) return _bsRegCache;                    // 재계산 캐시(데이터·기간 바뀌면 자동 무효화)
-  const by={}; let total=0, matched=0, unknown=0;
+  const by={}; let total=0, matched=0, unknown=0, hq=0, jb=0, hqUnknown=0;
   BSALE.rows.forEach(r=>{
     if(_bsRowYr(r)!==yr) return;                                            // 연도 필터
     if(typeof _bsRollChk==='function' && !_bsRollChk(r)) return;            // ★ 롤(필름) 제품만 — 다른 롤 집계와 동일 기준(부자재 등 제외)
     const m=_bsMonthOf(r); if(sel && sel.indexOf(m)<0) return;              // 선택 월 필터
     const q=_sNum(r.q||0); if(!q) return;
-    total+=q;
+    const isHQ = (r.grp==='본사');                                          // 본사 관리 대리점 판매분 — 지부와 함께 모두 포함(제외 안 함)
+    total+=q; if(isHQ) hq+=q; else jb+=q;
     let k=_regionKey(r.sido);                                               // ① ERP 시·도
     if(!k){ const rm=_dealerRegionMap().get(_bsNameNorm(r.dealer)); if(rm) k=rm.doKey; }   // ② 매장명 조인 백업
-    if(k){ by[k]=(by[k]||0)+q; matched+=q; } else unknown+=q;
+    if(k){ by[k]=(by[k]||0)+q; matched+=q; } else { unknown+=q; if(isHQ) hqUnknown+=q; }
   });
-  _bsRegKey=key; _bsRegCache={by, total, matched, unknown};
+  _bsRegKey=key; _bsRegCache={by, total, matched, unknown, hq, jb, hqUnknown};
   return _bsRegCache;
 }
 function salesRegionStats(){
@@ -6653,7 +6654,8 @@ function salesRegionStats(){
   const erp=_bsRegionRolls(sel);                                            // ERP 자동 집계(있으면 우선, 없으면 수기입력 폴백)
   _REGION_KEYS.forEach(k=>{ const rr=reg[k]||{}; const r=erp?(erp.by[k]||0):sumM(rr.roll), c=sumM(rr.carReg); roll[k]=r; car[k]=c; tRoll+=r; tCar+=c; by[k]=c>0?(r*rcap/c*100):0; });
   const unknown = erp ? erp.unknown : 0;                                    // 지역 매칭 안 된 롤(전국 합계에는 포함 → 상단 카드와 어긋나지 않게)
-  return {mode:'share', by, roll, car, tRoll:tRoll+unknown, tRollMatched:tRoll, tCar, cap:rcap, total:tRoll, src: erp?'erp':'manual', unknown};
+  return {mode:'share', by, roll, car, tRoll:tRoll+unknown, tRollMatched:tRoll, tCar, cap:rcap, total:tRoll, src: erp?'erp':'manual', unknown,
+          hq: erp?erp.hq:0, jb: erp?erp.jb:0, hqUnknown: erp?erp.hqUnknown:0};   // 본사/지부 내역(본사 판매분도 모두 포함됨을 화면에서 확인 가능하게)
 }
 
 function _pathCenter(d){ const n=(String(d).match(/-?\d+\.?\d*/g)||[]).map(Number); let sx=0,sy=0,c=0; for(let i=0;i+1<n.length;i+=2){ sx+=n[i]; sy+=n[i+1]; c++; } return c?{x:sx/c,y:sy/c}:{x:0,y:0}; }
@@ -6696,7 +6698,7 @@ function salesRegionMap(){
   const body=(()=>{
     const st=salesRegionStats();
     if(st.mode==='share'){
-      const {by,roll,car,tRoll,tCar,cap,src,unknown}=st;
+      const {by,roll,car,tRoll,tCar,cap,src,unknown,hq,jb,hqUnknown}=st;
       const _isErp = src==='erp';
       if(tRoll<=0&&tCar<=0) return `<div class="empty">${_isErp?'선택한 기간에 지부→대리점 판매(ERP) 데이터가 없습니다.':'지역별 세일즈 데이터가 없습니다. ⚙ 설정 → 매출 설정 → <b>지역별 세일즈 입력</b>에서 입력하세요.'}</div>`;
       const maxSh=Math.max(0.0001,..._REGION_KEYS.map(k=>by[k]||0));
@@ -6708,12 +6710,13 @@ function salesRegionMap(){
         +`<td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;font-weight:800;color:var(--amber)">${sh.toFixed(2)}%</td>`
         +bar(sh,maxSh)+`</tr>`).join('');
       const _unm=unknown||0;
-      const _unmRow = _unm>0 ? `<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink2)">지역미상 <span style="font-size:10px;color:var(--ink3)">(대리점 지역 없음)</span></td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink2)">${_unm.toLocaleString()}</td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink3)">—</td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink3)">—</td><td style="border-bottom:1px solid var(--line)"></td></tr>` : '';
+      const _unmHq = hqUnknown||0;
+      const _unmRow = _unm>0 ? `<tr><td style="padding:7px 9px;border-bottom:1px solid var(--line);color:var(--ink2)">지역미상 <span style="font-size:10px;color:var(--ink3)">(대리점 지역 없음${_unmHq>0?` · 본사 ${_unmHq.toLocaleString()}롤 포함`:''})</span></td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink2)">${_unm.toLocaleString()}</td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink3)">—</td><td style="padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;color:var(--ink3)">—</td><td style="border-bottom:1px solid var(--line)"></td></tr>` : '';
       const totSh=tCar>0?(tRoll*cap/tCar*100):0;
       const table=`<table class="dtbl" style="width:100%;border-collapse:collapse;font-size:13px"><tr><th ${thl}>지역</th><th ${thr}>롤 판매</th><th ${thr}>신차 등록</th><th ${thr}>점유율</th><th ${thl}></th></tr>${rowsH}${_unmRow}`
         +`<tr><td style="padding:7px 9px;font-weight:800;background:var(--bg2)">총합계</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tRoll.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2)">${tCar.toLocaleString()}</td><td style="padding:7px 9px;text-align:right;font-weight:800;background:var(--bg2);color:var(--amber)">${totSh.toFixed(2)}%</td><td style="background:var(--bg2)"></td></tr></table>`;
       return `<div class="cap" style="margin-bottom:10px">롤 판매 × 롤당 <b>${cap}대</b> ÷ 신차 등록 기준 · 전국 점유율 <b style="color:var(--amber)">${totSh.toFixed(2)}%</b>`
-        + (_isErp ? ` · 롤 판매는 <b>ERP 지부→대리점 판매</b>에서 자동 집계(올해 기준)${_unm>0?` <span style="color:var(--ink3)">· 지역미상 ${_unm.toLocaleString()}롤 포함</span>`:''} · 신차 등록만 ⚙설정에서 입력` : ` · 데이터는 ⚙설정에서 입력`)
+        + (_isErp ? ` · 롤 판매는 <b>ERP 지부→대리점 판매</b>에서 자동 집계(올해 기준) — <b>지부 ${(jb||0).toLocaleString()}롤 + 본사 ${(hq||0).toLocaleString()}롤</b> 모두 포함${_unm>0?` <span style="color:var(--ink3)">· 지역미상 ${_unm.toLocaleString()}롤 포함</span>`:''} · 신차 등록만 ⚙설정에서 입력` : ` · 데이터는 ⚙설정에서 입력`)
         + ` · 지도에 마우스를 올리면 상세</div>`
         + `<div class="hm-region"><div class="hm-region-map">${svg}</div><div class="hm-region-tbl">${table}</div></div>`;
     }
