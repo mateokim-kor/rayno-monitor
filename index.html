@@ -849,6 +849,7 @@
 
   .vcard{border:1px solid var(--line);border-radius:12px;padding:14px 15px;margin-bottom:11px;background:var(--card);
          border-left:3px solid var(--ink3);transition:.15s}
+  .vcard{content-visibility:auto;contain-intrinsic-size:auto 300px}   /* 화면 밖 카드는 렌더/레이아웃 생략 — 목록이 길어져도 스크롤·재렌더가 가벼움 */
   .vcard.done{border-left-color:var(--amber);background:var(--card2)}
   .vc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
   .vc-ai{margin-left:auto;font-size:11px;color:var(--ink3)}
@@ -2134,6 +2135,19 @@ function ingest(parsed, fname, opts){
 }
 
 // 저장소에서 RAW 재구성 (수집 순서 유지, idx·검증통계 재계산)
+// 행 id → 행 객체 인덱스 (O(1)).
+// 기존엔 RAW.rows.find(...)로 매번 전체를 훑었고, 감성 버튼 한 번 누를 때마다도 실행되어(markDirty→isVerifiedId)
+// 행이 많을수록 클릭이 느려졌음. rebuildRAW()가 새 배열을 만들므로 배열 identity로 자동 무효화됨.
+let _rowIdx=null, _rowIdxSrc=null;
+function _rowById(id){
+  if(!(typeof RAW!=='undefined' && RAW && Array.isArray(RAW.rows))) return null;
+  if(!_rowIdx || _rowIdxSrc!==RAW.rows){
+    _rowIdx=new Map();
+    for(const r of RAW.rows) _rowIdx.set(r.id, r);
+    _rowIdxSrc=RAW.rows;
+  }
+  return _rowIdx.get(id) || null;
+}
 function rebuildRAW(fname){
   const store = loadStore();
   _typeUnionCache=null;   // 데이터 변경 시 유형 목록 캐시 무효화
@@ -3119,7 +3133,7 @@ document.addEventListener('mousedown', e=>{ if(hlPop.style.display==='flex' && !
 hlPop.addEventListener('click', e=>{
   if(e.target.closest('[data-hlx]')){ hideHlPop(); const s=window.getSelection(); if(s)s.removeAllRanges(); return; }
   const b=e.target.closest('[data-hlc]'); if(!b||!hlPending) return;
-  const {id,text}=hlPending; const r=RAW.rows.find(z=>z.id===id);
+  const {id,text}=hlPending; const r=_rowById(id);
   if(r){ const hls=Array.isArray(r.hls)?r.hls.slice():[];
     if(!hls.some(h=>h.t===text)) hls.push({t:text,c:b.dataset.hlc});
     else hls.forEach(h=>{ if(h.t===text) h.c=b.dataset.hlc; });
@@ -3131,7 +3145,7 @@ hlPop.addEventListener('click', e=>{
 document.getElementById('modalBody').addEventListener('click', e=>{
   const m=e.target.closest('mark.hl-user'); if(!m || auth!=='admin') return;
   const card=m.closest('.rec[data-id]'); if(!card) return;
-  const id=card.dataset.id, t=m.textContent; const r=RAW.rows.find(z=>z.id===id); if(!r||!r.hls) return;
+  const id=card.dataset.id, t=m.textContent; const r=_rowById(id); if(!r||!r.hls) return;
   if(saveRow(id,{hls:r.hls.filter(h=>h.t!==t)}) && typeof flushCloudSave==='function') flushCloudSave();
   renderModalList(document.getElementById('modalSearch').value); toast('하이라이트를 해제했습니다.');
 });
@@ -3147,7 +3161,7 @@ document.getElementById('modalBody').addEventListener('click', e=>{
   if(slot.dataset.open==='1'){
     slot.innerHTML=''; slot.dataset.open=''; delete pending[id]; eb.textContent='✏ 감성·유형 수정'; return;
   }
-  const r=RAW.rows.find(x=>x.id===id); if(!r) return;
+  const r=_rowById(id); if(!r) return;
   slot.innerHTML=`<div class="rec-editor editor" data-id="${id}">${editorControls(r)}</div>`;
   slot.dataset.open='1'; eb.textContent='✕ 편집 닫기';
 });
@@ -3847,29 +3861,44 @@ function effProducts(){
   return RAYNO_PRODUCTS;
 }
 function effProductsList(){ const c=(STORE&&STORE.config&&STORE.config.products); return (Array.isArray(c)&&c.length)?c.slice():Object.keys(RAYNO_PRODUCTS); }
-function _prodHits(text){
-  const t=(text||'').toLowerCase(); const PR=effProducts();
-  // (제품, 별칭) 목록을 별칭 길이 내림차순 — 가장 긴(구체적) 이름 우선
+// 제품 별칭 매처 — 사전이 바뀌지 않으면 재사용.
+// 기존엔 호출마다 (제품,별칭) 목록을 새로 만들고 정렬하고 정규식까지 새로 컴파일했음.
+let _phCache=null, _phKey='';
+function _prodMatchers(){
+  const PR=effProducts();
+  let key=''; for(const p in PR){ key+=p+':'+(PR[p]||[]).length+';'; }   // 값싼 서명(제품 수·별칭 수)
+  if(_phCache && _phKey===key) return _phCache;
   const entries=[];
   for(const p in PR){ (PR[p]||[]).forEach(a=>{ const al=String(a).toLowerCase(); if(al) entries.push([p,al]); }); }
-  entries.sort((a,b)=>b[1].length-a[1].length);
+  entries.sort((a,b)=>b[1].length-a[1].length);   // 긴(구체적) 이름 우선 — 1회만
+  const out=entries.map(([p,al])=>{
+    const isKo=/[^\x00-\x7f]/.test(al);
+    return { p, al, isKo, re: isKo ? null : new RegExp('\\b'+al.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g') };   // 정규식 1회 컴파일
+  });
+  _phKey=key; _phCache=out;
+  return out;
+}
+function _prodHits(text){
+  const t=(text||'').toLowerCase();
+  const ms=_prodMatchers();
   const consumed=new Array(t.length).fill(false);
   const overlaps=(pos,len)=>{ for(let i=pos;i<pos+len;i++){ if(consumed[i]) return true; } return false; };
   const consume=(pos,len)=>{ for(let i=pos;i<pos+len;i++){ consumed[i]=true; } };
   const found=new Set();
-  entries.forEach(([p,al])=>{
-    if(/[^\x00-\x7f]/.test(al)){                                  // 한글 포함 → 부분일치(단, 더 긴 이름이 차지한 구간은 제외)
+  ms.forEach(m=>{
+    const al=m.al;
+    if(m.isKo){                                                    // 한글 포함 → 부분일치(단, 더 긴 이름이 차지한 구간은 제외)
       let idx=0,pos;
       while((pos=t.indexOf(al,idx))>=0){
-        if(!overlaps(pos,al.length)){ found.add(p); consume(pos,al.length); }
+        if(!overlaps(pos,al.length)){ found.add(m.p); consume(pos,al.length); }
         idx=pos+al.length;
       }
     } else {                                                       // 영문/숫자 → 단어경계
-      const re=new RegExp('\\b'+al.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g');
-      let m;
-      while((m=re.exec(t))!==null){
-        if(!overlaps(m.index,al.length)){ found.add(p); consume(m.index,al.length); }
-        if(re.lastIndex===m.index) re.lastIndex++;
+      const re=m.re; re.lastIndex=0;                               // 재사용 전 초기화 필수(g 플래그)
+      let mm;
+      while((mm=re.exec(t))!==null){
+        if(!overlaps(mm.index,al.length)){ found.add(m.p); consume(mm.index,al.length); }
+        if(re.lastIndex===mm.index) re.lastIndex++;
       }
     }
   });
@@ -3881,12 +3910,26 @@ function effBrandList(){
   const own=(typeof effOwnBrand==='function'?effOwnBrand():'');
   return [own, ...(typeof effCompetitors==='function'?effCompetitors():[])].filter(Boolean);
 }
+// 행별 자동 감지 캐시 — 본문은 바뀌지 않으므로 순수 함수. WeakMap이라 행 객체를 오염시키지 않음.
+// (사전이 바뀌면 서명이 달라져 자동 무효화)
+let _abMap=new WeakMap(), _apMap=new WeakMap(), _abKey='', _apKey='';
 function autoBrands(r){
+  const list=effBrandList(); const key=list.join('\u0001');
+  if(key!==_abKey){ _abMap=new WeakMap(); _abKey=key; }             // 브랜드 목록 변경 시 무효화
+  if(r && typeof r==='object'){ const c=_abMap.get(r); if(c!==undefined) return c; }
   const t=((r.title||'')+' '+(r.body||'')).toLowerCase(); const out=[];
-  effBrandList().forEach(b=>{ b=String(b).trim(); if(b && t.indexOf(b.toLowerCase())>=0 && out.indexOf(b)<0) out.push(b); });
+  list.forEach(b=>{ b=String(b).trim(); if(b && t.indexOf(b.toLowerCase())>=0 && out.indexOf(b)<0) out.push(b); });
+  if(r && typeof r==='object') _abMap.set(r,out);
   return out;
 }
-function autoProducts(r){ return _prodHits((r.title||'')+' '+(r.body||'')); }
+function autoProducts(r){
+  const ms=_prodMatchers(); const key=String(ms.length)+'|'+(ms[0]?ms[0].al:'');
+  if(key!==_apKey){ _apMap=new WeakMap(); _apKey=key; }             // 제품 사전 변경 시 무효화
+  if(r && typeof r==='object'){ const c=_apMap.get(r); if(c!==undefined) return c; }
+  const out=_prodHits((r.title||'')+' '+(r.body||''));
+  if(r && typeof r==='object') _apMap.set(r,out);
+  return out;
+}
 function productStats(set){
   const st={}; Object.keys(effProducts()).forEach(p=>st[p]={n:0,pos:0,neg:0,neu:0});
   set.forEach(r=>{ const hits=_prodHits((r.title||'')+' '+(r.body||'')); if(!hits.length)return;
@@ -4167,7 +4210,7 @@ document.getElementById('report').addEventListener('click', e=>{
 
   // 대표 게시물 자세히 보기 → 그 글(+관련 댓글)을 모달로
   const detBtn=e.target.closest('[data-detail]');
-  if(detBtn){ const id=detBtn.dataset.detail; const r=RAW.rows.find(x=>x.id===id); if(!r) return;
+  if(detBtn){ const id=detBtn.dataset.detail; const r=_rowById(id); if(!r) return;
     let list=[r];
     if(r.isPost){ const kids=RAW.rows.filter(x=>!x.isPost && ((r.link&&x.parentLink===r.link)||(r.title&&x.parentTitle===r.title)));
       list=list.concat(kids); }
@@ -4260,8 +4303,10 @@ function updateVerifyHeader(){
   document.getElementById('vfTotalN').textContent = total.toLocaleString();
   document.getElementById('vfPct').textContent = pct+'%';
   document.getElementById('vfTrack').style.width = pct+'%';
-  const v=RAW.rows.filter(isVerified).map(r=>r.vSent);
-  const c=s=>v.filter(x=>x===s).length;
+  // 전체 행을 1회만 순회해 감성별 건수 집계 (기존: filter 1회 + 감성별 filter 4회 = 5회 순회)
+  const _cnt={'긍정':0,'부정':0,'중립':0,'없음':0};
+  for(const r of RAW.rows){ if(isVerified(r)){ const s=r.vSent; if(_cnt[s]!==undefined) _cnt[s]++; } }
+  const c=s=>_cnt[s]||0;
   document.getElementById('vfBreakdown').innerHTML =
     `<span class="vf-bd-pos">긍정 <b>${c('긍정')}</b></span>`+
     `<span class="vf-bd-neg">부정 <b>${c('부정')}</b></span>`+
@@ -4281,7 +4326,7 @@ function effRow(r){
   }catch(e){}
   return base;
 }
-function isVerifiedId(id){ const r=RAW.rows.find(x=>x.id===id); return r ? isVerified(r) : false; }
+function isVerifiedId(id){ const r=_rowById(id); return r ? isVerified(r) : false; }
 
 // 추가 분류 필드 HTML (필요할 때만 생성)
 function classFieldsHTML(eff){
@@ -4584,7 +4629,7 @@ function dropCardFromList(card){
 }
 function confirmAuto(editorEl){
   const id=editorEl.dataset.id;
-  const r=RAW.rows.find(x=>x.id===id); if(!r) return;
+  const r=_rowById(id); if(!r) return;
   const eff=effRow(r);
   const changes={...(pending[id]||{}), vsrc:'manual', vconf:100};
   if(!changes.vSent) changes.vSent=eff.vSent||r.vSent||'';     // 자동 예측 감성 그대로 확정
@@ -4597,7 +4642,7 @@ function confirmAuto(editorEl){
     const verified=isVerifiedId(id);
     const leaves=(state.vfFilter==='todo'&&verified)||(state.vfFilter==='auto')||(state.vfFilter==='done'&&!verified);
     if(leaves){ dropCardFromList(card); }
-    else { const r2=RAW.rows.find(x=>x.id===id); const tmp=document.createElement('div'); tmp.innerHTML=vCard(r2); card.replaceWith(tmp.firstElementChild); }
+    else { const r2=_rowById(id); const tmp=document.createElement('div'); tmp.innerHTML=vCard(r2); card.replaceWith(tmp.firstElementChild); }
   }
   toast('검증 완료되었습니다.');
 }
@@ -4648,14 +4693,14 @@ function revertEditor(editorEl){
   delete pending[id];
   if(editorEl.closest('#verifyList')){
     // 저장값 기준으로 해당 카드만 다시 렌더 (목록 전체 재렌더 없음)
-    const r=RAW.rows.find(x=>x.id===id);
+    const r=_rowById(id);
     if(r){
       const card=editorEl.closest('.vcard');
       const tmp=document.createElement('div'); tmp.innerHTML=vCard(r);
       card.replaceWith(tmp.firstElementChild);
     }
   }else{
-    const r=RAW.rows.find(x=>x.id===id);
+    const r=_rowById(id);
     if(r) editorEl.innerHTML=editorControls(r);
   }
 }
@@ -4676,7 +4721,7 @@ function onEditorClick(e){
   if(clsT){
     const box=editorEl.querySelector('.vc-class');
     if(!box.hasAttribute('data-built')){
-      const id=editorEl.dataset.id; const r=RAW.rows.find(x=>x.id===id);
+      const id=editorEl.dataset.id; const r=_rowById(id);
       box.innerHTML=classFieldsHTML(effRow(r||{id})); box.setAttribute('data-built','1'); box.removeAttribute('hidden');
     }else{
       box.toggleAttribute('hidden');
