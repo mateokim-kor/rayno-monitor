@@ -5469,6 +5469,27 @@ function renderRDash(){
 }
 let _dealerAggCache=null;   // 집계 캐시(데이터 로드 시 무효화)
 let _dlrModalD=null;   // 현재 열린 대리점 상세 모달 대상(연도 토글 재렌더용)
+// 데이터 기준일(수집 시점) — 수집기가 멈추면 최근 발행분이 대시보드에 안 들어오므로 화면에서 바로 보이게 함
+function _dataFreshLine(){
+  const now=Date.now();
+  const pick=(o)=>{ try{ return (o&&o.updatedAt)||null; }catch(_){ return null; } };
+  const items=[
+    ['보증서',   pick(typeof WARR!=='undefined'?WARR:null)],
+    ['글라스케어', pick(typeof GLASS!=='undefined'?GLASS:null)],
+    ['대리점',   pick(typeof ERPD!=='undefined'?ERPD:null)],
+    ['판매',     pick(typeof BSALE!=='undefined'?BSALE:null)],
+  ];
+  const out=items.map(([lab,ts])=>{
+    if(!ts) return `<span style="color:var(--ink3)">${lab} —</span>`;
+    const t=new Date(ts); if(isNaN(t)) return `<span style="color:var(--ink3)">${lab} —</span>`;
+    const days=Math.floor((now-t.getTime())/86400000);
+    const ago = days<=0 ? '오늘' : (days===1 ? '어제' : days+'일 전');
+    const col = days>=3 ? 'var(--amber)' : (days>=7 ? '#b23b3b' : 'var(--ink2)');
+    const warn = days>=3 ? ' ⚠' : '';
+    return `<span style="color:${col}">${lab} ${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')} <span style="font-size:10.5px">(${ago})</span>${warn}</span>`;
+  }).join('<span style="color:var(--ink3)"> · </span>');
+  return `<span style="font-size:11.5px">${out}</span>`;
+}
 function _dealerAgg(){   // ERP 기준(대리점 마스터 dealers.json + ERP 매출 + branchSalesList 본사 직매) — 보증서·글라스케어(관리자 홈페이지) 제외
   if(_dealerAggCache) return _dealerAggCache;
   const M={};
@@ -5540,7 +5561,16 @@ function _dealerDetailHtml(d){
     ${row('담당 지부', escapeHtml(d.jibu||'-'))}
     ${row('구분', memBadge)}
     ${row('출처', (d.erp||d.bs)?(d.admin?'ERP + 관리자 홈페이지':'ERP'):'관리자 홈페이지(ERP 미등록)')}
-    ${d.admin?row('관리자 발행', `글라스케어 ${won(d.gIssue||0)}건 · 보증서 ${won(d.wIssue||0)}건`):''}
+    ${row('관리자 발행', d.admin
+      ? `글라스케어 ${won(d.gIssue||0)}건 · 보증서 ${won(d.wIssue||0)}건`
+      : `<span style="color:var(--ink3)">0건</span> <span style="font-size:11px;color:var(--amber)">— 이 대리점명으로 매칭된 발행 기록 없음</span>`)}
+  ${!d.admin ? `<div style="margin:6px 0 2px;padding:9px 11px;background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:8px;font-size:11.5px;color:var(--ink2);line-height:1.6">
+      관리자 홈페이지(보증서·글라스케어)에 발행 기록이 있는데도 0건이면 아래를 확인하세요.<br>
+      ① <b>수집 시점</b> — 아래 '데이터 기준일'이 오래됐으면 수집기가 멈춘 것(최근 발행분이 아직 안 들어옴)<br>
+      ② <b>대리점명 표기</b> — 관리자 홈페이지의 매장명과 ERP 대리점명이 다르면 매칭 실패<br>
+      ③ <b>발행 연도</b> — 대리점 현황은 <b>올해</b> 발행분만 봅니다(작년 발행은 잡히지 않음)
+    </div>` : ''}
+  ${row('데이터 기준일', _dataFreshLine())}
     ${row('상태', stat)}
     ${row('지역', escapeHtml(region))}
     ${d.addr?row('주소', escapeHtml(d.addr)):''}
@@ -5585,7 +5615,8 @@ function renderDealer(){
   const memberOpt=`<option value="all" ${DLR.member==='all'?'selected':''}>멤버스: 전체</option><option value="member" ${DLR.member==='member'?'selected':''}>멤버스</option><option value="normal" ${DLR.member==='normal'?'selected':''}>일반</option>`;
   const _dyC=(new Date()).getFullYear();
   const yearSeg=`<div class="seg" id="dlrYear" title="지부→대리점 판매(ERP)는 작년·올해가 함께 들어있어 연도를 갈라서 봅니다"><button data-dy="cur" class="${DLR.year==='cur'?'on':''}">${_dyC}</button><button data-dy="prev" class="${DLR.year==='prev'?'on':''}">${_dyC-1}</button><button data-dy="all" class="${DLR.year==='all'?'on':''}">전체</button></div>`;
-  const filters=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0">${statusSeg}${yearSeg}<select class="dt-select" id="dlrJibu">${jibuOpt}</select><select class="dt-select" id="dlrMember">${memberOpt}</select><input type="text" class="dt-input" id="dlrQ" placeholder="대리점명·코드 검색" value="${escapeHtml(DLR.q)}" style="min-width:170px"><button class="acc-btn" id="dlrSearchBtn">검색</button></div>`;
+  const filters=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0">${statusSeg}${yearSeg}<select class="dt-select" id="dlrJibu">${jibuOpt}</select><select class="dt-select" id="dlrMember">${memberOpt}</select><input type="text" class="dt-input" id="dlrQ" placeholder="대리점명·코드 검색" value="${escapeHtml(DLR.q)}" style="min-width:170px"><button class="acc-btn" id="dlrSearchBtn">검색</button></div>`
+    + `<div class="cap" style="margin:-4px 0 10px">데이터 기준일 · ${_dataFreshLine()}</div>`;
   const thl='style="text-align:left;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
   const th='style="text-align:right;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
   const tdl='style="text-align:left;padding:8px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
