@@ -6626,6 +6626,7 @@ function _bsRegionRolls(sel){
   const by={}; let total=0, matched=0, unknown=0;
   BSALE.rows.forEach(r=>{
     if(_bsRowYr(r)!==yr) return;                                            // 연도 필터
+    if(typeof _bsRollChk==='function' && !_bsRollChk(r)) return;            // ★ 롤(필름) 제품만 — 다른 롤 집계와 동일 기준(부자재 등 제외)
     const m=_bsMonthOf(r); if(sel && sel.indexOf(m)<0) return;              // 선택 월 필터
     const q=_sNum(r.q||0); if(!q) return;
     total+=q;
