@@ -5469,6 +5469,29 @@ function renderRDash(){
 }
 let _dealerAggCache=null;   // 집계 캐시(데이터 로드 시 무효화)
 let _dlrModalD=null;   // 현재 열린 대리점 상세 모달 대상(연도 토글 재렌더용)
+// 매칭 실패 진단: 관리자 홈페이지(보증서·글라스케어)에서 '비슷한' 매장명을 찾아 보여줌.
+// → ERP 대리점명과 관리자 매장명이 어떻게 다른지 화면에서 바로 확인 가능.
+function _adminNameHints(d){
+  const N=_bsNameNorm;
+  const mine=[N(d.name), N(d.store)].filter(Boolean);
+  if(!mine.length) return '';
+  const sim=(a,b)=>{
+    if(!a||!b) return false;
+    if(a===b || a.includes(b) || b.includes(a)) return true;
+    return a.length>=2 && b.length>=2 && a.slice(0,2)===b.slice(0,2);   // 앞 2글자 공통
+  };
+  const hit={};
+  const add=(nm,kind)=>{ const raw=String(nm||'').trim(); if(!raw) return; const n=N(raw); if(!n) return;
+    if(!mine.some(m=>sim(m,n))) return; const o=hit[raw]||(hit[raw]={w:0,g:0}); o[kind]++; };
+  ((typeof WARR!=='undefined'&&WARR&&WARR.rows)||[]).forEach(r=>add(r['매장명'],'w'));
+  const gcol=((typeof GLASS!=='undefined'&&GLASS&&GLASS.columns)||[]).includes('매장명(대리점명)')?'매장명(대리점명)':'매장명';
+  ((typeof GLASS!=='undefined'&&GLASS&&GLASS.rows)||[]).forEach(r=>add(r[gcol],'g'));
+  const ks=Object.keys(hit);
+  if(!ks.length) return `<div style="margin-top:7px;color:var(--ink3)">· 관리자 홈페이지 데이터에서 <b>비슷한 매장명을 찾지 못했습니다</b> → 아직 수집되지 않았거나 이름이 완전히 다릅니다.</div>`;
+  return `<div style="margin-top:7px">· 관리자 홈페이지에 있는 <b>비슷한 매장명</b> (이 이름들이 ERP 대리점명과 달라 매칭 실패):<br>`
+    + ks.map(k=>`&nbsp;&nbsp;<b style="color:var(--amber)">"${escapeHtml(k)}"</b> <span style="color:var(--ink3)">→ 보증서 ${hit[k].w}건 · 글라스케어 ${hit[k].g}건</span>`).join('<br>')
+    + `<br><span style="color:var(--ink3)">ERP 대리점명: "${escapeHtml(d.name||'')}"${d.store?` · 거래처명: "${escapeHtml(d.store)}"`:''}</span></div>`;
+}
 // 데이터 기준일(수집 시점) — 수집기가 멈추면 최근 발행분이 대시보드에 안 들어오므로 화면에서 바로 보이게 함
 function _dataFreshLine(){
   const now=Date.now();
@@ -5565,10 +5588,11 @@ function _dealerDetailHtml(d){
       ? `글라스케어 ${won(d.gIssue||0)}건 · 보증서 ${won(d.wIssue||0)}건`
       : `<span style="color:var(--ink3)">0건</span> <span style="font-size:11px;color:var(--amber)">— 이 대리점명으로 매칭된 발행 기록 없음</span>`)}
   ${!d.admin ? `<div style="margin:6px 0 2px;padding:9px 11px;background:var(--bg2);border:1px solid var(--line);border-left:3px solid var(--amber);border-radius:8px;font-size:11.5px;color:var(--ink2);line-height:1.6">
-      관리자 홈페이지(보증서·글라스케어)에 발행 기록이 있는데도 0건이면 아래를 확인하세요.<br>
-      ① <b>수집 시점</b> — 아래 '데이터 기준일'이 오래됐으면 수집기가 멈춘 것(최근 발행분이 아직 안 들어옴)<br>
-      ② <b>대리점명 표기</b> — 관리자 홈페이지의 매장명과 ERP 대리점명이 다르면 매칭 실패<br>
-      ③ <b>발행 연도</b> — 대리점 현황은 <b>올해</b> 발행분만 봅니다(작년 발행은 잡히지 않음)
+      <b>관리자 홈페이지 발행 기록이 이 대리점에 연결되지 않았습니다.</b> 아래를 확인하세요.<br>
+      ① <b>수집 시점</b> — 아래 '데이터 기준일'의 보증서 날짜가 오래됐으면 수집기가 멈춘 것<br>
+      ② <b>발행 연도</b> — 대리점 현황은 <b>올해</b> 발행분만 봅니다(작년 발행은 잡히지 않음)<br>
+      ③ <b>대리점명 표기</b> — 아래 참조
+      ${_adminNameHints(d)}
     </div>` : ''}
   ${row('데이터 기준일', _dataFreshLine())}
     ${row('상태', stat)}
