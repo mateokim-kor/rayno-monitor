@@ -2931,12 +2931,14 @@ function shareExplain(kind, m){
                 : `신차 실시공 ${N(inst)}건 — 신차 등록이 입력되지 않아 계산할 수 없습니다.`;
     note='보증서에서 중고차만 제외하고 집계합니다(=신차, 미기재분 포함). 그래서 전체 시공 기준보다 낮게 나옵니다. 신차 등록은 설정 → 매출에서 입력.';
   } else if(kind==='dealer'){
-    const rolls=_sNum((scc.dealerSales||{})[m]||0), cap=_sNum(scc.regionCap||0)||10, cars=rolls*cap;
+    const _erpR=(typeof _bsRollsOfMonth==='function')?_bsRollsOfMonth(m):null;   // ERP 지부→대리점 판매(자동)
+    const rolls=(_erpR!==null)?_erpR:_sNum((scc.dealerSales||{})[m]||0), cap=_sNum(scc.regionCap||0)||10, cars=rolls*cap;
+    const _src=(_erpR!==null)?'ERP 지부→대리점 판매(자동 집계)':'설정의 수기 입력값';
     title='시장 점유율 · 대리점 판매 ('+ml+')';
     formula='<b>대리점 판매 롤 수</b> × <b>롤당 대수</b> ÷ <b>신차 등록</b> × 100';
     calc = cr>0 ? `${N(rolls)}롤 × ${cap}대 = ${N(cars)}대(시공가능) ÷ ${N(cr)}대 × 100 = <b style="color:#f4911c">${F(cars/cr*100)}%</b>`
                 : `${N(rolls)}롤 × ${cap}대 = ${N(cars)}대 — 신차 등록 미입력으로 점유율 계산 불가`;
-    note='롤 수·신차 등록은 설정 → 매출 월별 입력, 롤당 대수는 설정의 값(기본 10대).';
+    note='롤 수 = '+_src+' · 신차 등록은 설정 → 매출에서 월별 입력 · 롤당 대수는 설정값(기본 10대).';
   } else {
     const b2c=_rollCars('B2C',m), b2b=_rollCars('B2B',m), tot=b2c+b2b;
     title='시장 점유율 · 판매(합계) ('+ml+')';
@@ -6939,7 +6941,7 @@ function renderRevenue(){
   s6+=`<div style="margin-bottom:11px">월 차량 출고 대수 (${lab}): <b>${carReg?roll(carReg)+'대':'(미입력)'}</b></div>`;
   s6+=`<table class="dtbl" style="width:100%;border-collapse:collapse"><tr><th ${thl}>기준</th><th ${th}>차량대수</th><th ${th}>점유율</th></tr>`
     +`<tr><td ${tdl}>품질보증서 기준 <span style="color:var(--ink2);font-weight:400">(1장=1대·자동)</span></td><td ${td}>${roll(warrCnt)}</td><td ${td}><b>${shr(warrCnt)}</b></td></tr>`
-    +`<tr><td ${tdl}>대리점 판매 기준 <span style="color:var(--ink2);font-weight:400">(수기)</span></td><td ${td}>${carDealer?roll(carDealer):'<span style=\"color:var(--ink2)\">(미입력)</span>'}</td><td ${td}><b>${carDealer?shr(carDealer):'—'}</b></td></tr>`
+    +`<tr><td ${tdl}>대리점 판매 기준 <span style="color:var(--ink2);font-weight:400">(${(typeof _bsRollsByMonth==='function'&&_bsRollsByMonth())?'ERP 자동':'수기'})</span></td><td ${td}>${carDealer?roll(carDealer):'<span style=\"color:var(--ink2)\">(미입력)</span>'}</td><td ${td}><b>${carDealer?shr(carDealer):'—'}</b></td></tr>`
     +`<tr><td ${tdl}>판매 기준 · B2C <span style="color:var(--ink2);font-weight:400">(롤×시공대수)</span></td><td ${td}>${roll(carB2C)}</td><td ${td}><b>${shr(carB2C)}</b></td></tr>`
     +`<tr><td ${tdl}>판매 기준 · B2B <span style="color:var(--ink2);font-weight:400">(롤×시공대수)</span></td><td ${td}>${roll(carB2B)}</td><td ${td}><b>${shr(carB2B)}</b></td></tr>`
     +`<tr><td ${tdl} style="font-weight:800;background:rgba(244,145,28,.1)">판매 기준 · 합계 (B2C+B2B)</td><td ${td} style="font-weight:800;background:rgba(244,145,28,.1)">${roll(carSales)}</td><td ${td} style="font-weight:800;background:rgba(244,145,28,.1)">${shr(carSales)}</td></tr></table>`;
@@ -7618,7 +7620,32 @@ function _capDef(mid){ return (/카본|모노|mono|tbtech|프레스토|presto/i.
 function _capOf(mid){ const c=_sNum((((SALES&&SALES.inputs&&SALES.inputs.cap)||{})[mid])||0); return c>0?c:_capDef(mid); }
 function _rollCars(ch,m){ const cm=(SALES&&SALES.chMat&&SALES.chMat[ch])||{}; let s=0; Object.keys(cm).forEach(mat=>{ if(!_isRoll(mat))return; s+=(cm[mat][m]||0)*_capOf(_midOf(mat)); }); return s; }  // 롤 판매수 × 롤당대수 = 시공가능 차량수
 function _rollCarsPick(ch){ let s=0; _salesActive().forEach(m=>s+=_rollCars(ch,m)); return s; }
-function _dealerCars(m){ const rc=_sNum(salesCfg().regionCap||0)||10; return _sNum(((salesCfg().dealerSales)||{})[m]||0) * rc; }   // 대리점 판매 롤 수 × 롤당 대수 = 시공가능 차량수
+// ── 대리점 판매 롤(월별): ERP 지부→대리점 판매(BSALE)에서 자동 집계 ──
+//   지역별(_bsRegionRolls)과 동일 기준: 올해 + 롤(필름) 제품만. 본사·지부 모두 포함.
+//   ※ BSALE에는 작년도 섞여 있으므로 연도 필터 필수.
+let _bsMonRollCache=null, _bsMonRollKey='';
+function _bsRollsByMonth(){
+  if(!(typeof BSALE!=='undefined' && BSALE && Array.isArray(BSALE.rows) && BSALE.rows.length)) return null;   // ERP 없으면 null → 수기입력 폴백
+  const yr=String((new Date()).getFullYear());
+  const key=yr+'|'+BSALE.rows.length+'|'+(BSALE.updatedAt||'');
+  if(_bsMonRollCache && _bsMonRollKey===key) return _bsMonRollCache;
+  const by={};
+  BSALE.rows.forEach(r=>{
+    if(_bsRowYr(r)!==yr) return;                                          // 연도 필터
+    if(typeof _bsRollChk==='function' && !_bsRollChk(r)) return;          // 롤(필름) 제품만
+    const m=_bsMonthOf(r); if(!m) return;
+    by[m]=(by[m]||0)+_sNum(r.q||0);
+  });
+  _bsMonRollKey=key; _bsMonRollCache=by;
+  return by;
+}
+function _bsRollsOfMonth(m){ const e=_bsRollsByMonth(); return e ? _sNum(e[m]||0) : null; }   // null = ERP 데이터 없음
+function _dealerCars(m){   // 대리점 판매 롤 × 롤당 대수 = 시공가능 차량수 (ERP 자동 → 없으면 설정의 수기입력)
+  const rc=_sNum(salesCfg().regionCap||0)||10;
+  const erp=_bsRollsOfMonth(m);
+  const rolls = (erp!==null) ? erp : _sNum(((salesCfg().dealerSales)||{})[m]||0);
+  return rolls * rc;
+}
 function _dealerPick(){ let s=0; _salesActive().forEach(m=>s+=_dealerCars(m)); return s; }
 function _carRegPick(){ return _scPick(salesCfg().carReg); }
 
@@ -7892,7 +7919,7 @@ function salesShareTable(){
   const pctOf=(num,m)=>{ const c=cr(m); return c>0?(num/c*100):null; };
   const totShare=f=>{ let n=0,c=0; M.forEach(m=>{n+=f(m);c+=cr(m);}); return c>0?(n/c*100):null; };
   const bases=[ {n:'보증서 · 신차 실시공',s:'신차만·실측',d:'신차에 실제 시공된 품질보증서 건수 (1건 = 1대)',f:m=>_qcNew(m)},
-    {n:'대리점 판매 기준',s:'수기',d:'대리점 판매 롤 수(수기 입력) × 롤당 시공 가능 대수',f:m=>_dealerCars(m)},
+    {n:'대리점 판매 기준',s:(typeof _bsRollsByMonth==='function'&&_bsRollsByMonth())?'ERP 자동':'수기',d:'지부→대리점 판매 롤 수(ERP 자동 집계 · 올해 · 롤 제품만) × 롤당 시공 가능 대수',f:m=>_dealerCars(m)},
     {n:'판매 기준 · B2C',s:'롤×시공대수',d:'B2C 롤 판매수 × 롤당 시공 가능 대수',f:m=>_rollCars('B2C',m)},
     {n:'판매 기준 · B2B',s:'롤×시공대수',d:'B2B 롤 판매수 × 롤당 시공 가능 대수',f:m=>_rollCars('B2B',m)},
     {n:'판매 기준 · 합계',s:'B2C+B2B',d:'B2C + B2B 롤 환산 대수 합',f:m=>_rollCars('B2C',m)+_rollCars('B2B',m),hi:1} ];
