@@ -2136,9 +2136,16 @@ async function cloudSaveRaw(path, arrayBuffer){
       { upsert:false, contentType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   }catch(e){ /* 원본 보관 실패는 분석에 영향 없음 */ }
 }
-function publicRawUrl(path, origName){
-  const enc = path.split('/').map(encodeURIComponent).join('/');
-  return `${SUPA.url}/storage/v1/object/public/${SUPA.bucket}/${enc}?download=${encodeURIComponent(origName||'download.xlsx')}`;
+/* 비공개 버킷 대응: 공개 URL 대신 60초짜리 서명 URL을 즉석 발급해 내려받는다.
+   서명 URL은 로그인한 사람에게만 발급되며 60초 뒤 자동으로 만료된다. */
+async function openRawDownload(path, origName){
+  if(!SB){ toast('서버 연결이 준비되지 않았습니다.', true); return; }
+  try{
+    const { data, error } = await SB.storage.from(SUPA.bucket)
+      .createSignedUrl(path, 60, { download: origName || 'download.xlsx' });
+    if(error || !data || !data.signedUrl) throw (error || new Error('링크 발급 실패'));
+    window.open(data.signedUrl, '_blank');
+  }catch(e){ toast('원본 내려받기 실패 · '+((e&&e.message)||''), true); }
 }
 let _rawListCache=null;
 async function cloudListRaw(){
@@ -2151,7 +2158,7 @@ async function cloudListRaw(){
 }
 async function downloadUpload(u){
   if(!u){ return; }
-  if(u.raw){ window.open(publicRawUrl(u.raw, u.name), '_blank'); return; }
+  if(u.raw){ await openRawDownload(u.raw, u.name); return; }
   // 이력에 경로가 없는 과거 업로드 → 보관함 목록에서 파일명으로 매칭
   const objs = await cloudListRaw();
   const safe = '_'+rawSafeName(u.name);
@@ -2161,7 +2168,7 @@ async function downloadUpload(u){
   if(cand.length>1 && u.at){ const atKey=String(u.at).replace(/[:.]/g,'-').slice(0,19);
     pick = cand.map(o=>({o,ts:o.slice('uploads/'.length,'uploads/'.length+19)}))
                .sort((a,b)=>Math.abs(a.ts.localeCompare(atKey))-Math.abs(b.ts.localeCompare(atKey)))[0].o; }
-  window.open(publicRawUrl(pick, u.name), '_blank');
+  await openRawDownload(pick, u.name);
 }
 
 // 행 고유키 = 카페·날짜·종류·제목·본문·링크 조합 → 같은 글은 다시 올려도 1건
@@ -8983,12 +8990,18 @@ function applyConfigAndSettings(){
 // ── 자동 수집 진행률: crawl_status.json 폴링 → % 바 표시 + 완료 시 자동 갱신 ──
 let _crawlPollTimer=null, _crawlInit=false, _crawlRefreshedAt='', _crawlReqAt=0, _crawlModalOpen=false;
 let _lastCrawlStatus=null, _crawlPeriodSel='3', _crawlFrom='', _crawlTo='';
-async function fetchCrawlStatus(){
-  if(typeof fetch!=='function') return null;
+/* 비공개 버킷 대응: 공개 URL 대신 로그인 세션이 실린 SDK 로 내려받는다.
+   (SDK 는 요청에 인증 토큰을 자동으로 붙이므로 버킷이 Private 이어도 동작) */
+async function sbGetJson(file){
+  if(!SB) return null;
   try{
-    const url=`${SUPA.url}/storage/v1/object/public/${SUPA.bucket}/${SUPA.statusFile}?cb=${Date.now()}`;
-    const r=await fetch(url); if(!r.ok) return null; return await r.json();
+    const { data, error } = await SB.storage.from(SUPA.bucket).download(file+'?cb='+Date.now());
+    if(error || !data) return null;
+    return JSON.parse(await data.text());
   }catch(e){ return null; }
+}
+async function fetchCrawlStatus(){
+  return await sbGetJson(SUPA.statusFile);
 }
 function crawlInnerHTML(s, isAdmin){
   const st0=(s&&s.state)?s.state:'idle';
@@ -10086,8 +10099,7 @@ boot();
 
   function getInfo(ws){
     if(ws==='rayno'){
-      var url=SUPA.url+'/storage/v1/object/public/'+SUPA.bucket+'/'+ERP_STATUS+'?cb='+Date.now();
-      return fetch(url).then(function(r){ return r.ok?r.json():null; }).then(function(s){
+      return Promise.resolve(sbGetJson(ERP_STATUS)).then(function(s){
         if(s){
           var t=s.lastSuccess?new Date(s.lastSuccess).getTime():(s.at?new Date(s.at).getTime():0);
           return {ok:!!t, ms:t, running:s.state==='running', error:s.state==='error'};
@@ -10096,8 +10108,7 @@ boot();
       }).catch(function(){ return _mt(SUPA.salesFile); });
     }
     // cafe(모니터링): 최종 크롤링 시간 = crawl_status.json 의 at
-    var curl=SUPA.url+'/storage/v1/object/public/'+SUPA.bucket+'/'+SUPA.statusFile+'?cb='+Date.now();
-    return fetch(curl).then(function(r){ return r.ok?r.json():null; }).then(function(s){
+    return Promise.resolve(sbGetJson(SUPA.statusFile)).then(function(s){
       if(s && s.at){
         var t=new Date(s.at).getTime();
         var run=(s.state==='running'||s.state==='await_auth') && (Date.now()-t<120000);
