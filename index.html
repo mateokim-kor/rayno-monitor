@@ -1042,6 +1042,9 @@
   .u-ok{background:var(--amber);color:#1a1208}
   .u-no{background:var(--bg2);color:var(--ink2);border:1px solid var(--line2)}
   .u-sec{font-size:13px;font-weight:800;color:var(--ink2);margin:16px 0 9px}
+  .u-lv{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:980px;vertical-align:middle}
+  .u-lv.lv-full{background:rgba(244,145,28,.16);color:var(--amber)}
+  .u-lv.lv-mon{background:var(--bg2);color:var(--ink2);border:1px solid var(--line2)}
   .lock-err{color:var(--neg);font-size:13px;margin-top:13px;min-height:18px;font-weight:600}
   #lockCancel{background:none;border:0;color:var(--ink3);font-family:var(--font);font-size:12.5px;
     font-weight:600;cursor:pointer;margin-top:4px;padding:6px;text-decoration:underline}
@@ -1857,6 +1860,9 @@ function _roleOf(email){
   return list.includes(me) ? 'admin' : 'viewer';
 }
 let _loggedIn = false;             // 로그인 여부(관리자·열람자 공통)
+/* 열람 등급: 'monitor' = 온라인 모니터링만 / 'full' = 레이노 데이터까지. 관리자는 항상 full */
+let _userLevel = 'monitor';
+function _canRayno(){ try{ return auth==='admin' || _userLevel==='full'; }catch(_){ return false; } }
 let auth = 'viewer';               // 'viewer'(열람자) | 'admin'(관리자)
 let _adminEmail = '';              // 현재 로그인한 관리자 이메일 (계정 관리용)
 function _isMaster(){
@@ -8574,6 +8580,9 @@ async function openRayno(){
   setRView(rview);
 }
 async function setWorkspace(ws){
+  // 권한 없는 워크스페이스로의 직접 진입 차단 (주소 복원·이전 탭 기억 등)
+  if(ws==='rayno' && !_canRayno()){ try{ toast('레이노 데이터 열람 권한이 없습니다. 관리자에게 문의해 주세요.', true); }catch(_){} ws='cafe'; }
+  if(ws==='settings' && auth!=='admin'){ try{ toast('관리자만 사용할 수 있습니다.', true); }catch(_){} ws='cafe'; }
   workspace=ws; try{_sbSyncActive();}catch(_){}
   document.querySelectorAll('.appsw-btn').forEach(b=>b.classList.toggle('on', b.dataset.ws===ws));
   const rayno=(ws==='rayno'), settings=(ws==='settings');
@@ -9195,8 +9204,10 @@ async function boot(){
   }
   _adminEmail=(_sess.user && _sess.user.email) || '';
   // 1-b) 관리자 목록에 없는 사용자는 승인 상태를 확인 — 미승인이면 데이터를 불러오지 않는다
-  if(_roleOf(_adminEmail)!=='admin'){
+  if(_roleOf(_adminEmail)==='admin'){ _userLevel='full'; }
+  else {
     const _prof = await _fetchProfile(_sess.user.id);
+    _userLevel = (_prof && _prof.level==='full') ? 'full' : 'monitor';
     if(!_prof || _prof.status!=='approved'){
       _loggedIn=false; auth='viewer';
       try{ _bootSkel&&_bootSkel.remove(); }catch(_){}
@@ -9290,7 +9301,7 @@ function showPending(prof){
 
 async function _fetchProfile(uid){
   try{
-    const r = await SB.from('profiles').select('status,name,dept,email').eq('id',uid).maybeSingle();
+    const r = await SB.from('profiles').select('status,level,name,dept,email').eq('id',uid).maybeSingle();
     return (r && r.data) || null;
   }catch(e){ return null; }
 }
@@ -9335,7 +9346,7 @@ function _uBadge(n){
 }
 async function _uLoad(){
   try{
-    const r = await SB.from('profiles').select('id,email,name,dept,status,created_at').order('created_at',{ascending:false});
+    const r = await SB.from('profiles').select('id,email,name,dept,status,level,created_at').order('created_at',{ascending:false});
     _uCache = (r && r.data) || [];
   }catch(e){ _uCache=[]; }
   return _uCache;
@@ -9349,22 +9360,32 @@ function renderUsers(){
   const box=document.getElementById('userModalBody'); if(!box) return;
   const grp={pending:[],approved:[],rejected:[]};
   _uCache.forEach(u=>{ (grp[u.status]||grp.pending).push(u); });
-  const row=(u,acts)=>'<div class="u-row"><div class="u-meta"><div class="u-nm">'+_uEsc(u.name||'(이름 없음)')+
-    ' <span style="font-weight:600;color:var(--ink2)">'+_uEsc(u.dept||'')+'</span></div><div class="u-sub">아이디 · '+_uEsc(_toId(u.email||''))+'</div></div>'+acts+'</div>';
+  const lv=u=>(u.level==='full'?'full':'monitor');
+  const badge=u=>'<span class="u-lv '+(lv(u)==='full'?'lv-full':'lv-mon')+'">'+(lv(u)==='full'?'전체':'모니터링만')+'</span>';
+  const row=(u,acts,withBadge)=>'<div class="u-row"><div class="u-meta"><div class="u-nm">'+_uEsc(u.name||'(이름 없음)')+
+    ' <span style="font-weight:600;color:var(--ink2)">'+_uEsc(u.dept||'')+'</span>'+(withBadge?' '+badge(u):'')+
+    '</div><div class="u-sub">아이디 · '+_uEsc(_toId(u.email||''))+'</div></div>'+acts+'</div>';
   let h='';
   h+='<div class="u-sec">승인 대기 '+grp.pending.length+'명</div>';
   h+= grp.pending.length ? grp.pending.map(u=>row(u,
-      '<button class="u-btn u-ok" data-uact="approved" data-uid="'+u.id+'">승인</button>'+
-      '<button class="u-btn u-no" data-uact="rejected" data-uid="'+u.id+'">거부</button>')).join('')
+      '<button class="u-btn u-ok" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만 승인</button>'+
+      '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체 승인</button>'+
+      '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">거부</button>', false)).join('')
     : '<div class="u-sub" style="padding:4px 2px">대기 중인 신청이 없습니다.</div>';
   h+='<div class="u-sec">이용 중 '+grp.approved.length+'명</div>';
   h+= grp.approved.length ? grp.approved.map(u=>row(u,
-      '<button class="u-btn u-no" data-uact="rejected" data-uid="'+u.id+'">차단</button>')).join('')
+      (lv(u)==='full'
+        ? '<button class="u-btn u-no" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만으로</button>'
+        : '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체로 올리기</button>')+
+      '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">차단</button>', true)).join('')
     : '<div class="u-sub" style="padding:4px 2px">아직 없습니다.</div>';
   if(grp.rejected.length){
     h+='<div class="u-sec">차단·거부 '+grp.rejected.length+'명</div>';
-    h+= grp.rejected.map(u=>row(u,'<button class="u-btn u-ok" data-uact="approved" data-uid="'+u.id+'">승인</button>')).join('');
+    h+= grp.rejected.map(u=>row(u,
+      '<button class="u-btn u-ok" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만 승인</button>'+
+      '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체 승인</button>', false)).join('');
   }
+  h+='<div class="su-note" style="margin-top:14px">모니터링만 = 온라인 모니터링 화면만 열람<br>전체 = 온라인 모니터링 + 레이노 데이터(매출·보증서·대리점) 열람</div>';
   box.innerHTML=h;
 }
 async function openUserModal(){
@@ -9375,13 +9396,18 @@ async function openUserModal(){
   await _uLoad(); renderUsers(); _uBadge(_uCache.filter(u=>u.status==='pending').length);
 }
 function closeUserModal(){ const m=document.getElementById('userModal'); if(m) m.style.display='none'; }
-async function setUserStatus(uid, st){
+async function setUserStatus(uid, act){
+  const parts=String(act||'').split(':');
+  const ok=(parts[0]==='ok');
+  const level=(parts[1]==='full') ? 'full' : 'monitor';
+  const patch = ok ? {status:'approved', level:level} : {status:'rejected'};
   try{
-    const r = await SB.from('profiles').update({status:st}).eq('id',uid);
+    const r = await SB.from('profiles').update(patch).eq('id',uid);
     if(r && r.error) throw r.error;
-    const u=_uCache.find(x=>x.id===uid); if(u) u.status=st;
+    const u=_uCache.find(x=>x.id===uid);
+    if(u){ u.status=patch.status; if(ok) u.level=level; }
     renderUsers(); _uBadge(_uCache.filter(x=>x.status==='pending').length);
-    toast(st==='approved' ? '승인되었습니다.' : '차단되었습니다.');
+    toast(ok ? ('승인되었습니다 · '+(level==='full'?'전체 열람':'모니터링만')) : '차단되었습니다.');
   }catch(e){ toast('처리 실패 · '+((e&&e.message)||''), true); }
 }
 
@@ -9834,7 +9860,7 @@ function _applySidebarLayout(){
         {t:'모니터링 리포트', ic:'report', k:'cafe:report', d:'누적 데이터 기반 · 감성·이슈 분석 리포트', go:()=>goCafe('report')},
         {t:'경쟁사 프로모션', ic:'promo', k:'cafe:promo', d:'경쟁사 프로모션·이벤트 동향을 추적합니다', go:()=>goCafe('promo')},
       ]},
-      {h:'레이노 데이터', items:[
+      {h:'레이노 데이터', rayno:true, items:[
         {t:'데이터 대시보드', ic:'data', k:'rayno:dash', d:'레이노 영업·품질 데이터를 한눈에 봅니다', go:()=>goRayno('dash')},
         {t:'매출 분석', ic:'chart', k:'rayno:revenue', ht:'매출 분석 (B2C+B2B)', d:'채널·지부·대리점별 매출을 분석합니다', go:()=>goRayno('revenue')},
         {t:'점유율 분석', ic:'chart', k:'rayno:share', ht:'시장 점유율 분석', d:'보증서·판매 기준 시장 점유율과 지역별 점유율을 분석합니다', go:()=>goRayno('share')},
@@ -9858,7 +9884,7 @@ function _applySidebarLayout(){
       + '<span class="rsb-app">레이노 인사이트 랩</span>';
     aside.appendChild(brand);
     const navWrap=document.createElement('div'); navWrap.className='rsb-nav'; aside.appendChild(navWrap);
-    const allItems=[]; let adminGrp=null;
+    const allItems=[]; let adminGrp=null, raynoGrp=null;
     NAVCFG.forEach(sec=>{
       const grp=document.createElement('div'); grp.className='rsb-grp'+(sec.admin?' rsb-grp-admin':'');
       const hd=document.createElement('div'); hd.className='rsb-sec'; hd.textContent=sec.h; grp.appendChild(hd);
@@ -9870,11 +9896,20 @@ function _applySidebarLayout(){
       });
       navWrap.appendChild(grp);
       if(sec.admin) adminGrp=grp;
+      if(sec.rayno) raynoGrp=grp;
     });
     if(allItems[0]) allItems[0].classList.add('on'); try{ if(typeof _sbSyncActive==='function') _sbSyncActive(); }catch(_){}
     brand.addEventListener('click',()=>{ allItems.forEach(b=>b.classList.remove('on')); if(allItems[0])allItems[0].classList.add('on'); goCafe('dash'); });
     // 관리자 그룹: 관리자 로그인 시에만 표시 (로그인 버튼 표시상태로 판별)
-    function syncAdmin(){ if(!adminGrp) return; var isAdmin=false; try{ isAdmin=(auth==='admin'); }catch(_){ isAdmin = !!(adminBtn && adminBtn.style.display==='none'); } adminGrp.style.display = isAdmin ? '' : 'none'; }
+    function syncAdmin(){
+      var isAdmin=false; try{ isAdmin=(auth==='admin'); }catch(_){ isAdmin = !!(adminBtn && adminBtn.style.display==='none'); }
+      if(adminGrp) adminGrp.style.display = isAdmin ? '' : 'none';
+      // 레이노 데이터: 등급이 'full' 이거나 관리자일 때만 노출
+      var canR=false; try{ canR=_canRayno(); }catch(_){}
+      if(raynoGrp) raynoGrp.style.display = canR ? '' : 'none';
+      try{ var rb=document.querySelector('.appsw-btn[data-ws="rayno"]'); if(rb) rb.style.display = canR ? '' : 'none'; }catch(_){}
+      try{ var sb2=document.querySelector('.appsw-btn[data-ws="settings"]'); if(sb2) sb2.style.display = isAdmin ? '' : 'none'; }catch(_){}
+    }
     syncAdmin();
     try{ if(typeof applyAuthUI==='function'){ const _origAuthUI=applyAuthUI; applyAuthUI=function(){ const r=_origAuthUI.apply(this,arguments); try{syncAdmin();}catch(_){}; return r; }; } }catch(_){}
     if(adminBtn){ try{ new MutationObserver(syncAdmin).observe(adminBtn,{attributes:true,attributeFilter:['style']}); }catch(_){} }
