@@ -9318,8 +9318,12 @@ async function doSignup(){
 /* ── 관리자: 승인 관리 ── */
 let _uCache=[];
 function _uBadge(n){
-  const b=document.getElementById('userBtn'); if(!b) return;
-  b.textContent = n>0 ? ('👥 사용자 승인 '+n) : '👥 사용자 승인';
+  const b=document.getElementById('userBtn');
+  if(b) b.textContent = n>0 ? ('👥 사용자 승인 '+n) : '👥 사용자 승인';
+  try{
+    const el=document.querySelector('.rsb-item[data-k="users"] .rsb-lbl');
+    if(el) el.textContent = n>0 ? ('사용자 승인 ('+n+')') : '사용자 승인';
+  }catch(_){}
 }
 async function _uLoad(){
   try{
@@ -9356,6 +9360,7 @@ function renderUsers(){
   box.innerHTML=h;
 }
 async function openUserModal(){
+  if(auth!=='admin'){ toast('관리자만 사용할 수 있습니다.',true); return; }
   const m=document.getElementById('userModal'); if(!m) return;
   m.style.display='flex';
   document.getElementById('userModalBody').innerHTML='<div class="u-sub" style="padding:8px 2px">불러오는 중…</div>';
@@ -9833,6 +9838,7 @@ function _applySidebarLayout(){
         {t:'보증서 리포트', ic:'report', k:'rayno:warrReport', d:'보증서 데이터 기반 분석 리포트', go:()=>goRayno('warrReport')},
       ]},
       {h:'관리자', admin:true, items:[
+        {t:'사용자 승인', ic:'shield', k:'users', d:'가입 신청을 승인하고 이용자를 관리합니다', go:()=>{ try{ openUserModal(); }catch(_){} }},
         {t:'데이터 검증', ic:'verify', k:'cafe:verify', d:'수집 데이터의 감성·분류를 검증합니다', go:()=>goCafe('verify')},
         {t:'자동 수집 관리', ic:'refresh', k:'crawl', d:'자동 수집 작업을 관리합니다', go:goCrawl},
         {t:'설정', ic:'gear', k:'settings', d:'대시보드 설정과 데이터 업로드를 관리합니다', go:goSettings},
