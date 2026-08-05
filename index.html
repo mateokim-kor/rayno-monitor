@@ -1011,14 +1011,25 @@
     padding:34px 30px 28px;text-align:center;box-shadow:0 30px 80px rgba(0,0,0,.5);animation:pop .2s ease}
   .lock-title{font-size:18px;font-weight:800;letter-spacing:-.02em}
   .lock-sub{font-size:13px;color:var(--ink2);margin-top:7px;line-height:1.6}
-  #lockEmail,#lockInput{width:100%;margin-top:14px;background:var(--bg2);border:1.5px solid var(--line2);border-radius:11px;
+  #lockEmail,#lockInput,.lock-in{width:100%;margin-top:10px;background:var(--bg2);border:1.5px solid var(--line2);border-radius:11px;
     color:var(--ink);font-family:var(--font);font-size:15px;font-weight:600;
     text-align:center;padding:13px 16px;outline:none}
   #lockEmail{margin-top:20px}
-  #lockEmail:focus,#lockInput:focus{border-color:var(--amber)}
-  #lockGo{width:100%;margin-top:12px;background:var(--amber);border:0;border-radius:11px;color:#1a1208;
+  #lockEmail:focus,#lockInput:focus,.lock-in:focus{border-color:var(--amber)}
+  #lockGo,.lock-btn2{width:100%;margin-top:12px;background:var(--amber);border:0;border-radius:11px;color:#1a1208;
     font-family:var(--font);font-size:15px;font-weight:800;padding:13px;cursor:pointer;transition:.15s}
-  #lockGo:hover{background:#f0974a}
+  #lockGo:hover,.lock-btn2:hover{background:#f0974a}
+  #lockSignupToggle{background:none;border:0;color:var(--ink2);font-family:var(--font);font-size:13px;font-weight:700;text-decoration:underline;cursor:pointer;margin-top:14px;padding:4px}
+  #lockSignupToggle:hover{color:var(--amber)}
+  .su-note{font-size:12.5px;color:var(--ink2);line-height:1.6;margin-top:10px;text-align:left;width:100%}
+  .u-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--line2);border-radius:11px;margin-bottom:8px;flex-wrap:wrap}
+  .u-meta{flex:1;min-width:190px}
+  .u-nm{font-weight:800;font-size:14px}
+  .u-sub{font-size:12.5px;color:var(--ink2);margin-top:2px}
+  .u-btn{border:0;border-radius:9px;padding:8px 13px;font-family:var(--font);font-size:13px;font-weight:800;cursor:pointer}
+  .u-ok{background:var(--amber);color:#1a1208}
+  .u-no{background:var(--bg2);color:var(--ink2);border:1px solid var(--line2)}
+  .u-sec{font-size:13px;font-weight:800;color:var(--ink2);margin:16px 0 9px}
   .lock-err{color:var(--neg);font-size:13px;margin-top:13px;min-height:18px;font-weight:600}
   #lockCancel{background:none;border:0;color:var(--ink3);font-family:var(--font);font-size:12.5px;
     font-weight:600;cursor:pointer;margin-top:4px;padding:6px;text-decoration:underline}
@@ -1303,6 +1314,7 @@
     <div class="nav-tools">
       <span class="acc-stat" id="accStat"></span>
       <span class="admin-flag" id="adminFlag">🔓 관리자 모드</span>
+      <button class="acc-btn admin-only" id="userBtn">👥 사용자 승인</button>
       <button class="acc-btn admin-only" id="addBtn">＋ 엑셀 추가</button>
       <button class="acc-btn admin-only" id="exportBtn">⬇ 내보내기(.xlsx)</button>
       <button class="acc-btn danger admin-only" id="clearBtn">전체 삭제</button>
@@ -1618,11 +1630,31 @@
     <div class="lock-sub" id="lockSub">관리자 이메일과 비밀번호를 입력하세요</div>
     <input id="lockEmail" type="email" placeholder="이메일" autocomplete="username">
     <input id="lockInput" type="password" placeholder="비밀번호" autocomplete="current-password">
-    <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);cursor:pointer;margin:-2px 0 4px;width:100%;justify-content:flex-start"><input id="lockRemember" type="checkbox" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--amber)">이 기기에서 로그인 유지</label>
+    <label id="lockRememberRow" style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2);cursor:pointer;margin:-2px 0 4px;width:100%;justify-content:flex-start"><input id="lockRemember" type="checkbox" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--amber)">이 기기에서 로그인 유지</label>
     <button id="lockGo">로그인</button>
     <div class="lock-err" id="lockErr"></div>
+    <button id="lockAlt" class="lock-btn2" style="display:none">로그아웃</button>
     <button id="lockCancel">취소</button>
+    <div id="lockSignupWrap" style="width:100%">
+      <button id="lockSignupToggle" type="button">계정이 없으신가요? 계정 만들기</button>
+      <div id="lockSignupBox" style="display:none;width:100%">
+        <input id="suName"  class="lock-in" type="text"     placeholder="이름" autocomplete="name">
+        <input id="suDept"  class="lock-in" type="text"     placeholder="소속 (예: 브랜드전략실)">
+        <input id="suEmail" class="lock-in" type="email"    placeholder="사내 이메일" autocomplete="email">
+        <input id="suPw"    class="lock-in" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="new-password">
+        <button id="suGo" class="lock-btn2">계정 만들기</button>
+        <div class="lock-err" id="suErr"></div>
+        <div class="su-note">계정을 만든 뒤 관리자 승인을 받아야 열람할 수 있습니다.<br>빠른 승인을 위해 <b>브랜드전략실 김도균 선임</b>에게 요청해 주세요.</div>
+      </div>
+    </div>
     <div class="lock-foot" id="lockFoot">일반 사용자는 로그인 없이 바로 볼 수 있습니다</div>
+  </div>
+</div>
+
+<div id="userModal" class="cmodal" style="display:none">
+  <div class="cmodal-card">
+    <div class="cmodal-head"><span class="cmodal-title">👥 사용자 승인 관리</span><button id="userModalClose" class="cmodal-x" type="button" aria-label="닫기">✕</button></div>
+    <div id="userModalBody"></div>
   </div>
 </div>
 
@@ -1676,9 +1708,9 @@ const CONFIG = {
     raynoLockTitle:'레이노 데이터', raynoLockSub:'접근하려면 비밀번호를 입력하세요.',
     emptyTitle:'아직 업로드된 데이터가 없습니다.', emptySub:'관리자가 엑셀을 업로드하면 이곳에 대시보드가 표시됩니다.',
     reportTitle:'📑 분석 리포트', reportSub:'누적 데이터 기반 · 감성은 검증값 우선(없으면 AI) 적용 · 기간을 바꾸면 리포트가 갱신됩니다',
-    loginTitle:'관리자 로그인',
-    loginSub:  '관리자 이메일과 비밀번호를 입력하세요',
-    loginFoot: '일반 사용자는 로그인 없이 바로 볼 수 있습니다',
+    loginTitle:'레이노 인사이트 랩',
+    loginSub:  '사내 계정으로 로그인해 주세요',
+    loginFoot: '사내 임직원 전용 · 승인된 계정만 열람할 수 있습니다',
   },
 
   // 자사 / 경쟁사 (언급 집계 + 브랜드 분류 프리셋)
@@ -1794,7 +1826,24 @@ const SB = (window.supabase && window.supabase.createClient)
   ? window.supabase.createClient(SUPA.url, SUPA.key, { auth:{ persistSession:true, autoRefreshToken:true } })
   : null;
 
-let auth = 'viewer';               // 'viewer'(비로그인) | 'admin'(로그인)
+/* ── 접근 권한 ─────────────────────────────────────────────────
+   ADMIN_EMAILS 에 적힌 이메일만 '관리자'(업로드·검증·설정·계정관리).
+   그 외 로그인 사용자는 '열람자'(조회 전용).
+   관리자를 늘리려면 아래 배열에 이메일 한 줄만 추가하면 됩니다.
+   목록을 비워두면 로그인한 사람 전원이 관리자가 됩니다(종전 동작). */
+const ADMIN_EMAILS = [
+  'kdk5508@naver.com',           // 현재 사용 중인 대시보드 관리자 계정
+  'mateokim@raynofilm.co.kr',    // 사내 메일로 계정을 새로 만들 경우 대비
+];
+function _roleOf(email){
+  const me=String(email||'').trim().toLowerCase();
+  if(!me) return 'viewer';
+  const list=ADMIN_EMAILS.map(x=>String(x||'').trim().toLowerCase()).filter(Boolean);
+  if(!list.length) return 'admin';
+  return list.includes(me) ? 'admin' : 'viewer';
+}
+let _loggedIn = false;             // 로그인 여부(관리자·열람자 공통)
+let auth = 'viewer';               // 'viewer'(열람자) | 'admin'(관리자)
 let _adminEmail = '';              // 현재 로그인한 관리자 이메일 (계정 관리용)
 function _isMaster(){
   const me=(_adminEmail||'').toLowerCase();
@@ -4872,8 +4921,9 @@ function showLock(){
   document.getElementById('lockErr').textContent='';
   document.getElementById('lockInput').value='';
   try{ const keep=document.getElementById('lockRemember'); if(keep) keep.checked = localStorage.getItem('rayno_trust')!=='0'; }catch(e){}
+  _lockToLogin();
   ls.classList.add('open');
-  setTimeout(()=>document.getElementById('lockEmail').focus(), 60);
+  setTimeout(()=>{ const el=document.getElementById('lockEmail'); if(el) el.focus(); }, 60);
 }
 function hideLock(){ document.getElementById('lockScreen').classList.remove('open'); }
 
@@ -4915,12 +4965,11 @@ async function submitLock(){
   catch(e){ error=e; }
   go.disabled=false; go.textContent='로그인';
   if(error){ lockErr('로그인 실패 · 이메일 또는 비밀번호를 확인하세요.'); return; }
-  auth='admin'; _adminEmail=email;
+  _adminEmail=email;
   try{ const keep=document.getElementById('lockRemember'); localStorage.setItem('rayno_trust', (keep&&keep.checked)?'1':'0'); }catch(e){}
-  hideLock();
-  applyAuthUI(); refreshVerify();
-  if(workspace==='settings') renderSettingsApp();
-  toast('관리자로 로그인했습니다 · 업로드/검증/관리 가능');
+  try{ sessionStorage.setItem('rayno_sess','1'); }catch(e){}
+  go.disabled=true; go.textContent='불러오는 중…';
+  location.reload();          // 로그인 후 데이터를 새로 받아 화면을 구성
 }
 function lockErr(msg){
   const e=document.getElementById('lockErr'); e.textContent='⚠ '+msg;
@@ -4929,11 +4978,10 @@ function lockErr(msg){
 async function logout(){
   flushCloudSave();
   try{ if(SB) await SB.auth.signOut(); }catch(e){}
-  auth='viewer'; _adminEmail='';
-  try{ localStorage.removeItem('rayno_trust'); }catch(e){}
-  applyAuthUI(); setView('dash');
-  if(workspace==='settings') renderSettingsApp();
-  toast('로그아웃되었습니다 (보기 전용)');
+  auth='viewer'; _adminEmail=''; _loggedIn=false;
+  try{ localStorage.removeItem('rayno_trust'); sessionStorage.removeItem('rayno_sess'); }catch(e){}
+  try{ Object.keys(localStorage).forEach(k=>{ if(/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); }); }catch(e){}
+  location.reload();          // 잠금화면으로 복귀
 }
 
 // 권한에 따라 UI 노출 제어
@@ -4942,8 +4990,8 @@ function applyAuthUI(){
   document.querySelectorAll('.admin-only').forEach(el=>{ el.style.display = admin ? '' : 'none'; });
   const sw=document.getElementById('appSwitcher'); if(sw) sw.style.display='flex';
   if(workspace==='rayno' && raynoUnlocked){ renderWarranty(); renderSearch(); renderRevenue(); applyRaynoAuth(); }   // 권한 바뀌면 모든 레이노 화면 갱신
-  document.getElementById('adminBtn').style.display  = admin ? 'none' : '';  // 로그인 버튼: 비로그인 방문자
-  document.getElementById('logoutBtn').style.display = admin ? '' : 'none';  // 로그아웃: 관리자
+  document.getElementById('adminBtn').style.display  = _loggedIn ? 'none' : '';  // 로그인 버튼: 비로그인 상태에서만
+  document.getElementById('logoutBtn').style.display = _loggedIn ? '' : 'none';  // 로그아웃: 로그인 사용자 전원
   document.getElementById('adminFlag').style.display = admin ? 'inline-flex' : 'none';
   if(!admin && (state.view==='verify'||state.view==='settings')) setView('dash');
   // 권한이 바뀌면 자동수집 박스도 다시 그림(부팅 땐 viewer라 비어 있던 것 → 로그인 후 시작 컨트롤 표시)
@@ -8477,8 +8525,8 @@ function applyRaynoAuth(){
   const admin=(auth==='admin');
   const set=(id,show)=>{const el=document.getElementById(id); if(el)el.style.display=show?'':'none';};
   set('raynoAdminFlag', admin);
-  set('raynoLoginBtn', !admin);
-  set('raynoLogoutBtn', admin);
+  set('raynoLoginBtn', !_loggedIn);
+  set('raynoLogoutBtn', _loggedIn);
   set('warrAddBtn', admin && rview==='warranty');
   set('warrCfgBtn', admin && rview==='warranty');
   set('warrUplDate', admin && rview==='warranty');
@@ -9118,14 +9166,38 @@ async function boot(){
     document.body.appendChild(_bootSkel); setTimeout(()=>{ try{ _bootSkel&&_bootSkel.remove(); }catch(_){} }, 6000); } }catch(_){}
   applyConfigAndSettings();
   // 보안: 이전에 브라우저에 저장돼 자동 로그인되던 세션 토큰을 정리 → 새 접속 시 항상 재로그인
-  try{ if(localStorage.getItem('rayno_trust')!=='1'){ Object.keys(localStorage).forEach(k=>{ if(/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); }); } }catch(e){}
+  try{ const _keepSess=(sessionStorage.getItem('rayno_sess')==='1'); if(localStorage.getItem('rayno_trust')!=='1' && !_keepSess){ Object.keys(localStorage).forEach(k=>{ if(/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); }); } }catch(e){}
   if(!SB){ if(_offlineMode || _cacheGet(SUPA.dataFile)){ toast('📴 오프라인 — 마지막으로 저장된 데이터를 표시합니다.', false); } else { toast('⚠ 서버 연결에 실패했습니다. 인터넷 연결을 확인하고 새로고침하세요.', true); } }
-  // 1) 로그인 세션 확인 (세션은 메모리에만 유지되므로, 새로고침/새 접속이면 비어 있음 → 열람자)
-  try{ const { data } = await SB.auth.getSession(); auth = (data && data.session) ? 'admin' : 'viewer'; if(data&&data.session&&data.session.user) _adminEmail=data.session.user.email||''; }
-  catch(e){ auth='viewer'; }
-  // 2) 클라우드 데이터 로드 (모든 방문자)
+  // 1) 로그인 세션 확인 — 세션이 없으면 화면도 데이터도 열지 않고 잠금화면에서 멈춘다
+  let _sess=null;
+  try{ const { data } = await SB.auth.getSession(); _sess=(data && data.session) || null; }
+  catch(e){ _sess=null; }
+  if(!_sess){
+    auth='viewer'; _loggedIn=false; _adminEmail='';
+    try{ _bootSkel&&_bootSkel.remove(); }catch(_){}
+    try{ const _nv=document.getElementById('nav'); if(_nv) _nv.style.display='none'; }catch(_){}
+    showLock();
+    return;                     // ← 부팅 중단. cloudLoadData 자체를 호출하지 않음
+  }
+  _adminEmail=(_sess.user && _sess.user.email) || '';
+  // 1-b) 관리자 목록에 없는 사용자는 승인 상태를 확인 — 미승인이면 데이터를 불러오지 않는다
+  if(_roleOf(_adminEmail)!=='admin'){
+    const _prof = await _fetchProfile(_sess.user.id);
+    if(!_prof || _prof.status!=='approved'){
+      _loggedIn=false; auth='viewer';
+      try{ _bootSkel&&_bootSkel.remove(); }catch(_){}
+      try{ const _nv=document.getElementById('nav'); if(_nv) _nv.style.display='none'; }catch(_){}
+      showPending(_prof);
+      return;                   // ← 승인 전에는 여기서 중단
+    }
+  }
+  _loggedIn=true;
+  auth='viewer';                // 역할은 설정 로드 뒤 확정
+  // 2) 클라우드 데이터 로드 (로그인한 사용자만 여기까지 도달)
   await cloudLoadData();
-  applyConfigAndSettings();   // 저장된 표시 문구/탭 이름을 로드 후 모든 방문자에게 적용
+  applyConfigAndSettings();   // 저장된 표시 문구/탭 이름을 로드 후 적용
+  auth=_roleOf(_adminEmail);  // 관리자 목록에 있으면 admin, 아니면 열람자(viewer)
+  if(auth==='admin'){ refreshPendingBadge().catch(()=>{}); }   // 헤더 버튼에 대기 인원 표시
   // 2.5) 중복 정리 마이그레이션 — 날짜만 다른 동일 글 합치기 (기존 데이터 1회 정리)
   STORE.config = STORE.config || {};
   if(STORE.config.canon!==4 && STORE.rows && STORE.rows.length){
@@ -9155,6 +9227,140 @@ async function boot(){
     if(now!==auth){ auth=now; applyAuthUI(); refreshVerify(); }
   });
 }
+/* ══ 계정 가입 · 승인 ══════════════════════════════════════════
+   가입 → profiles 테이블에 status='pending' 으로 기록 → 관리자 승인 후 열람.
+   승인 여부는 Supabase 서버에 저장되며, 화면에서 임의로 바꿀 수 없습니다. */
+const SIGNUP_DOMAIN = '@raynofilm.co.kr';   // 가입 허용 이메일 도메인 (비우면 제한 없음)
+const _uShow=(id,on)=>{ const e=document.getElementById(id); if(e) e.style.display = on ? '' : 'none'; };
+
+function _lockToLogin(){
+  ['lockEmail','lockInput','lockRememberRow','lockGo','lockSignupWrap'].forEach(id=>_uShow(id,true));
+  _uShow('lockAlt',false);
+  _uShow('lockSignupBox',false);
+  const t=document.getElementById('lockSignupToggle'); if(t) t.textContent='계정이 없으신가요? 계정 만들기';
+  const e=document.getElementById('suErr'); if(e) e.textContent='';
+}
+
+function showPending(prof){
+  const nm=(prof&&prof.name)||'';
+  document.getElementById('lockTitle').textContent='승인 대기 중';
+  document.getElementById('lockSub').textContent = (nm? nm+'님, ':'')+'계정이 만들어졌습니다. 관리자 승인 후 이용하실 수 있습니다.';
+  document.getElementById('lockFoot').textContent='빠른 승인을 위해 브랜드전략실 김도균 선임에게 요청해 주세요.';
+  ['lockEmail','lockInput','lockRememberRow','lockGo','lockSignupWrap','lockCancel'].forEach(id=>_uShow(id,false));
+  _uShow('lockAlt',true);
+  document.getElementById('lockErr').textContent='';
+  document.getElementById('lockScreen').classList.add('open');
+}
+
+async function _fetchProfile(uid){
+  try{
+    const r = await SB.from('profiles').select('status,name,dept,email').eq('id',uid).maybeSingle();
+    return (r && r.data) || null;
+  }catch(e){ return null; }
+}
+
+async function doSignup(){
+  const g=id=>(document.getElementById(id).value||'').trim();
+  const name=g('suName'), dept=g('suDept'), email=g('suEmail').toLowerCase();
+  const pw=document.getElementById('suPw').value;
+  const err=m=>{ document.getElementById('suErr').textContent='⚠ '+m; };
+  if(!name || !dept){ err('이름과 소속을 입력하세요.'); return; }
+  if(!email || email.indexOf('@')<0){ err('이메일을 확인하세요.'); return; }
+  if(SIGNUP_DOMAIN && !email.endsWith(SIGNUP_DOMAIN)){ err('사내 이메일('+SIGNUP_DOMAIN+')로만 가입할 수 있습니다.'); return; }
+  if(!pw || pw.length<6){ err('비밀번호는 6자 이상이어야 합니다.'); return; }
+  const btn=document.getElementById('suGo'); btn.disabled=true; btn.textContent='신청 중…';
+  let res=null, e2=null;
+  try{ res = await SB.auth.signUp({ email, password: pw, options:{ data:{ name, dept } } }); e2=res.error; }
+  catch(ex){ e2=ex; }
+  btn.disabled=false; btn.textContent='계정 만들기';
+  if(e2){ err('가입 실패 · '+((e2 && e2.message)||'다시 시도해 주세요')); return; }
+  if(res && res.data && res.data.session){
+    try{ sessionStorage.setItem('rayno_sess','1'); }catch(_){}
+    location.reload(); return;
+  }
+  document.getElementById('suErr').textContent='';
+  showPending({name});
+}
+
+/* ── 관리자: 승인 관리 ── */
+let _uCache=[];
+function _uBadge(n){
+  const b=document.getElementById('userBtn'); if(!b) return;
+  b.textContent = n>0 ? ('👥 사용자 승인 '+n) : '👥 사용자 승인';
+}
+async function _uLoad(){
+  try{
+    const r = await SB.from('profiles').select('id,email,name,dept,status,created_at').order('created_at',{ascending:false});
+    _uCache = (r && r.data) || [];
+  }catch(e){ _uCache=[]; }
+  return _uCache;
+}
+async function refreshPendingBadge(){
+  if(auth!=='admin') return;
+  try{ await _uLoad(); _uBadge(_uCache.filter(u=>u.status==='pending').length); }catch(e){}
+}
+function _uEsc(v){ return String(v==null?'':v).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function renderUsers(){
+  const box=document.getElementById('userModalBody'); if(!box) return;
+  const grp={pending:[],approved:[],rejected:[]};
+  _uCache.forEach(u=>{ (grp[u.status]||grp.pending).push(u); });
+  const row=(u,acts)=>'<div class="u-row"><div class="u-meta"><div class="u-nm">'+_uEsc(u.name||'(이름 없음)')+
+    ' <span style="font-weight:600;color:var(--ink2)">'+_uEsc(u.dept||'')+'</span></div><div class="u-sub">'+_uEsc(u.email||'')+'</div></div>'+acts+'</div>';
+  let h='';
+  h+='<div class="u-sec">승인 대기 '+grp.pending.length+'명</div>';
+  h+= grp.pending.length ? grp.pending.map(u=>row(u,
+      '<button class="u-btn u-ok" data-uact="approved" data-uid="'+u.id+'">승인</button>'+
+      '<button class="u-btn u-no" data-uact="rejected" data-uid="'+u.id+'">거부</button>')).join('')
+    : '<div class="u-sub" style="padding:4px 2px">대기 중인 신청이 없습니다.</div>';
+  h+='<div class="u-sec">이용 중 '+grp.approved.length+'명</div>';
+  h+= grp.approved.length ? grp.approved.map(u=>row(u,
+      '<button class="u-btn u-no" data-uact="rejected" data-uid="'+u.id+'">차단</button>')).join('')
+    : '<div class="u-sub" style="padding:4px 2px">아직 없습니다.</div>';
+  if(grp.rejected.length){
+    h+='<div class="u-sec">차단·거부 '+grp.rejected.length+'명</div>';
+    h+= grp.rejected.map(u=>row(u,'<button class="u-btn u-ok" data-uact="approved" data-uid="'+u.id+'">승인</button>')).join('');
+  }
+  box.innerHTML=h;
+}
+async function openUserModal(){
+  const m=document.getElementById('userModal'); if(!m) return;
+  m.style.display='flex';
+  document.getElementById('userModalBody').innerHTML='<div class="u-sub" style="padding:8px 2px">불러오는 중…</div>';
+  await _uLoad(); renderUsers(); _uBadge(_uCache.filter(u=>u.status==='pending').length);
+}
+function closeUserModal(){ const m=document.getElementById('userModal'); if(m) m.style.display='none'; }
+async function setUserStatus(uid, st){
+  try{
+    const r = await SB.from('profiles').update({status:st}).eq('id',uid);
+    if(r && r.error) throw r.error;
+    const u=_uCache.find(x=>x.id===uid); if(u) u.status=st;
+    renderUsers(); _uBadge(_uCache.filter(x=>x.status==='pending').length);
+    toast(st==='approved' ? '승인되었습니다.' : '차단되었습니다.');
+  }catch(e){ toast('처리 실패 · '+((e&&e.message)||''), true); }
+}
+
+document.addEventListener('click', e=>{
+  if(e.target.closest('#lockSignupToggle')){
+    const box=document.getElementById('lockSignupBox');
+    const open = box.style.display==='none';
+    box.style.display = open ? 'block' : 'none';
+    document.getElementById('lockSignupToggle').textContent = open ? '닫기' : '계정이 없으신가요? 계정 만들기';
+    if(open) setTimeout(()=>document.getElementById('suName').focus(),40);
+    return;
+  }
+  if(e.target.closest('#suGo')){ doSignup(); return; }
+  if(e.target.closest('#lockAlt')){ logout(); return; }
+  if(e.target.closest('#userBtn')){ openUserModal(); return; }
+  if(e.target.closest('#userModalClose')){ closeUserModal(); return; }
+  if(e.target.id==='userModal'){ closeUserModal(); return; }
+  const ub=e.target.closest('[data-uact]');
+  if(ub){ setUserStatus(ub.getAttribute('data-uid'), ub.getAttribute('data-uact')); return; }
+});
+document.addEventListener('keydown', e=>{
+  if(e.key!=='Enter') return;
+  if(e.target && e.target.id==='suPw') doSignup();
+});
+
 function _sbSvg(k){
   const P={
     home:'M3 11l9-7 9 7M5 10v9h5v-6h4v6h5v-9',
