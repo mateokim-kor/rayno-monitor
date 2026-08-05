@@ -9237,7 +9237,15 @@ async function boot(){
 
   // 5) 로그인 상태 변화 감지 (토큰 갱신·로그아웃 등 동기화)
   if(SB) SB.auth.onAuthStateChange((event, session)=>{
-    const now = session ? 'admin' : 'viewer';
+    // 세션이 사라지면(만료·다른 탭 로그아웃) 잠금화면으로 되돌린다
+    if(!session){
+      if(_loggedIn){ _loggedIn=false; try{ sessionStorage.removeItem('rayno_sess'); }catch(_){} location.reload(); }
+      return;
+    }
+    // 세션이 있어도 '관리자'는 ADMIN_EMAILS 에 있는 계정만. 나머지는 열람자.
+    const em = (session.user && session.user.email) || _adminEmail || '';
+    if(em) _adminEmail = em;
+    const now = _roleOf(em);
     if(now!==auth){ auth=now; applyAuthUI(); refreshVerify(); }
   });
 }
