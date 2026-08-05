@@ -1018,10 +1018,22 @@
   #lockEmail:focus,#lockInput:focus,.lock-in:focus{border-color:var(--amber)}
   #lockGo,.lock-btn2{width:100%;margin-top:12px;background:var(--amber);border:0;border-radius:11px;color:#1a1208;
     font-family:var(--font);font-size:15px;font-weight:800;padding:13px;cursor:pointer;transition:.15s}
-  #lockGo:hover,.lock-btn2:hover{background:#f0974a}
-  #lockSignupToggle{background:none;border:0;color:var(--ink2);font-family:var(--font);font-size:13px;font-weight:700;text-decoration:underline;cursor:pointer;margin-top:14px;padding:4px}
-  #lockSignupToggle:hover{color:var(--amber)}
-  .su-note{font-size:12.5px;color:var(--ink2);line-height:1.6;margin-top:10px;text-align:left;width:100%}
+  #lockGo:hover{background:#f0974a}
+  #suGo{background:var(--ink);color:var(--bg)}
+  #suGo:hover{background:var(--amber);color:#1a1208}
+  /* 로그인 / 가입 구분선 */
+  .lock-div{display:flex;align-items:center;gap:11px;width:100%;margin:24px 0 13px;
+    color:var(--ink2);font-size:12.5px;font-weight:700;white-space:nowrap}
+  .lock-div::before,.lock-div::after{content:'';flex:1;height:1px;background:var(--line2)}
+  /* 계정 만들기 토글 — 로그인 버튼과 무게를 다르게 (외곽선형) */
+  #lockSignupToggle{width:100%;background:transparent;border:1.5px solid var(--line2);border-radius:11px;
+    color:var(--ink);font-family:var(--font);font-size:14.5px;font-weight:800;padding:12px;cursor:pointer;transition:.15s}
+  #lockSignupToggle:hover{border-color:var(--amber);color:var(--amber)}
+  #lockSignupBox{width:100%;margin-top:11px;padding:15px 14px 14px;
+    border:1px solid var(--line2);border-radius:13px;text-align:left}
+  #lockSignupBox .su-head{font-size:13px;font-weight:800;color:var(--ink2);margin-bottom:2px}
+  #lockSignupBox .lock-in:first-of-type{margin-top:9px}
+  .su-note{font-size:12.5px;color:var(--ink2);line-height:1.65;margin-top:11px;text-align:left;width:100%}
   .u-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--line2);border-radius:11px;margin-bottom:8px;flex-wrap:wrap}
   .u-meta{flex:1;min-width:190px}
   .u-nm{font-weight:800;font-size:14px}
@@ -1634,17 +1646,19 @@
     <button id="lockGo">로그인</button>
     <div class="lock-err" id="lockErr"></div>
     <button id="lockAlt" class="lock-btn2" style="display:none">로그아웃</button>
-    <button id="lockCancel">취소</button>
+    <button id="lockCancel" style="display:none">취소</button>
     <div id="lockSignupWrap" style="width:100%">
-      <button id="lockSignupToggle" type="button">계정이 없으신가요? 계정 만들기</button>
-      <div id="lockSignupBox" style="display:none;width:100%">
+      <div class="lock-div">처음이신가요?</div>
+      <button id="lockSignupToggle" type="button">계정 만들기</button>
+      <div id="lockSignupBox" style="display:none">
+        <div class="su-head">가입 신청</div>
         <input id="suName"  class="lock-in" type="text"     placeholder="이름" autocomplete="name">
         <input id="suDept"  class="lock-in" type="text"     placeholder="소속 (예: 브랜드전략실)">
         <input id="suId"    class="lock-in" type="text"     placeholder="아이디 (영문 소문자·숫자 4~20자)" autocomplete="username">
         <input id="suPw"    class="lock-in" type="password" placeholder="비밀번호 (6자 이상)" autocomplete="new-password">
-        <button id="suGo" class="lock-btn2">계정 만들기</button>
+        <button id="suGo" class="lock-btn2">가입 신청하기</button>
         <div class="lock-err" id="suErr"></div>
-        <div class="su-note">아이디는 영문 소문자·숫자 4~20자로 만들어 주세요.<br>계정을 만든 뒤 <b>관리자 승인</b>을 받아야 열람할 수 있습니다.<br>빠른 승인을 위해 <b>브랜드전략실 김도균 선임</b>에게 요청해 주세요.</div>
+        <div class="su-note">신청 후 <b>관리자 승인</b>을 받아야 열람할 수 있습니다.<br>빠른 승인을 위해 <b>브랜드전략실 김도균 선임</b>에게 요청해 주세요.</div>
       </div>
     </div>
     <div class="lock-foot" id="lockFoot">일반 사용자는 로그인 없이 바로 볼 수 있습니다</div>
@@ -9250,7 +9264,8 @@ function _lockToLogin(){
   ['lockEmail','lockInput','lockRememberRow','lockGo','lockSignupWrap'].forEach(id=>_uShow(id,true));
   _uShow('lockAlt',false);
   _uShow('lockSignupBox',false);
-  const t=document.getElementById('lockSignupToggle'); if(t) t.textContent='계정이 없으신가요? 계정 만들기';
+  const t=document.getElementById('lockSignupToggle'); if(t) t.textContent='계정 만들기';
+  _uShow('lockCancel',false);
   const e=document.getElementById('suErr'); if(e) e.textContent='';
 }
 
@@ -9285,7 +9300,7 @@ async function doSignup(){
   let res=null, e2=null;
   try{ res = await SB.auth.signUp({ email, password: pw, options:{ data:{ name, dept, uid } } }); e2=res.error; }
   catch(ex){ e2=ex; }
-  btn.disabled=false; btn.textContent='계정 만들기';
+  btn.disabled=false; btn.textContent='가입 신청하기';
   if(e2){
     const m=String((e2&&e2.message)||'');
     if(/already|exist/i.test(m)) err('이미 사용 중인 아이디입니다. 다른 아이디를 입력해 주세요.');
@@ -9362,7 +9377,7 @@ document.addEventListener('click', e=>{
     const box=document.getElementById('lockSignupBox');
     const open = box.style.display==='none';
     box.style.display = open ? 'block' : 'none';
-    document.getElementById('lockSignupToggle').textContent = open ? '닫기' : '계정이 없으신가요? 계정 만들기';
+    document.getElementById('lockSignupToggle').textContent = open ? '가입 신청 닫기' : '계정 만들기';
     if(open) setTimeout(()=>{ const el=document.getElementById('suName'); if(el) el.focus(); },40);
     return;
   }
