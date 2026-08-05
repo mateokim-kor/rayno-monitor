@@ -1731,7 +1731,7 @@ const CONFIG = {
     headerTitle:'레이노 인사이트 랩',
     headerSub:  '브랜드의 현재와 미래를 함께 분석합니다.',
     footer1:    '레이노 인사이트 랩 · 검증(verified) 데이터 우선 대시보드',
-    footer2:    '모든 분석은 브라우저 안에서만 처리되며 파일은 외부로 전송되지 않습니다.',
+    footer2:    '분석은 브라우저에서 수행되며, 업로드 파일과 분석 데이터는 사내 사용자만 접근할 수 있는 클라우드 저장소에 보관됩니다.',
     tabCafe:'온라인 모니터링', tabRayno:'레이노 데이터', tabSettings:'설정',
     tabDash:'대시보드', tabReport:'리포트', tabPromo:'경쟁사 프로모션', tabVerify:'데이터 검증',
     tabRDash:'대시보드', tabWarranty:'품질보증서 현황', tabWarrReport:'보증서 리포트', tabGlass:'글라스케어 현황', tabDealer:'대리점 현황', tabSearch:'브랜드 검색량', tabRevenue:'매출 현황',
@@ -1830,7 +1830,7 @@ const CLASS_FIELDS = [
 const SKEY = 'rayno_monitor_v1';   // (구) localStorage 키 — 마이그레이션 시에만 참조
 const AKEY = 'rayno_auth';
 const SETKEY = 'rayno_settings_v1';// localStorage 설정(제외 키워드 등) 키
-const PW = CONFIG.password;        // (구) 비밀번호 — Supabase 로그인으로 대체됨(미사용)
+// (구) 정적 비밀번호 방식은 Supabase 로그인으로 대체되어 완전히 제거됨
 
 // ── Supabase 연결 설정 ──
 const SUPA = {
@@ -2330,6 +2330,19 @@ function cleanV(v){ const s=String(v==null?'':v).trim(); return (s==='nan'||s===
 
 function clean(v){ const s=String(v==null?'':v).trim(); return (s==='없음'||s==='nan'||s==='NaN')?'':s; }
 function escapeHtml(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+/* 링크 주소 안전성 검사.
+   escapeHtml 은 < > & " 만 바꾸므로 javascript: 같은 주소는 그대로 통과한다.
+   실제로 브라우저가 열어도 되는 http / https 만 허용하고, 나머지는 빈 값으로 만들어
+   링크 자체가 그려지지 않게 한다. */
+function safeUrl(v){
+  const raw = String(v == null ? '' : v).trim();
+  if(!raw) return '';
+  try{
+    const u = new URL(raw, location.href);
+    return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '';
+  }catch(_){ return ''; }
+}
+function safeHref(v){ return escapeHtml(safeUrl(v)); }
 
 // ── 검증 우선 값 결정 ──
 function sentOf(r){ return state.mode==='strict' ? r.vSent : (r.vSent || r.aiSent); }
@@ -3145,7 +3158,7 @@ function recCard(r){
       ? `<div class="rec-parent">↳ 원글: ${escapeHtml(r.parentTitle)}</div>` : '';
   const linkUrl = r.link || (!r.isPost ? r.parentLink : '');
   const linkBlock = linkUrl
-      ? `<a class="rec-link" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">🔗 원문 보기</a>` : '';
+      ? `<a class="rec-link" href="${safeHref(linkUrl)}" target="_blank" rel="noopener">🔗 원문 보기</a>` : '';
   const clsTags = CLASS_FIELDS.map(f=> r[f.key]
       ? `<span class="tagm cls">${f.label}: <b>${escapeHtml(r[f.key])}</b></span>` : '').filter(Boolean).join('');
   const clsBlock = clsTags ? `<div class="rec-cls">${clsTags}</div>` : '';
@@ -3631,7 +3644,7 @@ function repCard(r){
   const sent=rsent(r); const cls=sent==='긍정'?'pos':sent==='부정'?'neg':'neu';
   const kind=r.isPost?'게시글':'댓글';
   const raw=(r.body||''); const body=escapeHtml(raw.slice(0,170))+(raw.length>170?'…':'');
-  const link=r.link?`<a class="vc-srcbtn" href="${escapeHtml(r.link)}" target="_blank" rel="noopener" style="margin-left:0">🔗 원문</a>`:'';
+  const link=r.link?`<a class="vc-srcbtn" href="${safeHref(r.link)}" target="_blank" rel="noopener" style="margin-left:0">🔗 원문</a>`:'';
   return `<div class="rep-quote ${cls}">
     <div class="rep-q-top"><span class="tagm cafe">${escapeHtml(r.cafe)}</span>${r.date?`<span class="tagm date">${escapeHtml(r.date)}</span>`:''}<span class="tagm kind ${r.isPost?'':'c'}">${kind}</span><span class="tagm ${cls}">${sent||'-'}</span></div>
     ${r.title?`<div class="rep-q-title">${escapeHtml(r.title)}</div>`:''}
@@ -4660,7 +4673,7 @@ function vCard(r){
   const titleBlock = r.isPost && r.title ? `<div class="vc-title">${escapeHtml(r.title)}</div>` : '';
   const parentBlock = (!r.isPost && r.parentTitle) ? `<div class="vc-parent">↳ 원글: ${escapeHtml(r.parentTitle)}</div>` : '';
   const linkUrl = r.link || (!r.isPost ? r.parentLink : '');
-  const linkBtn = linkUrl ? `<a class="vc-srcbtn" href="${escapeHtml(linkUrl)}" target="_blank" rel="noopener">🔗 원문 ${r.isPost?'보기':'글 보기'}</a>` : '';
+  const linkBtn = linkUrl ? `<a class="vc-srcbtn" href="${safeHref(linkUrl)}" target="_blank" rel="noopener">🔗 원문 ${r.isPost?'보기':'글 보기'}</a>` : '';
   return `<div class="vcard editor ${done?'done':''} ${pending[r.id]?'dirty':''}" data-id="${r.id}">
     <div class="vc-top">
       <input type="checkbox" class="vsel" data-id="${r.id}" ${vSel.has(r.id)?'checked':''} title="선택(일괄 처리)">
@@ -5021,6 +5034,9 @@ async function logout(){
   auth='viewer'; _adminEmail=''; _loggedIn=false;
   try{ localStorage.removeItem('rayno_trust'); sessionStorage.removeItem('rayno_sess'); }catch(e){}
   try{ Object.keys(localStorage).forEach(k=>{ if(/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); }); }catch(e){}
+  // 내려받아 둔 매출·보증서·대리점 캐시도 함께 삭제한다.
+  // (남겨두면 로그아웃 뒤에도 공용 PC·퇴사자 PC에 회사 데이터가 그대로 남는다)
+  try{ Object.keys(localStorage).forEach(k=>{ if(k.indexOf('rayno_cache_')===0) localStorage.removeItem(k); }); }catch(e){}
   location.reload();          // 잠금화면으로 복귀
 }
 
@@ -5207,7 +5223,7 @@ function promoCardHTML(it,admin){
   const st=promoStatus(it); const stCls=st==='진행중'?'on':st==='예정'?'soon':'end';
   const period=(it.start||it.end)?`${it.start||'?'} ~ ${it.end||'상시'}`:'기간 미입력';
   const col=promoCompColor(it.comp);
-  return `<div class="card pm-card"><div class="pm-card-top"><span class="pm-comp" style="background:${col}">${escapeHtml(it.comp||'경쟁사')}</span>${it.channel?`<span class="pm-chan">${escapeHtml(it.channel)}</span>`:''}${it.source==='auto'?'<span class="pm-src">🤖 자동수집</span>':''}<span class="pm-status ${stCls}">${st}</span><span class="pm-cap">기록 ${escapeHtml(it.captured||'')}</span>${admin?`<span class="pm-actions"><span class="pm-edit" data-pact="edit" data-id="${escapeHtml(it.id)}">수정</span><span class="pm-del" data-pact="del" data-id="${escapeHtml(it.id)}">삭제</span></span>`:''}</div><div class="pm-name">${escapeHtml(it.title||'(제목 없음)')}</div>${it.benefit?`<div class="pm-benefit">🎁 ${escapeHtml(it.benefit)}</div>`:''}<div class="pm-meta">📅 ${escapeHtml(period)}</div>${promoMemoBlock(it)}${it.url?`<a class="pm-link" href="${escapeHtml(it.url)}" target="_blank" rel="noopener">🔗 원문 열기</a>`:''}</div>`;
+  return `<div class="card pm-card"><div class="pm-card-top"><span class="pm-comp" style="background:${col}">${escapeHtml(it.comp||'경쟁사')}</span>${it.channel?`<span class="pm-chan">${escapeHtml(it.channel)}</span>`:''}${it.source==='auto'?'<span class="pm-src">🤖 자동수집</span>':''}<span class="pm-status ${stCls}">${st}</span><span class="pm-cap">기록 ${escapeHtml(it.captured||'')}</span>${admin?`<span class="pm-actions"><span class="pm-edit" data-pact="edit" data-id="${escapeHtml(it.id)}">수정</span><span class="pm-del" data-pact="del" data-id="${escapeHtml(it.id)}">삭제</span></span>`:''}</div><div class="pm-name">${escapeHtml(it.title||'(제목 없음)')}</div>${it.benefit?`<div class="pm-benefit">🎁 ${escapeHtml(it.benefit)}</div>`:''}<div class="pm-meta">📅 ${escapeHtml(period)}</div>${promoMemoBlock(it)}${it.url?`<a class="pm-link" href="${safeHref(it.url)}" target="_blank" rel="noopener">🔗 원문 열기</a>`:''}</div>`;
 }
 function promoFormHTML(which){
   const it = which==='new' ? {id:'',comp:'',channel:'홈페이지',title:'',benefit:'',start:'',end:'',url:'',memo:''} : (PROMO.items.find(x=>x.id===which)||{});
