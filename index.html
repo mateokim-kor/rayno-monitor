@@ -1052,6 +1052,14 @@
   .u-lv{display:inline-block;font-size:11px;font-weight:800;padding:2px 8px;border-radius:980px;vertical-align:middle}
   .u-lv.lv-full{background:rgba(244,145,28,.16);color:var(--amber)}
   .u-lv.lv-mon{background:var(--bg2);color:var(--ink2);border:1px solid var(--line2)}
+  /* 사용자 관리 탭 (2026-08-10 모달 → 정식 탭 전환) */
+  .u-app-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .u-head-acts{display:flex;gap:7px;flex-wrap:wrap}
+  .u-cnt{display:inline-block;min-width:18px;margin-left:6px;padding:1px 7px;border-radius:980px;background:var(--bg2);border:1px solid var(--line2);font-size:11px;font-weight:800;color:var(--ink2)}
+  .set-subnav button.on .u-cnt{background:rgba(0,0,0,.14);border-color:transparent;color:#1a1208}
+  .u-btn.u-del{background:var(--bg2);color:var(--neg);border:1px solid var(--line2)}
+  .u-btn.u-del:hover{background:var(--neg);color:#fff;border-color:var(--neg)}
+  .u-empty{padding:26px 8px;text-align:center;color:var(--ink3);font-size:13.5px}
   .pw-who{font-size:13px;color:var(--ink2);margin:2px 0 12px}
   .pw-in{width:100%;box-sizing:border-box;margin-top:9px;background:var(--bg2);border:1.5px solid var(--line2);
     border-radius:11px;color:var(--ink);font-family:var(--font);font-size:14.5px;padding:12px 15px;outline:none}
@@ -1626,6 +1634,22 @@
     <div id="setWarrHost" data-setcat="warr"></div>
     <div id="setAccessHost" data-setcat="display"></div>
     <div id="setOptHost" data-setcat="data"></div>
+  </div>
+
+  <div id="usersApp" style="display:none">
+    <div class="set-app-sec u-app-head">
+      <h2 class="set-app-h">👥 사용자 관리</h2>
+      <div class="u-head-acts">
+        <button class="viewbtn" id="uCopyList" type="button">명단 복사</button>
+        <button class="viewbtn" id="uReload" type="button">새로고침</button>
+      </div>
+    </div>
+    <div id="uSubnav" class="set-subnav">
+      <button data-ucat="pending" class="on">승인 대기</button>
+      <button data-ucat="approved">이용 중</button>
+      <button data-ucat="rejected">차단·거부</button>
+    </div>
+    <div id="usersAppBody"></div>
   </div>
 
   <footer>
@@ -8504,6 +8528,7 @@ function _sbSyncActive(){
     const ws=(typeof workspace!=='undefined')?workspace:'cafe';
     if(ws==='rayno') key='rayno:'+((typeof rview!=='undefined'&&rview)?rview:'dash');
     else if(ws==='settings') key='settings';
+    else if(ws==='users') key='users';
     else key='cafe:'+((typeof state!=='undefined'&&state.view)?state.view:'dash');
     const items=document.querySelectorAll('.rsb-item'); if(!items.length) return;
     let act=null;
@@ -8517,6 +8542,7 @@ function _restoreNav(nav){
   if(nav.rv && RVIEW_BOX[nav.rv]) rview=nav.rv;            // 레이노 열릴 때 이 뷰로
   if(nav.ws==='rayno'){ setWorkspace('rayno'); }
   else if(nav.ws==='settings'){ setWorkspace('settings'); }
+  else if(nav.ws==='users'){ setWorkspace('users'); }
   else { let cv=nav.cv; const ok={dash:1,report:1,promo:1,verify:1}; if(cv==='verify'&&auth!=='admin')cv='dash'; if(cv&&ok[cv]&&cv!=='dash') setView(cv); }
   try{_sbSyncActive();}catch(_){}
 }
@@ -8648,15 +8674,18 @@ async function setWorkspace(ws){
   // 권한 없는 워크스페이스로의 직접 진입 차단 (주소 복원·이전 탭 기억 등)
   if(ws==='rayno' && !_canRayno()){ try{ toast('레이노 데이터 열람 권한이 없습니다. 관리자에게 문의해 주세요.', true); }catch(_){} ws='cafe'; }
   if(ws==='settings' && auth!=='admin'){ try{ toast('관리자만 사용할 수 있습니다.', true); }catch(_){} ws='cafe'; }
+  if(ws==='users' && auth!=='admin'){ try{ toast('관리자만 사용할 수 있습니다.', true); }catch(_){} ws='cafe'; }
   workspace=ws; try{_sbSyncActive();}catch(_){}
   document.querySelectorAll('.appsw-btn').forEach(b=>b.classList.toggle('on', b.dataset.ws===ws));
-  const rayno=(ws==='rayno'), settings=(ws==='settings');
+  const rayno=(ws==='rayno'), settings=(ws==='settings'), users=(ws==='users');
   document.getElementById('raynoApp').style.display = rayno?'block':'none';
   document.getElementById('settingsApp').style.display = settings?'block':'none';
+  const _ua=document.getElementById('usersApp'); if(_ua) _ua.style.display = users?'block':'none';
   const _tgl=document.getElementById('dashToolToggle'); if(_tgl) _tgl.style.display=(ws==='cafe')?'':'none';   // 도구·필터 접기는 모니터링 전용
   if(ws!=='cafe'){ const pb=document.getElementById('periodBar'); if(pb) pb.style.display='none'; }   // 기간 바는 모니터링 전용
   if(rayno){ hideCafe(); await openRayno(); }
   else if(settings){ hideCafe(); await openSettingsWs(); }
+  else if(users){ hideCafe(); await openUsersWs(); }
   else { showCafe(); }
   _saveNav();
   window.scrollTo({top:0,behavior:'smooth'});
@@ -9427,46 +9456,121 @@ async function refreshPendingBadge(){
   try{ await _uLoad(); _uBadge(_uCache.filter(u=>u.status==='pending').length); }catch(e){}
 }
 function _uEsc(v){ return String(v==null?'':v).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function renderUsers(){
-  const box=document.getElementById('userModalBody'); if(!box) return;
+let ucat='pending';   // 사용자 관리 탭에서 보고 있는 분류
+function _uGroups(){
   const grp={pending:[],approved:[],rejected:[]};
   _uCache.forEach(u=>{ (grp[u.status]||grp.pending).push(u); });
+  return grp;
+}
+function _uSyncSubnav(){
+  const grp=_uGroups();
+  const cnt={pending:grp.pending.length, approved:grp.approved.length, rejected:grp.rejected.length};
+  const lbl={pending:'승인 대기', approved:'이용 중', rejected:'차단·거부'};
+  document.querySelectorAll('#uSubnav button').forEach(b=>{
+    const k=b.dataset.ucat;
+    b.classList.toggle('on', k===ucat);
+    b.innerHTML=lbl[k]+'<span class="u-cnt">'+(cnt[k]||0)+'</span>';
+  });
+}
+function renderUsers(){
+  const box=document.getElementById('usersAppBody'); if(!box) return;
+  const grp=_uGroups();
   const lv=u=>(u.level==='full'?'full':'monitor');
   const badge=u=>'<span class="u-lv '+(lv(u)==='full'?'lv-full':'lv-mon')+'">'+(lv(u)==='full'?'전체':'모니터링만')+'</span>';
   const row=(u,acts,withBadge)=>'<div class="u-row"><div class="u-meta"><div class="u-nm">'+_uEsc(u.name||'(이름 없음)')+
     ' <span style="font-weight:600;color:var(--ink2)">'+_uEsc(u.dept||'')+'</span>'+(withBadge?' '+badge(u):'')+
     '</div><div class="u-sub">아이디 · '+_uEsc(_toId(u.email||''))+'</div></div>'+acts+'</div>';
   let h='';
-  h+='<div class="u-sec">승인 대기 '+grp.pending.length+'명</div>';
-  h+= grp.pending.length ? grp.pending.map(u=>row(u,
-      '<button class="u-btn u-ok" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만 승인</button>'+
-      '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체 승인</button>'+
-      '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">거부</button>', false)).join('')
-    : '<div class="u-sub" style="padding:4px 2px">대기 중인 신청이 없습니다.</div>';
-  h+='<div class="u-sec">이용 중 '+grp.approved.length+'명</div>';
-  h+= grp.approved.length ? grp.approved.map(u=>row(u,
-      (lv(u)==='full'
-        ? '<button class="u-btn u-no" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만으로</button>'
-        : '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체로 올리기</button>')+
-      '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">차단</button>', true)).join('')
-    : '<div class="u-sub" style="padding:4px 2px">아직 없습니다.</div>';
-  if(grp.rejected.length){
-    h+='<div class="u-sec">차단·거부 '+grp.rejected.length+'명</div>';
-    h+= grp.rejected.map(u=>row(u,
-      '<button class="u-btn u-ok" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만 승인</button>'+
-      '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체 승인</button>', false)).join('');
+  if(ucat==='pending'){
+    h = grp.pending.length ? grp.pending.map(u=>row(u,
+        '<button class="u-btn u-ok" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만 승인</button>'+
+        '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체 승인</button>'+
+        '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">거부</button>', false)).join('')
+      : '<div class="u-empty">대기 중인 신청이 없습니다.</div>';
+  } else if(ucat==='approved'){
+    h = grp.approved.length ? grp.approved.map(u=>row(u,
+        (lv(u)==='full'
+          ? '<button class="u-btn u-no" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만으로</button>'
+          : '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체로 올리기</button>')+
+        '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">차단</button>', true)).join('')
+      : '<div class="u-empty">아직 이용 중인 사용자가 없습니다.</div>';
+  } else {
+    h = grp.rejected.length ? grp.rejected.map(u=>row(u,
+        '<button class="u-btn u-ok" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만 승인</button>'+
+        '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체 승인</button>'+
+        '<button class="u-btn u-del" data-udel="1" data-uid="'+u.id+'">삭제</button>', false)).join('')
+      : '<div class="u-empty">차단·거부된 사용자가 없습니다.</div>';
+    if(grp.rejected.length){
+      h+='<div class="su-note" style="margin-top:14px">삭제하면 로그인 계정까지 함께 지워집니다. 되돌릴 수 없으며, 다시 이용하려면 새로 가입해야 합니다.</div>';
+    }
   }
-  h+='<div class="su-note" style="margin-top:14px">모니터링만 = 온라인 모니터링 화면만 열람<br>전체 = 온라인 모니터링 + 레이노 데이터(매출·보증서·대리점) 열람</div>';
+  if(ucat!=='rejected'){
+    h+='<div class="su-note" style="margin-top:14px">모니터링만 = 온라인 모니터링 화면만 열람<br>전체 = 온라인 모니터링 + 레이노 데이터(매출·보증서·대리점) 열람</div>';
+  }
   box.innerHTML=h;
+  _uSyncSubnav();
 }
-async function openUserModal(){
-  if(auth!=='admin'){ toast('관리자만 사용할 수 있습니다.',true); return; }
-  const m=document.getElementById('userModal'); if(!m) return;
-  m.style.display='flex';
-  document.getElementById('userModalBody').innerHTML='<div class="u-sub" style="padding:8px 2px">불러오는 중…</div>';
+async function openUsersWs(){
+  const box=document.getElementById('usersAppBody');
+  if(box) box.innerHTML='<div class="u-empty">불러오는 중…</div>';
   await _uLoad(); renderUsers(); _uBadge(_uCache.filter(u=>u.status==='pending').length);
 }
+/* 예전 팝업 호출부 호환용 — 이제 탭으로 이동시킨다 */
+async function openUserModal(){
+  if(auth!=='admin'){ toast('관리자만 사용할 수 있습니다.',true); return; }
+  try{ await setWorkspace('users'); }catch(_){}
+}
 function closeUserModal(){ const m=document.getElementById('userModal'); if(m) m.style.display='none'; }
+
+/* 차단·거부된 사용자 계정 완전 삭제 (서버 함수 admin_delete_user 호출) */
+async function deleteUserAccount(uid){
+  if(auth!=='admin'){ toast('관리자만 사용할 수 있습니다.',true); return; }
+  const u=_uCache.find(x=>x.id===uid);
+  const who=(u && (u.name || _toId(u.email||''))) || '이 사용자';
+  if(!confirm(who+' 님의 계정을 완전히 삭제할까요?\n\n로그인 계정까지 지워지며 되돌릴 수 없습니다.\n다시 이용하려면 새로 가입해야 합니다.')) return;
+  try{
+    const r = await SB.rpc('admin_delete_user', { target_id: uid });
+    if(r && r.error) throw r.error;
+    const res = r && r.data;
+    if(res && res.ok===false){ toast(res.msg||'삭제하지 못했습니다.', true); return; }
+    _uCache = _uCache.filter(x=>x.id!==uid);
+    renderUsers(); _uBadge(_uCache.filter(x=>x.status==='pending').length);
+    toast('삭제되었습니다.');
+  }catch(e){
+    const msg=(e&&e.message)||'';
+    if(/function|does not exist|schema cache/i.test(msg)){
+      toast('삭제 기능이 아직 준비되지 않았습니다. supabase_delete_user.sql 을 먼저 실행해 주세요.', true);
+    } else {
+      toast('삭제 실패 · '+msg, true);
+    }
+  }
+}
+
+/* 현재 사용자 명단을 표 형태 텍스트로 복사 */
+function copyUserList(){
+  if(!_uCache.length){ toast('불러온 사용자가 없습니다.',true); return; }
+  const st={pending:'승인 대기', approved:'이용 중', rejected:'차단·거부'};
+  const lvl=u=>(u.status!=='approved') ? '-' : (u.level==='full'?'전체':'모니터링만');
+  const lines=['이름\t부서\t아이디\t상태\t권한'];
+  ['approved','pending','rejected'].forEach(s=>{
+    _uCache.filter(u=>u.status===s).forEach(u=>{
+      lines.push([(u.name||'(이름 없음)'), (u.dept||''), _toId(u.email||''), (st[s]||s), lvl(u)].join('\t'));
+    });
+  });
+  const text=lines.join('\n');
+  const done=()=>toast('명단 '+(lines.length-1)+'명을 복사했습니다. 엑셀·문서에 붙여넣으세요.');
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(done, ()=>_uCopyFallback(text,done)); }
+    else _uCopyFallback(text,done);
+  }catch(_){ _uCopyFallback(text,done); }
+}
+function _uCopyFallback(text,done){
+  try{
+    const ta=document.createElement('textarea'); ta.value=text;
+    ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy'); ta.remove(); done();
+  }catch(e){ toast('복사에 실패했습니다.',true); }
+}
 async function setUserStatus(uid, act){
   const parts=String(act||'').split(':');
   const ok=(parts[0]==='ok');
@@ -9496,6 +9600,12 @@ document.addEventListener('click', e=>{
   if(e.target.closest('#userBtn')){ openUserModal(); return; }
   if(e.target.closest('#userModalClose')){ closeUserModal(); return; }
   if(e.target.id==='userModal'){ closeUserModal(); return; }
+  const udel=e.target.closest('[data-udel]');
+  if(udel){ deleteUserAccount(udel.getAttribute('data-uid')); return; }
+  const ucatBtn=e.target.closest('#uSubnav button[data-ucat]');
+  if(ucatBtn){ ucat=ucatBtn.dataset.ucat; renderUsers(); return; }
+  if(e.target.closest('#uCopyList')){ copyUserList(); return; }
+  if(e.target.closest('#uReload')){ openUsersWs(); return; }
   const ub=e.target.closest('[data-uact]');
   if(ub){ setUserStatus(ub.getAttribute('data-uid'), ub.getAttribute('data-uact')); return; }
 });
@@ -9992,7 +10102,7 @@ function _applySidebarLayout(){
         {t:'보증서 리포트', ic:'report', k:'rayno:warrReport', d:'보증서 데이터 기반 분석 리포트', go:()=>goRayno('warrReport')},
       ]},
       {h:'관리자', admin:true, items:[
-        {t:'사용자 승인', ic:'shield', k:'users', d:'가입 신청을 승인하고 이용자를 관리합니다', go:()=>{ try{ openUserModal(); }catch(_){} }},
+        {t:'사용자 승인', ic:'shield', k:'users', d:'가입 신청을 승인하고 이용자를 관리합니다', go:()=>{ try{ setWorkspace('users'); }catch(_){} }},
         {t:'데이터 검증', ic:'verify', k:'cafe:verify', d:'수집 데이터의 감성·분류를 검증합니다', go:()=>goCafe('verify')},
         {t:'자동 수집 관리', ic:'refresh', k:'crawl', d:'자동 수집 작업을 관리합니다', go:goCrawl},
         {t:'설정', ic:'gear', k:'settings', d:'대시보드 설정과 데이터 업로드를 관리합니다', go:goSettings},
