@@ -5723,7 +5723,7 @@ function _dealerAgg(){   // ERP 기준(대리점 마스터 dealers.json + ERP �
   const ens=n=>M[n]||(M[n]={name:n, store:'', jibu:'', code:'', member:false, membership:'', salesA:0, salesQ:0, erp:false, rank:'', tier:'', sido:'', sigungu:'', salesType:'', unuse:false, addr:'', tel:'', ceo:''});
   const _isJibuName=n=>{ const s=String(n||''); if(/지부|본사/.test(s)) return true; if(typeof _sToJibu==='function' && _sToJibu(s)) return true; return false; };
   // ① ERP 대리점 마스터(branchCustList → dealers.json) — 유일한 대리점 모집단
-  if(typeof ERPD!=='undefined'&&ERPD&&Array.isArray(ERPD.dealers)){ ERPD.dealers.forEach(e=>{ const nm=String(e.name||'').trim(); if(!nm||_isJibuName(nm))return; const d=ens(nm); d.erp=true; if(e.code) d.code=e.code; d.store=String(e.custName||'').trim()||d.store; if(e.branch) d.jibu=e.branch; d.membership=String(e.membership||''); d.member=!!e.glasscare; d.rank=e.rank||d.rank; d.tier=e.tier||d.tier; d.sido=e.sido||d.sido; d.sigungu=e.sigungu||d.sigungu; d.salesType=e.salesType||d.salesType; d.unuse=!!e.unuse; d.addr=e.addr||d.addr; d.tel=e.tel||d.tel; d.ceo=e.ceo||d.ceo; }); }
+  if(typeof ERPD!=='undefined'&&ERPD&&Array.isArray(ERPD.dealers)){ ERPD.dealers.forEach(e=>{ const nm=String(e.name||'').trim(); if(!nm||_isJibuName(nm))return; const d=ens(nm); d.erp=true; if(e.code) d.code=e.code; d.store=String(e.custName||'').trim()||d.store; if(e.branch) d.jibu=e.branch; d.membership=String(e.membership||''); d.member=!!e.glasscare; d.rank=e.rank||d.rank; d.tier=e.tier||d.tier; d.sido=e.sido||d.sido; d.sigungu=e.sigungu||d.sigungu; d.salesType=e.salesType||d.salesType; d.unuse=!!e.unuse; }); }
   // ② branchsales(지부→대리점)에 있는 대리점 — 마스터에 없어도 목록에 포함(지부·본사 모두)
   if(typeof BSALE!=='undefined'&&BSALE&&Array.isArray(BSALE.rows)&&typeof _bsJibuOf==='function'){
     BSALE.rows.forEach(r=>{
@@ -5801,9 +5801,7 @@ function _dealerDetailHtml(d){
   ${row('데이터 기준일', _dataFreshLine())}
     ${row('상태', stat)}
     ${row('지역', escapeHtml(region))}
-    ${d.addr?row('주소', escapeHtml(d.addr)):''}
-    ${d.ceo?row('대표', escapeHtml(d.ceo)):''}
-    ${d.tel?row('연락처', escapeHtml(d.tel)):''}
+    <!-- 주소·대표·연락처 표시 제거 (2026-08-10 Q-06: 대리점 사업자 정보 수집·저장 제외) -->
     ${(d.rank||d.tier)?row('등급', '거래처 '+escapeHtml(d.rank||'-')+' · 시장 '+escapeHtml(d.tier||'-')):''}
     ${d.salesType?row('판매형태', escapeHtml(d.salesType)):''}
     <div style="margin-top:12px;font-size:11.5px;color:var(--ink3);line-height:1.6">※ 매출·롤은 <b>지부 → 대리점 판매(branchSalesList)</b> 누적입니다(위 연도 토글 기준).${d.bsSales?' (본사 직매 포함)':''} 대리점 마스터(branchCustList) 기준.</div>
@@ -7889,9 +7887,8 @@ function _dealerRegionMap(){   // 정규화 매장명 → {doKey, sgg} (보증�
   const m=new Map();
   if(typeof ERPD!=='undefined' && ERPD && Array.isArray(ERPD.dealers)){
     ERPD.dealers.forEach(d=>{
-      const doKey=_regionKey(d.sido)||_regionKey(d.addr);   // 시·도명 우선, 없으면 주소 앞부분에서
-      let sgg=String(d.sigungu||'').trim();
-      if(!sgg && d.addr){ const p=String(d.addr).trim().split(/\s+/); if(p.length>=2) sgg=p[1]; }   // 주소 2번째 토큰(시/군/구)
+      const doKey=_regionKey(d.sido);   // 시·도 코드만 사용 (Q-06으로 주소 미수집. 실측상 전 대리점 시·도 채워져 있음)
+      const sgg=String(d.sigungu||'').trim();
       const reg={doKey,sgg};
       [d.name,d.agentName,d.custName].forEach(nm=>{ const key=_bsNameNorm(nm); if(key && !m.has(key)) m.set(key,reg); });
     });
