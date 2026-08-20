@@ -5298,12 +5298,15 @@ function _renderPromoImpl(box){
   const comps=[...new Set(items.map(i=>i.comp).filter(Boolean))];
   const chans=[...new Set(items.map(i=>i.channel).filter(Boolean))];
   const fchip=(type,val,label,active)=>`<span class="pm-fchip ${active?'on':''}" data-pfilter="${type}" data-val="${escapeHtml(val)}">${escapeHtml(label)}</span>`;
-  const compFilter=comps.length?`<div class="pm-frow"><span class="pm-flbl">경쟁사</span>${fchip('comp','','전체',!_promoFilter.comp)}${comps.map(c=>fchip('comp',c,c,_promoFilter.comp===c)).join('')}</div>`:'';
-  const chanFilter=chans.length?`<div class="pm-frow"><span class="pm-flbl">채널</span>${fchip('channel','','전체',!_promoFilter.channel)}${chans.map(c=>fchip('channel',c,c,_promoFilter.channel===c)).join('')}</div>`:'';
-  const statFilter=`<div class="pm-frow"><span class="pm-flbl">상태</span>${['','진행중','예정','종료'].map(s=>fchip('status',s,s||'전체',_promoFilter.status===s)).join('')}</div>`;
+  /* 2026-08-20: 필터 3줄(경쟁사·채널·상태)을 공통 필터 줄(_fbar) 한 묶음씩으로.
+     이름표는 이미 있었으므로 _fbar의 이름표로 옮기고, 칩은 그대로 둡니다
+     (경쟁사·채널은 항목 수가 그때그때 달라 알약 버튼보다 칩이 알맞습니다). */
+  const compFilter=comps.length?`${fchip('comp','','전체',!_promoFilter.comp)}${comps.map(c=>fchip('comp',c,c,_promoFilter.comp===c)).join('')}`:'';
+  const chanFilter=chans.length?`${fchip('channel','','전체',!_promoFilter.channel)}${chans.map(c=>fchip('channel',c,c,_promoFilter.channel===c)).join('')}`:'';
+  const statFilter=`${['','진행중','예정','종료'].map(s=>fchip('status',s,s||'전체',_promoFilter.status===s)).join('')}`;
   const active=items.filter(i=>promoStatus(i)==='진행중').length;
   const viewToggle=`<div class="pm-vtoggle"><span class="pm-vt ${_promoView==='card'?'on':''}" data-pview="card">카드</span><span class="pm-vt ${_promoView==='timeline'?'on':''}" data-pview="timeline">타임라인</span><span class="pm-vt ${_promoView==='calendar'?'on':''}" data-pview="calendar">달력</span></div>`;
-  const head=`<div class="card pm-head"><div class="pm-head-top"><div><h3 class="pm-title">🎯 경쟁사 프로모션 모니터링</h3><div class="cap">경쟁사 홈페이지·이벤트페이지·SNS에서 확인한 프로모션을 기록·추적합니다. ${admin?'‘＋ 프로모션 추가’로 직접 등록하세요.':'(등록은 관리자만 가능합니다)'}</div></div><div class="pm-head-right">${viewToggle}${admin?`<button class="pm-add" data-pact="add">＋ 프로모션 추가</button>`:''}</div></div><div class="pm-stat">전체 <b>${items.length}</b>건 · 진행중 <b style="color:var(--pos)">${active}</b>건</div>${compFilter}${chanFilter}${statFilter}</div>`;
+  const head=`<div class="card pm-head"><div class="pm-head-top"><div><h3 class="pm-title">🎯 경쟁사 프로모션 모니터링</h3><div class="cap">경쟁사 홈페이지·이벤트페이지·SNS에서 확인한 프로모션을 기록·추적합니다. ${admin?'‘＋ 프로모션 추가’로 직접 등록하세요.':'(등록은 관리자만 가능합니다)'}</div></div><div class="pm-head-right">${viewToggle}${admin?`<button class="pm-add" data-pact="add">＋ 프로모션 추가</button>`:''}</div></div><div class="pm-stat">전체 <b>${items.length}</b>건 · 진행중 <b style="color:var(--pos)">${active}</b>건</div>${_fbar([['경쟁사',compFilter],['채널',chanFilter],['상태',statFilter]])}</div>`;
   let body;
   if(!items.length) body=`<div class="card"><div class="empty">${admin?'아직 등록된 프로모션이 없습니다. ‘＋ 프로모션 추가’로 첫 항목을 등록해 보세요.':'아직 등록된 경쟁사 프로모션이 없습니다.'}</div></div>`;
   else if(!view.length) body=`<div class="card"><div class="empty">조건에 맞는 프로모션이 없습니다.</div></div>`;
@@ -6013,7 +6016,7 @@ function _dealerDetailHtml(d){
     :'<span style="color:var(--ink3)">일반</span> <span style="color:var(--ink3);font-size:11px">'+_memBasis+'</span>';
   const stat=d.unuse?'<span style="color:var(--amber);font-weight:800">미사용</span>':'<span style="color:var(--dv2);font-weight:800">사용중</span>';
   const row=(k,v)=>`<div style="display:flex;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)"><div style="flex:0 0 92px;color:var(--ink3);font-size:12.5px">${k}</div><div style="flex:1;font-size:13.5px;color:var(--ink)">${v}</div></div>`;
-  const _dY=(new Date()).getFullYear(); const _dPrev=(_cardYr&&_cardYr.dlr==='prev'); const _dSelY=_dPrev?String(_dY-1):String(_dY); const _dYr=(d.bsYr&&d.bsYr[_dSelY])||{a:0,q:0,mon:{}}; const _dSeg=`<div class="seg dlr-yseg" style="transform:scale(.85);transform-origin:left center;margin:0"><button type="button" data-dyv="cur" class="${!_dPrev?'on':''}">${_dY}</button><button type="button" data-dyv="prev" class="${_dPrev?'on':''}">${_dY-1}</button></div>`;
+  const _dY=(new Date()).getFullYear(); const _dPrev=(_cardYr&&_cardYr.dlr==='prev'); const _dSelY=_dPrev?String(_dY-1):String(_dY); const _dYr=(d.bsYr&&d.bsYr[_dSelY])||{a:0,q:0,mon:{}}; const _dSeg=`<div class="seg dlr-yseg"><button type="button" data-dyv="cur" class="${!_dPrev?'on':''}">${_dY}</button><button type="button" data-dyv="prev" class="${_dPrev?'on':''}">${_dY-1}</button></div>`;
   return `<div style="font-size:13px">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;flex-wrap:wrap"><div style="font-size:12px;color:var(--ink3);font-weight:700">지부 → 대리점 판매 · 연도</div>${_dSeg}</div>
     <div style="display:flex;gap:12px;margin-bottom:8px">
@@ -6970,8 +6973,16 @@ function _prevSalesObj(S){ if(!S||!S.prev) return null; const p=S.prev; return {
      안 그러면 2025+2026이 조용히 합산됨(숫자가 두 배 가까이 부풀어도 티가 안 남). */
 function _cyrYear(key){ const y=(new Date()).getFullYear(); return String((typeof _cardYr!=='undefined'&&_cardYr&&_cardYr[key]==='prev')?(y-1):y); }
 function _withYear(key,fn){ const _real=SALES; const hasPrev=!!(_real&&_real.prev&&(_real.prev.months||[]).length); const up=(_cardYr&&_cardYr[key]==='prev'&&hasPrev); if(up){ const pv=_prevSalesObj(_real); if(pv) SALES=pv; } try{ return fn(); } finally{ SALES=_real; } }
-  function _cyrSeg(key){ const y=(new Date()).getFullYear(); const isPrev=!!(_cardYr&&_cardYr[key]==='prev'); return `<div class="seg cyr-seg" data-cyk="${key}" style="transform:scale(.85);transform-origin:left center;margin:0"><button type="button" data-cyv="cur" class="${!isPrev?'on':''}">${y}</button><button type="button" data-cyv="prev" class="${isPrev?'on':''}">${y-1}</button></div>`; }
-  function _cardHdr(title,key,xlsx){ return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${title}</h3>${_cyrSeg(key)}</div>${xlsx?`<button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(title)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button>`:''}</div>`; }
+  function _cyrSeg(key){ const y=(new Date()).getFullYear(); const isPrev=!!(_cardYr&&_cardYr[key]==='prev'); /* 2026-08-20: transform:scale(.85)로 억지로 줄이던 것을 없앴습니다.
+     이제 공통 필터 줄(_fbar) 안에 들어가므로 크기가 다른 필터와 저절로 맞습니다. */
+  return `<div class="seg cyr-seg" data-cyk="${key}"><button type="button" data-cyv="cur" class="${!isPrev?'on':''}">${y}</button><button type="button" data-cyv="prev" class="${isPrev?'on':''}">${y-1}</button></div>`; }
+  /* 2026-08-20: 제목 옆에 연도 토글과 엑셀 버튼을 나란히 두던 것을
+     **제목 → 그 아래 공통 필터 줄(연도 + 엑셀 다운로드)** 로 바꿨습니다.
+     화면 전체가 "필터는 제목 바로 아래 한 줄" 규칙을 따르게 됩니다. */
+  function _cardHdr(title,key,xlsx){
+    const dl = xlsx ? `<button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(title)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button>` : '';
+    return `<h3 style="margin:0 0 11px"><span class="dot"></span>${title}</h3>` + _fbar([['연도', _cyrSeg(key)]], dl);
+  }
 /* 공통 필터 줄 생성기.
    groups = [[이름표, 조작장치HTML], ...]  이름표가 빈 문자열이면 이름표 없이 붙는다.
    화면 어디서나 같은 모양·같은 자리에 나오도록 이 함수만 쓴다. */
