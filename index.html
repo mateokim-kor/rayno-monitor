@@ -1050,10 +1050,23 @@
   #lockSignupBox .su-head{font-size:13px;font-weight:800;color:var(--ink2);margin-bottom:2px}
   #lockSignupBox .lock-in:first-of-type{margin-top:9px}
   .su-note{font-size:12.5px;color:var(--ink2);line-height:1.65;margin-top:11px;text-align:left;width:100%}
-  .u-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--line2);border-radius:11px;margin-bottom:8px;flex-wrap:wrap}
-  .u-meta{flex:1;min-width:190px}
-  .u-nm{font-weight:800;font-size:14px}
-  .u-sub{font-size:12.5px;color:var(--ink2);margin-top:2px}
+  /* 사용자 카드 — 2026-08-20 재설계
+     · 정보를 위아래로 쌓아 눈이 좌우로 흔들리지 않게 한다
+     · 등급은 이름 옆 작은 배지 대신, 아래에 색 점과 함께 한 줄로 크게
+     · 조작은 오른쪽 한 곳에 모은다 */
+  .u-row{display:flex;align-items:flex-start;gap:14px;padding:14px 16px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:var(--card);transition:.14s}
+  .u-row:hover{border-color:var(--line2);box-shadow:0 1px 8px rgba(0,0,0,.04)}
+  .u-meta{flex:1;min-width:200px}
+  .u-nm{font-weight:800;font-size:15px;color:var(--ink);letter-spacing:-.01em}
+  .u-nm .u-dept{font-weight:600;font-size:13px;color:var(--ink2);margin-left:6px}
+  .u-sub{font-size:12.5px;color:var(--ink3);margin-top:3px;font-variant-numeric:tabular-nums}
+  .u-state{display:flex;align-items:center;gap:6px;margin-top:9px;font-size:12.5px;font-weight:700}
+  .u-dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .u-acts{display:flex;gap:7px;align-items:center;flex:none;flex-wrap:wrap;justify-content:flex-end}
+  /* 등급 선택 — 올리기/내리기 대신 지금 등급을 고르는 방식 */
+  .u-sel{border:1px solid var(--line2);background:var(--card);color:var(--ink);font-family:var(--font);font-size:13px;font-weight:700;padding:8px 11px;border-radius:9px;cursor:pointer;min-height:38px}
+  .u-sel:hover{border-color:var(--amber)}
+  .u-adminbox{display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:9px;background:rgba(0,113,227,.08);color:var(--neu);font-size:12.5px;font-weight:800;white-space:nowrap}
   .u-btn{border:0;border-radius:9px;padding:8px 13px;font-family:var(--font);font-size:13px;font-weight:800;cursor:pointer}
   .u-ok{background:var(--amber);color:#1a1208}
   .u-no{background:var(--bg2);color:var(--ink2);border:1px solid var(--line2)}
@@ -1647,8 +1660,8 @@
   </div>
 
   <div id="usersApp" style="display:none">
-    <div class="set-app-sec u-app-head">
-      <h2 class="set-app-h">👥 사용자 관리</h2>
+    <div class="set-app-sec u-app-head" style="margin-top:2px;justify-content:flex-end">
+      <!-- 2026-08-20: 안쪽 제목 제거. 화면 상단에 이미 '사용자 승인'이 있어 같은 말이 두 겹이었음 -->
       <div class="u-head-acts">
         <button class="viewbtn" id="uCopyList" type="button">명단 복사</button>
         <button class="viewbtn" id="uReload" type="button">새로고침</button>
@@ -9808,43 +9821,62 @@ function _uSyncSubnav(){
   });
 }
 function renderUsers(){
+  /* 2026-08-20 재설계
+     · 정보를 이름 → 아이디 → 등급 순으로 위아래 배치 (눈이 좌우로 흔들리지 않게)
+     · '전체로 올리기 / 모니터링만으로' 두 버튼 → 지금 등급을 고르는 선택 상자 하나로
+       (올리는 건지 내리는 건지 헷갈리던 문제 해결)
+     · 관리자 계정은 배지를 달고 조작 버튼을 감춘다
+       (소스의 ADMIN_EMAILS 목록에 있으면 등급과 무관하게 관리자로 동작하는데,
+        예전 화면은 '모니터링만'으로 표시하고 차단 버튼까지 보여줘 사실과 달랐음) */
   const box=document.getElementById('usersAppBody'); if(!box) return;
   const grp=_uGroups();
   const lv=u=>(u.level==='full'?'full':'monitor');
-  const badge=u=>'<span class="u-lv '+(lv(u)==='full'?'lv-full':'lv-mon')+'">'+(lv(u)==='full'?'전체':'모니터링만')+'</span>';
-  const row=(u,acts,withBadge)=>'<div class="u-row"><div class="u-meta"><div class="u-nm">'+_uEsc(u.name||'(이름 없음)')+
-    ' <span style="font-weight:600;color:var(--ink2)">'+_uEsc(u.dept||'')+'</span>'+(withBadge?' '+badge(u):'')+
-    '</div><div class="u-sub">아이디 · '+_uEsc(_toId(u.email||''))+'</div></div>'+acts+'</div>';
+  const isAdmin=u=>{ try{ return _roleOf(u.email||'')==='admin'; }catch(_){ return false; } };
+
+  const stateLine=(u)=>{
+    if(isAdmin(u)) return '<div class="u-state" style="color:var(--neu)"><span class="u-dot" style="background:var(--neu)"></span>관리자 — 모든 화면과 설정 사용</div>';
+    if(u.status==='pending')  return '<div class="u-state" style="color:var(--ink3)"><span class="u-dot" style="background:var(--ink3)"></span>승인 대기 중</div>';
+    if(u.status==='rejected') return '<div class="u-state" style="color:var(--neg)"><span class="u-dot" style="background:var(--neg)"></span>차단됨 — 로그인해도 열람 불가</div>';
+    return lv(u)==='full'
+      ? '<div class="u-state" style="color:var(--amber)"><span class="u-dot" style="background:var(--amber)"></span>전체 — 온라인 모니터링 + 레이노 데이터</div>'
+      : '<div class="u-state" style="color:var(--ink2)"><span class="u-dot" style="background:var(--ink3)"></span>모니터링만 — 온라인 모니터링 화면만</div>';
+  };
+  const card=(u,acts)=>'<div class="u-row"><div class="u-meta">'
+    + '<div class="u-nm">'+_uEsc(u.name||'(이름 없음)')
+    + (u.dept?'<span class="u-dept">'+_uEsc(u.dept)+'</span>':'')+'</div>'
+    + '<div class="u-sub">'+_uEsc(_toId(u.email||''))+'</div>'
+    + stateLine(u)
+    + '</div><div class="u-acts">'+acts+'</div></div>';
+
+  // 등급 선택 상자 — 고른 값이 곧 그 사람의 등급이 된다
+  const lvSel=(u,forApprove)=>'<select class="u-sel" data-ulv="1" data-uid="'+u.id+'">'
+    + (forApprove?'<option value="">승인하기…</option>':'')
+    + '<option value="full"'+(!forApprove&&lv(u)==='full'?' selected':'')+'>전체 열람</option>'
+    + '<option value="monitor"'+(!forApprove&&lv(u)==='monitor'?' selected':'')+'>모니터링만</option>'
+    + '</select>';
+  const adminBox='<div class="u-adminbox">관리자 계정</div>';
+
   let h='';
   if(ucat==='pending'){
-    h = grp.pending.length ? grp.pending.map(u=>row(u,
-        '<button class="u-btn u-ok" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만 승인</button>'+
-        '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체 승인</button>'+
-        '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">거부</button>', false)).join('')
+    h = grp.pending.length ? grp.pending.map(u=> isAdmin(u) ? card(u, adminBox) : card(u,
+        lvSel(u,true) + '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">거부</button>')).join('')
       : '<div class="u-empty">대기 중인 신청이 없습니다.</div>';
   } else if(ucat==='approved'){
-    h = grp.approved.length ? grp.approved.map(u=>row(u,
-        (lv(u)==='full'
-          ? '<button class="u-btn u-no" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만으로</button>'
-          : '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체로 올리기</button>')+
-        '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">차단</button>', true)).join('')
+    h = grp.approved.length ? grp.approved.map(u=> isAdmin(u) ? card(u, adminBox) : card(u,
+        lvSel(u,false) + '<button class="u-btn u-no" data-uact="no" data-uid="'+u.id+'">차단</button>')).join('')
       : '<div class="u-empty">아직 이용 중인 사용자가 없습니다.</div>';
   } else {
-    h = grp.rejected.length ? grp.rejected.map(u=>row(u,
-        '<button class="u-btn u-ok" data-uact="ok:monitor" data-uid="'+u.id+'">모니터링만 승인</button>'+
-        '<button class="u-btn u-ok" data-uact="ok:full" data-uid="'+u.id+'">전체 승인</button>'+
-        '<button class="u-btn u-del" data-udel="1" data-uid="'+u.id+'">삭제</button>', false)).join('')
+    h = grp.rejected.length ? grp.rejected.map(u=> isAdmin(u) ? card(u, adminBox) : card(u,
+        lvSel(u,true) + '<button class="u-btn u-del" data-udel="1" data-uid="'+u.id+'">삭제</button>')).join('')
       : '<div class="u-empty">차단·거부된 사용자가 없습니다.</div>';
     if(grp.rejected.length){
       h+='<div class="su-note" style="margin-top:14px">삭제하면 로그인 계정까지 함께 지워집니다. 되돌릴 수 없으며, 다시 이용하려면 새로 가입해야 합니다.</div>';
     }
   }
-  if(ucat!=='rejected'){
-    h+='<div class="su-note" style="margin-top:14px">모니터링만 = 온라인 모니터링 화면만 열람<br>전체 = 온라인 모니터링 + 레이노 데이터(매출·보증서·대리점) 열람</div>';
-  }
   box.innerHTML=h;
   _uSyncSubnav();
 }
+
 async function openUsersWs(){
   const box=document.getElementById('usersAppBody');
   if(box) box.innerHTML='<div class="u-empty">불러오는 중…</div>';
@@ -9948,6 +9980,14 @@ document.addEventListener('click', e=>{
   if(e.target.closest('#uReload')){ openUsersWs(); return; }
   const ub=e.target.closest('[data-uact]');
   if(ub){ setUserStatus(ub.getAttribute('data-uid'), ub.getAttribute('data-uact')); return; }
+});
+/* 등급 선택 상자 — 고른 값이 곧 그 사람의 등급이 된다.
+   (예전의 '전체로 올리기 / 모니터링만으로' 두 버튼을 대체) */
+document.addEventListener('change', function(e){
+  const sel=e.target && e.target.closest && e.target.closest('select[data-ulv]');
+  if(!sel) return;
+  const v=sel.value; if(!v) return;                 // '승인하기…' 를 그대로 둔 경우
+  setUserStatus(sel.getAttribute('data-uid'), 'ok:'+v);
 });
 document.addEventListener('keydown', e=>{
   if(e.key!=='Enter') return;
