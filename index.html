@@ -11099,6 +11099,7 @@ function _yoyEtcDept(){
   if(!all.length) return '';
   const pm=((SALES.prev&&SALES.prev.months)||[]).filter(m=>all.indexOf(m)>=0);
   const sum=(o,ms)=>{ let t=0; (ms||[]).forEach(m=>{ t+=+((o&&o.ma&&o.ma[m])||0); }); return t; };
+  const noPrev=!P || !Object.keys(P).length;   // 전년 부서별 내역이 통째로 없는 경우
   const names=new Set([...Object.keys(E||{}), ...Object.keys(P||{})]);
   const rows=[...names].map(n=>{
     const c=sum(E[n],all), p=P?sum(P[n],pm):0;
@@ -11117,32 +11118,35 @@ function _yoyEtcDept(){
     const dir=r.pct==null?'':(r.pct>=0?'▲':'▼');
     // 기여도: 전체가 줄었을 때 이 부서가 그 감소의 몇 %를 차지하는가
     const share=(totD>0 && r.d<0) ? ((-r.d)/totD*100) : null;
+    const pCell = noPrev ? '<span style="color:var(--ink3);font-size:11px">자료 없음</span>' : _yoyFmtWon(r.p);
     body+=`<tr><td ${tdl}>${escapeHtml(r.n)}</td>`
       + `<td ${td}>${_yoyFmtWon(r.c)}</td>`
-      + `<td ${td} style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:#888;font-variant-numeric:tabular-nums">${_yoyFmtWon(r.p)}</td>`
+      + `<td ${td} style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:#888;font-variant-numeric:tabular-nums">${pCell}</td>`
       + `<td ${td} style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:${cl};font-weight:700">${r.pct==null?'-':dir+Math.abs(r.pct).toFixed(1)+'%'}</td>`
       + `<td ${td} style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:${share!=null?'#dc2626':'var(--ink3)'};font-weight:${share!=null?'700':'400'}">${share!=null?share.toFixed(0)+'%':'·'}</td></tr>`;
   });
   const tpct=tp?((tc-tp)/tp*100):null;
   const ml=all[0]+'~'+all[all.length-1]+'월';
   const top=rows[0];
-  const note = (totD>0 && top && top.d<0)
-    ? `별도채널 감소액 ${_yoyFmtWon(totD)} 중 <b>${escapeHtml(top.n)}</b>이(가) ${_yoyFmtWon(-top.d)}로 가장 큽니다.`
-    : '전년 대비 감소가 두드러지는 부서는 없습니다.';
+  const note = noPrev
+    ? '<b>전년 부서별 자료가 아직 없습니다.</b> 수집기를 최신본으로 교체하고 한 번 실행하면 작년 값이 채워집니다.'
+    : ((totD>0 && top && top.d<0)
+        ? `별도채널 감소액 ${_yoyFmtWon(totD)} 중 <b>${escapeHtml(top.n)}</b>이(가) ${_yoyFmtWon(-top.d)}로 가장 큽니다.`
+        : '전년 대비 감소가 두드러지는 부서는 없습니다.');
   return `<div class="card">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
       <div><h3 style="margin:0"><span class="dot"></span>별도채널 · 부서별 내역</h3>
         <div style="color:var(--ink2);font-size:12px;margin-top:3px">올해 vs 전년 · ${ml} 누계 기준 · <b>${nowM}월은 진행 중이라 제외</b></div></div>
       <div style="text-align:right"><div style="font-size:20px;font-weight:800;color:${tpct==null?'#888':(tpct>=0?'#16a34a':'#dc2626')};line-height:1.1">${tpct==null?'-':(tpct>=0?'▲ ':'▼ ')+Math.abs(tpct).toFixed(1)+'%'}</div>
-        <div style="color:var(--ink2);font-size:12px;margin-top:2px">올해 ${_yoyFmtWon(tc)} · 전년 ${_yoyFmtWon(tp)}</div></div>
+        <div style="color:var(--ink2);font-size:12px;margin-top:2px">올해 ${_yoyFmtWon(tc)} · 전년 ${noPrev?'자료 없음':_yoyFmtWon(tp)}</div></div>
     </div>
     <div class="iv-wrap" style="margin-top:8px"><table style="width:100%;border-collapse:collapse;min-width:520px">
       <tr><th ${thl}>부서</th><th ${th}>올해</th><th ${th}>전년</th><th ${th}>증감</th><th ${th}>감소 기여도</th></tr>
       ${body}
-      <tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${td}><b>${_yoyFmtWon(tc)}</b></td><td ${td} style="padding:5px 9px;text-align:right;color:#888"><b>${_yoyFmtWon(tp)}</b></td><td ${td} style="padding:5px 9px;text-align:right;color:${tpct==null?'#888':(tpct>=0?'#16a34a':'#dc2626')}"><b>${tpct==null?'-':(tpct>=0?'▲':'▼')+Math.abs(tpct).toFixed(1)+'%'}</b></td><td ${td}></td></tr>
+      <tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${td}><b>${_yoyFmtWon(tc)}</b></td><td ${td} style="padding:5px 9px;text-align:right;color:#888"><b>${noPrev?'자료 없음':_yoyFmtWon(tp)}</b></td><td ${td} style="padding:5px 9px;text-align:right;color:${tpct==null?'#888':(tpct>=0?'#16a34a':'#dc2626')}"><b>${tpct==null?'-':(tpct>=0?'▲':'▼')+Math.abs(tpct).toFixed(1)+'%'}</b></td><td ${td}></td></tr>
     </table></div>
     <div class="cap" style="margin-top:8px">${note}</div>
-    <div class="cap" style="margin-top:4px"><b>감소 기여도</b> = 이 부서의 감소액 ÷ 별도채널 전체 감소액. 어느 부서가 하락을 이끌었는지 보여줍니다.</div>
+    <div class="cap" style="margin-top:4px"><b>감소 기여도</b> = 이 부서의 감소액 ÷ 별도채널 전체 감소액. 어느 부서가 하락을 이끌었는지 보여줍니다. 늘어난 부서가 있으면 합계가 100%를 넘을 수 있습니다.</div>
   </div>`;
 }
 function renderYoY(){
