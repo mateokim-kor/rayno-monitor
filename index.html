@@ -5632,6 +5632,81 @@ function _summaryHero(){
   return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>이번 달 상태${m!=null?` · ${y}년 ${m}월`:''}</h3><span class="cap">현재값 · <b>작년 같은 달 대비</b> · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div><div class="cap" style="margin-top:6px">썬팅은 계절 산업이라 <b>전월이 아닌 작년 같은 달</b>과 비교합니다. 회색으로 표시된 값이 작년 실적입니다.</div></div>`;
 }
 
+/* ══ 추세 — 올해와 작년을 두 선으로 겹쳐 보기 ═══════════════════
+   계절 산업이라 "지난달보다 늘었나"보다 "작년 같은 시기보다 나은가"가 중요합니다.
+   회색 선(작년) 위에 주황 선(올해)이 있으면 좋은 흐름입니다.
+   지표는 버튼으로 바꿉니다 — 매출 / 시공(보증서) / 롤 판매 / 글라스케어 */
+let _trendMetric='sales';
+function _trendSeries(metric, y, py){
+  const M=[1,2,3,4,5,6,7,8,9,10,11,12];
+  const pick=(map,yy)=>M.map(m=>{ const o=map&&map[yy]; if(!o) return null; return (o[m]!=null)?o[m]:null; });
+  if(metric==='sales'){
+    if(typeof SALES==='undefined'||!SALES||!SALES.channels) return null;
+    const sum=(S,m)=>{ if(!S||!S.channels) return null; const C=S.channels;
+      const g=c=>(C[c]&&C[c].ma&&C[c].ma[m])||0; return g('B2C')+g('B2B')+g('별도채널'); };
+    const P=SALES.prev, pm=(P&&P.months)||[];
+    return { unit:'매출',
+      cur: M.map(m=>((SALES.months||[]).indexOf(m)>=0)?sum(SALES,m):null),
+      prev:M.map(m=>(pm.indexOf(m)>=0)?sum(P,m):null),
+      fmt: v=>fmtKRW(v) };
+  }
+  if(metric==='roll'){
+    if(typeof BSALE==='undefined'||!BSALE||!Array.isArray(BSALE.rows)) return null;
+    const acc={};
+    BSALE.rows.forEach(r=>{ const ym=String(r.ym||''); if(ym.length<6) return;
+      const yy=+ym.slice(0,4), mm=+ym.slice(4,6); if(!mm) return;
+      (acc[yy]=acc[yy]||{})[mm]=(acc[yy][mm]||0)+(Number(r.q||0)||0); });
+    return { unit:'롤 판매', cur:pick(acc,y), prev:pick(acc,py), fmt:v=>Math.round(v).toLocaleString()+'롤' };
+  }
+  let map=null;
+  try{ map = (metric==='glass') ? _yoyGlassYM() : _yoyWarrYM(); }catch(_){ return null; }
+  return { unit: metric==='glass'?'글라스케어':'시공(보증서)',
+    cur:pick(map,y), prev:pick(map,py), fmt:v=>Math.round(v).toLocaleString()+'건' };
+}
+function _trendCard(){
+  const {y, py}=_heroYM();
+  const S=_trendSeries(_trendMetric, y, py);
+  if(!S) return '';
+  const has=(a)=>Array.isArray(a)&&a.some(v=>v!=null);
+  if(!has(S.cur)&&!has(S.prev)) return '';
+  const btn=(k,t)=>`<button data-trend="${k}" class="${_trendMetric===k?'on':''}">${t}</button>`;
+  const seg=`<div class="seg" style="flex-wrap:wrap">${btn('sales','매출')}${btn('warr','시공')}${btn('roll','롤 판매')}${btn('glass','글라스케어')}</div>`;
+  return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h3 style="margin:0"><span class="dot"></span>추세 · ${y}년과 ${py}년</h3>${seg}</div>`
+    + `<div style="height:250px"><canvas id="trendChart"></canvas></div>`
+    + `<div class="cap" style="margin-top:8px" id="trendNote">${_trendNote(S, py)}</div>`
+    + `<div class="cap" style="margin-top:4px">주황이 <b>${y}년</b>, 회색이 <b>${py}년</b>입니다. 주황 선이 회색 위에 있으면 작년 같은 시기보다 좋은 흐름입니다.</div></div>`;
+}
+/* 한 줄 해설 — 올해·작년 값이 모두 있는 가장 최근 달 기준.
+   지표를 바꾸면 차트와 함께 이 문구도 갱신해야 한다(안 그러면 차트와 설명이 어긋남). */
+function _trendNote(S, py){
+  for(let i=11;i>=0;i--){
+    if(S.cur[i]!=null && S.prev[i]!=null && S.prev[i]){
+      const d=(S.cur[i]-S.prev[i])/S.prev[i]*100;
+      return `${i+1}월 기준 ${S.unit}은(는) 작년 같은 달보다 <b style="color:${d>=0?'var(--pos)':'var(--neg)'}">${d>=0?'+':''}${d.toFixed(1)}%</b> (${S.fmt(S.cur[i])} · 작년 ${S.fmt(S.prev[i])})`;
+    }
+  }
+  return `${py}년 자료가 없어 비교선을 그리지 못했습니다.`;
+}
+function _trendDraw(){
+  if(!document.getElementById('trendChart')) return;
+  const {y, py}=_heroYM();
+  const S=_trendSeries(_trendMetric, y, py); if(!S) return;
+  const nt=document.getElementById('trendNote'); if(nt) nt.innerHTML=_trendNote(S, py);   // 해설도 같이 갱신
+  const L=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  makeChart('trendChart', { type:'line',
+    data:{ labels:L, datasets:[
+      { label:py+'년', data:S.prev, borderColor:'#9aa3ad', backgroundColor:'transparent',
+        borderWidth:2, borderDash:[5,4], pointRadius:0, tension:.3, spanGaps:true, fill:false },
+      { label:y+'년',  data:S.cur,  borderColor:'#f4911c', backgroundColor:'rgba(244,145,28,.10)',
+        borderWidth:2.6, pointRadius:3, tension:.3, spanGaps:true, fill:true }
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:true, position:'bottom', labels:{boxWidth:12, usePointStyle:true}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+' '+(c.parsed.y!=null?S.fmt(c.parsed.y):'자료 없음')}} },
+      scales:{ x:{grid:{display:false}},
+        y:{beginAtZero:true, grid:{color:_ck().grid}, ticks:{callback:v=>S.fmt(v)}} } } });
+}
+
 function renderRDash(){
   const box=document.getElementById('rDash'); if(!box) return;
   const hasSales=!!(SALES&&SALES.channels), hasWarr=!!(WARR&&WARR.rows&&WARR.rows.length), hasGlass=!!(GLASS&&GLASS.rows&&GLASS.rows.length);
@@ -5644,6 +5719,7 @@ function renderRDash(){
   const gDates=hasGlass?GLASS.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
   const yr=((wDates[wDates.length-1]||gDates[gDates.length-1]||'').slice(0,4))||String(new Date().getFullYear());
   let h=_summaryHero();
+  h+=_trendCard();   // 2026-08 추가: 올해·작년 두 선 추세
   if(hasSales){
     const C=SALES.channels, ms=_salesMonths();
     _scoreSel=_scoreSel.filter(m=>ms.indexOf(m)>=0);
@@ -9645,6 +9721,11 @@ document.addEventListener('click', e=>{
   if(e.target.id==='userModal'){ closeUserModal(); return; }
   const udel=e.target.closest('[data-udel]');
   if(udel){ deleteUserAccount(udel.getAttribute('data-uid')); return; }
+  const tb=e.target.closest('[data-trend]');
+  if(tb){ _trendMetric=tb.getAttribute('data-trend');
+    document.querySelectorAll('[data-trend]').forEach(x=>x.classList.toggle('on', x===tb));
+    try{ _trendDraw(); }catch(_){}   // 카드를 다시 그리지 않고 차트만 교체
+    return; }
   const ucatBtn=e.target.closest('#uSubnav button[data-ucat]');
   if(ucatBtn){ ucat=ucatBtn.dataset.ucat; renderUsers(); return; }
   if(e.target.closest('#uCopyList')){ copyUserList(); return; }
