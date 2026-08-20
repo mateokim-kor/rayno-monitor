@@ -10778,6 +10778,15 @@ boot();
   }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
+/* 2026-08-20 수정: 상단 도구 버튼을 설정 화면으로 옮기는 작업을
+   예전에는 renderSettingsApp() 안에서만 했다 → **설정 화면을 한 번도 열지 않으면
+   버튼이 상단에 그대로 남아 있었다.** 화면이 뜨자마자 옮기도록 여기서도 호출한다.
+   (_toolsMoved 플래그가 있어 두 번 불러도 안전) */
+(function(){
+  const go=()=>{ try{ _moveToolsToSettings(); }catch(_){} };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', go);
+  else go();
+})();
 </script>
 <script>
 /* ── 관리자: ERP·품질보증서 수동 수집 트리거 (erp_command.json) ── */
