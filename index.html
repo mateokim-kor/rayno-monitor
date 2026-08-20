@@ -1611,8 +1611,8 @@
         <button class="acc-btn admin-only" id="dataCheckBtn">🔎 데이터 점검</button>
         <button class="acc-btn admin-only" id="erpSyncBtn" style="display:none">🔄 지금 수집</button>
         <button class="acc-btn" id="warrCfgBtn">⚙ 표시 설정</button>
-        <button class="acc-btn" id="raynoLoginBtn">🔐 관리자 로그인</button>
-        <button class="acc-btn" id="raynoLogoutBtn">로그아웃</button>
+        <!-- 2026-08-20 제거: 🔐 관리자 로그인(예전 비밀번호 방식 잔재, 지금은 Supabase 로그인)
+             / 로그아웃(사이드바 맨 아래에 이미 있어 완전 중복) -->
       </div>
     </div>
     <div id="rWarranty" style="display:none"></div>
@@ -1642,6 +1642,7 @@
     <div id="setSalesHost" data-setcat="sales"></div>
     <div id="setWarrHost" data-setcat="warr"></div>
     <div id="setAccessHost" data-setcat="display"></div>
+    <div id="setToolsHost" data-setcat="data"></div>
     <div id="setOptHost" data-setcat="data"></div>
   </div>
 
@@ -8921,7 +8922,10 @@ function updateUploadDates(){
 }
 function applyRaynoAuth(){
   const admin=(auth==='admin');
-  const set=(id,show)=>{const el=document.getElementById(id); if(el)el.style.display=show?'':'none';};
+  const set=(id,show)=>{const el=document.getElementById(id); if(!el) return;
+    // 설정 화면으로 옮긴 버튼은 탭에 상관없이 항상 보이게 둔다(설정 자체가 관리자 전용)
+    if(el.closest && el.closest('#setToolsHost')){ el.style.display=''; return; }
+    el.style.display=show?'':'none';};
   set('raynoAdminFlag', admin);
   set('raynoLoginBtn', !_loggedIn);
   set('raynoLogoutBtn', _loggedIn);
@@ -9083,7 +9087,48 @@ function applySettingsCat(){
 }
 (function(){ const sn=document.getElementById('setSubnav'); if(sn) sn.addEventListener('click', e=>{ const b=e.target.closest('button[data-setcat]'); if(!b) return; _setCat=b.dataset.setcat; applySettingsCat(); try{window.scrollTo({top:0,behavior:'smooth'});}catch(_){} }); })();
 try{ document.getElementById('settingsApp').addEventListener('change', e=>{ if(e.target && e.target.id==='backupFile'){ const file=e.target.files&&e.target.files[0]; if(!file) return; const rd=new FileReader(); rd.onload=()=>importBackup(String(rd.result||'')); rd.readAsText(file); e.target.value=''; } }); }catch(_){}
+/* ══ 상단 도구 버튼을 설정 화면으로 이동 ═══════════════════════════
+   2026-08-20: 화면 위쪽에 관리자용 버튼이 8개나 늘어서 있어 정리했습니다.
+   버튼을 새로 만들지 않고 **기존 요소를 그대로 옮깁니다**(appendChild).
+   그래야 클릭 동작·표시 조건(applyRaynoAuth 등)이 전부 그대로 살아 있고,
+   되돌리고 싶으면 이 함수 호출만 지우면 원래 자리로 돌아갑니다.
+   ※ 평소엔 수집기가 자동으로 데이터를 받아오므로 이 버튼들은 쓸 일이 없지만,
+     수집기에 문제가 생겼을 때 손으로 엑셀을 올려 급한 불을 끄는 통로라 남겨둡니다. */
+let _toolsMoved=false;
+function _moveToolsToSettings(){
+  if(_toolsMoved) return;
+  const host=document.getElementById('setToolsHost'); if(!host) return;
+  const ids=[
+    ['salesAddBtn','매출 ERP 원본(.XLS)을 직접 올립니다'],
+    ['salesPrevBtn','작년 매출 ERP 원본을 직접 올립니다'],
+    ['warrAddBtn','품질보증서 엑셀을 직접 올립니다'],
+    ['glassAddBtn','글라스케어 엑셀을 직접 올립니다'],
+    ['erpSyncBtn','수집기에 지금 바로 수집하라고 신호를 보냅니다'],
+    ['dataCheckBtn','수집된 데이터에 이상이 없는지 점검합니다'],
+    ['warrCfgBtn','품질보증서 화면의 표시 항목을 설정합니다']
+  ];
+  const dates=['salesUplDate','warrUplDate','glassUplDate'];
+  host.innerHTML='<div class="card set-card"><h3 style="margin:0 0 4px"><span class="dot"></span>데이터 도구</h3>'
+    + '<div class="cap" style="margin-bottom:12px">평소에는 수집기가 자동으로 데이터를 받아옵니다. 아래 버튼은 <b>수집기에 문제가 있을 때</b> 손으로 처리하는 용도입니다.</div>'
+    + '<div id="setToolsRow" style="display:flex;flex-direction:column;gap:10px"></div></div>';
+  const row=document.getElementById('setToolsRow');
+  ids.forEach(([id,desc])=>{
+    const btn=document.getElementById(id); if(!btn) return;
+    const line=document.createElement('div');
+    line.style.cssText='display:flex;align-items:center;gap:11px;flex-wrap:wrap';
+    btn.style.display='';                 // 상단에서 숨겨져 있던 것도 설정에서는 보이게
+    line.appendChild(btn);                // ★ 새로 만들지 않고 원래 버튼을 옮긴다
+    const d=document.getElementById(id.replace('AddBtn','UplDate'));
+    if(d && dates.indexOf(d.id)>=0){ d.style.display=''; line.appendChild(d); }
+    const cap=document.createElement('span');
+    cap.className='cap'; cap.style.cssText='flex:1;min-width:180px'; cap.textContent=desc;
+    line.appendChild(cap);
+    row.appendChild(line);
+  });
+  _toolsMoved=true;
+}
 function renderSettingsApp(){
+  try{ _moveToolsToSettings(); }catch(_){}
   const gate=document.getElementById('setGate');
   const oH=document.getElementById('setOptHost');
   const aH=document.getElementById('setAccessHost'), cH=document.getElementById('setCafeHost'), wH=document.getElementById('setWarrHost'), sH=document.getElementById('setSalesHost');
@@ -9155,8 +9200,8 @@ document.getElementById('settingsApp').addEventListener('change', e=>{
 document.getElementById('appSwitcher').addEventListener('click', e=>{ const b=e.target.closest('.appsw-btn'); if(b) setWorkspace(b.dataset.ws); });
 { const _rb=document.querySelector('.appsw-btn[data-ws="rayno"]'); if(_rb){ const _pf=()=>{ try{ _loadRaynoData(); }catch(e){} }; _rb.addEventListener('mouseenter',_pf,{once:true,passive:true}); _rb.addEventListener('touchstart',_pf,{once:true,passive:true}); } }   // 레이노 탭에 마우스/터치 시 데이터 선로드
 document.getElementById('raynoNav').addEventListener('click', e=>{ const b=e.target.closest('.nav-btn'); if(b&&b.dataset.rview) setRView(b.dataset.rview); });
-document.getElementById('raynoLogoutBtn').addEventListener('click', logout);
-document.getElementById('raynoLoginBtn').addEventListener('click', showLock);
+/* 2026-08-20: 상단 로그아웃·관리자 로그인 버튼을 없앴으므로 연결도 제거.
+   (로그아웃은 사이드바 맨 아래 버튼이 담당) */
 document.getElementById('raynoPwGo').addEventListener('click', raynoTryUnlock);
 document.getElementById('raynoPw').addEventListener('keydown', e=>{ if(e.key==='Enter') raynoTryUnlock(); });
 document.getElementById('warrAddBtn').addEventListener('click', ()=>document.getElementById('warrFileInput').click());
