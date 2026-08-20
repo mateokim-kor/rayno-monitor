@@ -5614,13 +5614,20 @@ function _heroCntPair(ymMap, y, py, m){ // {연도:{월:건수}} 에서 올해/�
   const c=g(y);
   return {cur:(c==null?0:c), prev:g(py)};
 }
-function _heroRollPair(y, py, m){       // 지부→대리점 롤 판매 (branchsales)
-  if(m==null||typeof BSALE==='undefined'||!BSALE||!Array.isArray(BSALE.rows)) return null;
-  const key=(yy)=>String(yy)+String(m).padStart(2,'0');
-  const kc=key(y), kp=key(py); let c=0,p=0,hasP=false;
-  BSALE.rows.forEach(r=>{ const ym=String(r.ym||''); const q=Number(r.q||0)||0;
-    if(ym===kc) c+=q; else if(ym===kp){ p+=q; hasP=true; } });
-  return {cur:c, prev:hasP?p:null};
+/* 롤 판매 — 매출 분석 탭과 같은 기준(본사 출고 수량, salesMonthlyList)을 쓴다.
+   ※ 예전에는 지부→대리점 판매(branchSalesList)를 썼는데,
+      ERP 등록이 늦는 일이 잦아 7월이 79롤(정상 2,580롤)로 잡히며 매달 빨간불이 떴다.
+      또 매출 분석 탭의 '판매 롤 수'와 숫자가 달라 같은 달인데 화면마다 다르게 보였다.
+      대리점 단계 세부는 점유율 분석 탭에서 확인한다. */
+function _heroRollPair(y, py, m){
+  if(m==null||typeof SALES==='undefined'||!SALES||!SALES.prodAll) return null;
+  const sumRoll=(S)=>{ if(!S||!S.prodAll) return null; let q=0;
+    (S.prodList||[]).forEach(pn=>{ try{ if(_isExcl(pn)||!_isRoll(pn)) return; }catch(_){ }
+      const o=S.prodAll[pn]; if(o&&o.mq) q+=(o.mq[m]||0); });
+    return q; };
+  const P=SALES.prev;
+  const hasPrevMonth = !!(P && (P.months||[]).indexOf(m)>=0 && P.prodAll);
+  return {cur:sumRoll(SALES), prev:hasPrevMonth?sumRoll(P):null};
 }
 function _summaryHero(){
   const won=n=>Math.round(n||0).toLocaleString();
@@ -5640,7 +5647,7 @@ function _summaryHero(){
   add('글라스케어',   _heroCntPair(gMap, y, py, m), v=>won(v)+'건');
   if(!cards.length) return '';
   const insight = parts.length ? `${py}년 같은 달 대비 — ${parts.join(' · ')}.` : '작년 같은 달 자료가 없어 비교하지 못했습니다.';
-  return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>이번 달 상태${m!=null?` · ${y}년 ${m}월`:''}</h3><span class="cap">현재값 · <b>작년 같은 달 대비</b> · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div><div class="cap" style="margin-top:6px">썬팅은 계절 산업이라 <b>전월이 아닌 작년 같은 달</b>과 비교합니다. 회색이 작년 실적입니다.<br><b>${nowM}월은 아직 진행 중이라 비교에서 제외</b>하고, 완결된 마지막 달을 기준으로 표시합니다.</div></div>`;
+  return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>${y}년 ${m}월 실적${m!=null?'':''}</h3><span class="cap">마감된 마지막 달 · <b>작년 같은 달 대비</b> · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div><div class="cap" style="margin-top:6px"><b>${nowM}월은 아직 진행 중</b>이라(오늘까지의 부분 실적) 작년 한 달 전체와 비교하면 반토막처럼 보입니다. 그래서 <b>마감이 끝난 ${m}월</b>을 기준으로 보여줍니다.<br>썬팅은 계절 산업이라 <b>전월이 아닌 작년 같은 달</b>과 비교합니다. 회색이 작년 실적입니다.</div></div>`;
 }
 
 /* ══ 추세 — 올해와 작년을 두 선으로 겹쳐 보기 ═══════════════════
@@ -5661,13 +5668,17 @@ function _trendSeries(metric, y, py){
       prev:M.map(m=>(pm.indexOf(m)>=0)?sum(P,m):null),
       fmt: v=>fmtKRW(v) };
   }
-  if(metric==='roll'){
-    if(typeof BSALE==='undefined'||!BSALE||!Array.isArray(BSALE.rows)) return null;
-    const acc={};
-    BSALE.rows.forEach(r=>{ const ym=String(r.ym||''); if(ym.length<6) return;
-      const yy=+ym.slice(0,4), mm=+ym.slice(4,6); if(!mm) return;
-      (acc[yy]=acc[yy]||{})[mm]=(acc[yy][mm]||0)+(Number(r.q||0)||0); });
-    return { unit:'롤 판매', cur:pick(acc,y), prev:pick(acc,py), fmt:v=>Math.round(v).toLocaleString()+'롤' };
+  if(metric==='roll'){   // 매출 분석 탭과 같은 기준(본사 출고 수량)
+    if(typeof SALES==='undefined'||!SALES||!SALES.prodAll) return null;
+    const rollM=(S,m)=>{ if(!S||!S.prodAll) return null; let q=0;
+      (S.prodList||[]).forEach(pn=>{ try{ if(_isExcl(pn)||!_isRoll(pn)) return; }catch(_){ }
+        const o=S.prodAll[pn]; if(o&&o.mq) q+=(o.mq[m]||0); });
+      return q; };
+    const P=SALES.prev, pm=(P&&P.months)||[];
+    return { unit:'롤 판매',
+      cur: M.map(m=>((SALES.months||[]).indexOf(m)>=0)?rollM(SALES,m):null),
+      prev:M.map(m=>(pm.indexOf(m)>=0&&P.prodAll)?rollM(P,m):null),
+      fmt:v=>Math.round(v).toLocaleString()+'롤' };
   }
   let map=null;
   try{ map = (metric==='glass') ? _yoyGlassYM() : _yoyWarrYM(); }catch(_){ return null; }
