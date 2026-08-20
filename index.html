@@ -5582,11 +5582,22 @@ function _heroCard(label, valueStr, pct, sub){
    작년 같은 달과 비교해야 진짜 신호가 드러납니다.
    지표도 4개로 정리했습니다 — 매출 / 시공 / 롤 판매 / 글라스케어.
    (B2C·B2B 분리와 온라인 언급은 각 전용 탭에 그대로 있습니다) */
-function _heroYM(){                     // 기준 연·월과 작년 같은 달
-  const {cur}=_refMonths();
-  let yr=new Date().getFullYear();
-  try{ const w=_yoyWarrYM(); const ys=Object.keys(w).map(Number).filter(Boolean).sort(); if(ys.length) yr=ys[ys.length-1]; }catch(_){}
-  return {m:cur, y:yr, py:yr-1};
+/* 기준 연·월 — ★ 진행 중인 달은 쓰지 않는다.
+   오늘이 8월 20일인데 8월(20일치)을 작년 8월(31일치) 전체와 비교하면
+   매출이 반토막 난 것처럼 보이고 전 지표가 '점검 필요'로 뜬다.
+   실제로 나빠진 게 아니라 달이 아직 안 끝났기 때문이므로,
+   비교 기준은 항상 **완결된 마지막 달**로 잡는다. */
+function _heroYM(){
+  const now=new Date();
+  const nowY=now.getFullYear(), nowM=now.getMonth()+1;
+  let doneY=nowY, doneM=nowM-1;                 // 지난달까지가 완결된 달
+  if(doneM<1){ doneM=12; doneY=nowY-1; }
+  const {months}=_refMonths();                  // 자료가 실제로 있는 달
+  const avail=(months||[]).filter(m=>m<=doneM);
+  const m = avail.length ? avail[avail.length-1] : null;   // 완결·보유 둘 다 만족하는 마지막 달
+  let yr=doneY;
+  try{ const w=_yoyWarrYM(); const ys=Object.keys(w).map(Number).filter(Boolean).sort(); if(ys.length) yr=Math.max(...ys.filter(x=>x<=nowY)); }catch(_){}
+  return {m, y:yr, py:yr-1, nowM, inProgress:(nowM>doneM||true)&&nowM};
 }
 function _heroSalesPair(m){             // 올해 m월 / 작년 m월 전사 매출
   if(typeof SALES==='undefined'||!SALES||!SALES.channels||m==null) return null;
@@ -5613,7 +5624,7 @@ function _heroRollPair(y, py, m){       // 지부→대리점 롤 판매 (branch
 }
 function _summaryHero(){
   const won=n=>Math.round(n||0).toLocaleString();
-  const {m, y, py}=_heroYM(); const cards=[]; const parts=[];
+  const {m, y, py, nowM}=_heroYM(); const cards=[]; const parts=[];
   const add=(label, pair, fmt, unitSub)=>{
     if(!pair) return null;
     const pct=(pair.prev==null||!pair.prev)?null:_yoyPct(pair.cur, pair.prev);
@@ -5629,7 +5640,7 @@ function _summaryHero(){
   add('글라스케어',   _heroCntPair(gMap, y, py, m), v=>won(v)+'건');
   if(!cards.length) return '';
   const insight = parts.length ? `${py}년 같은 달 대비 — ${parts.join(' · ')}.` : '작년 같은 달 자료가 없어 비교하지 못했습니다.';
-  return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>이번 달 상태${m!=null?` · ${y}년 ${m}월`:''}</h3><span class="cap">현재값 · <b>작년 같은 달 대비</b> · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div><div class="cap" style="margin-top:6px">썬팅은 계절 산업이라 <b>전월이 아닌 작년 같은 달</b>과 비교합니다. 회색으로 표시된 값이 작년 실적입니다.</div></div>`;
+  return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>이번 달 상태${m!=null?` · ${y}년 ${m}월`:''}</h3><span class="cap">현재값 · <b>작년 같은 달 대비</b> · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div><div class="cap" style="margin-top:6px">썬팅은 계절 산업이라 <b>전월이 아닌 작년 같은 달</b>과 비교합니다. 회색이 작년 실적입니다.<br><b>${nowM}월은 아직 진행 중이라 비교에서 제외</b>하고, 완결된 마지막 달을 기준으로 표시합니다.</div></div>`;
 }
 
 /* ══ 추세 — 올해와 작년을 두 선으로 겹쳐 보기 ═══════════════════
@@ -5664,17 +5675,18 @@ function _trendSeries(metric, y, py){
     cur:pick(map,y), prev:pick(map,py), fmt:v=>Math.round(v).toLocaleString()+'건' };
 }
 function _trendCard(){
-  const {y, py}=_heroYM();
+  const {y, py, nowM}=_heroYM();
   const S=_trendSeries(_trendMetric, y, py);
   if(!S) return '';
+  _trendCut(S, nowM);   // 진행 중인 달은 선에서 제외(끝이 뚝 떨어져 위기처럼 보이는 것 방지)
   const has=(a)=>Array.isArray(a)&&a.some(v=>v!=null);
   if(!has(S.cur)&&!has(S.prev)) return '';
   const btn=(k,t)=>`<button data-trend="${k}" class="${_trendMetric===k?'on':''}">${t}</button>`;
   const seg=`<div class="seg" style="flex-wrap:wrap">${btn('sales','매출')}${btn('warr','시공')}${btn('roll','롤 판매')}${btn('glass','글라스케어')}</div>`;
   return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h3 style="margin:0"><span class="dot"></span>추세 · ${y}년과 ${py}년</h3>${seg}</div>`
-    + `<div style="height:250px"><canvas id="trendChart"></canvas></div>`
+    + `<div style="position:relative;height:250px;margin-top:6px"><canvas id="trendChart"></canvas></div>`
     + `<div class="cap" style="margin-top:8px" id="trendNote">${_trendNote(S, py)}</div>`
-    + `<div class="cap" style="margin-top:4px">주황이 <b>${y}년</b>, 회색이 <b>${py}년</b>입니다. 주황 선이 회색 위에 있으면 작년 같은 시기보다 좋은 흐름입니다.</div></div>`;
+    + `<div class="cap" style="margin-top:4px">주황이 <b>${y}년</b>, 회색이 <b>${py}년</b>입니다. 주황 선이 회색 위에 있으면 작년 같은 시기보다 좋은 흐름입니다. · <b>${nowM}월은 진행 중이라 그리지 않습니다.</b></div></div>`;
 }
 /* 한 줄 해설 — 올해·작년 값이 모두 있는 가장 최근 달 기준.
    지표를 바꾸면 차트와 함께 이 문구도 갱신해야 한다(안 그러면 차트와 설명이 어긋남). */
@@ -5687,10 +5699,19 @@ function _trendNote(S, py){
   }
   return `${py}년 자료가 없어 비교선을 그리지 못했습니다.`;
 }
+/* 진행 중인 달을 올해 선에서 지운다.
+   8월 20일에 8월(20일치)을 그리면 그래프 끝이 급락해 실제보다 나빠 보인다.
+   작년 선은 이미 끝난 해이므로 12월까지 그대로 둔다. */
+function _trendCut(S, nowM){
+  if(!S||!nowM) return S;
+  for(let i=nowM-1;i<12;i++) S.cur[i]=null;
+  return S;
+}
 function _trendDraw(){
   if(!document.getElementById('trendChart')) return;
-  const {y, py}=_heroYM();
+  const {y, py, nowM}=_heroYM();
   const S=_trendSeries(_trendMetric, y, py); if(!S) return;
+  _trendCut(S, nowM);
   const nt=document.getElementById('trendNote'); if(nt) nt.innerHTML=_trendNote(S, py);   // 해설도 같이 갱신
   const L=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   makeChart('trendChart', { type:'line',
