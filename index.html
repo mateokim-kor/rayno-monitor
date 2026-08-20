@@ -11004,6 +11004,7 @@ function _salesBasisOver(S, months, basis){
   if(basis==='b2c') return b2c;
   if(basis==='b2b') return b2b;
   if(basis==='b2cb2b') return b2c+b2b;
+  if(basis==='etc') return etc;        // 별도채널(해외영업·건축·테크·브랜드사업 등)
   return b2c+b2b+etc;        // 전사
 }
 
@@ -11015,19 +11016,33 @@ function _yoyEmpty(title,msg){
 }
 function _yoyBuild(key,title,months,curOf,prevOf,fmt,curLab,prevLab,topExtra){
   const curArr=months.map(curOf), prevArr=months.map(prevOf);
-  const cCum=curArr.reduce((s,v)=>s+v,0), pCum=prevArr.reduce((s,v)=>s+v,0);
+  /* ★ 진행 중인 달은 누계에서 뺀다.
+     오늘이 8월 20일이면 올해 8월은 20일치인데 작년 8월은 한 달 전체다.
+     이걸 그대로 더하면 누계 증감률이 실제보다 나쁘게 나온다(실측 -27.6% → 7월까지면 -22.6%).
+     표에는 그대로 두되 '진행 중'으로 표시해 실적 자체는 볼 수 있게 한다. */
+  const _nowM=new Date().getMonth()+1;
+  const _isProg=m=>m>=_nowM;
+  const _doneIdx=months.map((m,i)=>_isProg(m)?-1:i).filter(i=>i>=0);
+  const _useIdx=_doneIdx.length?_doneIdx:months.map((m,i)=>i);   // 완결 월이 하나도 없으면 전체 사용
+  const _cutApplied=_doneIdx.length>0 && _doneIdx.length<months.length;
+  const cCum=_useIdx.reduce((s,i)=>s+curArr[i],0), pCum=_useIdx.reduce((s,i)=>s+prevArr[i],0);
   const pct=_yoyPctV(cCum,pCum);
   const dir=pct==null?'':(pct>=0?'▲':'▼'), col=pct==null?'#888':(pct>=0?'#16a34a':'#dc2626'), pctTxt=pct==null?'-':(Math.abs(pct).toFixed(1)+'%');
-  const ml=months.length?(months[0]+'~'+months[months.length-1]+'월'):'';
+  const _um=_useIdx.map(i=>months[i]);
+  const ml=_um.length?(_um[0]+'~'+_um[_um.length-1]+'월'):'';
   const th='style="text-align:right;padding:7px 9px;background:var(--amber);color:#fff;font-size:11px;font-weight:800;white-space:nowrap"';
   const thl='style="text-align:left;padding:7px 9px;background:var(--amber);color:#fff;font-size:11px;font-weight:800"';
   let rows='';
   months.forEach((m,i)=>{ const c=curArr[i],p=prevArr[i],pp=_yoyPctV(c,p); const d=pp==null?'':(pp>=0?'▲':'▼'), cl=pp==null?'#888':(pp>=0?'#16a34a':'#dc2626');
+    if(_isProg(m)){   // 진행 중인 달 — 증감률을 띄우면 반토막처럼 보이므로 안내로 대체
+      rows+=`<tr style="opacity:.72"><td style="padding:5px 9px;border-bottom:1px solid var(--line)">${m}월 <span style="font-size:10.5px;color:var(--ink3);font-weight:700">진행 중</span></td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums">${fmt(c)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:#888;font-variant-numeric:tabular-nums">${fmt(p)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:var(--ink3);font-size:11px">달 마감 후 비교</td></tr>`;
+      return;
+    }
     rows+=`<tr><td style="padding:5px 9px;border-bottom:1px solid var(--line)">${m}월</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums">${fmt(c)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:#888;font-variant-numeric:tabular-nums">${fmt(p)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:${cl};font-weight:700">${pp==null?'-':d+Math.abs(pp).toFixed(1)+'%'}</td></tr>`;
   });
   const html=`<div class="card">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
-      <div><h3 style="margin:0"><span class="dot"></span>${title}</h3><div style="color:var(--ink2);font-size:12px;margin-top:3px">${curLab} vs ${prevLab} · ${ml} 누계 기준</div></div>
+      <div><h3 style="margin:0"><span class="dot"></span>${title}</h3><div style="color:var(--ink2);font-size:12px;margin-top:3px">${curLab} vs ${prevLab} · ${ml} 누계 기준${_cutApplied?` · <b>${_nowM}월은 진행 중이라 누계에서 제외</b>`:''}</div></div>
       <div style="text-align:right"><div style="font-size:24px;font-weight:800;color:${col};line-height:1.1">${dir} ${pctTxt}</div><div style="color:var(--ink2);font-size:12px;margin-top:2px">올해 ${fmt(cCum)} · 전년 ${fmt(pCum)}</div></div>
     </div>
     ${topExtra||''}
@@ -11051,13 +11066,13 @@ function _yoySectionFromYM(ym, key, title, fmt){
 }
 function _yoySales(){
   const basis=_yoySalesBasis||'all';
-  const BL={all:'전사 매출',b2c:'B2C',b2b:'B2B',b2cb2b:'B2C+B2B'};
+  const BL={all:'전사 매출',b2c:'B2C',b2b:'B2B',b2cb2b:'B2C+B2B',etc:'별도채널'};
   const T='매출 · '+(BL[basis]||'전사 매출');
   if(typeof SALES==='undefined'||!SALES||!SALES.prodAll) return {html:_yoyEmpty(T,'올해 매출 데이터가 없습니다 — 매출 화면에서 ‘＋ 매출 ERP’로 올려주세요.'), chart:null};
   const months=(SALES.months||[]).slice();
   if(!months.length) return {html:_yoyEmpty(T,'매출 월 데이터가 없습니다.'), chart:null};
   if(!SALES.prev||!SALES.prev.channels) return {html:_yoyEmpty(T,'전년 매출 데이터가 없습니다 — 매출 화면에서 ‘＋ 전년 매출’로 올리면 자동으로 비교됩니다.'), chart:null};
-  const seg=`<div class="seg" id="yoyBasisSeg" style="margin:2px 0 6px;flex-wrap:wrap"><button data-yb="all" class="${basis==='all'?'on':''}">전사 매출</button><button data-yb="b2c" class="${basis==='b2c'?'on':''}">B2C</button><button data-yb="b2b" class="${basis==='b2b'?'on':''}">B2B</button><button data-yb="b2cb2b" class="${basis==='b2cb2b'?'on':''}">B2C+B2B</button></div>`;
+  const seg=`<div class="seg" id="yoyBasisSeg" style="margin:2px 0 6px;flex-wrap:wrap"><button data-yb="all" class="${basis==='all'?'on':''}">전사 매출</button><button data-yb="b2c" class="${basis==='b2c'?'on':''}">B2C</button><button data-yb="b2b" class="${basis==='b2b'?'on':''}">B2B</button><button data-yb="b2cb2b" class="${basis==='b2cb2b'?'on':''}">B2C+B2B</button><button data-yb="etc" class="${basis==='etc'?'on':''}">별도채널</button></div>`;
   return _yoyBuild('sales',T,months,m=>_salesBasisOver(SALES,[m],basis),m=>_salesBasisOver(SALES.prev,[m],basis),_yoyFmtWon,'올해','전년',seg);
 }
 function _yoyDrawChart(c){
