@@ -11086,6 +11086,65 @@ function _yoyDrawChart(c){
         tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(c.key==='sales'?_yoyFmtWon(ctx.parsed.y):(ctx.parsed.y||0).toLocaleString()+'건')}} },
       scales:{ x:{grid:{display:false}}, y:{beginAtZero:true,ticks:{callback:v=>c.key==='sales'?_yoyFmtWon(v):v}} } } }); }catch(_){ }
 }
+/* ══ 별도채널 부서별 내역 ═══════════════════════════════════════
+   별도채널은 전사 매출의 절반 가까이를 차지하는데 그동안 화면이 없었다.
+   수집기가 `SALES.extra`에 부서별로 이미 쪼개 저장하고 있어(해외영업팀·건축영업팀·
+   테크팀·브랜드사업 등), 그것을 그대로 보여준다.
+   ※ 진행 중인 달은 누계에서 뺀다(다른 카드와 같은 기준). */
+function _yoyEtcDept(){
+  if(typeof SALES==='undefined'||!SALES||!SALES.extra) return '';
+  const E=SALES.extra, P=(SALES.prev&&SALES.prev.extra)||null;
+  const nowM=new Date().getMonth()+1;
+  const all=(SALES.months||[]).filter(m=>m<nowM);          // 마감된 달만
+  if(!all.length) return '';
+  const pm=((SALES.prev&&SALES.prev.months)||[]).filter(m=>all.indexOf(m)>=0);
+  const sum=(o,ms)=>{ let t=0; (ms||[]).forEach(m=>{ t+=+((o&&o.ma&&o.ma[m])||0); }); return t; };
+  const names=new Set([...Object.keys(E||{}), ...Object.keys(P||{})]);
+  const rows=[...names].map(n=>{
+    const c=sum(E[n],all), p=P?sum(P[n],pm):0;
+    return {n, c, p, d:c-p, pct:(p? (c-p)/p*100 : null)};
+  }).filter(r=>r.c||r.p).sort((x,y)=>x.d-y.d);             // 많이 줄어든 순
+  if(!rows.length) return '';
+  const tc=rows.reduce((s,r)=>s+r.c,0), tp=rows.reduce((s,r)=>s+r.p,0);
+  const totD=tp-tc;                                        // 전체 감소액(양수면 감소)
+  const th='style="text-align:right;padding:7px 9px;background:var(--amber);color:#fff;font-size:11px;font-weight:800;white-space:nowrap"';
+  const thl='style="text-align:left;padding:7px 9px;background:var(--amber);color:#fff;font-size:11px;font-weight:800"';
+  const td='style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
+  const tdl='style="padding:5px 9px;border-bottom:1px solid var(--line)"';
+  let body='';
+  rows.forEach(r=>{
+    const cl=r.pct==null?'#888':(r.pct>=0?'#16a34a':'#dc2626');
+    const dir=r.pct==null?'':(r.pct>=0?'▲':'▼');
+    // 기여도: 전체가 줄었을 때 이 부서가 그 감소의 몇 %를 차지하는가
+    const share=(totD>0 && r.d<0) ? ((-r.d)/totD*100) : null;
+    body+=`<tr><td ${tdl}>${escapeHtml(r.n)}</td>`
+      + `<td ${td}>${_yoyFmtWon(r.c)}</td>`
+      + `<td ${td} style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:#888;font-variant-numeric:tabular-nums">${_yoyFmtWon(r.p)}</td>`
+      + `<td ${td} style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:${cl};font-weight:700">${r.pct==null?'-':dir+Math.abs(r.pct).toFixed(1)+'%'}</td>`
+      + `<td ${td} style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:${share!=null?'#dc2626':'var(--ink3)'};font-weight:${share!=null?'700':'400'}">${share!=null?share.toFixed(0)+'%':'·'}</td></tr>`;
+  });
+  const tpct=tp?((tc-tp)/tp*100):null;
+  const ml=all[0]+'~'+all[all.length-1]+'월';
+  const top=rows[0];
+  const note = (totD>0 && top && top.d<0)
+    ? `별도채널 감소액 ${_yoyFmtWon(totD)} 중 <b>${escapeHtml(top.n)}</b>이(가) ${_yoyFmtWon(-top.d)}로 가장 큽니다.`
+    : '전년 대비 감소가 두드러지는 부서는 없습니다.';
+  return `<div class="card">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
+      <div><h3 style="margin:0"><span class="dot"></span>별도채널 · 부서별 내역</h3>
+        <div style="color:var(--ink2);font-size:12px;margin-top:3px">올해 vs 전년 · ${ml} 누계 기준 · <b>${nowM}월은 진행 중이라 제외</b></div></div>
+      <div style="text-align:right"><div style="font-size:20px;font-weight:800;color:${tpct==null?'#888':(tpct>=0?'#16a34a':'#dc2626')};line-height:1.1">${tpct==null?'-':(tpct>=0?'▲ ':'▼ ')+Math.abs(tpct).toFixed(1)+'%'}</div>
+        <div style="color:var(--ink2);font-size:12px;margin-top:2px">올해 ${_yoyFmtWon(tc)} · 전년 ${_yoyFmtWon(tp)}</div></div>
+    </div>
+    <div class="iv-wrap" style="margin-top:8px"><table style="width:100%;border-collapse:collapse;min-width:520px">
+      <tr><th ${thl}>부서</th><th ${th}>올해</th><th ${th}>전년</th><th ${th}>증감</th><th ${th}>감소 기여도</th></tr>
+      ${body}
+      <tr style="background:var(--bg2)"><td ${tdl}><b>합계</b></td><td ${td}><b>${_yoyFmtWon(tc)}</b></td><td ${td} style="padding:5px 9px;text-align:right;color:#888"><b>${_yoyFmtWon(tp)}</b></td><td ${td} style="padding:5px 9px;text-align:right;color:${tpct==null?'#888':(tpct>=0?'#16a34a':'#dc2626')}"><b>${tpct==null?'-':(tpct>=0?'▲':'▼')+Math.abs(tpct).toFixed(1)+'%'}</b></td><td ${td}></td></tr>
+    </table></div>
+    <div class="cap" style="margin-top:8px">${note}</div>
+    <div class="cap" style="margin-top:4px"><b>감소 기여도</b> = 이 부서의 감소액 ÷ 별도채널 전체 감소액. 어느 부서가 하락을 이끌었는지 보여줍니다.</div>
+  </div>`;
+}
 function renderYoY(){
   const box=document.getElementById('rYoY'); if(!box) return;
   if(!yoyLoaded || !salesLoaded || !glassLoaded){
@@ -11101,7 +11160,7 @@ function renderYoY(){
   const wSec=_yoySectionFromYM(_yoyWarrYM(),'warr','품질보증서 (발급 건수)',_yoyFmtCnt);
   const gSec=_yoySectionFromYM(_yoyGlassYM(),'glass','글라스케어 (가입 건수)',_yoyFmtCnt);
   const intro=`<div style="margin:2px 0 14px;color:var(--ink2);font-size:12px">매출은 <b>금액</b>, 품질보증서·글라스케어는 <b>건수</b> 기준으로 올해와 전년 같은 기간을 비교합니다.</div>`;
-  box.innerHTML = intro + sSec.html + wSec.html + gSec.html;
+  box.innerHTML = intro + sSec.html + _yoyEtcDept() + wSec.html + gSec.html;   // 별도채널 부서별 내역을 매출 카드 바로 뒤에
   _yoyDrawChart(sSec.chart); _yoyDrawChart(wSec.chart); _yoyDrawChart(gSec.chart);
 }
 document.addEventListener('click', function(e){
