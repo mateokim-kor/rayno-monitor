@@ -7407,7 +7407,12 @@ function renderRevenue(){
   let s8=`<button id="salesRepCopy" class="acc-btn" style="margin-bottom:8px">📋 리포트 복사</button><pre id="salesRepText" style="white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-family:inherit;font-size:13px;color:var(--ink);margin:0">${rep.replace(/</g,'&lt;')}</pre>`;
 
   box.innerHTML=`<div style="font-size:12px;color:var(--ink2);margin-bottom:10px">최종 업데이트: ${new Date(SALES.updatedAt).toLocaleString('ko-KR')} · 기간 ${M.length?M[0]+'~'+M[M.length-1]+'월':'-'} · 품목 ${SALES.prodList.length}종</div>`
-    + _todayCard2(false)
+    /* 2026-08-20 '오늘 매출' 카드 제거.
+       · 이 탭은 월·누계 단위 분석 화면인데 하루치만 성격이 달랐고,
+       · 하루 매출은 오르내리는 게 정상이라 이걸 보고 판단할 일이 없었으며(작성자도 한 번도 안 봄),
+       · ERP 당일 자료가 늦게 올라오면 오후에도 '0원 ▼100%'가 화면 맨 위에 빨갛게 떠 오해를 줬다.
+       수집기(today_sales.json)는 그대로 두었으므로 아래 한 줄을 되살리면 즉시 복구된다.
+       + _todayCard2(false) */
     + _periodSalesCard2(false)
     + sel
     + salesKPI()
@@ -7460,7 +7465,11 @@ function renderShare(){
 /* ── 일별 매출 6개월 (ERP salesDailyList · 기간 집계) ── */
 let DAILY=null, dailyLoaded=false;
 async function ensureDaily(){ if(dailyLoaded)return; try{ const j=await cloudLoadJSON(SUPA.dailyFile); if(j&&Array.isArray(j.days)) DAILY=j; }catch(_){} dailyLoaded=true; }
-let PSV={preset:'thisweek', from:'', to:''};   // 기간 매출 카드 상태
+let PSV={preset:'lastweek', from:'', to:''};   // 기간 매출 카드 상태
+/* 2026-08-20 기본값 '이번 주' → '지난 주'.
+   이번 주는 아직 안 끝났는데 작년 한 주 전체와 비교해 실제보다 크게 줄어 보였다
+   (예: 목요일 기준 4일치 vs 7일치 → -62%). 마감된 주끼리 비교하는 것이 기본이고,
+   이번 주를 보고 싶으면 위 버튼에서 직접 고르면 된다. */
 function _psDaysInRange(from,to){ if(!DAILY||!DAILY.days) return []; return DAILY.days.filter(d=>d.date>=from&&d.date<=to); }
 function _psSum(from,to){ let b2c=0,b2b=0,etc=0; _psDaysInRange(from,to).forEach(d=>{b2c+=d.b2c||0;b2b+=d.b2b||0;etc+=d.etc||0;}); return {b2c,b2b,etc,total:b2c+b2b+etc}; }
 function _ymd8(dt){ return dt.getFullYear()+String(dt.getMonth()+1).padStart(2,'0')+String(dt.getDate()).padStart(2,'0'); }
@@ -7470,7 +7479,7 @@ function _psRange(preset){   // 프리셋 → {from,to,prevFrom,prevTo,label}
   const mk=(a,b)=>({from:_ymd8(a),to:_ymd8(b)});
   const shift=(dt,n)=>{ const x=new Date(dt); x.setDate(x.getDate()+n); return x; };
   if(preset==='custom'){ const f=(PSV.from||'').replace(/-/g,''), t=(PSV.to||'').replace(/-/g,''); return {from:f,to:t,prevFrom:'',prevTo:'',label:`${_ymdDash(f)} ~ ${_ymdDash(t)}`}; }
-  if(preset==='thisweek'){ const dow=(today.getDay()+6)%7; const mon=shift(today,-dow); const r=mk(mon,today); const pr=mk(shift(mon,-7),shift(mon,-1)); return {...r,prevFrom:pr.from,prevTo:pr.to,label:'이번 주',prevLabel:'지난 주'}; }
+  if(preset==='thisweek'){ const dow=(today.getDay()+6)%7; const mon=shift(today,-dow); const r=mk(mon,today); const pr=mk(shift(mon,-7),shift(mon,-1)); return {...r,prevFrom:pr.from,prevTo:pr.to,label:'이번 주',prevLabel:'지난 주',inProgress:true}; }   // 아직 진행 중인 기간
   if(preset==='lastweek'){ const dow=(today.getDay()+6)%7; const thisMon=shift(today,-dow); const lastMon=shift(thisMon,-7), lastSun=shift(thisMon,-1); const r=mk(lastMon,lastSun); const pr=mk(shift(lastMon,-7),shift(lastMon,-1)); return {...r,prevFrom:pr.from,prevTo:pr.to,label:'지난 주',prevLabel:'전전 주'}; }
   const n=parseInt(preset,10)||7; const from=shift(today,-(n-1)); const r=mk(from,today); const pr=mk(shift(from,-n),shift(from,-1)); return {...r,prevFrom:pr.from,prevTo:pr.to,label:`최근 ${n}일`,prevLabel:`직전 ${n}일`};
 }
@@ -7484,7 +7493,7 @@ function _periodSalesCard(){
   const dlt=(c,p)=>{ if(!P) return ''; if(!(p>0)) return '<span style="color:var(--ink3);font-size:11px">신규</span>'; const d=(c-p)/p*100,up=d>=0; return `<span style="color:${up?'#16a34a':'#dc2626'};font-size:11px;font-weight:700">${up?'▲':'▼'}${Math.abs(d).toFixed(0)}%</span>`; };
   const chip=(lab,v,col,pv)=>`<div style="flex:1;min-width:90px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:9px 12px"><div style="font-size:11px;color:var(--ink3);display:flex;justify-content:space-between;gap:4px">${lab}${P?dlt(v,pv):''}</div><div style="font-size:16px;font-weight:800;color:${col}">${won(v)}<span style="font-size:11px;font-weight:500;color:var(--ink3)"> 원</span></div></div>`;
   const cmp=P?`<div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span>${escapeHtml(R.prevLabel||'직전')} <b>${won(P.total)}원</b></span>${dlt(cur.total,P.total)}<span style="color:var(--ink3)">${P.total>0?'('+(cur.total-P.total>=0?'+':'')+won(cur.total-P.total)+'원)':''}</span></div>`:'';
-  return `<div class="card" style="margin-bottom:13px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap"><span class="dot"></span><b style="font-size:14px">기간 매출</b><span style="font-size:12px;color:var(--ink3)">${escapeHtml(R.label)} · ${_ymdDash(R.from)}~${_ymdDash(R.to)}</span><span style="margin-left:auto;font-size:11px;color:var(--ink3)">전체구분(매출+시공+할인) 기준</span></div>${_psControls()}<div style="display:flex;gap:9px;flex-wrap:wrap"><div style="flex:1.3;min-width:130px;background:linear-gradient(135deg,#f4911c,#e0781a);border-radius:10px;padding:10px 14px;color:#fff"><div style="font-size:11px;opacity:.92;display:flex;justify-content:space-between;gap:6px;align-items:center">전사${P&&P.total>0?`<span style="font-weight:700">${((cur.total-P.total)/P.total*100>=0?'▲':'▼')}${Math.abs((cur.total-P.total)/P.total*100).toFixed(0)}%</span>`:''}</div><div style="font-size:20px;font-weight:800">${won(cur.total)}<span style="font-size:11px;font-weight:500;opacity:.85"> 원</span></div></div>${chip('B2C',cur.b2c,'#3f78c7',P?P.b2c:0)}${chip('B2B',cur.b2b,'#2f9e6f',P?P.b2b:0)}${chip('기타',cur.etc,'#8a6bd8',P?P.etc:0)}</div>${cmp}</div>`;
+  return `<div class="card" style="margin-bottom:13px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap"><span class="dot"></span><b style="font-size:14px">기간 매출</b><span style="font-size:12px;color:var(--ink3)">${escapeHtml(R.label)} · ${_ymdDash(R.from)}~${_ymdDash(R.to)}</span><span style="margin-left:auto;font-size:11px;color:var(--ink3)">전체구분(매출+시공+할인) 기준</span>${R.inProgress?`<div style="width:100%;margin-top:6px;font-size:11.5px;color:var(--neg)"><b>${escapeHtml(R.label)}는 아직 진행 중</b>입니다(오늘까지의 부분 실적). 지난 주 전체와 비교되므로 실제보다 적게 보입니다.</div>`:''}</div>${_psControls()}<div style="display:flex;gap:9px;flex-wrap:wrap"><div style="flex:1.3;min-width:130px;background:linear-gradient(135deg,#f4911c,#e0781a);border-radius:10px;padding:10px 14px;color:#fff"><div style="font-size:11px;opacity:.92;display:flex;justify-content:space-between;gap:6px;align-items:center">전사${P&&P.total>0?`<span style="font-weight:700">${((cur.total-P.total)/P.total*100>=0?'▲':'▼')}${Math.abs((cur.total-P.total)/P.total*100).toFixed(0)}%</span>`:''}</div><div style="font-size:20px;font-weight:800">${won(cur.total)}<span style="font-size:11px;font-weight:500;opacity:.85"> 원</span></div></div>${chip('B2C',cur.b2c,'#3f78c7',P?P.b2c:0)}${chip('B2B',cur.b2b,'#2f9e6f',P?P.b2b:0)}${chip('기타',cur.etc,'#8a6bd8',P?P.etc:0)}</div>${cmp}</div>`;
 }
 function _psControls(){
   const b=(v,l)=>`<button data-ps="${v}" class="${PSV.preset===v?'on':''}">${l}</button>`;
@@ -7888,10 +7897,26 @@ function drawSalesCharts(){
   // 제품 TOP (롤 중분류, 선택 기간)
   if(document.getElementById('cProdTop')){ const mids={}; SALES.prodList.forEach(mat=>{ if(_isRoll(mat)){ const mid=_midOf(mat); mids[mid]=(mids[mid]||0)+_sPick(SALES.prodAll[mat].mq); } });
     const top=Object.keys(mids).map(k=>[k,mids[k]]).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    /* 2026-08-20: 작년 같은 기간 막대를 나란히 붙임.
+       순위만 있으면 "1위 제품이 작년보다 줄었는지"를 알 수 없어 판단이 안 된다.
+       전년 자료가 없으면 올해 막대만 그린다(0짜리 회색 막대를 그리지 않음). */
+    const _P=SALES.prev;
+    let _prevTop=null;
+    if(_P && _P.prodList && _P.prodAll){
+      const pm={}; _P.prodList.forEach(mat=>{ if(_isRoll(mat)){ const mid=_midOf(mat); pm[mid]=(pm[mid]||0)+_sPick(_P.prodAll[mat].mq); } });
+      if(Object.keys(pm).length) _prevTop=top.map(x=>pm[x[0]]||0);
+    }
+    const _ds=[{label:'올해', data:top.map(x=>x[1]), backgroundColor:AM, borderRadius:3}];
+    if(_prevTop) _ds.push({label:'전년', data:_prevTop, backgroundColor:'#d4dae2', borderRadius:3});
     makeChart('cProdTop',{ type:'bar',
-      data:{ labels:top.map(x=>x[0]), datasets:[{label:'판매수량', data:top.map(x=>x[1]), backgroundColor:AM}] },
+      data:{ labels:top.map(x=>x[0]), datasets:_ds },
       options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>c.parsed.x.toLocaleString()+'롤'}} },
+        plugins:{ legend:{display:!!_prevTop, position:'top', labels:{boxWidth:12,font:{size:11}}},
+          tooltip:{callbacks:{label:c=>{
+            const v=c.parsed.x||0; let t=c.dataset.label+' '+v.toLocaleString()+'롤';
+            if(_prevTop && c.datasetIndex===0){ const pv=_prevTop[c.dataIndex]||0;
+              if(pv) t+=' ('+((v-pv)/pv*100>=0?'+':'')+((v-pv)/pv*100).toFixed(1)+'%)'; }
+            return t; }}} },
         scales:{ x:{grid:{color:ck.grid},ticks:{color:ck.text}}, y:{grid:{display:false},ticks:{color:ck.text,font:{size:11}}} } } }); }
 }
 function salesReportText(){
@@ -8016,10 +8041,33 @@ function salesKPI(){
   const spBB=_sparkbar(_km.map(m=>(_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)),'var(--dv1)',{label:'B2C+B2B 합계',fmt:v=>eok(v)+'억',months:_km});
   const spRoll=_sparkbar(_km.map(_rollM),'var(--dv2)',{label:'롤 판매수량',fmt:v=>won(v)+' 롤',months:_km});
   const spShare=_sparkbar(_km.map(m=>{ const cr=_crM(m); return cr>0?_qcNew(m)/cr*100:0; }),'var(--dv6)',{label:'시장 점유율 (보증서)',fmt:v=>v.toFixed(1)+'%',months:_km});
+  /* 2026-08-20: KPI에 작년 같은 기간 대비를 덧붙임.
+     현재값만 있으면 "이게 좋은 건지 나쁜 건지"를 알 수 없다.
+     비교 기간은 올해 자료가 있는 달과 같은 달만 사용하고,
+     전년 자료가 없으면 아무것도 붙이지 않는다. */
+  const _P=SALES.prev, _pm=(_P&&_P.months)||[];
+  const _cmpM=_km.filter(m=>_pm.indexOf(m)>=0);
+  const _pEnt=()=>{ if(!_P||!_P.channels) return null; const c=_P.channels; let t=0;
+    _cmpM.forEach(m=>{ t+=((c.B2C&&c.B2C.ma[m])||0)+((c.B2B&&c.B2B.ma[m])||0)+((c['별도채널']&&c['별도채널'].ma[m])||0); }); return t; };
+  const _pBB=()=>{ if(!_P||!_P.channels) return null; const c=_P.channels; let t=0;
+    _cmpM.forEach(m=>{ t+=((c.B2C&&c.B2C.ma[m])||0)+((c.B2B&&c.B2B.ma[m])||0); }); return t; };
+  const _pRoll=()=>{ if(!_P||!_P.prodAll) return null; let q=0;
+    _cmpM.forEach(m=>{ (_P.prodList||[]).forEach(pn=>{ try{ if(_isExcl(pn)||!_isRoll(pn)) return; }catch(_){ }
+      const o=_P.prodAll[pn]; if(o&&o.mq) q+=(o.mq[m]||0); }); }); return q; };
+  // 올해도 같은 달만 더해야 비교가 성립한다
+  const _cEnt=_cmpM.reduce((t,m)=>t+((_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)+((_cc['별도채널']&&_cc['별도채널'].ma[m])||0)),0);
+  const _cBB =_cmpM.reduce((t,m)=>t+((_cc.B2C.ma[m]||0)+(_cc.B2B.ma[m]||0)),0);
+  const _cRoll=_cmpM.reduce((t,m)=>t+_rollM(m),0);
+  const _yoyTag=(cur,prev,fmt)=>{
+    if(!_cmpM.length || prev==null || !prev) return '';
+    const d=(cur-prev)/prev*100;
+    const col=d>=0?'#16a34a':'#dc2626';
+    return ` · <b style="color:${col}">${d>=0?'▲':'▼'}${Math.abs(d).toFixed(1)}%</b> <span style="color:var(--ink3)">작년 ${fmt(prev)}</span>`;
+  };
   return `<div style="display:flex;gap:11px;flex-wrap:wrap;margin-bottom:14px">`
-    + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도 · 별도채널 포함', spEnt)
-    + kpi('B2C+B2B 합계', eok(bbT)+'억', entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'', spBB)
-    + kpi('롤 판매수량', won(rollQ)+' 롤', '제외 항목 미포함', spRoll)
+    + kpi('전사 매출액', eok(entT)+'억', 'VAT 별도 · 별도채널 포함'+_yoyTag(_cEnt,_pEnt(),v=>eok(v)+'억'), spEnt)
+    + kpi('B2C+B2B 합계', eok(bbT)+'억', (entT?'전사 대비 '+(bbT/entT*100).toFixed(1)+'%':'')+_yoyTag(_cBB,_pBB(),v=>eok(v)+'억'), spBB)
+    + kpi('롤 판매수량', won(rollQ)+' 롤', '제외 항목 미포함'+_yoyTag(_cRoll,_pRoll(),v=>won(v)+' 롤'), spRoll)
     + kpi('시장 점유율 (보증서 기준)', share, crT?`신차 시공 ${won(wT)} <span style="color:var(--ink3)">(전체 ${won(_qcPick())})</span> ÷ 신차 등록 ${won(crT)}`:'설정에서 신차 등록 입력', spShare)
     + `</div>`;
 }
