@@ -5572,40 +5572,66 @@ function _momPct(cur, prev){ if(prev==null||!isFinite(prev)||prev===0) return nu
 function _refMonths(){ let months=[]; if(typeof SALES!=='undefined'&&SALES&&SALES.months) months=_salesMonths(); if(!months.length&&typeof WARR!=='undefined'&&WARR&&WARR.rows){ const s=new Set(); WARR.rows.forEach(r=>{const m=parseInt(String(r['시공일자']||'').slice(5,7),10); if(m)s.add(m);}); months=[...s].sort((a,b)=>a-b); } const cur=months.length?months[months.length-1]:null; return {cur, prev:cur!=null?cur-1:null, months}; }
 function _heroCard(label, valueStr, pct, sub){
   const st=_statusOf(pct);
-  let mom; if(pct==null) mom=`<span class="mom mom-na">전월 대비 —</span>`; else { const up=pct>=0; mom=`<span class="mom ${up?'mom-up':'mom-down'}">${up?'▲':'▼'} ${Math.abs(pct).toFixed(1)}%</span>`; }
-  return `<div class="hero-card"><div class="hero-l">${label}</div><div class="hero-v">${valueStr}</div><div class="hero-meta">${mom}<span class="st-badge ${st.cls}">${st.label}</span></div>${sub?`<div class="hero-sub">${sub}</div>`:''}</div>`;
+  let yoy; if(pct==null) yoy=`<span class="mom mom-na">작년 대비 —</span>`; else { const up=pct>=0; yoy=`<span class="mom ${up?'mom-up':'mom-down'}">${up?'▲':'▼'} ${Math.abs(pct).toFixed(1)}%</span>`; }
+  return `<div class="hero-card"><div class="hero-l">${label}</div><div class="hero-v">${valueStr}</div><div class="hero-meta">${yoy}<span class="st-badge ${st.cls}">${st.label}</span></div>${sub?`<div class="hero-sub">${sub}</div>`:''}</div>`;
+}
+/* ══ 이번 달 핵심 요약 ══════════════════════════════════════════
+   2026-08 개편: 비교 기준을 '전월 대비' → '전년 동월 대비'로 바꿨습니다.
+   썬팅은 여름 성수기가 뚜렷한 계절 산업이라(보증서 기준 1월과 6월이 1.5배 차이)
+   전월과 비교하면 계절 변동인지 실제 문제인지 구분되지 않습니다.
+   작년 같은 달과 비교해야 진짜 신호가 드러납니다.
+   지표도 4개로 정리했습니다 — 매출 / 시공 / 롤 판매 / 글라스케어.
+   (B2C·B2B 분리와 온라인 언급은 각 전용 탭에 그대로 있습니다) */
+function _heroYM(){                     // 기준 연·월과 작년 같은 달
+  const {cur}=_refMonths();
+  let yr=new Date().getFullYear();
+  try{ const w=_yoyWarrYM(); const ys=Object.keys(w).map(Number).filter(Boolean).sort(); if(ys.length) yr=ys[ys.length-1]; }catch(_){}
+  return {m:cur, y:yr, py:yr-1};
+}
+function _heroSalesPair(m){             // 올해 m월 / 작년 m월 전사 매출
+  if(typeof SALES==='undefined'||!SALES||!SALES.channels||m==null) return null;
+  const sum=(S)=>{ if(!S||!S.channels) return null; const C=S.channels;
+    const g=c=>(C[c]&&C[c].ma&&C[c].ma[m])||0; return g('B2C')+g('B2B')+g('별도채널'); };
+  const P=SALES.prev;
+  const hasPrevMonth = !!(P && (P.months||[]).indexOf(m)>=0);   // 작년에 그 달 자료가 실제로 있는지
+  return {cur:sum(SALES), prev:hasPrevMonth?sum(P):null};
+}
+function _heroCntPair(ymMap, y, py, m){ // {연도:{월:건수}} 에서 올해/작년 같은 달
+  if(m==null) return null;
+  // 그 달 항목이 아예 없으면 null(자료 없음) — 실제 0건과 구분해야 '작년 0건'으로 잘못 보이지 않는다
+  const g=(yy)=>{ const o=ymMap&&ymMap[yy]; if(!o) return null; return (o[m]!=null)?o[m]:null; };
+  const c=g(y);
+  return {cur:(c==null?0:c), prev:g(py)};
+}
+function _heroRollPair(y, py, m){       // 지부→대리점 롤 판매 (branchsales)
+  if(m==null||typeof BSALE==='undefined'||!BSALE||!Array.isArray(BSALE.rows)) return null;
+  const key=(yy)=>String(yy)+String(m).padStart(2,'0');
+  const kc=key(y), kp=key(py); let c=0,p=0,hasP=false;
+  BSALE.rows.forEach(r=>{ const ym=String(r.ym||''); const q=Number(r.q||0)||0;
+    if(ym===kc) c+=q; else if(ym===kp){ p+=q; hasP=true; } });
+  return {cur:c, prev:hasP?p:null};
 }
 function _summaryHero(){
   const won=n=>Math.round(n||0).toLocaleString();
-  const {cur, prev}=_refMonths(); const cards=[]; let totPct=null, b2cPct=null, b2bPct=null;
-  if(typeof SALES!=='undefined'&&SALES&&SALES.channels && cur!=null){
-    const C=SALES.channels, ch=(c,m)=>(m!=null&&C[c]&&C[c].ma[m])||0;
-    const ent=m=>ch('B2C',m)+ch('B2B',m)+(C['별도채널']?ch('별도채널',m):0);
-    const tC=ent(cur), tP=ent(prev), bC=ch('B2C',cur), bP=ch('B2C',prev), bbC=ch('B2B',cur), bbP=ch('B2B',prev);
-    totPct=_momPct(tC,tP); b2cPct=_momPct(bC,bP); b2bPct=_momPct(bbC,bbP);
-    cards.push(_heroCard('총 매출', fmtKRW(tC), totPct, cur+'월 · 전월 대비'));
-    cards.push(_heroCard('B2C 매출', fmtKRW(bC), b2cPct, cur+'월 · 전월 대비'));
-    cards.push(_heroCard('B2B 매출', fmtKRW(bbC), b2bPct, cur+'월 · 전월 대비'));
-  }
-  if(typeof WARR!=='undefined'&&WARR&&WARR.rows&&WARR.rows.length && cur!=null){
-    const cnt=m=>m==null?0:WARR.rows.filter(r=>parseInt(String(r['시공일자']||'').slice(5,7),10)===m).length;
-    const wC=cnt(cur), wP=cnt(prev);
-    cards.push(_heroCard('인증서 발급', won(wC)+'건', _momPct(wC,wP), cur+'월 · 전월 대비'));
-  }
-  if(typeof RAW!=='undefined' && RAW && RAW.rows && RAW.rows.length){
-    const cnt=m=>m==null?0:RAW.rows.filter(r=>{ const d=normDate(r.date); return d && parseInt(d.slice(5,7),10)===m; }).length;
-    const oC=cur!=null?cnt(cur):0, oP=cnt(prev);
-    const pctO=(cur!=null&&oP>0)?_momPct(oC,oP):null;
-    cards.push(_heroCard('온라인 언급', won(cur!=null?oC:RAW.rows.length)+'건', pctO, cur!=null?cur+'월 · 전월 대비':'누적'));
-  }
+  const {m, y, py}=_heroYM(); const cards=[]; const parts=[];
+  const add=(label, pair, fmt, unitSub)=>{
+    if(!pair) return null;
+    const pct=(pair.prev==null||!pair.prev)?null:_yoyPct(pair.cur, pair.prev);
+    const sub=(m!=null?`${m}월 · `:'')+(pair.prev==null?`${py}년 자료 없음`:`${py}년 ${fmt(pair.prev)}`);
+    cards.push(_heroCard(label, fmt(pair.cur), pct, sub));
+    if(pct!=null) parts.push(`${label} ${pct>=0?'+':''}${pct.toFixed(1)}%`);
+    return pct;
+  };
+  add('매출', _heroSalesPair(m), v=>fmtKRW(v));
+  let wMap=null,gMap=null; try{ wMap=_yoyWarrYM(); }catch(_){} try{ gMap=_yoyGlassYM(); }catch(_){}
+  add('시공(보증서)', _heroCntPair(wMap, y, py, m), v=>won(v)+'건');
+  add('롤 판매',      _heroRollPair(y, py, m),      v=>won(v)+'롤');
+  add('글라스케어',   _heroCntPair(gMap, y, py, m), v=>won(v)+'건');
   if(!cards.length) return '';
-  let insight='비교 가능한 데이터가 부족합니다.'; const ip=[];
-  if(totPct!=null) ip.push(`총 매출 전월 대비 <b>${totPct>=0?'+':''}${totPct.toFixed(1)}%</b>`);
-  if(b2cPct!=null) ip.push(`B2C ${b2cPct>=0?'상승세':'하락'}(${b2cPct>=0?'+':''}${b2cPct.toFixed(1)}%)`);
-  if(b2bPct!=null) ip.push(`B2B ${b2bPct>=0?'+':''}${b2bPct.toFixed(1)}%`);
-  if(ip.length) insight='이번 달 '+ip.join(' · ')+'.';
-  return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>이번 달 핵심 요약${cur!=null?` · ${cur}월`:''}</h3><span class="cap">현재값 · 전월 대비 증감 · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div></div>`;
+  const insight = parts.length ? `${py}년 같은 달 대비 — ${parts.join(' · ')}.` : '작년 같은 달 자료가 없어 비교하지 못했습니다.';
+  return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>이번 달 상태${m!=null?` · ${y}년 ${m}월`:''}</h3><span class="cap">현재값 · <b>작년 같은 달 대비</b> · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div><div class="cap" style="margin-top:6px">썬팅은 계절 산업이라 <b>전월이 아닌 작년 같은 달</b>과 비교합니다. 회색으로 표시된 값이 작년 실적입니다.</div></div>`;
 }
+
 function renderRDash(){
   const box=document.getElementById('rDash'); if(!box) return;
   const hasSales=!!(SALES&&SALES.channels), hasWarr=!!(WARR&&WARR.rows&&WARR.rows.length), hasGlass=!!(GLASS&&GLASS.rows&&GLASS.rows.length);
@@ -8666,7 +8692,10 @@ function applyRaynoAuth(){
 function raynoLockOn(){ const c=STORE&&STORE.config&&STORE.config.raynoLock; return c? c.on!==false : true; }
 function raynoPass(){ const c=STORE&&STORE.config&&STORE.config.raynoLock; return (c&&c.pass)?String(c.pass):CONFIG.raynoPassword; }
 let _raynoDataP=null;
-function _loadRaynoData(){ if(!_raynoDataP) _raynoDataP=Promise.all([ensureBiz(),ensureWarr(),ensureSales(),ensureGlass(),ensureErpd()].map(x=>Promise.resolve(x).catch(()=>{}))); return _raynoDataP; }   // 4종 병렬 로드 + 프로미스 캐싱(중복 fetch 방지)
+function _loadRaynoData(){ if(!_raynoDataP) _raynoDataP=Promise.all([ensureBiz(),ensureWarr(),ensureSales(),ensureGlass(),ensureErpd(),ensureYoy(),ensureBranchsales()].map(x=>Promise.resolve(x).catch(()=>{}))); return _raynoDataP; }
+// 병렬 로드 + 프로미스 캐싱(중복 fetch 방지)
+//  2026-08 추가: ensureYoy(작년 보증서·글라스케어 월별 건수) · ensureBranchsales(롤 판매)
+//  → '이번 달 상태' 카드의 작년 같은 달 비교에 필요. 없으면 '작년 자료 없음'으로만 표시됨
 async function openRayno(){
   const lock=document.getElementById('raynoLock'), nav=document.getElementById('raynoNav');
   if(!raynoLockOn()) raynoUnlocked=true;   // 잠금이 꺼져 있으면 누구나 통과
