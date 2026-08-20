@@ -5630,24 +5630,67 @@ function _heroRollPair(y, py, m){
   return {cur:sumRoll(SALES), prev:hasPrevMonth?sumRoll(P):null};
 }
 function _summaryHero(){
+  /* 2026-08 재개편: 단월 → **누계** 기준.
+     월별 변동이 매우 커서(전사 매출 기준 3월 +74% / 5월 -49% / 7월 -44%)
+     어느 달을 보느냐에 따라 정반대 결론이 나온다. 누계가 훨씬 안정적이다.
+     큰 숫자는 1~N월 누계, 아래 작은 글씨에 해당 월 단월을 곁들인다. */
   const won=n=>Math.round(n||0).toLocaleString();
-  const {m, y, py, nowM}=_heroYM(); const cards=[]; const parts=[];
-  const add=(label, pair, fmt, unitSub)=>{
-    if(!pair) return null;
-    const pct=(pair.prev==null||!pair.prev)?null:_yoyPct(pair.cur, pair.prev);
-    const sub=(m!=null?`${m}월 · `:'')+(pair.prev==null?`${py}년 자료 없음`:`${py}년 ${fmt(pair.prev)}`);
-    cards.push(_heroCard(label, fmt(pair.cur), pct, sub));
+  const {m, y, py, nowM}=_heroYM();
+  if(m==null) return '';
+  const ms=[]; for(let i=1;i<=m;i++) ms.push(i);        // 1월 ~ 마감된 마지막 달
+  const cards=[]; const parts=[];
+  const add=(label, cum, one, fmt)=>{
+    if(!cum) return;
+    const pct=(cum.prev==null||!cum.prev)?null:_yoyPct(cum.cur, cum.prev);
+    let sub = cum.prev==null ? `${py}년 자료 없음`
+            : `${py}년 ${fmt(cum.prev)}`;
+    if(one && one.prev!=null && one.prev){
+      const op=_yoyPct(one.cur, one.prev);
+      sub += ` · ${m}월만 ${op>=0?'+':''}${op.toFixed(1)}%`;
+    }
+    cards.push(_heroCard(label, fmt(cum.cur), pct, sub));
     if(pct!=null) parts.push(`${label} ${pct>=0?'+':''}${pct.toFixed(1)}%`);
-    return pct;
   };
-  add('매출', _heroSalesPair(m), v=>fmtKRW(v));
+  // 매출 — 누계
+  const salesCum=(()=>{
+    if(typeof SALES==='undefined'||!SALES||!SALES.channels) return null;
+    const sum=(S,mm)=>{ if(!S||!S.channels) return 0; const C=S.channels;
+      const g=c=>(C[c]&&C[c].ma&&C[c].ma[mm])||0; return g('B2C')+g('B2B')+g('별도채널'); };
+    const P=SALES.prev, pm=(P&&P.months)||[];
+    let c=0,p=0,hasP=false;
+    ms.forEach(mm=>{ if((SALES.months||[]).indexOf(mm)>=0) c+=sum(SALES,mm);
+      if(pm.indexOf(mm)>=0){ p+=sum(P,mm); hasP=true; } });
+    return {cur:c, prev:hasP?p:null};
+  })();
+  const cntCum=(map)=>{
+    if(!map) return null;
+    const g=(yy,mm)=>{ const o=map[yy]; if(!o) return null; return (o[mm]!=null)?o[mm]:null; };
+    let c=0,p=0,hasP=false;
+    ms.forEach(mm=>{ const a=g(y,mm); if(a!=null) c+=a; const b=g(py,mm); if(b!=null){ p+=b; hasP=true; } });
+    return {cur:c, prev:hasP?p:null};
+  };
+  const rollCum=(()=>{
+    if(typeof SALES==='undefined'||!SALES||!SALES.prodAll) return null;
+    const rm=(S,mm)=>{ if(!S||!S.prodAll) return 0; let q=0;
+      (S.prodList||[]).forEach(pn=>{ try{ if(_isExcl(pn)||!_isRoll(pn)) return; }catch(_){ }
+        const o=S.prodAll[pn]; if(o&&o.mq) q+=(o.mq[mm]||0); });
+      return q; };
+    const P=SALES.prev, pm=(P&&P.months)||[];
+    let c=0,p=0,hasP=false;
+    ms.forEach(mm=>{ if((SALES.months||[]).indexOf(mm)>=0) c+=rm(SALES,mm);
+      if(pm.indexOf(mm)>=0 && P.prodAll){ p+=rm(P,mm); hasP=true; } });
+    return {cur:c, prev:hasP?p:null};
+  })();
   let wMap=null,gMap=null; try{ wMap=_yoyWarrYM(); }catch(_){} try{ gMap=_yoyGlassYM(); }catch(_){}
-  add('시공(보증서)', _heroCntPair(wMap, y, py, m), v=>won(v)+'건');
-  add('롤 판매',      _heroRollPair(y, py, m),      v=>won(v)+'롤');
-  add('글라스케어',   _heroCntPair(gMap, y, py, m), v=>won(v)+'건');
+  add('매출',        salesCum,          _heroSalesPair(m),            v=>fmtKRW(v));
+  add('시공(보증서)', cntCum(wMap),      _heroCntPair(wMap, y, py, m), v=>won(v)+'건');
+  add('롤 판매',      rollCum,           _heroRollPair(y, py, m),      v=>won(v)+'롤');
+  add('글라스케어',   cntCum(gMap),      _heroCntPair(gMap, y, py, m), v=>won(v)+'건');
   if(!cards.length) return '';
-  const insight = parts.length ? `${py}년 같은 달 대비 — ${parts.join(' · ')}.` : '작년 같은 달 자료가 없어 비교하지 못했습니다.';
-  return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>${y}년 ${m}월 실적${m!=null?'':''}</h3><span class="cap">마감된 마지막 달 · <b>작년 같은 달 대비</b> · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div><div class="cap" style="margin-top:6px"><b>${nowM}월은 아직 진행 중</b>이라(오늘까지의 부분 실적) 작년 한 달 전체와 비교하면 반토막처럼 보입니다. 그래서 <b>마감이 끝난 ${m}월</b>을 기준으로 보여줍니다.<br>썬팅은 계절 산업이라 <b>전월이 아닌 작년 같은 달</b>과 비교합니다. 회색이 작년 실적입니다.</div></div>`;
+  const insight = parts.length
+    ? `${py}년 1~${m}월 대비 — ${parts.join(' · ')}.`
+    : '작년 같은 기간 자료가 없어 비교하지 못했습니다.';
+  return `<div class="card hero-wrap"><div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:13px"><h3 style="margin:0"><span class="dot"></span>${y}년 1~${m}월 누계</h3><span class="cap">누계 · <b>작년 같은 기간 대비</b> · 상태</span></div><div class="hero-grid">${cards.join('')}</div><div class="hero-insight">${insight}</div><div class="cap" style="margin-top:6px">월별 실적은 큰 거래 하나로 크게 흔들리므로 <b>누계</b>를 기준으로 봅니다. 카드 아래 작은 글씨가 ${m}월 단월 증감입니다.<br><b>${nowM}월은 아직 진행 중</b>이라 누계에서 제외했습니다.</div></div>`;
 }
 
 /* ══ 추세 — 올해와 작년을 두 선으로 겹쳐 보기 ═══════════════════
@@ -7963,13 +8006,19 @@ function salesKPI(){
 }
 function salesCompareCard(){
   const ms=_salesMonths(); if(!SALES||!SALES.channels||ms.length<2) return '';
-  if(ms.indexOf(_salesCmpA)<0) _salesCmpA=ms[ms.length-2];
-  if(ms.indexOf(_salesCmpB)<0) _salesCmpB=ms[ms.length-1];
+  /* 기본값에서 진행 중인 달을 뺀다.
+     8월 20일에 '7월 vs 8월'을 기본으로 보여주면 8월이 20일치라 -50% 같은 숫자가 뜨는데
+     실제로 반토막 난 게 아니다. 마감된 달끼리 비교하는 것이 기본. (직접 고르면 볼 수는 있다) */
+  const _nowM=new Date().getMonth()+1;
+  const _done=ms.filter(m=>m<_nowM);
+  const _base=(_done.length>=2)?_done:ms;
+  if(ms.indexOf(_salesCmpA)<0) _salesCmpA=_base[_base.length-2];
+  if(ms.indexOf(_salesCmpB)<0) _salesCmpB=_base[_base.length-1];
   const C=SALES.channels, A=_salesCmpA, B=_salesCmpB, won=n=>Math.round(n||0).toLocaleString();
   const rollOf=m=>{ let q=0; (SALES.prodList||[]).forEach(p=>{ if(_isExcl(p)||!_isRoll(p))return; q+=SALES.prodAll[p].mq[m]||0; }); return q; };
   const ent=m=>C.B2C.ma[m]+C.B2B.ma[m]+C['별도채널'].ma[m];
   const rows=[ {n:'전사 매출액',f:ent,u:'원'},{n:'B2C 매출',f:m=>C.B2C.ma[m],u:'원'},{n:'B2B 매출',f:m=>C.B2B.ma[m],u:'원'},{n:'B2C+B2B 합계',f:m=>C.B2C.ma[m]+C.B2B.ma[m],u:'원'},{n:'판매 롤 수',f:rollOf,u:'롤'},{n:'품질보증서',f:m=>_qc(m),u:'건'} ];
-  const opt=sel=>ms.map(m=>`<option value="${m}"${sel===m?' selected':''}>${m}월</option>`).join('');
+  const opt=sel=>ms.map(m=>`<option value="${m}"${sel===m?' selected':''}>${m}월${m>=_nowM?' (진행 중)':''}</option>`).join('');
   const thl=`class="l"`, th=``, tdl=`class="l"`, td=``;
   const ss=`style="padding:5px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;font-weight:700"`;
   let h=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월 비교</h3>`
@@ -7977,7 +8026,13 @@ function salesCompareCard(){
    +`<div class="iv-wrap"><table class="iv"><tr><th ${thl}>지표</th><th ${th}>${A}월</th><th ${th}>${B}월</th><th ${th}>증감</th><th ${th}>증감률</th></tr>`;
   rows.forEach(r=>{ const a=r.f(A)||0,b=r.f(B)||0,d=b-a,p=a?(d/a*100):0; const col=d>0?'#16a34a':(d<0?'#dc2626':'var(--ink2)'),sg=d>0?'+':'';
     h+=`<tr><td ${tdl}>${r.n}</td><td ${td}>${won(a)}${r.u?' '+r.u:''}</td><td ${td}>${won(b)}${r.u?' '+r.u:''}</td><td ${td} style="color:${col};font-weight:700">${sg}${won(d)}</td><td ${td} style="color:${col};font-weight:700">${a?sg+p.toFixed(1)+'%':'—'}</td></tr>`; });
-  h+=`</table></div></div>`; return h;
+  const _warnM=[A,B].filter(m=>m>=_nowM);
+  if(_warnM.length){
+    h+=`</table></div><div class="cap" style="margin-top:8px;color:var(--neg)"><b>${_warnM.join('·')}월은 아직 진행 중</b>입니다(오늘까지의 부분 실적). 마감된 달과 비교하면 실제보다 크게 줄어든 것처럼 보이니 참고만 하세요.</div></div>`;
+  } else {
+    h+=`</table></div><div class="cap" style="margin-top:8px">마감이 끝난 달끼리 비교합니다. 진행 중인 달도 위 목록에서 직접 고를 수 있습니다.</div></div>`;
+  }
+  return h;
 }
 function salesSummaryTable(){
   if(!SALES||!SALES.channels) return '<div style="color:var(--ink2);font-size:13px">매출 ERP 업로드 후 표시됩니다.</div>';
@@ -11014,7 +11069,7 @@ function _yoyGlassYM(){ try{ if(typeof YOY!=='undefined'&&YOY&&YOY.glass&&Object
 function _yoyEmpty(title,msg){
   return `<div class="card"><h3 style="margin:0 0 8px"><span class="dot"></span>${title}</h3><div style="padding:22px 14px;text-align:center;color:var(--ink3);font-size:13px;background:var(--bg2,#f7f8fa);border-radius:10px">${msg}</div></div>`;
 }
-function _yoyBuild(key,title,months,curOf,prevOf,fmt,curLab,prevLab,topExtra){
+function _yoyBuild(key,title,months,curOf,prevOf,fmt,curLab,prevLab,topExtra,noPrev){
   const curArr=months.map(curOf), prevArr=months.map(prevOf);
   /* ★ 진행 중인 달은 누계에서 뺀다.
      오늘이 8월 20일이면 올해 8월은 20일치인데 작년 8월은 한 달 전체다.
@@ -11038,12 +11093,12 @@ function _yoyBuild(key,title,months,curOf,prevOf,fmt,curLab,prevLab,topExtra){
       rows+=`<tr style="opacity:.72"><td style="padding:5px 9px;border-bottom:1px solid var(--line)">${m}월 <span style="font-size:10.5px;color:var(--ink3);font-weight:700">진행 중</span></td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums">${fmt(c)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:#888;font-variant-numeric:tabular-nums">${fmt(p)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:var(--ink3);font-size:11px">달 마감 후 비교</td></tr>`;
       return;
     }
-    rows+=`<tr><td style="padding:5px 9px;border-bottom:1px solid var(--line)">${m}월</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums">${fmt(c)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:#888;font-variant-numeric:tabular-nums">${fmt(p)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:${cl};font-weight:700">${pp==null?'-':d+Math.abs(pp).toFixed(1)+'%'}</td></tr>`;
+    rows+=`<tr><td style="padding:5px 9px;border-bottom:1px solid var(--line)">${m}월</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums">${fmt(c)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:#888;font-variant-numeric:tabular-nums">${noPrev?'—':fmt(p)}</td><td style="padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);color:${cl};font-weight:700">${noPrev?'<span style="color:var(--ink3);font-weight:400">—</span>':(pp==null?'-':d+Math.abs(pp).toFixed(1)+'%')}</td></tr>`;
   });
   const html=`<div class="card">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:4px">
       <div><h3 style="margin:0"><span class="dot"></span>${title}</h3><div style="color:var(--ink2);font-size:12px;margin-top:3px">${curLab} vs ${prevLab} · ${ml} 누계 기준${_cutApplied?` · <b>${_nowM}월은 진행 중이라 누계에서 제외</b>`:''}</div></div>
-      <div style="text-align:right"><div style="font-size:24px;font-weight:800;color:${col};line-height:1.1">${dir} ${pctTxt}</div><div style="color:var(--ink2);font-size:12px;margin-top:2px">올해 ${fmt(cCum)} · 전년 ${fmt(pCum)}</div></div>
+      <div style="text-align:right">${noPrev?`<div style="font-size:13px;font-weight:700;color:var(--ink3);line-height:1.3">전년 자료 없음</div>`:`<div style="font-size:24px;font-weight:800;color:${col};line-height:1.1">${dir} ${pctTxt}</div>`}<div style="color:var(--ink2);font-size:12px;margin-top:2px">올해 ${fmt(cCum)}${noPrev?'':' · 전년 '+fmt(pCum)}</div></div>
     </div>
     ${topExtra||''}
     <div style="height:228px;position:relative;margin:8px 0 6px"><canvas id="yoyc_${key}"></canvas></div>
@@ -11051,7 +11106,7 @@ function _yoyBuild(key,title,months,curOf,prevOf,fmt,curLab,prevLab,topExtra){
       <tr><th ${thl}>월</th><th ${th}>올해</th><th ${th}>전년</th><th ${th}>증감</th></tr>${rows}
     </table></div>
   </div>`;
-  return {html, chart:{key, months, curArr, prevArr}};
+  return {html, chart:{key, months, curArr, prevArr, noPrev:!!noPrev}};
 }
 function _yoySectionFromYM(ym, key, title, fmt){
   const years=Object.keys(ym).map(Number).filter(y=>y>0).sort((a,b)=>a-b);
@@ -11062,7 +11117,9 @@ function _yoySectionFromYM(ym, key, title, fmt){
   let months=Object.keys(cur).map(Number).filter(Boolean).sort((a,b)=>a-b);
   if(!months.length) months=Object.keys(prev).map(Number).filter(Boolean).sort((a,b)=>a-b);
   if(!months.length) return {html:_yoyEmpty(title,'데이터가 없습니다.'), chart:null};
-  return _yoyBuild(key,title,months,m=>cur[m]||0,m=>prev[m]||0,fmt,curY+'년',prevY+'년');
+  // 전년 키는 있으나 값이 전부 0이면(수집 안 된 경우) 0건으로 보여주지 않고 '자료 없음'으로 표시
+  const _pSum=months.reduce((t,m)=>t+(prev[m]||0),0);
+  return _yoyBuild(key,title,months,m=>cur[m]||0,m=>prev[m]||0,fmt,curY+'년',prevY+'년',null,!_pSum);
 }
 function _yoySales(){
   const basis=_yoySalesBasis||'all';
@@ -11078,9 +11135,11 @@ function _yoySales(){
 function _yoyDrawChart(c){
   if(!c) return;
   try{ makeChart('yoyc_'+c.key, { type:'bar',
-    data:{ labels:c.months.map(m=>m+'월'), datasets:[
-      {label:'올해', data:c.curArr, backgroundColor:'#f4911c', borderRadius:3, maxBarThickness:34},
-      {label:'전년', data:c.prevArr, backgroundColor:'#d4dae2', borderRadius:3, maxBarThickness:34} ]},
+    data:{ labels:c.months.map(m=>m+'월'), datasets:(
+      c.noPrev
+        ? [{label:'올해', data:c.curArr, backgroundColor:'#f4911c', borderRadius:3, maxBarThickness:34}]   // 전년 자료가 없으면 0짜리 회색 막대를 그리지 않는다
+        : [{label:'올해', data:c.curArr, backgroundColor:'#f4911c', borderRadius:3, maxBarThickness:34},
+           {label:'전년', data:c.prevArr, backgroundColor:'#d4dae2', borderRadius:3, maxBarThickness:34}] )},
     options:{ responsive:true, maintainAspectRatio:false, animation:false,
       plugins:{ legend:{display:true,position:'top',labels:{boxWidth:12,font:{size:11}}},
         tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+(c.key==='sales'?_yoyFmtWon(ctx.parsed.y):(ctx.parsed.y||0).toLocaleString()+'건')}} },
