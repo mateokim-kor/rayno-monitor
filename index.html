@@ -5469,10 +5469,11 @@ function _dateBar(prefix, st, minD, maxD){
     while((y<ey||(y===ey&&m<=em))&&g++<600){ ms.push(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
     mo=_moSelect(prefix, st, ms, true);
   }
-  return `<div class="seg" id="${prefix}Preset">${pb('all','전체')}${pb('7','7일')}${pb('30','30일')}${pb('90','90일')}</div>`
-    +`<span class="dt-range" style="display:inline-flex"><input type="date" class="dt-input" id="${prefix}From" value="${fromD}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="${prefix}To" value="${toD}"></span>`
-    +`<button class="acc-btn" id="${prefix}Apply">조회</button>`
-    +mo;
+  /* 2026-08-20: 공통 필터 줄(_fbar)로 통일.
+     보증서·글라스케어·데이터 대시보드가 이 함수를 공유하므로 한 번에 같은 모양이 된다. */
+  const presetSeg=`<div class="seg" id="${prefix}Preset">${pb('all','전체')}${pb('7','7일')}${pb('30','30일')}${pb('90','90일')}</div>`;
+  const rangeBox=`<span class="dt-range" style="display:inline-flex;align-items:center;gap:4px"><input type="date" class="dt-input" id="${prefix}From" value="${fromD}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="${prefix}To" value="${toD}"></span><button class="acc-btn" id="${prefix}Apply">조회</button>`;
+  return _fbar([['기간', presetSeg], ['직접 지정', rangeBox], [mo?'월':'', mo]]);
 }
 /* 2026-08-20 제거: _scoreMonthChips (매출 핵심 월 선택 — 삭제됨) */
 /* 2026-08-20 제거: _salesCorePresets (매출 핵심 카드 — 삭제됨) */
@@ -5836,7 +5837,9 @@ function renderRDash(){
   const won=n=>Math.round(n||0).toLocaleString(), eok=n=>(n/1e8).toFixed(1), pct=(x,y)=>y?(x/y*100).toFixed(1)+'%':'—';
   const grid=cards=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px">${cards.join('')}</div>`;
   const split=(t1,t2)=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:14px"><div>${t1}</div><div>${t2}</div></div>`;
-  const cardHead=(title,bar)=>`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px"><h3 style="margin:0"><span class="dot"></span>${title}</h3><div class="cardctrl">${bar}</div></div>`;
+  /* 2026-08-20: 제목과 필터를 한 줄에 나란히 두던 것을
+     **제목 → 그 아래 공통 필터 줄**로 바꿨습니다(화면 전체 통일 규칙). */
+  const cardHead=(title,bar)=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${title}</h3>${bar||''}`;
   const wDates=hasWarr?WARR.rows.map(r=>warrDateStr(r)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
   const gDates=hasGlass?GLASS.rows.map(r=>String(r['시공일자']||'').slice(0,10)).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort():[];
   const yr=((wDates[wDates.length-1]||gDates[gDates.length-1]||'').slice(0,4))||String(new Date().getFullYear());
@@ -6088,7 +6091,15 @@ function renderDealer(){
       +`<span style="color:${DLR.src==='admin'?'inherit':'#b23b3b'};font-weight:800">관리자만 ${_sN(_srcCnt.admin)}</span></button>`
     +`</div>`;
   const yearSeg=`<div class="seg" id="dlrYear" title="지부→대리점 판매(ERP)는 작년·올해가 함께 들어있어 연도를 갈라서 봅니다"><button data-dy="cur" class="${DLR.year==='cur'?'on':''}">${_dyC}</button><button data-dy="prev" class="${DLR.year==='prev'?'on':''}">${_dyC-1}</button><button data-dy="all" class="${DLR.year==='all'?'on':''}">전체</button></div>`;
-  const filters=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0">${statusSeg}${yearSeg}${srcSeg}<select class="dt-select" id="dlrJibu">${jibuOpt}</select><select class="dt-select" id="dlrMember">${memberOpt}</select><input type="text" class="dt-input" id="dlrQ" placeholder="대리점명·코드 검색" value="${escapeHtml(DLR.q)}" style="min-width:170px"><button class="acc-btn" id="dlrSearchBtn">검색</button></div>`
+  /* 2026-08-20: 필터 5종이 한 줄에 뭉쳐 있어 무엇을 고르는지 알기 어려웠음
+       → 공통 필터 줄(_fbar)에 이름표를 붙여 묶는다 */
+    const filters=_fbar([
+      ['상태', statusSeg],
+      ['연도', yearSeg],
+      ['출처', srcSeg],
+      ['소속', `<select class="dt-select" id="dlrJibu">${jibuOpt}</select><select class="dt-select" id="dlrMember">${memberOpt}</select>`],
+      ['검색', `<input type="text" class="dt-input" id="dlrQ" placeholder="대리점명·코드" value="${escapeHtml(DLR.q)}" style="min-width:150px"><button class="acc-btn" id="dlrSearchBtn">검색</button>`]
+    ])
     + (DLR.src!=='all' ? `<div class="cap" style="margin:-4px 0 6px;color:${DLR.src==='admin'?'#b23b3b':'var(--ink2)'}"><b>출처 = ${DLR.src==='both'?'ERP+관리자':(DLR.src==='erp'?'ERP만':'관리자만')}</b> · ${won(rows.length)}곳`
         + (DLR.src==='admin' ? ' — ERP에 등록되지 않았는데 보증서·글라스케어를 발행 중입니다. 미등록 매장이거나, 대리점명 표기가 달라 매칭이 안 된 경우입니다.'
           : (DLR.src==='erp' ? ' — ERP에는 있지만 올해 보증서·글라스케어 발행 기록이 없습니다(신규·휴면).' : ' — ERP 등록 + 발행 실적 모두 있는 정상 대리점입니다.'))
@@ -7478,7 +7489,9 @@ function renderShare(){
   const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
   const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
   const M=_salesMonths(), cut=_salesCut(), lab=_salesLabel();
-  const sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${lab} · 월을 여러 개 누르면 합산</span></div>`;
+  /* 2026-08-20: 공통 필터 줄(_fbar)로 통일 — 조작은 필터 줄, 설명은 그 아래 한 줄 */
+  const sel=_fbar([['기간', `<div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div>`]])
+    + `<div class="cap" style="margin:-6px 0 14px">${lab} · 월을 여러 개 누르면 합산됩니다</div>`;
   const won=n=>Math.round(n||0).toLocaleString();
   const _crp=_natCarRegPick(), _shFmt=v=> v!=null? v.toFixed(1)+'%':'—';
   const _shW=_crp>0? _qcNewPick()/_crp*100 : null;
@@ -8633,23 +8646,23 @@ function renderSearch(){
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${kws.map((k,i)=>`<button class="sw-ctoggle" data-kw="${escapeHtml(k)}" title="${selSet.has(k)?'숨기기':'표시'}" style="display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer;background:${selSet.has(k)?'var(--bg2)':'transparent'};opacity:${selSet.has(k)?'1':'.4'};font-weight:${selSet.has(k)?'700':'400'};color:var(--ink)">${dot(i)}${escapeHtml(k)}</button>`).join('')}</div>`;
   // 차트 모드: 추이 / 순위 / 집중 비교
   const cmode = SWF.chartMode||'trend';
-  const modeSeg = `<div class="seg" id="swModeSeg" style="margin-bottom:10px"><button data-cm="trend" class="${cmode==='trend'?'on':''}">추이</button><button data-cm="rank" class="${cmode==='rank'?'on':''}">순위</button><button data-cm="focus" class="${cmode==='focus'?'on':''}">집중 비교</button></div>`;
+  const modeSeg = `<div class="seg" id="swModeSeg"><button data-cm="trend" class="${cmode==='trend'?'on':''}">추이</button><button data-cm="rank" class="${cmode==='rank'?'on':''}">순위</button><button data-cm="focus" class="${cmode==='focus'?'on':''}">집중 비교</button></div>`;
   const _monthYms = chartRows.map(r=>r.ym);
   let chartInner, chartCtrls='';
   if(cmode==='rank'){
     if(!SWF.rankYm || _monthYms.indexOf(SWF.rankYm)<0) SWF.rankYm=_monthYms[_monthYms.length-1]||'';
-    chartCtrls = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><span class="cap">기준 월</span><select class="dt-select" id="swRankYm" style="max-width:150px">${_monthYms.map(ym=>`<option value="${ym}" ${SWF.rankYm===ym?'selected':''}>${ym}</option>`).join('')}</select><span class="cap">검색량 많은 순</span></div>`;
+    chartCtrls = `<span class="fbar-l">기준 월</span><select class="dt-select" id="swRankYm" style="max-width:150px">${_monthYms.map(ym=>`<option value="${ym}" ${SWF.rankYm===ym?'selected':''}>${ym}</option>`).join('')}</select>`;
     chartInner = SWF.rankYm ? '<div class="biz-chart" style="height:520px"><canvas id="swChart"></canvas></div>' : '<div class="empty">월 데이터가 없습니다.</div>';
   } else if(cmode==='focus'){
     const comps=kws.filter(k=>k!=='레이노');
     if(!SWF.focusKw || comps.indexOf(SWF.focusKw)<0) SWF.focusKw=comps[0]||'';
-    chartCtrls = `<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px"><span class="cap"><b style="color:var(--amber)">레이노</b> vs</span><select class="dt-select" id="swFocusKw" style="max-width:180px">${comps.map(k=>`<option value="${escapeHtml(k)}" ${SWF.focusKw===k?'selected':''}>${escapeHtml(k)}</option>`).join('')}</select><span class="cap">두 키워드만 강조, 나머지는 흐리게</span></div>`;
+    chartCtrls = `<span class="fbar-l"><b style="color:var(--amber)">레이노</b> vs</span><select class="dt-select" id="swFocusKw" style="max-width:180px">${comps.map(k=>`<option value="${escapeHtml(k)}" ${SWF.focusKw===k?'selected':''}>${escapeHtml(k)}</option>`).join('')}</select>`;
     chartInner = chartRows.length ? '<div class="biz-chart"><canvas id="swChart"></canvas></div>' : '<div class="empty">데이터가 없습니다.</div>';
   } else {
     chartCtrls = chartSel;
     chartInner = (chartRows.length&&chartKwsDraw.length)?'<div class="biz-chart"><canvas id="swChart"></canvas></div>':'<div class="empty">표시할 데이터가 없습니다.'+(admin?' 키워드/월을 추가하거나 표시 키워드를 선택하세요.':'')+'</div>';
   }
-  const chart=`<div class="card"><h3><span class="dot"></span>브랜드·경쟁사 검색량 <span class="rep-sub2">${cmode==='rank'?'월별 순위':cmode==='focus'?'집중 비교':'추이'}${SWF.year?' · '+SWF.year+'년':''}</span></h3>${modeSeg}${chartCtrls}${chartInner}</div>`;
+  const chart=`<div class="card"><h3><span class="dot"></span>브랜드·경쟁사 검색량 <span class="rep-sub2">${cmode==='rank'?'월별 순위':cmode==='focus'?'집중 비교':'추이'}${SWF.year?' · '+SWF.year+'년':''}</span></h3>${_fbar([['보기', modeSeg], ['', chartCtrls]])}${chartInner}</div>`;
   const missing=_SW_PRESET.filter(k=>kws.indexOf(k)<0).length;
   const kwCard = admin?`<div class="card"><h3><span class="dot"></span>검색 키워드 <span class="rep-sub2">레이노 + 경쟁사 · 직접 추가·수정·삭제</span></h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px">${kws.map((k,i)=>`<span style="display:inline-flex;align-items:center;gap:7px;background:var(--bg2);border:1px solid var(--line);border-radius:999px;padding:5px 8px 5px 13px">${dot(i)}<input class="sw-kwedit" data-kw="${escapeHtml(k)}" value="${escapeHtml(k)}" title="클릭해 이름 수정" style="border:none;background:none;font-size:13px;font-weight:600;color:var(--ink);min-width:40px;width:${Math.min(Math.max(k.length,4)+1,18)}ch;outline:none"><button class="sw-kwdel" data-kw="${escapeHtml(k)}" title="키워드 삭제" style="border:none;background:none;color:var(--ink3);cursor:pointer;font-size:16px;line-height:1;padding:0 2px">×</button></span>`).join('')}</div>
