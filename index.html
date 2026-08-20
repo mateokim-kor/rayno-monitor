@@ -5707,6 +5707,22 @@ function _trendCut(S, nowM){
   for(let i=nowM-1;i<12;i++) S.cur[i]=null;
   return S;
 }
+/* 그리기 안전 호출.
+   숨겨진 상태(폭 0)에서 Chart.js를 만들면 아무것도 안 그려지고 이후에도 복구되지 않는다.
+   그래서 캔버스가 실제 크기를 가질 때까지 몇 프레임 기다렸다 그린다.
+   오류는 삼키지 말고 콘솔과 화면에 남긴다(원인 추적용). */
+function _trendDrawSafe(tries){
+  tries = tries||0;
+  const cv=document.getElementById('trendChart'); if(!cv) return;
+  const w=cv.parentElement ? cv.parentElement.clientWidth : 0;
+  if(w<10 && tries<20){ requestAnimationFrame(()=>_trendDrawSafe(tries+1)); return; }
+  try{ _trendDraw(); }
+  catch(e){
+    console.error('[추세 차트] 그리기 실패:', e);
+    const box=cv.parentElement;
+    if(box) box.innerHTML='<div class="empty" style="padding:24px 8px">추세 그래프를 그리지 못했습니다 · '+((e&&e.message)||'')+'</div>';
+  }
+}
 function _trendDraw(){
   if(!document.getElementById('trendChart')) return;
   const {y, py, nowM}=_heroYM();
@@ -5793,6 +5809,7 @@ function renderRDash(){
     h+=`<div class="card">${cardHead('글라스케어 가입 현황', _dateBar('rdg',RDG,minD,maxD))}${grid(cards)}${split(_miniTable('지부','가입',gjt,gjt.reduce((s,x)=>s+x[1],0)),_miniTable('제품 라인','가입',glineRows,glineRows.reduce((s,x)=>s+x[1],0)||1))}</div>`;
   }
   box.innerHTML=h;
+  _trendDrawSafe();   // ★ 추세 차트는 화면이 DOM에 붙은 뒤에 그린다(이 호출이 빠지면 그래프가 빈칸으로 남음)
 }
 let _dealerAggCache=null;   // 집계 캐시(데이터 로드 시 무효화)
 let _dlrModalD=null;   // 현재 열린 대리점 상세 모달 대상(연도 토글 재렌더용)
@@ -9745,7 +9762,7 @@ document.addEventListener('click', e=>{
   const tb=e.target.closest('[data-trend]');
   if(tb){ _trendMetric=tb.getAttribute('data-trend');
     document.querySelectorAll('[data-trend]').forEach(x=>x.classList.toggle('on', x===tb));
-    try{ _trendDraw(); }catch(_){}   // 카드를 다시 그리지 않고 차트만 교체
+    _trendDrawSafe();   // 카드를 다시 그리지 않고 차트만 교체
     return; }
   const ucatBtn=e.target.closest('#uSubnav button[data-ucat]');
   if(ucatBtn){ ucat=ucatBtn.dataset.ucat; renderUsers(); return; }
