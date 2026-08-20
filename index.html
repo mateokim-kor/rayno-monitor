@@ -162,6 +162,18 @@
             background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
   .ctl-group{display:flex;flex-direction:column;gap:7px}
   .ctl-label{font-size:10.5px;color:var(--ink3);text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+  /* ══ 공통 필터 줄 (2026-08-20) ══════════════════════════════
+     화면마다 필터의 위치·모양이 제각각이라 매번 찾아야 했다.
+     규칙 ①필터는 항상 카드 제목 바로 아래 한 줄 ②같은 일은 같은 모양
+          ③여러 묶음이면 각 묶음 앞에 이름표를 단다 */
+  .fbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+        margin:0 0 13px;padding:9px 12px;background:var(--bg2);
+        border:1px solid var(--line);border-radius:11px}
+  .fbar-g{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .fbar-l{font-size:11.5px;font-weight:800;color:var(--ink3);letter-spacing:.02em;white-space:nowrap}
+  .fbar .seg{background:var(--card);border-color:var(--line2)}
+  .fbar .dt-select,.fbar .dt-input{background:var(--card)}
+  .fbar-sp{flex:1;min-width:0}   /* 오른쪽 끝으로 밀어낼 때 */
   .seg{display:flex;background:var(--bg2);border:1px solid var(--line);border-radius:980px;padding:3px}
   .seg button{border:0;background:transparent;color:var(--ink2);font-family:var(--font);
               font-size:12.5px;font-weight:600;padding:7px 15px;border-radius:980px;cursor:pointer;transition:.18s}
@@ -5523,7 +5535,7 @@ function salesJibuProdRankTable(){
   const _avM=_salesMonths(); const _selM=_jspMonths.filter(m=>_avM.indexOf(m)>=0).sort((a,b)=>a-b);
   const M=_selM.length?_selM.slice():_avM.slice(), sm=o=>{let s=0;M.forEach(m=>s+=(o&&o[m])||0);return s;};
   const _mLabel=_selM.length?(_selM.length===1?_selM[0]+'월':(_selM.every((m,i)=>i===0||m===_selM[i-1]+1)?_selM[0]+'~'+_selM[_selM.length-1]+'월':_selM.join('·')+'월')):'전체';
-  const _jspMonSeg=`<div class="seg" id="jspMonthSeg" style="margin-bottom:8px;flex-wrap:wrap"><button data-m="0" class="${_selM.length===0?'on':''}">전체</button>${_avM.map(m=>`<button data-m="${m}" class="${_selM.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div>`;
+  const _jspMonSeg=`<div class="seg" id="jspMonthSeg" style="flex-wrap:wrap"><button data-m="0" class="${_selM.length===0?'on':''}">전체</button>${_avM.map(m=>`<button data-m="${m}" class="${_selM.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div>`;
   const CATL={MONO:'모노', PRESTO:'프레스토'};
   const catOf=mat=>{ const c=(typeof _midOf==='function'?_midOf(mat):mat)||'기타'; return CATL[c]||c; };
   const catTot={};
@@ -5531,8 +5543,8 @@ function salesJibuProdRankTable(){
   const catList=Object.keys(catTot).filter(c=>catTot[c]>0).sort((a,b)=>catTot[b]-catTot[a]);
   if(!catList.length) return '<div class="empty">롤 판매 데이터가 없습니다.</div>';
   let sel=_jspSel; if(sel!=='__all' && catList.indexOf(sel)<0) sel=catList[0];
-  const seg=`<div class="seg" id="jspSeg" style="margin-bottom:10px;flex-wrap:wrap"><button data-cat="__all" class="${sel==='__all'?'on':''}">전체</button>${catList.map(c=>`<button data-cat="${escapeHtml(c)}" class="${c===sel?'on':''}">${escapeHtml(c)}</button>`).join('')}</div>`;
-  const _jspViewSeg=`<div class="seg" id="jspViewSeg" style="margin-bottom:10px"><button data-jv="rank" class="${_jspView!=='matrix'?'on':''}">순위</button><button data-jv="matrix" class="${_jspView==='matrix'?'on':''}">지부×월 매트릭스</button></div>`;
+  const seg=`<div class="seg" id="jspSeg" style="flex-wrap:wrap"><button data-cat="__all" class="${sel==='__all'?'on':''}">전체</button>${catList.map(c=>`<button data-cat="${escapeHtml(c)}" class="${c===sel?'on':''}">${escapeHtml(c)}</button>`).join('')}</div>`;
+  const _jspViewSeg=`<div class="seg" id="jspViewSeg"><button data-jv="rank" class="${_jspView!=='matrix'?'on':''}">순위</button><button data-jv="matrix" class="${_jspView==='matrix'?'on':''}">지부×월 매트릭스</button></div>`;
   const JG=SALES_JIBU.concat(['본사']);
   if(_jspView==='matrix'){
     const Mcols=_selM.length?_selM.slice():_avM.slice();
@@ -5554,7 +5566,7 @@ function salesJibuProdRankTable(){
     const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
     const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
     const tdb='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;color:var(--amber);font-weight:700"';
-    let h=_jspMonSeg+seg+_jspViewSeg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> 지부 × 월 롤 판매 수량 · ${escapeHtml(_mLabel)} (단위: 롤)${bsLoaded?' · <b>구매 대비 판매율 = 판매 롤(지부→대리점) ÷ 합계 × 100</b>':' · <span style="color:var(--ink3)">지부→대리점 데이터 로딩 중…</span>'}</div>`;
+    let h=_fbar([['기간',_jspMonSeg],['제품',seg],['보기',_jspViewSeg]])+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> 지부 × 월 롤 판매 수량 · ${escapeHtml(_mLabel)} (단위: 롤)${bsLoaded?' · <b>구매 대비 판매율 = 판매 롤(지부→대리점) ÷ 합계 × 100</b>':' · <span style="color:var(--ink3)">지부→대리점 데이터 로딩 중…</span>'}</div>`;
     if(!mrows.length) return h+'<div class="empty">선택한 제품의 지부별·월별 판매 데이터가 없습니다.</div>';
     h+=`<div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:${160+Mcols.length*60+300}px"><tr><th ${thl}>지부</th>${Mcols.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th><th ${th}>판매 롤<br>(지부→대리점)</th><th ${th}>구매 대비<br>판매율</th></tr>`;
     mrows.forEach(r=>{ const bs=bsByJibu[r.j]||0; h+=`<tr><td ${tdl}>${escapeHtml(r.j)}</td>${r.cells.map(v=>`<td ${td}>${roll(v)}</td>`).join('')}<td ${tdt}>${roll(r.tot)}</td><td ${td}>${roll(bs)}</td><td ${tdb}>${pctOf(bs,r.tot)}</td></tr>`; });
@@ -5563,14 +5575,14 @@ function salesJibuProdRankTable(){
   }
   const rows=JG.map(j=>{ const pm=SALES.jibuProd[j]||{}; let q=0,a=0; Object.keys(pm).forEach(mat=>{ const oo=pm[mat]; if(sel==='__all'){ if(_isRoll(mat)) q+=sm(oo.q||oo); a+=sm(oo.a||{}); } else { if(!_isRoll(mat)||catOf(mat)!==sel)return; q+=sm(oo.q||oo); a+=sm(oo.a||{}); } }); return {j,q,a}; }).filter(r=>r.q>0||r.a>0).sort((x,y)=>y.q-x.q);
   const totQ=rows.reduce((s,r)=>s+r.q,0)||1, totA=rows.reduce((s,r)=>s+r.a,0);
-  if(!rows.length) return _jspMonSeg+seg+_jspViewSeg+'<div class="empty">선택한 제품의 지부별 판매 데이터가 없습니다.</div>';
+  if(!rows.length) return _fbar([['기간',_jspMonSeg],['제품',seg],['보기',_jspViewSeg]])+'<div class="empty">선택한 제품의 지부별 판매 데이터가 없습니다.</div>';
   const thl='style="text-align:left;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
   const th='style="text-align:right;padding:9px 11px;font-size:11px;font-weight:800;background:var(--amber);color:#fff;white-space:nowrap"';
   const tdl='style="text-align:left;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line)"';
   const td='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums"';
   const tdt='style="text-align:right;padding:7px 9px;font-size:13px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;font-weight:800;background:rgba(244,145,28,.10)"';
   const roll=n=>n?Math.round(n).toLocaleString():'·', kw=n=>n?Math.round(n).toLocaleString()+'원':'·';
-  let h=_jspMonSeg+seg+_jspViewSeg+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> ${sel==='__all'?'롤 판매 지부 순위':'를 가장 많이 판매한 지부 순위'} · ${escapeHtml(_mLabel)} · 롤 판매 수 기준</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
+  let h=_fbar([['기간',_jspMonSeg],['제품',seg],['보기',_jspViewSeg]])+`<div class="cap" style="margin-bottom:8px"><b style="color:var(--amber)">${sel==='__all'?'전체 제품':escapeHtml(sel)}</b> ${sel==='__all'?'롤 판매 지부 순위':'를 가장 많이 판매한 지부 순위'} · ${escapeHtml(_mLabel)} · 롤 판매 수 기준</div><div class="iv-wrap"><table class="dtbl" style="width:100%;border-collapse:collapse;min-width:440px"><tr><th ${thl}>순위</th><th ${thl}>지부</th><th ${tdt.replace('13px','11.5px')}>롤 판매</th><th ${th}>매출액</th><th ${th}>점유율</th></tr>`;
   rows.forEach((r,i)=>{ h+=`<tr><td ${tdl} style="color:var(--ink3);width:38px">${i+1}</td><td ${tdl}>${escapeHtml(r.j)}</td><td ${tdt}>${roll(r.q)}</td><td ${td}>${kw(r.a)}</td><td ${td}>${(r.q/totQ*100).toFixed(1)}%</td></tr>`; });
   h+=`<tr class="t-tot"><td ${tdl}></td><td ${tdl}><b>합계</b></td><td ${tdt}><b>${roll(totQ)}</b></td><td ${td}><b>${kw(totA)}</b></td><td ${td}><b>100%</b></td></tr></table></div>`;
   return h;
@@ -6945,6 +6957,15 @@ function _cyrYear(key){ const y=(new Date()).getFullYear(); return String((typeo
 function _withYear(key,fn){ const _real=SALES; const hasPrev=!!(_real&&_real.prev&&(_real.prev.months||[]).length); const up=(_cardYr&&_cardYr[key]==='prev'&&hasPrev); if(up){ const pv=_prevSalesObj(_real); if(pv) SALES=pv; } try{ return fn(); } finally{ SALES=_real; } }
   function _cyrSeg(key){ const y=(new Date()).getFullYear(); const isPrev=!!(_cardYr&&_cardYr[key]==='prev'); return `<div class="seg cyr-seg" data-cyk="${key}" style="transform:scale(.85);transform-origin:left center;margin:0"><button type="button" data-cyv="cur" class="${!isPrev?'on':''}">${y}</button><button type="button" data-cyv="prev" class="${isPrev?'on':''}">${y-1}</button></div>`; }
   function _cardHdr(title,key,xlsx){ return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${title}</h3>${_cyrSeg(key)}</div>${xlsx?`<button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(title)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button>`:''}</div>`; }
+/* 공통 필터 줄 생성기.
+   groups = [[이름표, 조작장치HTML], ...]  이름표가 빈 문자열이면 이름표 없이 붙는다.
+   화면 어디서나 같은 모양·같은 자리에 나오도록 이 함수만 쓴다. */
+function _fbar(groups, extraRight){
+  const gs=(groups||[]).filter(g=>g && g[1]).map(g=>
+    `<div class="fbar-g">${g[0]?`<span class="fbar-l">${g[0]}</span>`:''}${g[1]}</div>`).join('');
+  if(!gs && !extraRight) return '';
+  return `<div class="fbar">${gs}${extraRight?`<div class="fbar-sp"></div>${extraRight}`:''}</div>`;
+}
 function _sNorm(s){ return String(s||'').replace(/\(주\)|주식회사|\(유\)|[\s.]/g,''); }
 function _sToJibu(cust){ const n=_sNorm(cust); if(!n)return null; for(const j of SALES_JIBU){ const nj=_sNorm(j); if(n.includes(nj)||nj.includes(n)) return j; } return null; }
 function _sNum(v){ const x=parseFloat(String(v==null?'':v).replace(/,/g,'').trim()); return isFinite(x)?x:0; }
@@ -7353,7 +7374,12 @@ function renderRevenue(){
   const hh=t=>`<h3 style="margin:0 0 11px"><span class="dot"></span>${t}</h3>`;
   const hhx=t=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 11px;flex-wrap:wrap"><h3 style="margin:0"><span class="dot"></span>${t}</h3><button type="button" class="acc-btn xlsx-tbl" data-xt="${escapeHtml(t)}" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700" title="이 표를 현재 필터 기준으로 엑셀 다운로드">⬇ 엑셀 다운로드</button></div>`;
   const lab=_salesLabel();
-  let sel=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px"><div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div><span style="color:var(--ink2);font-size:12px">${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> <span style="color:var(--ink3)">· 월을 여러 개 누르면 합산 · <b style="color:var(--amber)">각 표의 [연도] 버튼</b>으로 작년 전환</span>${cut?` · <span style="color:var(--amber)">마감 ${cut}월</span>`:''}</span></div>`;
+  /* 2026-08-20: 공통 필터 줄(_fbar)로 교체.
+     예전에는 여기만 다른 모양·다른 간격이었고, 안내 문구가 필터와 뒤섞여 길었다.
+     조작 장치는 필터 줄에, 설명은 그 아래 한 줄로 분리한다. */
+  const _monthSeg=`<div class="seg" id="salesMonthSeg"><button data-m="0" class="${_salesSel.length===0?'on':''}">${cut?'누적':'전체'}</button>${M.map(m=>`<button data-m="${m}" class="${_salesSel.indexOf(m)>=0?'on':''}">${m}월</button>`).join('')}</div>`;
+  let sel=_fbar([['기간', _monthSeg]])
+    + `<div class="cap" style="margin:-6px 0 14px">${lab} · 총매출 <b style="color:var(--amber)">${eok(tAmt)}억</b> · 월을 여러 개 누르면 합산됩니다${cut?` · <b style="color:var(--amber)">마감 ${cut}월</b>`:''}</div>`;
 
   // ── 차트 대시보드 ──
   const chartCard=(id,title,sub)=>`<div class="card" style="margin:0"><h3 style="margin:0 0 4px"><span class="dot"></span>${title}</h3>${sub?`<div class="cap" style="margin:0 0 4px">${sub}</div>`:''}<div class="biz-chart"><canvas id="${id}"></canvas></div></div>`;
@@ -7504,9 +7530,15 @@ function _periodSalesCard(){
   return `<div class="card" style="margin-bottom:13px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:9px;flex-wrap:wrap"><span class="dot"></span><b style="font-size:14px">기간 매출</b><span style="font-size:12px;color:var(--ink3)">${escapeHtml(R.label)} · ${_ymdDash(R.from)}~${_ymdDash(R.to)}</span><span style="margin-left:auto;font-size:11px;color:var(--ink3)">전체구분(매출+시공+할인) 기준</span>${R.inProgress?`<div style="width:100%;margin-top:6px;font-size:11.5px;color:var(--neg)"><b>${escapeHtml(R.label)}는 아직 진행 중</b>입니다(오늘까지의 부분 실적). 지난 주 전체와 비교되므로 실제보다 적게 보입니다.</div>`:''}</div>${_psControls()}<div style="display:flex;gap:9px;flex-wrap:wrap"><div style="flex:1.3;min-width:130px;background:linear-gradient(135deg,#f4911c,#e0781a);border-radius:10px;padding:10px 14px;color:#fff"><div style="font-size:11px;opacity:.92;display:flex;justify-content:space-between;gap:6px;align-items:center">전사${P&&P.total>0?`<span style="font-weight:700">${((cur.total-P.total)/P.total*100>=0?'▲':'▼')}${Math.abs((cur.total-P.total)/P.total*100).toFixed(0)}%</span>`:''}</div><div style="font-size:20px;font-weight:800">${won(cur.total)}<span style="font-size:11px;font-weight:500;opacity:.85"> 원</span></div></div>${chip('B2C',cur.b2c,'#3f78c7',P?P.b2c:0)}${chip('B2B',cur.b2b,'#2f9e6f',P?P.b2b:0)}${chip('기타',cur.etc,'#8a6bd8',P?P.etc:0)}</div>${cmp}</div>`;
 }
 function _psControls(){
+  /* 2026-08-20: 공통 필터 줄(_fbar)로 통일 */
   const b=(v,l)=>`<button data-ps="${v}" class="${PSV.preset===v?'on':''}">${l}</button>`;
-  return `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:11px"><div class="seg" id="psPreset" style="flex-wrap:wrap">${b('thisweek','이번 주')}${b('lastweek','지난 주')}${b('7','최근 7일')}${b('30','최근 30일')}${b('90','최근 90일')}${b('custom','직접 지정')}</div>${PSV.preset==='custom'?`<span class="dt-range" style="display:inline-flex;align-items:center;gap:4px"><input type="date" class="dt-input" id="psFrom" value="${PSV.from}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="psTo" value="${PSV.to}"><button class="acc-btn" id="psApply">조회</button></span>`:''}</div>`;
+  const seg=`<div class="seg" id="psPreset" style="flex-wrap:wrap">${b('thisweek','이번 주')}${b('lastweek','지난 주')}${b('7','최근 7일')}${b('30','최근 30일')}${b('90','최근 90일')}${b('custom','직접 지정')}</div>`;
+  const range = PSV.preset==='custom'
+    ? `<span class="dt-range" style="display:inline-flex;align-items:center;gap:4px"><input type="date" class="dt-input" id="psFrom" value="${PSV.from}"><span class="dt-tilde">~</span><input type="date" class="dt-input" id="psTo" value="${PSV.to}"><button class="acc-btn" id="psApply">조회</button></span>`
+    : '';
+  return _fbar([['기간', seg], ['', range]]);
 }
+
 
 /* ── 오늘 매출 카드 (2026-08-20 제거) ──────────────────────────
    화면에서 카드를 뺀 뒤 남아 있던 코드 일체를 정리했습니다.
@@ -8089,7 +8121,7 @@ function salesCompareCard(){
   const thl=`class="l"`, th=``, tdl=`class="l"`, td=``;
   const ss=`style="padding:5px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font-size:13px;font-weight:700"`;
   let h=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월 비교</h3>`
-   +`<div style="display:flex;align-items:center;gap:8px;margin-bottom:11px;font-size:13px"><select id="salesCmpA" ${ss}>${opt(A)}</select><b style="color:var(--ink2)">vs</b><select id="salesCmpB" ${ss}>${opt(B)}</select></div>`
+   +_fbar([['비교할 달', `<select id="salesCmpA" class="dt-select">${opt(A)}</select><b style="color:var(--ink3);font-size:12px;margin:0 2px">vs</b><select id="salesCmpB" class="dt-select">${opt(B)}</select>`]])
    +`<div class="iv-wrap"><table class="iv"><tr><th ${thl}>지표</th><th ${th}>${A}월</th><th ${th}>${B}월</th><th ${th}>증감</th><th ${th}>증감률</th></tr>`;
   rows.forEach(r=>{ const a=r.f(A)||0,b=r.f(B)||0,d=b-a,p=a?(d/a*100):0; const col=d>0?'#16a34a':(d<0?'#dc2626':'var(--ink2)'),sg=d>0?'+':'';
     h+=`<tr><td ${tdl}>${r.n}</td><td ${td}>${won(a)}${r.u?' '+r.u:''}</td><td ${td}>${won(b)}${r.u?' '+r.u:''}</td><td ${td} style="color:${col};font-weight:700">${sg}${won(d)}</td><td ${td} style="color:${col};font-weight:700">${a?sg+p.toFixed(1)+'%':'—'}</td></tr>`; });
