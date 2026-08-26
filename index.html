@@ -1626,6 +1626,7 @@
       <button class="nav-btn on" data-rview="dash"><span data-txt="tabRDash">대시보드</span></button>
       <button class="nav-btn" data-rview="revenue"><span data-txt="tabRevenue">매출 현황</span></button>
       <button class="nav-btn" data-rview="share"><span>점유율 분석</span></button>
+      <button class="nav-btn" data-rview="carreg"><span>신차 판매량</span></button>
       <button class="nav-btn" data-rview="yoy"><span>YoY 실적 비교</span></button>
       <button class="nav-btn" data-rview="warranty"><span data-txt="tabWarranty">품질보증서 현황</span></button>
       <button class="nav-btn" data-rview="glass"><span data-txt="tabGlass">글라스케어 현황</span></button>
@@ -1652,6 +1653,7 @@
     <div id="rGlass" style="display:none"></div>
     <div id="rRevenue"></div>
     <div id="rShare" style="display:none"></div>
+    <div id="rCarReg" style="display:none"></div>
     <div id="rYoY" style="display:none"></div>
     <input type="file" id="warrFileInput" accept=".xlsx,.xls" hidden>
     <input type="file" id="salesFileInput" accept=".xls,.xlsx,.csv,.txt" hidden><input type="file" id="salesPrevFileInput" accept=".xls,.xlsx,.csv,.txt" hidden>
@@ -8867,7 +8869,7 @@ function renderWarrReport(){
 
   box.innerHTML = headCard + kpiCard + insightCard + (moverCard?`<div class="biz-grid">${moverCard}${dailyCard}</div>`:dailyCard) + compGrid;
 }
-const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', dealer:'rDealer', search:'rSearch', revenue:'rRevenue', share:'rShare', yoy:'rYoY'};
+const RVIEW_BOX={dash:'rDash', warranty:'rWarranty', warrReport:'rWarrReport', glass:'rGlass', dealer:'rDealer', search:'rSearch', revenue:'rRevenue', share:'rShare', carreg:'rCarReg', yoy:'rYoY'};
 function _saveNav(){ try{ localStorage.setItem('rayno_nav', JSON.stringify({ ws:workspace, cv:(typeof state!=='undefined'&&state&&state.view)||'dash', rv:rview })); }catch(e){} }
 function _sbSyncActive(){
   try{
@@ -8919,6 +8921,7 @@ function _dispatchRView(v){
   else if(v==='search') renderSearch();
   else if(v==='yoy') renderYoY();
   else if(v==='share') renderShare();
+  else if(v==='carreg') renderCarReg();
   else renderRevenue();
 }
 function _renderRViewStamped(v){ _dispatchRView(v); const b=document.getElementById(RVIEW_BOX[v]); if(b){ b.__rsig=_rviewSig(); b.__rdone=1; } }
@@ -10520,6 +10523,7 @@ function _applySidebarLayout(){
         {t:'데이터 대시보드', ic:'data', k:'rayno:dash', d:'레이노 영업·품질 데이터를 한눈에 봅니다', go:()=>goRayno('dash')},
         {t:'매출 분석', ic:'chart', k:'rayno:revenue', ht:'매출 분석 (B2C+B2B)', d:'채널·지부·대리점별 매출을 분석합니다', go:()=>goRayno('revenue')},
         {t:'점유율 분석', ic:'chart', k:'rayno:share', ht:'시장 점유율 분석', d:'보증서·판매 기준 시장 점유율과 지역별 점유율을 분석합니다', go:()=>goRayno('share')},
+        {t:'신차 판매량', ic:'chart', k:'rayno:carreg', d:'점유율 계산의 기준이 되는 신차 등록 대수를 확인합니다', go:()=>goRayno('carreg')},
         {t:'YoY 실적 비교', ic:'chart', k:'rayno:yoy', d:'매출·보증서·글라스케어를 전년과 비교합니다', go:()=>goRayno('yoy')},
         {t:'품질보증서', ic:'shield', k:'rayno:warranty', d:'보증서 발급 현황과 시공 데이터를 분석합니다', go:()=>goRayno('warranty')},
         {t:'글라스케어 현황', ic:'sparkle', k:'rayno:glass', d:'글라스케어 시공·판매 현황을 분석합니다', go:()=>goRayno('glass')},
@@ -11414,6 +11418,117 @@ function _yoyEtcDept(){
     <div class="cap" style="margin-top:8px">${note}</div>
     <div class="cap" style="margin-top:4px"><b>감소 기여도</b> = 이 부서의 감소액 ÷ 별도채널 전체 감소액. 어느 부서가 하락을 이끌었는지 보여줍니다. 늘어난 부서가 있으면 합계가 100%를 넘을 수 있습니다.</div>
   </div>`;
+}
+/* ══ 신차 판매량 화면 (2026-08-21 신설) ═══════════════════════════
+   설정 → 매출 → 지역별 세일즈 입력에서 손으로 넣은 신차 등록 대수를
+   한자리에서 확인하는 화면입니다. 이 값이 모든 점유율 계산의 분모라
+   틀리면 점유율이 통째로 틀어지므로, 입력 상태를 눈으로 볼 수 있게 합니다.
+   · 저장 위치: salesCfg().region[지역].carReg[월]
+   · 값 수정은 설정에서만 (같은 값을 두 곳에서 고치면 헷갈리므로) */
+function _carRegData(){
+  const cfg=(salesCfg().region)||{};
+  const rows=_REGION_KEYS_V.map(g=>{
+    const mo={}; let tot=0;
+    _regionMembers(g).forEach(mk=>{            // 전남광주처럼 합쳐진 지역은 원본 칸을 더한다
+      const rr=cfg[mk]; if(!rr||!rr.carReg) return;
+      for(let m=1;m<=12;m++){ const v=_sNum(rr.carReg[m]||0); if(v){ mo[m]=(mo[m]||0)+v; tot+=v; } }
+    });
+    return {g, mo, tot};
+  });
+  const monTot={}; let grand=0;
+  rows.forEach(r=>{ for(let m=1;m<=12;m++){ if(r.mo[m]){ monTot[m]=(monTot[m]||0)+r.mo[m]; grand+=r.mo[m]; } } });
+  const months=[]; for(let m=1;m<=12;m++) if(monTot[m]) months.push(m);
+  return {rows, monTot, grand, months};
+}
+function renderCarReg(){
+  const box=document.getElementById('rCarReg'); if(!box) return;
+  if(!salesLoaded){ box.innerHTML='<div class="card"><div class="empty">데이터를 불러오는 중…</div></div>';
+    ensureSales().then(()=>{ if(typeof rview!=='undefined'&&rview==='carreg') renderCarReg(); }); return; }
+
+  const D=_carRegData();
+  const won=n=>Math.round(n||0).toLocaleString();
+  const goSet='<button type="button" class="acc-btn" id="carRegGoSet">⚙ 설정에서 입력·수정</button>';
+
+  if(!D.grand){
+    box.innerHTML=`<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>신차 판매량</h3>`
+      + _fbar([], goSet)
+      + `<div class="empty" style="padding:30px 12px">아직 입력된 신차 등록 대수가 없습니다.<br><span class="cap">설정 → 매출 → 지역별 세일즈 입력에서 월별로 넣어주세요.</span></div></div>`;
+    _wireCarReg(); return;
+  }
+
+  const filled=D.rows.filter(r=>r.tot>0).length;
+  const th='style="text-align:right;padding:7px 9px;background:var(--amber);color:#fff;font-size:11px;font-weight:800;white-space:nowrap"';
+  const thl='style="text-align:left;padding:7px 9px;background:var(--amber);color:#fff;font-size:11px;font-weight:800;position:sticky;left:0;z-index:1"';
+  const td='padding:5px 9px;text-align:right;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums';
+  const tdl='padding:5px 9px;border-bottom:1px solid var(--line);position:sticky;left:0;background:var(--card)';
+
+  // 많이 파는 지역부터
+  const sorted=D.rows.slice().sort((a,b)=>b.tot-a.tot);
+  let body='';
+  sorted.forEach(r=>{
+    const share = D.grand ? (r.tot/D.grand*100) : 0;
+    body+=`<tr><td style="${tdl}">${escapeHtml(r.g)}</td>`
+      + D.months.map(m=>`<td style="${td}${r.mo[m]?'':';color:var(--ink3)'}">${r.mo[m]?won(r.mo[m]):'·'}</td>`).join('')
+      + `<td style="${td};font-weight:800">${r.tot?won(r.tot):'·'}</td>`
+      + `<td style="${td};color:var(--ink2)">${r.tot?share.toFixed(1)+'%':'·'}</td></tr>`;
+  });
+
+  const table=`<div class="iv-wrap"><table style="width:100%;border-collapse:collapse;min-width:${260+D.months.length*66}px">`
+    + `<tr><th ${thl}>지역</th>${D.months.map(m=>`<th ${th}>${m}월</th>`).join('')}<th ${th}>합계</th><th ${th}>비중</th></tr>`
+    + body
+    + `<tr style="background:var(--bg2)"><td style="${tdl};background:var(--bg2)"><b>전국</b></td>`
+    + D.months.map(m=>`<td style="${td}"><b>${won(D.monTot[m])}</b></td>`).join('')
+    + `<td style="${td}"><b>${won(D.grand)}</b></td><td style="${td}"></td></tr>`
+    + `</table></div>`;
+
+  const top=sorted[0];
+  box.innerHTML =
+    `<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>신차 판매량 <span class="rep-sub2">직접 입력한 신차 등록 대수</span></h3>`
+    + _fbar([['입력 현황', `<span class="fbar-l" style="font-weight:600;color:var(--ink2)">${D.months.length}개월 · ${filled}개 지역 · 총 ${won(D.grand)}대</span>`]], goSet)
+    + `<div class="cap">이 값은 <b>모든 점유율 계산의 분모</b>입니다. 여기가 비어 있으면 점유율이 계산되지 않고, 값이 틀리면 점유율도 함께 틀어집니다.</div>`
+    + table
+    + `<div class="cap" style="margin-top:9px">${top&&top.tot?`가장 큰 시장은 <b>${escapeHtml(top.g)}</b>(${won(top.tot)}대 · ${(top.tot/D.grand*100).toFixed(1)}%)입니다.`:''} 빈 칸(·)은 아직 입력하지 않은 달입니다.</div>`
+    + `</div>`
+    + `<div class="card"><h3 style="margin:0 0 11px"><span class="dot"></span>월별 추이 <span class="rep-sub2">전국 신차 등록</span></h3>`
+    + `<div style="position:relative;height:280px;margin-top:6px"><canvas id="carRegChart"></canvas></div>`
+    + `<div class="cap" style="margin-top:8px">입력된 달만 그립니다. 특정 달이 유독 낮으면 그 달 입력이 빠졌는지 확인해 주세요.</div></div>`;
+
+  _wireCarReg();
+  _carRegDraw(D);
+}
+function _carRegDraw(D, tries){
+  /* 캔버스가 아직 화면에 안 보이면(폭 0) 잠시 기다렸다 그린다.
+     ★ 재시도 횟수를 반드시 제한할 것 — 제한이 없으면 화면이 계속 숨겨져 있을 때
+        무한히 다시 호출되어 CPU를 계속 먹는다(검증 중 실제로 발견). */
+  tries = tries||0;
+  const cv=document.getElementById('carRegChart'); if(!cv) return;
+  if((cv.parentElement?cv.parentElement.clientWidth:0)<10){
+    if(tries<20) requestAnimationFrame(()=>_carRegDraw(D, tries+1));
+    return;
+  }
+  try{
+    const ck=_ck();
+    makeChart('carRegChart',{ type:'bar',
+      data:{ labels:D.months.map(m=>m+'월'),
+        datasets:[{label:'신차 등록', data:D.months.map(m=>D.monTot[m]||0), backgroundColor:'#f4911c', borderRadius:3, maxBarThickness:44}] },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>Math.round(c.parsed.y).toLocaleString()+'대'}} },
+        scales:{ x:{grid:{display:false},ticks:{color:ck.text}},
+                 y:{beginAtZero:true, grid:{color:ck.grid}, ticks:{color:ck.text, callback:v=>Math.round(v).toLocaleString()}} } } });
+  }catch(e){
+    console.error('[신차 판매량] 그래프 실패:', e);
+    const b=cv.parentElement; if(b) b.innerHTML='<div class="empty" style="padding:24px 8px">그래프를 그리지 못했습니다 · '+((e&&e.message)||'')+'</div>';
+  }
+}
+let _carRegWired=false;
+function _wireCarReg(){
+  if(_carRegWired) return; _carRegWired=true;
+  document.addEventListener('click', function(e){
+    if(e.target&&e.target.closest&&e.target.closest('#carRegGoSet')){
+      try{ setWorkspace('settings'); }catch(_){}
+      setTimeout(()=>{ const b=document.querySelector('[data-setcat="sales"]'); if(b) b.click(); }, 120);
+    }
+  });
 }
 function renderYoY(){
   const box=document.getElementById('rYoY'); if(!box) return;
