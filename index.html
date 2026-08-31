@@ -899,6 +899,12 @@
     border:1px solid var(--line2);background:var(--bg2);color:var(--ink3);transition:.12s;user-select:none}
   .vp-chip:hover{border-color:var(--ink2);color:var(--ink2)}
   .vp-chip.on{background:var(--amber);border-color:var(--amber);color:#1a1208}
+  .vp-more{display:inline-flex;align-items:center;border:1px dashed var(--line2);border-radius:11px;
+    padding:3px 9px;font-size:11px;color:var(--ink3);cursor:pointer;background:transparent}
+  .vp-more:hover{border-color:var(--amber);color:var(--amber)}
+  .vc-moretoggle{margin-top:8px;border:1px dashed var(--line2);background:transparent;color:var(--ink3);
+    border-radius:7px;padding:5px 10px;font-size:11.5px;font-family:var(--font);cursor:pointer}
+  .vc-moretoggle:hover{border-color:var(--ink2);color:var(--ink2)}
 
   /* 상세/카드 분류 태그 */
   .tagm.cls{background:var(--bg);border:1px solid var(--line2);color:var(--ink2)}
@@ -4488,18 +4494,44 @@ function isVerifiedId(id){ const r=_rowById(id); return r ? isVerified(r) : fals
 
 // 추가 분류 필드 HTML (필요할 때만 생성)
 function classFieldsHTML(eff){
-  return '<div style="font-size:11px;color:var(--ink3);margin:0 0 7px;line-height:1.5">🤖 <b>언급 브랜드·제품</b>은 본문에서 자동 감지되어 미리 선택됩니다. 필요 시 칩을 눌러 수정하세요.</div>'+CLASS_FIELDS.map(f=>{
+  const sent = eff.vSent || '';
+  // 칩이 많은 필드(브랜드·제품)는 선택된 것만 먼저 보이고 나머지는 접어둔다
+  const COLLAPSE = {brand:1, product:1};
+  const chipTag=(f,p,on)=>`<span class="vp-chip ${on?'on':''}" data-field="${f.key}" data-kind="${f.kind}" data-val="${escapeHtml(p)}">${escapeHtml(p)}</span>`;
+  const fieldHTML=f=>{
     const val=escapeHtml(eff[f.key]||''); let chips='';
     if(f.kind==='multi'||f.kind==='pick'){
       const cv=(eff[f.key]||'').split(',').map(s=>s.trim()).filter(Boolean);
       const presets=(f.presetsFn?f.presetsFn():(f.presets||[]));
-      chips=`<div class="vp-chips">`+presets.map(p=>
-        `<span class="vp-chip ${cv.includes(p)?'on':''}" data-field="${f.key}" data-kind="${f.kind}" data-val="${escapeHtml(p)}">${escapeHtml(p)}</span>`
-      ).join('')+`</div>`;
+      if(COLLAPSE[f.key] && presets.length>10){
+        const sel=presets.filter(p=>cv.includes(p)), rest=presets.filter(p=>!cv.includes(p));
+        chips=`<div class="vp-chips">`+sel.map(p=>chipTag(f,p,true)).join('')
+            + `<span class="vp-more" data-field="${f.key}">＋ 전체 보기(${rest.length})</span></div>`
+            + `<div class="vp-chips vp-rest" data-rest="${f.key}" hidden>`+rest.map(p=>chipTag(f,p,false)).join('')+`</div>`;
+      }else{
+        chips=`<div class="vp-chips">`+presets.map(p=>chipTag(f,p,cv.includes(p))).join('')+`</div>`;
+      }
     }
     return `<div class="vc-field"><label>${f.label}</label>
       <input class="vc-input" data-field="${f.key}" value="${val}" placeholder="${escapeHtml(f.ph||'')}">${chips}</div>`;
-  }).join('');
+  };
+  // 감성 연동: 긍정이유는 감성이 긍정일 때만, 부정이유는 부정일 때만 노출
+  const isMain=f=>{
+    // 감성이 안 맞아도 이미 입력된 값이 있으면 숨기지 않는다(기존 데이터 보호)
+    if(f.key==='posReason') return sent==='긍정' || !!String(eff.posReason||'').trim();
+    if(f.key==='negReason') return sent==='부정' || !!String(eff.negReason||'').trim();
+    return f.key==='brand' || f.key==='product';
+  };
+  const main=CLASS_FIELDS.filter(isMain);
+  const extra=CLASS_FIELDS.filter(f=>f.key==='recommender'||f.key==='carModel');
+  const hasExtra=extra.some(f=>String(eff[f.key]||'').trim());
+  const hint = (sent==='긍정'||sent==='부정')
+    ? '🤖 <b>언급 브랜드·제품</b>은 본문에서 자동 감지되어 미리 선택됩니다. 필요 시 칩을 눌러 수정하세요.'
+    : '🤖 <b>언급 브랜드·제품</b>은 자동 감지됩니다. 이유 항목은 감성을 <b>긍정</b> 또는 <b>부정</b>으로 선택하면 나타납니다.';
+  return '<div style="font-size:11px;color:var(--ink3);margin:0 0 7px;line-height:1.5">'+hint+'</div>'
+    + main.map(fieldHTML).join('')
+    + `<button type="button" class="vc-moretoggle">${hasExtra?'추천 주체 · 차종 (입력됨) ▾':'＋ 추천 주체 · 차종'}</button>`
+    + `<div class="vc-more" hidden>`+extra.map(fieldHTML).join('')+`</div>`;
 }
 
 // 공용 편집 컨트롤 (검증 카드 + 상세 모달에서 재사용) — 스테이징만, 저장은 버튼으로
@@ -4888,6 +4920,21 @@ function onEditorClick(e){
     return;
   }
 
+  const moreChips=e.target.closest('.vp-more');
+  if(moreChips){
+    const k=moreChips.dataset.field;
+    const rest=editorEl.querySelector(`.vp-rest[data-rest="${k}"]`);
+    if(rest) rest.removeAttribute('hidden');
+    moreChips.remove();
+    return;
+  }
+  const moreT=e.target.closest('.vc-moretoggle');
+  if(moreT){
+    const box=editorEl.querySelector('.vc-more');
+    if(box){ box.toggleAttribute('hidden');
+      moreT.textContent = box.hasAttribute('hidden') ? '＋ 추천 주체 · 차종' : '－ 추천 주체 · 차종'; }
+    return;
+  }
   const chip=e.target.closest('.vp-chip');
   if(chip){
     const key=chip.dataset.field, kind=chip.dataset.kind, val=chip.dataset.val;
@@ -4905,6 +4952,14 @@ function onEditorClick(e){
     const val=btn.dataset.v;
     editorEl.querySelectorAll('.vbtn[data-v]').forEach(b=>b.classList.toggle('on', b.dataset.v===val));
     stage(editorEl,{vSent:val});
+    // 감성이 바뀌면 긍정/부정 이유 표시를 다시 맞춘다 (이미 펼쳐진 경우에만)
+    const clsBox=editorEl.querySelector('.vc-class');
+    if(clsBox && clsBox.hasAttribute('data-built')){
+      const wasHidden=clsBox.hasAttribute('hidden');
+      const rid=editorEl.dataset.id; const rr=_rowById(rid);
+      clsBox.innerHTML=classFieldsHTML(effRow(rr||{id:rid}));
+      if(wasHidden) clsBox.setAttribute('hidden','');
+    }
     return;
   }
 }
