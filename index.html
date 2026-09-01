@@ -952,6 +952,20 @@
   .vc-reasonpop-h span{font-weight:600;color:var(--ink3)}
   .vc-reasoninput{margin-top:8px;width:100%}
   .vc-reasonhint{font-size:11.5px;color:var(--ink3);padding:9px 11px;border:1px dashed var(--line2);border-radius:8px}
+  .vp-chip.rchip{position:relative;padding-right:9px}
+  .vp-chip.rchip[draggable="true"]{cursor:grab}
+  .vp-chip.rchip.dragging{opacity:.4}
+  .rchip-x{position:absolute;top:-6px;right:-6px;width:16px;height:16px;line-height:14px;
+    border-radius:50%;border:1px solid var(--line2);background:var(--bg2);color:var(--ink3);
+    font-size:12px;padding:0;cursor:pointer;display:none;align-items:center;justify-content:center}
+  .vp-chip.rchip:hover .rchip-x{display:flex}
+  .rchip-x:hover{background:var(--neg);border-color:var(--neg);color:#fff}
+  .vc-radd{display:flex;gap:6px;margin-top:9px}
+  .vc-radd input{flex:1;min-width:0;border:1px solid var(--line2);border-radius:7px;padding:6px 9px;
+    font-size:12px;font-family:var(--font)}
+  .vc-raddbtn{border:1px solid var(--line2);background:var(--bg2);color:var(--ink2);border-radius:7px;
+    padding:6px 10px;font-size:12px;font-family:var(--font);cursor:pointer;white-space:nowrap}
+  .vc-raddbtn:hover{border-color:var(--amber);color:var(--amber)}
   .modal-tail{display:flex;justify-content:center;padding:10px 0 4px}
   .modal-more{border:1px dashed var(--line2);background:var(--bg2);color:var(--ink2);border-radius:8px;
     padding:8px 16px;font-size:12.5px;font-family:var(--font);cursor:pointer}
@@ -4762,16 +4776,21 @@ function reasonControlHTML(eff){
     </div>`;
   const cur=String(eff[key]||'').split(',').map(x=>x.trim()).filter(Boolean);
   const btnTxt = cur.length ? (cur.length<=2?cur.join(', '):`${cur[0]} 외 ${cur.length-1}건`) : '— 이유 선택 —';
+  const canEdit = (typeof auth!=='undefined' && auth==='admin');
   const chips=(presets||[]).map(v=>
-    `<span class="vp-chip ${cur.includes(v)?'on':''}" data-field="${key}" data-kind="multi" data-val="${escapeHtml(v)}">${escapeHtml(v)}</span>`).join('');
+    `<span class="vp-chip rchip ${cur.includes(v)?'on':''}" data-field="${key}" data-kind="multi" data-val="${escapeHtml(v)}"${canEdit?' draggable="true"':''}>${escapeHtml(v)}${canEdit?`<button type="button" class="rchip-x" data-rdel="${escapeHtml(v)}" title="이 항목을 목록에서 삭제">×</button>`:''}</span>`).join('');
   return `<div class="vc-reasonbox" data-rkey="${key}">
     <div class="vc-sec-label">${label}</div>
     <div class="vc-reasonwrap">
       <button type="button" class="vc-reasonbtn ${cur.length?'has':''}" data-rbtn="1">${escapeHtml(btnTxt)} <span class="vc-caret">▾</span></button>
       <div class="vc-reasonpop" hidden>
-        <div class="vc-reasonpop-h">${label} 선택 <span>· 여러 개 선택 가능</span></div>
-        <div class="vp-chips">${chips}</div>
-        <input class="vc-input vc-reasoninput" data-field="${key}" value="${escapeHtml(eff[key]||'')}" placeholder="직접 입력 (쉼표 구분)">
+        <div class="vc-reasonpop-h">${label} 선택 <span>· 여러 개 선택 가능${canEdit?' · ✕ 삭제 · 드래그로 순서 변경':''}</span></div>
+        <div class="vp-chips vc-rchips" data-rkey="${key}">${chips}</div>
+        ${canEdit?`<div class="vc-radd">
+          <input class="vc-newreason" data-rkey="${key}" placeholder="새 ${label} 추가 후 Enter">
+          <button type="button" class="vc-raddbtn" data-rkey="${key}">＋ 추가</button>
+        </div>`:''}
+        <input type="hidden" class="vc-input" data-field="${key}" value="${escapeHtml(eff[key]||'')}">
       </div>
     </div>
   </div>`;
@@ -5169,6 +5188,19 @@ function onEditorClick(e){
     return;
   }
 
+  // ── 이유 목록 편집 (관리자) ──
+  const rDel=e.target.closest('.rchip-x');
+  if(rDel){
+    e.stopPropagation();
+    const key=rDel.closest('.vc-rchips').dataset.rkey, v=rDel.dataset.rdel;
+    if(confirm(`'${v}'을(를) 목록에서 삭제할까요?\n\n이미 이 이유로 입력해 둔 글의 값은 그대로 유지됩니다.`)){
+      _saveReasonList(key, _reasonList(key).filter(x=>x!==v));
+      _rerenderReasonPop(editorEl);
+    }
+    return;
+  }
+  const rAdd=e.target.closest('.vc-raddbtn');
+  if(rAdd){ _addReason(editorEl, rAdd.dataset.rkey); return; }
   const rBtn=e.target.closest('.vc-reasonbtn');
   if(rBtn){
     const pop=rBtn.parentElement.querySelector('.vc-reasonpop');
@@ -5247,6 +5279,76 @@ function _syncReasonBtn(editorEl,key,val){
   btn.innerHTML=`${escapeHtml(txt)} <span class="vc-caret">▾</span>`;
   btn.classList.toggle('has', cur.length>0);
 }
+// ── 이유 목록(표준 명칭) 편집 — 설정 화면과 같은 저장소를 씁니다 ──
+function _reasonList(key){ return (key==='posReason'?effPosReasons():effNegReasons()).slice(); }
+function _saveReasonList(key,list){
+  const clean=[...new Set(list.map(x=>String(x).trim()).filter(Boolean))];
+  STORE.config=STORE.config||{};
+  STORE.config[key==='posReason'?'posReasons':'negReasons']=clean;
+  try{ saveStore(STORE); }catch(err){}
+  try{ if(typeof flushCloudSave==='function') flushCloudSave(); }catch(err){}
+}
+function _rerenderReasonPop(editorEl){
+  const slot=editorEl && editorEl.querySelector('.vc-reasonslot'); if(!slot) return;
+  const id=editorEl.dataset.id, r=_rowById(id);
+  slot.innerHTML=reasonControlHTML(effRow(r||{id}));
+  const pop=slot.querySelector('.vc-reasonpop'); if(pop) pop.removeAttribute('hidden');
+}
+function _addReason(editorEl,key){
+  const box=editorEl.querySelector(`.vc-newreason[data-rkey="${key}"]`); if(!box) return;
+  const v=(box.value||'').trim(); if(!v) return;
+  const list=_reasonList(key);
+  if(!list.includes(v)){ list.push(v); _saveReasonList(key,list); }
+  // 새로 추가한 항목은 지금 보고 있는 글에도 바로 선택해 준다
+  const inp=editorEl.querySelector(`.vc-input[data-field="${key}"]`);
+  if(inp){
+    const cur=(inp.value||'').split(',').map(x=>x.trim()).filter(Boolean);
+    if(!cur.includes(v)){
+      cur.push(v); const nv=cur.join(', ');
+      inp.value=nv; stage(editorEl,{[key]:nv}); _syncReasonBtn(editorEl,key,nv);
+    }
+  }
+  box.value='';
+  _rerenderReasonPop(editorEl);
+}
+// 새 항목 입력 후 Enter
+document.addEventListener('keydown', e=>{
+  const box=e.target.closest && e.target.closest('.vc-newreason'); if(!box) return;
+  if(e.key==='Enter'){ e.preventDefault(); const ed=box.closest('.editor'); if(ed) _addReason(ed, box.dataset.rkey); }
+});
+// 드래그로 순서 변경
+let _rDrag=null;
+document.addEventListener('dragstart', e=>{
+  const c=e.target.closest && e.target.closest('.rchip'); if(!c) return;
+  _rDrag={key:c.closest('.vc-rchips').dataset.rkey, val:c.dataset.val};
+  c.classList.add('dragging');
+  try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',c.dataset.val); }catch(err){}
+});
+document.addEventListener('dragend', e=>{
+  const c=e.target.closest && e.target.closest('.rchip'); if(c) c.classList.remove('dragging');
+  _rDrag=null;
+});
+document.addEventListener('dragover', e=>{
+  if(!_rDrag) return;
+  const wrap=e.target.closest && e.target.closest('.vc-rchips'); if(!wrap) return;
+  if(wrap.dataset.rkey!==_rDrag.key) return;
+  e.preventDefault();
+});
+document.addEventListener('drop', e=>{
+  if(!_rDrag) return;
+  const wrap=e.target.closest && e.target.closest('.vc-rchips'); if(!wrap) return;
+  if(wrap.dataset.rkey!==_rDrag.key) return;
+  e.preventDefault();
+  const over=e.target.closest('.rchip');
+  const list=_reasonList(_rDrag.key);
+  const from=list.indexOf(_rDrag.val); if(from<0) return;
+  let to = over ? list.indexOf(over.dataset.val) : list.length-1;
+  if(to<0) to=list.length-1;
+  list.splice(from,1); list.splice(to,0,_rDrag.val);
+  _saveReasonList(_rDrag.key,list);
+  const ed=wrap.closest('.editor'); _rDrag=null;
+  if(ed) _rerenderReasonPop(ed);
+});
 // 바깥을 클릭하면 열린 드롭다운을 닫는다
 document.addEventListener('click', e=>{
   if(e.target.closest('.vc-reasonwrap')) return;
