@@ -936,6 +936,8 @@
   .rz-chip.pos:hover{border-color:var(--pos);color:var(--pos)}
   .rz-chip.neg:hover{border-color:var(--neg);color:var(--neg)}
   .rz-empty{font-size:12px;color:var(--ink3)}
+  .rz-chip.rz-miss{border-style:dashed;font-size:11px;padding:3px 9px;color:var(--ink3);background:transparent}
+  .rz-chip.rz-miss:hover{border-color:var(--ink2);color:var(--ink2)}
   .vp-more{display:inline-flex;align-items:center;border:1px dashed var(--line2);border-radius:11px;
     padding:3px 9px;font-size:11px;color:var(--ink3);cursor:pointer;background:transparent}
   .vp-more:hover{border-color:var(--amber);color:var(--amber)}
@@ -2821,22 +2823,37 @@ function renderKPIs(rows){
         .forEach(v=>{ m[v]=(m[v]||0)+1; }); });
       return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n); };
     const posT=topOf('posReason',10), negT=topOf('negReason',10);
-    if(!posT.length && !negT.length){ box.style.display='none'; box.innerHTML=''; return; }
+    const _anyMiss=considered.some(r=>{const sv=sentOf(r);
+      return (sv==='긍정'&&!String(r.posReason||'').trim())||(sv==='부정'&&!String(r.negReason||'').trim());});
+    if(!posT.length && !negT.length && !_anyMiss){ box.style.display='none'; box.innerHTML=''; return; }
     box.style.display='';
     const chips=(arr,cls,key)=> arr.length
       ? arr.map(([v,c])=>`<span class="rz-chip ${cls}" data-rzk="${key}" data-rzv="${escapeHtml(v)}">${escapeHtml(v)} <b>${c}</b></span>`).join('')
       : '<span class="rz-empty">해당 기간에 입력된 이유가 없습니다.</span>';
     const posN=posT.reduce((a,b)=>a+b[1],0), negN=negT.reduce((a,b)=>a+b[1],0);
+    // 감성은 정해졌는데 이유를 안 넣은 글 — 검증 누락 확인용
+    const missOf=(key,sent)=>considered.filter(r=>sentOf(r)===sent && !String(r[key]||'').trim());
+    const posMiss=missOf('posReason','긍정'), negMiss=missOf('negReason','부정');
+    const missChip=(arr,sent)=> arr.length
+      ? `<span class="rz-chip rz-miss" data-rzmiss="${sent}">이유 미입력 <b>${arr.length.toLocaleString()}</b></span>` : '';
     box.innerHTML = `<h3><span class="dot"></span>긍정 · 부정 이유</h3>
       <div class="cap">검증 시 입력한 이유 항목 집계 · 칩을 클릭하면 해당 글·댓글 목록이 열립니다</div>
       <div class="rz-wrap">
         <div><div class="rz-h pos">▲ 긍정 이유 <span style="color:var(--ink3);font-weight:600">· ${posN.toLocaleString()}건</span></div>
-          <div class="rz-chips">${chips(posT,'pos','posReason')}</div></div>
+          <div class="rz-chips">${chips(posT,'pos','posReason')}${missChip(posMiss,'긍정')}</div></div>
         <div><div class="rz-h neg">▼ 부정 이유 <span style="color:var(--ink3);font-weight:600">· ${negN.toLocaleString()}건</span></div>
-          <div class="rz-chips">${chips(negT,'neg','negReason')}</div></div>
+          <div class="rz-chips">${chips(negT,'neg','negReason')}${missChip(negMiss,'부정')}</div></div>
       </div>`;
     box.querySelectorAll('.rz-chip').forEach(el=>{
       el.addEventListener('click',()=>{
+        const ms=el.dataset.rzmiss;
+        if(ms){   // 이유 미입력 목록
+          const key = ms==='긍정' ? 'posReason' : 'negReason';
+          const list=considered.filter(r=>sentOf(r)===ms && !String(r[key]||'').trim());
+          openDetail(`${ms} · <span style="color:var(--ink2)">이유 미입력</span>`, list,
+            `${ms}으로 분류됐지만 ${ms} 이유가 입력되지 않은 글·댓글입니다`);
+          return;
+        }
         const k=el.dataset.rzk, v=el.dataset.rzv;
         const list=considered.filter(r=>(r[k]||'').split(',').map(x=>x.trim()).includes(v));
         const isPos=(k==='posReason');
