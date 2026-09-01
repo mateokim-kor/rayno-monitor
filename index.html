@@ -924,6 +924,18 @@
     border:1px solid var(--line2);background:var(--bg2);color:var(--ink3);transition:.12s;user-select:none}
   .vp-chip:hover{border-color:var(--ink2);color:var(--ink2)}
   .vp-chip.on{background:var(--amber);border-color:var(--amber);color:#1a1208}
+  .rz-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px}
+  @media(max-width:760px){ .rz-wrap{grid-template-columns:1fr} }
+  .rz-h{font-size:12px;font-weight:800;margin:2px 0 8px;letter-spacing:.02em}
+  .rz-h.pos{color:var(--pos)} .rz-h.neg{color:var(--neg)}
+  .rz-chips{display:flex;flex-wrap:wrap;gap:6px}
+  .rz-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line2);
+    border-radius:13px;padding:4px 10px;font-size:12px;color:var(--ink2);cursor:pointer;
+    background:var(--bg2);transition:border-color .12s,color .12s}
+  .rz-chip b{font-weight:800;font-variant-numeric:tabular-nums}
+  .rz-chip.pos:hover{border-color:var(--pos);color:var(--pos)}
+  .rz-chip.neg:hover{border-color:var(--neg);color:var(--neg)}
+  .rz-empty{font-size:12px;color:var(--ink3)}
   .vp-more{display:inline-flex;align-items:center;border:1px dashed var(--line2);border-radius:11px;
     padding:3px 9px;font-size:11px;color:var(--ink3);cursor:pointer;background:transparent}
   .vp-more:hover{border-color:var(--amber);color:var(--amber)}
@@ -998,7 +1010,17 @@
   .vc-class[hidden]{display:none}
   .vcard.dirty{border-left-color:var(--amber);box-shadow:0 0 0 1px rgba(232,137,59,.25) inset}
   .vcard.justsaved{animation:vsaved .7s ease}
-  .vcard.vactive{box-shadow:0 0 0 2px var(--amber) inset;border-left-color:var(--amber)}
+  .vcard.vactive{position:relative;z-index:2;border-left-color:var(--amber);
+    box-shadow:0 0 0 3px var(--amber), 0 8px 22px rgba(0,0,0,.30);
+    transform:translateZ(0)}
+  .vcard.vactive::before{content:"▶ 지금 검증 중";position:absolute;top:-10px;left:14px;
+    background:var(--amber);color:#1a1205;font-size:10.5px;font-weight:700;
+    padding:2px 9px;border-radius:9px;letter-spacing:.02em;white-space:nowrap;
+    box-shadow:0 2px 6px rgba(0,0,0,.3);z-index:3}
+  /* 활성 카드가 있을 때 나머지는 흐리게 — 지금 보는 글이 한눈에 */
+  #verifyList.hasactive .vcard:not(.vactive){opacity:.42;filter:saturate(.55)}
+  #verifyList.hasactive .vcard:not(.vactive):hover{opacity:.8}
+  .vcard{transition:opacity .15s ease, box-shadow .15s ease}
   .vsel{width:17px;height:17px;cursor:pointer;accent-color:var(--amber);flex:0 0 auto;margin:0}
   .vf-hint{font-size:11.5px;color:var(--ink3);margin:2px 0 10px;line-height:1.6}
   .vf-hint b{color:var(--ink2);background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:11px}
@@ -1500,6 +1522,7 @@
     <div id="dashAlert"></div>
     <div id="dashBrief"></div>
     <div class="grid kpis" id="kpis"></div>
+    <div class="card" id="kpiReasons" style="display:none;margin-top:12px"></div>
 
     <div class="grid cols">
       <div class="card">
@@ -2790,6 +2813,39 @@ function renderKPIs(rows){
        ${tag}${c.icon?`<span class="kpi-ic">${_sbSvg(c.icon)}</span>`:''}<div class="lab">${c.lab}</div>
        <div class="val">${c.val}</div><div class="meta">${c.meta}</div>${see}</div>`;
   }).join('');
+  // ── 긍정 · 부정 이유 요약 (KPI 카드 바로 아래) ──
+  (function(){
+    const box=document.getElementById('kpiReasons'); if(!box) return;
+    const topOf=(key,n)=>{ const m={};
+      considered.forEach(r=>{ (r[key]||'').split(',').map(x=>x.trim()).filter(Boolean)
+        .forEach(v=>{ m[v]=(m[v]||0)+1; }); });
+      return Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,n); };
+    const posT=topOf('posReason',10), negT=topOf('negReason',10);
+    if(!posT.length && !negT.length){ box.style.display='none'; box.innerHTML=''; return; }
+    box.style.display='';
+    const chips=(arr,cls,key)=> arr.length
+      ? arr.map(([v,c])=>`<span class="rz-chip ${cls}" data-rzk="${key}" data-rzv="${escapeHtml(v)}">${escapeHtml(v)} <b>${c}</b></span>`).join('')
+      : '<span class="rz-empty">해당 기간에 입력된 이유가 없습니다.</span>';
+    const posN=posT.reduce((a,b)=>a+b[1],0), negN=negT.reduce((a,b)=>a+b[1],0);
+    box.innerHTML = `<h3><span class="dot"></span>긍정 · 부정 이유</h3>
+      <div class="cap">검증 시 입력한 이유 항목 집계 · 칩을 클릭하면 해당 글·댓글 목록이 열립니다</div>
+      <div class="rz-wrap">
+        <div><div class="rz-h pos">▲ 긍정 이유 <span style="color:var(--ink3);font-weight:600">· ${posN.toLocaleString()}건</span></div>
+          <div class="rz-chips">${chips(posT,'pos','posReason')}</div></div>
+        <div><div class="rz-h neg">▼ 부정 이유 <span style="color:var(--ink3);font-weight:600">· ${negN.toLocaleString()}건</span></div>
+          <div class="rz-chips">${chips(negT,'neg','negReason')}</div></div>
+      </div>`;
+    box.querySelectorAll('.rz-chip').forEach(el=>{
+      el.addEventListener('click',()=>{
+        const k=el.dataset.rzk, v=el.dataset.rzv;
+        const list=considered.filter(r=>(r[k]||'').split(',').map(x=>x.trim()).includes(v));
+        const isPos=(k==='posReason');
+        openDetail(`${isPos?'긍정':'부정'} 이유 · <span style="color:var(--${isPos?'pos':'neg'})">${escapeHtml(v)}</span>`,
+          list, `'${v}'(으)로 분류된 글·댓글입니다`);
+      });
+    });
+  })();
+
   // 감성 카드 클릭 → 드릴다운 토글 (자세히 보기 버튼 클릭은 제외)
   document.querySelectorAll('#kpis .kpi.clickable').forEach(card=>{
     card.addEventListener('click', e=>{
@@ -3172,7 +3228,23 @@ function shareExplain(kind, m){
   openExplain(title, body);
 }
 function openDetail(titleHtml, rows, capText){
-  MODAL_ROWS = rows.slice().sort((a,b)=>a.idx-b.idx);
+  // 최신 글부터 표시 — 단, 댓글은 원글 바로 아래에 붙여 묶음을 유지한다
+  MODAL_ROWS = (function(){
+    const src = rows.slice().sort((a,b)=>a.idx-b.idx);
+    const _d = r=>{ try{ return normDate(r.date)||''; }catch(e){ return r.date||''; } };
+    const groups = new Map();
+    src.forEach(r=>{
+      const base = r.isPost ? (r.title||'') : (r.parentTitle||r.title||'');
+      const key = (base||('#'+r.idx)) + '|' + (r.cafe||'');
+      let o = groups.get(key);
+      if(!o){ o = {d:'', idx:r.idx, rows:[]}; groups.set(key,o); }
+      o.rows.push(r);
+      const d=_d(r); if(d>o.d) o.d=d;          // 묶음 대표일자 = 그룹 내 최신일
+    });
+    return [...groups.values()]
+      .sort((a,b)=> a.d===b.d ? (b.idx-a.idx) : (a.d<b.d?1:-1))   // 날짜 내림차순
+      .reduce((acc,o)=>acc.concat(o.rows),[]);
+  })();
   document.getElementById('modalTitle').innerHTML = titleHtml +
     `<span class="badge">${rows.length}건</span>`;
   document.getElementById('modalCap').textContent = capText || '항목을 클릭하면 원문으로 이동할 수 있습니다';
@@ -3925,7 +3997,11 @@ function buildBrandEmail(){
   // 델타 헬퍼
   const dl=(c,p)=> (p==null||!p)?'':(c>=p?` (▲${(((c-p)/p)*100).toFixed(0)}%)`:` (▼${(((p-c)/p)*100).toFixed(0)}%)`);
   const pp=(c,p)=> (p==null)?'':((c-p)>=0?` (▲${(c-p).toFixed(1)}%p)`:` (▼${(p-c).toFixed(1)}%p)`);
-  const prate=o=>{ const cl=o.pos+o.neg+o.neu; return cl?Math.round(o.pos/cl*100):0; };
+  // 긍정률 = 긍정÷(긍정+부정) · 중립 제외 — 대시보드 KPI와 동일 정의
+  const prate=o=>{ const op=o.pos+o.neg; return op?Math.round(o.pos/op*100):null; };
+  const prateTxt=o=>{ const r=prate(o); return r===null?'—':r+'%'; };
+  const opinN=o=>o.pos+o.neg;
+  const SMALL_N=10;   // 의견 표본이 이보다 적으면 단정하지 않는다
 
   // 기간(요일 포함)
   const _wd=['일','월','화','수','목','금','토'];
@@ -3938,7 +4014,16 @@ function buildBrandEmail(){
   // 감성 퍼센트(전체 기준)
   const _tot=M.total||1, pPos=M.pos/_tot*100, pNeu=M.neu/_tot*100, pNeg=M.neg/_tot*100;
   // 제품 자동 태그
-  const _prodTag=(o,i)=>{ const r=prate(o); if(i===0) return '시장 주도 제품'; if(r>=60) return '최상위 만족도'; if(r<40) return '※ 부정 언급 및 비율 지속 모니터링 필요'; return ''; };
+  const _prodTag=(o,i)=>{
+    const r=prate(o), op=opinN(o), t=[];
+    if(i===0 && o.n>=SMALL_N) t.push('언급량 1위');
+    if(op<3) t.push(`표본 부족(의견 ${op}건) — 해석 주의`);
+    else if(o.neg>=2 && r!==null && r<50) t.push(`※ 부정 ${o.neg}건 — 원인 점검 필요`);
+    else if(r!==null && r>=80 && op>=SMALL_N) t.push('만족도 최상위');
+    else if(r!==null && r>=80) t.push(`만족도 높음 (의견 ${op}건)`);
+    else if(o.neg>=1 && r!==null && r<50) t.push(`부정 ${o.neg}건 — 추이 관찰`);
+    return t.join(' · ');
+  };
   // 주요 부정 게시글: 사유별 원문 URL
   const negByReason={};
   cur.forEach(r=>{ if(!r.isPost||rsent(r)!=='부정') return; const reason=((r.negReason||'').trim())||'기타'; const url=(r.link||'').trim(); if(!url) return; (negByReason[reason]=negByReason[reason]||[]).push(url); });
@@ -3949,25 +4034,27 @@ function buildBrandEmail(){
   const L=[];
   L.push('안녕하세요, 브랜드전략실 김도균 선임입니다 :)');
   L.push('레이노 온라인 브랜드 언급 데이터 및 여론 분석 결과 보고드립니다.');
-  L.push(`▶ 온라인 모니터링 대시보드: ${dash}`);
-  L.push('');
-  L.push('전반적인 여론은 여전히 우호적인 지표를 나타내고 있으나, 주요 부정 요인이 관측되어 아래와 같이 요약 보고합니다.');
+  L.push(`▶ 레이노 인사이트 랩 : ${dash}`);
+  L.push('※ 위 사이트 이용에는 회원가입 및 승인이 필요합니다. 가입을 희망하시는 분은 김도균 선임 메일 또는 연락처 (010-8893-5504) 로 문의 부탁드립니다.');
   L.push('');
   L.push('[주요 내용]');
   L.push('1. 분석 개요');
   L.push(`- 분석 대상: 네이버 주요 자동차·전기차 동호회 카페 총 ${monCafes}곳`);
   L.push(`- 분석 기간: ${periodKor}`);
-  L.push(`- 표본 규모: 총 ${M.total.toLocaleString()}건 (게시글 ${M.posts.toLocaleString()}건 / 댓글 ${M.cmts.toLocaleString()}건)`);
+  L.push(`- 표본 규모: 총 ${M.total.toLocaleString()}건 (게시글 ${M.posts.toLocaleString()}건 / 댓글 ${M.cmts.toLocaleString()}건)${P?` · 직전 동기간 대비${dl(M.total,P.total)}`:''}`);
   if(kws.length) L.push(`- 분석 키워드: ${kws.join(', ')}`);
   L.push(`※ 감성이 없는 '입점업체 광고 글' 같은 경우는 집계에서 제외됩니다.`);
   L.push('');
   L.push('2. 감성 분포 및 브랜드 점유율');
   L.push(`- 감성 지표: 긍정 ${M.pos.toLocaleString()}건(${pPos.toFixed(1)}%) | 중립 ${M.neu.toLocaleString()}건(${pNeu.toFixed(1)}%) | 부정 ${M.neg.toLocaleString()}건(${pNeg.toFixed(1)}%)`);
+  L.push(`- 긍정률(중립 제외): ${M.posRate.toFixed(1)}%${P?pp(M.posRate,P.posRate):''} · 순감성(긍정률−부정률): ${M.net.toFixed(1)}%p${P?pp(M.net,P.net):''}`);
   if(coEnt.length) L.push(`- 경쟁사 동시 언급 빈도 (자사 글 내 노출 수): ${coEnt.map(([b,c])=>`${b}: ${c.toLocaleString()}건 (${coTotal?Math.round(c/coTotal*100):0}%)`).join(' | ')}`);
   L.push('');
   if(pEnt.length){
     L.push('3. 제품별 여론 분석');
-    pEnt.forEach(([p,o],i)=>{ const tag=_prodTag(o,i); L.push(`- ${p}: ${o.n.toLocaleString()}건 (긍정 ${o.pos} / 부정 ${o.neg}) | 긍정률 ${prate(o)}%${tag?` (${tag})`:''}`); });
+    pEnt.forEach(([p,o],i)=>{ const tag=_prodTag(o,i);
+      L.push(`- ${p}: 언급 ${o.n.toLocaleString()}건 (긍정 ${o.pos} / 부정 ${o.neg} / 중립 ${o.neu}) | 긍정률 ${prateTxt(o)} (의견 ${opinN(o)}건 기준)${tag?` — ${tag}`:''}`); });
+    L.push(`※ 긍정률 = 긍정÷(긍정+부정)이며 중립은 제외합니다(대시보드 지표와 동일 기준). 의견 표본 ${SMALL_N}건 미만은 참고용으로만 해석하시기 바랍니다.`);
     L.push('');
   }
   if(posR.length||negR.length){
@@ -3976,8 +4063,13 @@ function buildBrandEmail(){
     if(negR.length) L.push(`- 부정 요인: ${negR.map(x=>`${x[0]}(${x[1]})`).join(', ')}`);
     L.push('');
   }
+  if(cafeTop.length){
+    L.push('5. 채널 집중도');
+    L.push(`- 상위 카페: ${cafeTop.map(([c,n])=>`${c} ${n}건(${Math.round(n/(M.total||1)*100)}%)`).join(' | ')}`);
+    L.push('');
+  }
   L.push('[데이터 요약 및 핵심 인사이트]');
-  L.push('1. 우호적 여론 지속');
+  L.push(`1. ${M.posRate>=60?'우호적 여론 지속':(M.posRate>=40?'여론 혼조 — 긍·부정 균형 구간':'부정 우위 — 즉시 대응 필요')}`);
   L.push(`- 총 ${M.total.toLocaleString()}건의 유효 표본 중 긍정 반응이 ${pPos.toFixed(1)}%를 차지하며 부정 반응(${pNeg.toFixed(1)}%)을 ${pPos>=pNeg?'안정적으로 상회':'하회'}하고 있습니다. 전반적인 시장 신뢰도는 ${pPos>=pNeg?'견고하게 유지':'주의가 필요한 흐름으로 관측'}되고 있습니다.`);
   if(posR.length||negR.length){
     const ps=posR.slice(0,2).map(x=>x[0]).join('·')||'-', ns=negR.slice(0,2).map(x=>x[0]).join('·')||'-';
@@ -3992,21 +4084,30 @@ function buildBrandEmail(){
   L.push('');
   if(negReasonEnt.length){
     L.push('[주요 부정 게시글]');
-    negReasonEnt.forEach(([reason,urls],i)=>{ const us=[...new Set(urls)].slice(0,3).join(' / '); L.push(`${i+1}. ${reason} [원문 ${us}]`); });
+    negReasonEnt.forEach(([reason,urls],i)=>{ const us=[...new Set(urls)].slice(0,3).join(' / '); L.push(`${i+1}. ${reason} [원문: ${us}]`); });
     L.push('');
   }
   L.push('[데이터 기반 부서별 제언] * 요약 제공');
   L.push('[브랜드전략실]');
-  L.push(`- 최대 강점인 '${posR[0]?posR[0][0]:'가성비'}'를 단순 저가 이미지가 아닌 '합리적인 프리미엄 선택'으로 포지셔닝하는 캠페인 메시지 강화`);
-  L.push('[영업팀]');
+  L.push(`- 최대 강점인 '${posR[0]?posR[0][0]:'시공 품질'}'(긍정 요인 1위, ${posR[0]?posR[0][1]:0}건)를 단순 저가 이미지가 아닌 '합리적인 프리미엄 선택'으로 포지셔닝하는 캠페인 메시지 강화`);
+  if(coEnt.length) L.push(`- 최다 동시 언급 대조군 '${coEnt[0][0]}'(${coEnt[0][1]}건) 대비 우위 요소를 비교 콘텐츠로 선점 — 소비자 비교 검토 단계에서의 이탈 방어`);
+  L.push('[브랜드영업실]');
   L.push(`- 대리점 세일즈 툴 가이드 보강 및 '${negR[0]?negR[0][0]:'주요 이슈'}${negR[1]?'·'+negR[1][0]:''}' 관련 대리점 대응`);
-  L.push('[품질혁신팀]');
-  const _lowProd=pEnt.slice().sort((a,b)=>prate(a[1])-prate(b[1]))[0];
-  L.push(`- ${(_lowProd&&prate(_lowProd[1])<50)?`${_lowProd[0]} 제품군 품질`:'주요 제품군 품질'} 및 시장 피드백(시공 품질 관리) 점검`);
+  if(cafeTop.length) L.push(`- 언급 집중 채널 '${cafeTop[0][0]}'(${cafeTop[0][1]}건, 전체의 ${Math.round(cafeTop[0][1]/(M.total||1)*100)}%) 우선 대응 — 해당 채널 내 시공 후기 확보 유도`);
+  L.push('[품질물류운영팀]');
+  // 부정 '건수'는 언급량에 비례하므로, 전체 평균 부정률 대비 유의하게 높은 제품만 지목한다
+  const _baseNeg=M.negRate;   // 전체 부정률(중립 제외)
+  const _negRate=o=>{ const op=opinN(o); return op?o.neg/op*100:0; };
+  const _risk=pEnt.slice()
+    .filter(e=>e[1].neg>=2 && opinN(e[1])>=5 && _negRate(e[1])>=Math.max(_baseNeg*1.5,25))
+    .sort((a,b)=>_negRate(b[1])-_negRate(a[1]))[0];
+  if(_risk) L.push(`- '${_risk[0]}' 부정률 ${_negRate(_risk[1]).toFixed(0)}%(부정 ${_risk[1].neg}건 / 의견 ${opinN(_risk[1])}건) — 전체 평균 부정률 ${_baseNeg.toFixed(0)}%를 크게 상회하여 해당 제품군 시공 품질 우선 점검 필요`);
+  else if(negR.length) L.push(`- '${negR[0][0]}' 관련 시장 피드백 ${negR[0][1]}건 점검 — 현재 특정 제품군으로의 부정 집중 징후는 관측되지 않아 공정 전반 점검 권장`);
+  else L.push('- 금주 부정 요인 특이사항 없음 — 정기 모니터링 수준 유지');
   L.push('');
-  L.push('※ 원문 자료 및 채널별 세부 데이터는 아래 브랜드 모니터링 대시보드에서 실시간으로 확인하실 수 있습니다.');
-  L.push(`▶ 브랜드 모니터링 대시보드 URL: ${dash}`);
-  L.push('※ 차주부터는 주간 단위로 공유드릴 예정입니다.');
+  L.push(`▶ 레이노 인사이트 랩 : ${dash}`);
+  L.push('※ 위 사이트 이용에는 회원가입 및 승인이 필요합니다. 가입을 희망하시는 분은 김도균 선임 메일 또는 연락처 (010-8893-5504) 로 문의 부탁드립니다.');
+  L.push('※ 원문 자료 및 채널별 세부 데이터는 위 링크에서 실시간으로 확인하실 수 있습니다.');
   L.push('');
   L.push('감사합니다.');
   L.push('브랜드전략실 김도균 드림.');
@@ -4747,12 +4848,14 @@ function renderBulkBar(){
     + ['긍정','부정','중립','없음','바이럴'].map(s=>`<button class="bb-b" data-bulk="${s}">${s}</button>`).join('')
     + `<button class="bb-x" data-bulkx="1">해제</button>`;
 }
-function setVActive(i){
+function setVActive(i, noScroll){
+  const list=document.getElementById('verifyList');
   const cards=[...document.querySelectorAll('#verifyList .vcard')];
-  if(!cards.length){ vActive=-1; return; }
+  if(!cards.length){ vActive=-1; if(list) list.classList.remove('hasactive'); return; }
   i=Math.max(0, Math.min(i, cards.length-1)); vActive=i;
   cards.forEach((c,idx)=>c.classList.toggle('vactive', idx===i));
-  cards[i].scrollIntoView({block:'nearest'});
+  if(list) list.classList.add('hasactive');
+  if(!noScroll) cards[i].scrollIntoView({block:'nearest'});
 }
 function vShortcutSet(sent){
   const cards=[...document.querySelectorAll('#verifyList .vcard')];
@@ -5012,6 +5115,13 @@ function onEditorChange(e){
     stage(editorEl,{[key]:val});
   }
 }
+// 카드를 클릭하면 '지금 검증 중' 표시를 그 카드로 옮긴다 (스크롤은 건드리지 않음)
+document.getElementById('verifyList').addEventListener('click', e=>{
+  const card=e.target.closest && e.target.closest('.vcard'); if(!card) return;
+  const cards=[...document.querySelectorAll('#verifyList .vcard')];
+  const idx=cards.indexOf(card);
+  if(idx>=0 && idx!==vActive) setVActive(idx, true);
+}, true);
 document.getElementById('verifyList').addEventListener('click', onEditorClick);
 document.getElementById('verifyList').addEventListener('change', onEditorChange);
 document.getElementById('verifyList').addEventListener('change', e=>{
