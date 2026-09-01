@@ -936,6 +936,26 @@
   .rz-chip.pos:hover{border-color:var(--pos);color:var(--pos)}
   .rz-chip.neg:hover{border-color:var(--neg);color:var(--neg)}
   .rz-empty{font-size:12px;color:var(--ink3)}
+  .vc-tworow{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .vc-tcol{flex:1 1 240px;min-width:220px}
+  .vc-reasonwrap{position:relative}
+  .vc-reasonbtn{width:100%;text-align:left;border:1.5px solid var(--line2);background:var(--bg2);
+    color:var(--ink3);border-radius:8px;padding:8px 11px;font-size:13px;font-family:var(--font);
+    cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .vc-reasonbtn.has{color:var(--ink);border-color:var(--amber)}
+  .vc-reasonbtn:hover{border-color:var(--ink2)}
+  .vc-caret{opacity:.6;font-size:11px}
+  .vc-reasonpop{position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:40;
+    background:var(--card,#fff);border:1px solid var(--line2);border-radius:10px;
+    box-shadow:0 10px 28px rgba(0,0,0,.22);padding:10px;min-width:260px}
+  .vc-reasonpop-h{font-size:11px;font-weight:800;color:var(--ink2);margin-bottom:7px}
+  .vc-reasonpop-h span{font-weight:600;color:var(--ink3)}
+  .vc-reasoninput{margin-top:8px;width:100%}
+  .vc-reasonhint{font-size:11.5px;color:var(--ink3);padding:9px 11px;border:1px dashed var(--line2);border-radius:8px}
+  .modal-tail{display:flex;justify-content:center;padding:10px 0 4px}
+  .modal-more{border:1px dashed var(--line2);background:var(--bg2);color:var(--ink2);border-radius:8px;
+    padding:8px 16px;font-size:12.5px;font-family:var(--font);cursor:pointer}
+  .modal-more:hover{border-color:var(--amber);color:var(--amber)}
   .rz-chip.rz-miss{border-style:dashed;font-size:11px;padding:3px 9px;color:var(--ink3);background:transparent}
   .rz-chip.rz-miss:hover{border-color:var(--ink2);color:var(--ink2)}
   .vp-more{display:inline-flex;align-items:center;border:1px dashed var(--line2);border-radius:11px;
@@ -3288,15 +3308,54 @@ function renderModalList(q){
   document.querySelectorAll('#modalSentSeg button').forEach(b=>{ const k=b.dataset.ms;
     b.textContent = k==='all'?`전체 ${MODAL_ROWS.length}`:`${k} ${cnt[k]||0}`; });
   const el=document.getElementById('modalBody');
-  if(!list.length){ el.innerHTML='<div class="modal-empty">표시할 항목이 없습니다.</div>'; return; }
-  el.innerHTML=list.map(r=>recCard(r)).join('');
-  // 더보기 토글
-  el.querySelectorAll('.rec-more').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const body=btn.previousElementSibling;
+  if(!list.length){ el.innerHTML='<div class="modal-empty">표시할 항목이 없습니다.</div>'; MODAL_LIST=[]; MODAL_SHOWN=0; return; }
+  // 한 번에 전부 그리지 않고 스크롤에 맞춰 이어붙인다 (수백 건에서 멈춤 방지)
+  MODAL_LIST=list; MODAL_SHOWN=0; el.innerHTML='';
+  _modalAppend();
+  _modalBindOnce();
+}
+// ── 목록 점진 렌더 ──
+let MODAL_LIST=[], MODAL_SHOWN=0, _modalBound=false;
+const MODAL_PAGE=40;
+function _modalAppend(){
+  const el=document.getElementById('modalBody'); if(!el) return;
+  const next=MODAL_LIST.slice(MODAL_SHOWN, MODAL_SHOWN+MODAL_PAGE);
+  if(!next.length){ const t=el.querySelector('.modal-tail'); if(t) t.remove(); return; }
+  const tail=el.querySelector('.modal-tail'); if(tail) tail.remove();
+  const frag=document.createElement('div');
+  frag.innerHTML=next.map(r=>recCard(r)).join('');
+  const df=document.createDocumentFragment();
+  while(frag.firstChild) df.appendChild(frag.firstChild);
+  el.appendChild(df);
+  MODAL_SHOWN+=next.length;
+  if(MODAL_SHOWN<MODAL_LIST.length){
+    const d=document.createElement('div');
+    d.className='modal-tail';
+    d.innerHTML=`<button type="button" class="modal-more">＋ 더 불러오기 (${(MODAL_LIST.length-MODAL_SHOWN).toLocaleString()}건 남음)</button>`;
+    el.appendChild(d);
+  }
+}
+function _modalBindOnce(){
+  if(_modalBound) return; _modalBound=true;
+  const el=document.getElementById('modalBody'); if(!el) return;
+  // 이벤트 위임 — 항목마다 리스너를 붙이지 않는다
+  el.addEventListener('click', e=>{
+    const more=e.target.closest('.rec-more');
+    if(more){
+      const body=more.previousElementSibling;
       body.classList.toggle('clamp');
-      btn.textContent = body.classList.contains('clamp') ? '더 보기 ▾' : '접기 ▴';
-    });
+      more.textContent = body.classList.contains('clamp') ? '더 보기 ▾' : '접기 ▴';
+      return;
+    }
+    if(e.target.closest('.modal-more')){ _modalAppend(); return; }
+  });
+  // 바닥 근처에 오면 자동으로 이어붙임
+  let busy=false;
+  el.addEventListener('scroll', ()=>{
+    if(busy) return;
+    if(el.scrollTop+el.clientHeight >= el.scrollHeight-400){
+      busy=true; requestAnimationFrame(()=>{ _modalAppend(); busy=false; });
+    }
   });
 }
 // 감성 표현 사전(틴팅·후기 도메인) — 본문 하이라이트용
@@ -4675,11 +4734,8 @@ function classFieldsHTML(eff){
       <input class="vc-input" data-field="${f.key}" value="${val}" placeholder="${escapeHtml(f.ph||'')}">${chips}</div>`;
   };
   // 감성 연동: 긍정이유는 긍정일 때만, 부정이유는 부정일 때만 (단, 이미 입력된 값이 있으면 유지)
-  const isMain=f=>{
-    if(f.key==='posReason') return sent==='긍정' || !!String(eff.posReason||'').trim();
-    if(f.key==='negReason') return sent==='부정' || !!String(eff.negReason||'').trim();
-    return f.key==='brand' || f.key==='product';
-  };
+  // 긍정/부정 이유는 게시글 유형 옆 드롭다운으로 이동 — 여기서는 제외
+  const isMain=f=> f.key==='brand' || f.key==='product';
   const main=CLASS_FIELDS.filter(isMain);
   const extra=CLASS_FIELDS.filter(f=>f.key==='recommender'||f.key==='carModel');
   const hasExtra=extra.some(f=>String(eff[f.key]||'').trim());
@@ -4692,6 +4748,34 @@ function classFieldsHTML(eff){
     + `<div class="vc-more" hidden>`+extra.map(fieldHTML).join('')+`</div>`;
 }
 
+// ── 긍정/부정 이유 선택 드롭다운 (게시글 유형 옆) ──
+function reasonControlHTML(eff){
+  const sent=eff.vSent||'';
+  let key='', label='', presets=[];
+  if(sent==='긍정'){ key='posReason'; label='긍정 이유'; presets=effPosReasons(); }
+  else if(sent==='부정'){ key='negReason'; label='부정 이유'; presets=effNegReasons(); }
+  else if(String(eff.posReason||'').trim()){ key='posReason'; label='긍정 이유'; presets=effPosReasons(); }
+  else if(String(eff.negReason||'').trim()){ key='negReason'; label='부정 이유'; presets=effNegReasons(); }
+  else return `<div class="vc-reasonbox">
+      <div class="vc-sec-label">이유</div>
+      <div class="vc-reasonhint">감성을 <b>긍정</b> 또는 <b>부정</b>으로 선택하면 이유를 고를 수 있습니다.</div>
+    </div>`;
+  const cur=String(eff[key]||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const btnTxt = cur.length ? (cur.length<=2?cur.join(', '):`${cur[0]} 외 ${cur.length-1}건`) : '— 이유 선택 —';
+  const chips=(presets||[]).map(v=>
+    `<span class="vp-chip ${cur.includes(v)?'on':''}" data-field="${key}" data-kind="multi" data-val="${escapeHtml(v)}">${escapeHtml(v)}</span>`).join('');
+  return `<div class="vc-reasonbox" data-rkey="${key}">
+    <div class="vc-sec-label">${label}</div>
+    <div class="vc-reasonwrap">
+      <button type="button" class="vc-reasonbtn ${cur.length?'has':''}" data-rbtn="1">${escapeHtml(btnTxt)} <span class="vc-caret">▾</span></button>
+      <div class="vc-reasonpop" hidden>
+        <div class="vc-reasonpop-h">${label} 선택 <span>· 여러 개 선택 가능</span></div>
+        <div class="vp-chips">${chips}</div>
+        <input class="vc-input vc-reasoninput" data-field="${key}" value="${escapeHtml(eff[key]||'')}" placeholder="직접 입력 (쉼표 구분)">
+      </div>
+    </div>
+  </div>`;
+}
 // 공용 편집 컨트롤 (검증 카드 + 상세 모달에서 재사용) — 스테이징만, 저장은 버튼으로
 function editorControls(r){
   const eff=effRow(r);
@@ -4712,8 +4796,13 @@ function editorControls(r){
   return `
     <div class="vc-sec-label">감성 ${dirty?'<span style="color:var(--amber)">(미저장)</span>':''}</div>
     <div class="vseg">${seg}</div>
-    <div class="vc-sec-label">게시글 유형</div>
-    <div class="vc-typewrap"><select class="vc-select" data-type="1">${typeOpts}</select>${aiTypeTxt}</div>
+    <div class="vc-tworow">
+      <div class="vc-tcol">
+        <div class="vc-sec-label">게시글 유형</div>
+        <div class="vc-typewrap"><select class="vc-select" data-type="1">${typeOpts}</select>${aiTypeTxt}</div>
+      </div>
+      <div class="vc-tcol vc-reasonslot">${reasonControlHTML(eff)}</div>
+    </div>
     <button type="button" class="vc-clstoggle">${hasCls?'추가 분류 (입력됨) ▾':'＋ 추가 분류 입력'}</button>
     <div class="vc-class" hidden></div>
     <div class="vc-actions">
@@ -5080,6 +5169,15 @@ function onEditorClick(e){
     return;
   }
 
+  const rBtn=e.target.closest('.vc-reasonbtn');
+  if(rBtn){
+    const pop=rBtn.parentElement.querySelector('.vc-reasonpop');
+    const willOpen=pop.hasAttribute('hidden');
+    document.querySelectorAll('.vc-reasonpop').forEach(x=>x.setAttribute('hidden',''));
+    if(willOpen) pop.removeAttribute('hidden');
+    return;
+  }
+  if(e.target.closest('.vc-reasonpop')){ /* 팝오버 내부 클릭은 닫지 않음 */ }
   const moreChips=e.target.closest('.vp-more');
   if(moreChips){
     const k=moreChips.dataset.field;
@@ -5105,6 +5203,7 @@ function onEditorClick(e){
     const newVal=cur.join(', '); input.value=newVal;
     editorEl.querySelectorAll(`.vp-chip[data-field="${key}"]`).forEach(c=>c.classList.toggle('on',cur.includes(c.dataset.val)));
     stage(editorEl,{[key]:newVal});
+    _syncReasonBtn(editorEl,key,newVal);
     return;
   }
   const btn=e.target.closest('.vbtn');
@@ -5112,6 +5211,11 @@ function onEditorClick(e){
     const val=btn.dataset.v;
     editorEl.querySelectorAll('.vbtn[data-v]').forEach(b=>b.classList.toggle('on', b.dataset.v===val));
     stage(editorEl,{vSent:val});
+    const rslot=editorEl.querySelector('.vc-reasonslot');
+    if(rslot){
+      const rid2=editorEl.dataset.id; const rr2=_rowById(rid2);
+      rslot.innerHTML=reasonControlHTML(effRow(rr2||{id:rid2}));
+    }
     const clsBox=editorEl.querySelector('.vc-class');
     if(clsBox && clsBox.hasAttribute('data-built')){
       const wasHidden=clsBox.hasAttribute('hidden');
@@ -5130,8 +5234,24 @@ function onEditorChange(e){
     const cur=val.split(',').map(s=>s.trim()).filter(Boolean);
     editorEl.querySelectorAll(`.vp-chip[data-field="${key}"]`).forEach(c=>c.classList.toggle('on',cur.includes(c.dataset.val)));
     stage(editorEl,{[key]:val});
+    _syncReasonBtn(editorEl,key,val);
   }
 }
+// 이유 드롭다운 버튼 라벨을 선택값에 맞춰 갱신
+function _syncReasonBtn(editorEl,key,val){
+  if(key!=='posReason' && key!=='negReason') return;
+  const box=editorEl.querySelector(`.vc-reasonbox[data-rkey="${key}"]`); if(!box) return;
+  const btn=box.querySelector('.vc-reasonbtn'); if(!btn) return;
+  const cur=String(val||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const txt=cur.length?(cur.length<=2?cur.join(', '):`${cur[0]} 외 ${cur.length-1}건`):'— 이유 선택 —';
+  btn.innerHTML=`${escapeHtml(txt)} <span class="vc-caret">▾</span>`;
+  btn.classList.toggle('has', cur.length>0);
+}
+// 바깥을 클릭하면 열린 드롭다운을 닫는다
+document.addEventListener('click', e=>{
+  if(e.target.closest('.vc-reasonwrap')) return;
+  document.querySelectorAll('.vc-reasonpop').forEach(x=>x.setAttribute('hidden',''));
+});
 // 카드를 클릭하면 '지금 검증 중' 표시를 그 카드로 옮긴다 (스크롤은 건드리지 않음)
 document.getElementById('verifyList').addEventListener('click', e=>{
   const card=e.target.closest && e.target.closest('.vcard'); if(!card) return;
