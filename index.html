@@ -161,14 +161,15 @@
     .upl-date{display:inline-block;margin-left:6px;margin-top:0}
   }
   html[data-theme="dark"]{
-    --bg:#121417; --bg2:#1a1e24; --card:#1a1e24; --card2:#22272f;
-    --page:#0e1014; --topbar:#1a1e24;
-    --line:#2a2f38; --line2:#3a414c;
-    --ink:#f4f6f8; --ink2:#aeb4bf; --ink3:#7a818c; --ink0:#f4f6f8;
-    --dv1:#5e9bff; --dv2:#3ddc97; --dv3:#a78bfa; --dv4:#f4911c; --dv5:#ff6258; --dv6:#2dd4bf;
-    --amber:#f4911c; --amber-d:#d97e0e;
-    --pos:#3ddc97; --neg:#ff6258; --neu:#5e9bff;
-    --pos-bg:rgba(61,220,151,.14); --neg-bg:rgba(255,98,88,.14); --neu-bg:rgba(94,155,255,.14);
+    /* 표면 단계를 벌려 카드가 배경에서 떠 보이게 한다 (page < bg < card < bg2 < card2) */
+    --bg:#15181d; --bg2:#1e232b; --card:#1a1e25; --card2:#242a33;
+    --page:#0a0c0f; --topbar:#1a1e25;
+    --line:#2c323b; --line2:#434b57;
+    --ink:#f8fafc; --ink2:#c6cdd7; --ink3:#8d95a1; --ink0:#ffffff;
+    --dv1:#60a5fa; --dv2:#34d399; --dv3:#a78bfa; --dv4:#fbbf24; --dv5:#f87171; --dv6:#2dd4bf;
+    --amber:#ffa733; --amber-d:#f4911c;
+    --pos:#34d399; --neg:#f87171; --neu:#60a5fa;
+    --pos-bg:rgba(52,211,153,.16); --neg-bg:rgba(248,113,113,.16); --neu-bg:rgba(96,165,250,.16);
     --shadow:0 1px 3px rgba(0,0,0,.4), 0 8px 28px rgba(0,0,0,.45);
     --shadow-sm:0 1px 2px rgba(0,0,0,.4), 0 3px 12px rgba(0,0,0,.4);
     color-scheme:dark;
@@ -1116,9 +1117,18 @@
     padding:2px 9px;border-radius:9px;letter-spacing:.02em;white-space:nowrap;
     box-shadow:0 2px 6px rgba(0,0,0,.3);z-index:3}
   /* 활성 카드가 있을 때 나머지는 흐리게 — 지금 보는 글이 한눈에 */
-  #verifyList.hasactive .vcard:not(.vactive){opacity:.42;filter:saturate(.55)}
-  #verifyList.hasactive .vcard:not(.vactive):hover{opacity:.8}
-  .vcard{transition:opacity .15s ease, box-shadow .15s ease}
+  /* 비활성 카드는 살짝만 물러나게 — 채도는 건드리지 않는다(탁해 보임) */
+  #verifyList.hasactive .vcard:not(.vactive){opacity:.86}
+  #verifyList.hasactive .vcard:not(.vactive):hover{opacity:1}
+  .vcard{transition:opacity .15s ease, box-shadow .15s ease, border-color .15s ease}
+  .vcard:hover{border-color:var(--line2)}
+  /* 편집 영역 — 카드 안에서 한 단계 들어간 면으로 구분 */
+  .vc-panel{margin-top:13px;padding:13px 14px 14px;border:1px solid var(--line);
+    border-radius:11px;background:var(--bg2)}
+  .vc-panel .vc-sec-label:first-child{margin-top:0}
+  .vc-panel .vc-actions{margin-bottom:0}
+  /* 본문과 메타 사이 간격 정리 */
+  .vcard .vc-body{margin-top:2px}
   .vsel{width:17px;height:17px;cursor:pointer;accent-color:var(--amber);flex:0 0 auto;margin:0}
   .vf-hint{font-size:11.5px;color:var(--ink3);margin:2px 0 10px;line-height:1.6}
   .vf-hint b{color:var(--ink2);background:var(--bg2);border:1px solid var(--line);border-radius:5px;padding:0 5px;font-size:11px}
@@ -5105,7 +5115,7 @@ function vCard(r){
     ${titleBlock}${parentBlock}
     <div class="vc-body ${longish?'clamp':''}">${body}</div>
     ${longish?`<button class="vc-more">더 보기 ▾</button>`:''}
-    ${editorControls(r)}
+    <div class="vc-panel">${editorControls(r)}</div>
   </div>`;
 }
 
@@ -11355,7 +11365,9 @@ boot();
       '.stale-banner .sb-tx b{font-weight:800}'+
       '.stale-banner .sb-tx span{opacity:.85;font-size:12px}'+
       '.stale-banner.warn{background:#fff7e6;border-color:#f0c46a;color:#7a4f00}'+
-      '.stale-banner.crit{background:#fdecea;border-color:#f0a19a;color:#8c1d13}';
+      '.stale-banner.crit{background:#fdecea;border-color:#f0a19a;color:#8c1d13}'+
+      'html[data-theme="dark"] .stale-banner.warn{background:#2e2410;border-color:#7a5a1e;color:#f5cf8a}'+
+      'html[data-theme="dark"] .stale-banner.crit{background:#33191a;border-color:#8a3b36;color:#ffb3ac}';
     document.head.appendChild(st);
   }
 
