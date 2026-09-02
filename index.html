@@ -11147,7 +11147,8 @@ boot();
       return Promise.resolve(sbGetJson(ERP_STATUS)).then(function(s){
         if(s){
           var t=s.lastSuccess?new Date(s.lastSuccess).getTime():(s.at?new Date(s.at).getTime():0);
-          return {ok:!!t, ms:t, running:s.state==='running', error:s.state==='error'};
+          return {ok:!!t, ms:t, running:s.state==='running', error:s.state==='error',
+                  msg:(s.message||s.reason||'')};
         }
         return _mt(SUPA.salesFile);
       }).catch(function(){ return _mt(SUPA.salesFile); });
@@ -11157,7 +11158,8 @@ boot();
       if(s && s.at){
         var t=new Date(s.at).getTime();
         var run=(s.state==='running'||s.state==='await_auth') && (Date.now()-t<120000);
-        return {ok:!!t, ms:t, running:run, error:s.state==='error'};
+        return {ok:!!t, ms:t, running:run, error:s.state==='error',
+                msg:(s.message||s.reason||'')};
       }
       return _mt(SUPA.dataFile);   // 상태파일 없으면 데이터 갱신시각으로 폴백
     }).catch(function(){ return _mt(SUPA.dataFile); });
@@ -11170,6 +11172,38 @@ boot();
         return {ok:!!t, ms:t, running:false, error:false};
       }).catch(function(){ return {ok:false,ms:0}; });
     }catch(e){ return {ok:false,ms:0}; }
+  }
+
+  // ── 데이터 지연·수집 실패 경고 배너 ──
+  // 수집이 실패해도 화면은 이전 수치를 그대로 보여주므로, 눈에 띄게 알린다.
+  var WARN_MS={rayno:3*60*60*1000,  cafe:30*60*60*1000};   // 주의
+  var CRIT_MS={rayno:12*60*60*1000, cafe:72*60*60*1000};   // 심각
+  function bannerEl(){
+    var el=document.getElementById('dataStaleBanner');
+    if(el && el.isConnected) return el;
+    var h=header(); if(!h) return null;
+    el=document.createElement('div'); el.id='dataStaleBanner'; el.className='stale-banner';
+    h.insertAdjacentElement('afterend', el);
+    return el;
+  }
+  function renderBanner(ws,label,info){
+    var el=bannerEl(); if(!el) return;
+    if(!info || !info.ok || info.running){ el.style.display='none'; return; }
+    var age=Date.now()-info.ms;
+    var warn=WARN_MS[ws]||3*60*60*1000, crit=CRIT_MS[ws]||12*60*60*1000;
+    var lvl = info.error ? 'crit' : (age>=crit ? 'crit' : (age>=warn ? 'warn' : ''));
+    if(!lvl){ el.style.display='none'; return; }
+    var hrs=Math.floor(age/3600000);
+    var ago = hrs<24 ? (hrs+'시간') : (Math.floor(hrs/24)+'일');
+    var head = info.error ? (label+' 수집이 실패했습니다')
+                          : (label+' 데이터가 '+ago+'째 갱신되지 않았습니다');
+    var sub  = '마지막 성공 '+fmt(info.ms)
+             + (info.msg?(' · '+String(info.msg).slice(0,80)):'')
+             + ' · 지금 보이는 수치는 그 시점 기준입니다. 수집기 상태를 확인해 주세요.';
+    el.className='stale-banner '+lvl;
+    el.style.display='flex';
+    el.innerHTML='<span class="sb-ic">'+(lvl==='crit'?'\u26D4':'\u26A0')+'</span>'
+      +'<span class="sb-tx"><b>'+head+'</b><span>'+sub+'</span></span>';
   }
 
   function ensure(){
@@ -11191,7 +11225,7 @@ boot();
   function render(){
     var el=ensure(); if(!el) return;
     var ws=wsNow();
-    if(ws!=='cafe' && ws!=='rayno'){ el.style.display='none'; return; }
+    if(ws!=='cafe' && ws!=='rayno'){ el.style.display='none'; var _b=document.getElementById('dataStaleBanner'); if(_b) _b.style.display='none'; return; }
     el.style.display='inline-flex';
     var dot=el.querySelector('#erpLiveDot'), txt=el.querySelector('#erpLiveTxt');
     var label, fresh;
@@ -11201,6 +11235,7 @@ boot();
       fresh=FRESH_ERP;
     } else { label='모니터링'; fresh=FRESH_MON; }
     var info=_cache[ws];
+    renderBanner(ws, label, info);
     if(!info || !info.ok){ dot.className='erp-dot'; dot.style.background='#9aa'; txt.innerHTML='<b>'+label+'</b> 연동 정보 없음'; return; }
     var age=Date.now()-info.ms, when=fmt(info.ms);
     if(info.running){ dot.className='erp-dot pulse'; dot.style.background='#f59e0b'; txt.innerHTML='<b>'+label+'</b> 연동 중…'; }
@@ -11227,7 +11262,15 @@ boot();
       '.erp-dot{width:9px;height:9px;border-radius:50%;background:#9aa;flex:0 0 auto}'+
       '.erp-dot.pulse{animation:erpPulse 1.6s ease-in-out infinite}'+
       '@keyframes erpPulse{0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.5)}50%{box-shadow:0 0 0 6px rgba(34,197,94,0)}}'+
-      '@media(max-width:560px){.erp-live{font-size:12px;padding:6px 11px}}';
+      '@media(max-width:560px){.erp-live{font-size:12px;padding:6px 11px}}'+
+      '.stale-banner{display:none;align-items:flex-start;gap:10px;margin:10px 0 0;padding:12px 15px;'+
+      'border-radius:10px;font-size:13px;line-height:1.55;border:1px solid transparent}'+
+      '.stale-banner .sb-ic{font-size:16px;line-height:1.3;flex:0 0 auto}'+
+      '.stale-banner .sb-tx{display:flex;flex-direction:column;gap:2px}'+
+      '.stale-banner .sb-tx b{font-weight:800}'+
+      '.stale-banner .sb-tx span{opacity:.85;font-size:12px}'+
+      '.stale-banner.warn{background:#fff7e6;border-color:#f0c46a;color:#7a4f00}'+
+      '.stale-banner.crit{background:#fdecea;border-color:#f0a19a;color:#8c1d13}';
     document.head.appendChild(st);
   }
 
