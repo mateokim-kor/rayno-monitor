@@ -1015,6 +1015,8 @@
   .vc-reasonpop-h span{font-weight:600;color:var(--ink3)}
   .vc-reasoninput{margin-top:8px;width:100%}
   .vc-reasonhint{font-size:11.5px;color:var(--ink3);padding:9px 11px;border:1px dashed var(--line2);border-radius:8px}
+  .vp-chip[data-kbi]::after{content:attr(data-kbi);margin-left:6px;font-size:10px;font-weight:800;
+    opacity:.55;border:1px solid currentColor;border-radius:4px;padding:0 3px;line-height:1.35}
   .vp-chip.rchip{position:relative;padding-right:9px}
   .vp-chip.rchip[draggable="true"]{cursor:grab}
   .vp-chip.rchip.dragging{opacity:.4}
@@ -1112,10 +1114,11 @@
   .vcard.vactive{position:relative;z-index:2;border-left-color:var(--amber);
     box-shadow:0 0 0 3px var(--amber), 0 8px 22px rgba(0,0,0,.30);
     transform:translateZ(0)}
-  .vcard.vactive::before{content:"▶ 지금 검증 중";position:absolute;top:-10px;left:14px;
-    background:var(--amber);color:#1a1205;font-size:10.5px;font-weight:700;
-    padding:2px 9px;border-radius:9px;letter-spacing:.02em;white-space:nowrap;
-    box-shadow:0 2px 6px rgba(0,0,0,.3);z-index:3}
+  /* 배지는 카드 안에 둔다 — 밖으로 빼면 위 요소에 가려 잘린다 */
+  .vc-nowbadge{display:none;align-items:center;gap:4px;background:var(--amber);color:#1a1205;
+    font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:9px;letter-spacing:.02em;
+    white-space:nowrap;flex:0 0 auto}
+  .vcard.vactive .vc-nowbadge{display:inline-flex}
   /* 활성 카드가 있을 때 나머지는 흐리게 — 지금 보는 글이 한눈에 */
   /* 비활성 카드는 살짝만 물러나게 — 채도는 건드리지 않는다(탁해 보임) */
   #verifyList.hasactive .vcard:not(.vactive){opacity:.86}
@@ -1123,6 +1126,24 @@
   .vcard{transition:opacity .15s ease, box-shadow .15s ease, border-color .15s ease}
   .vcard:hover{border-color:var(--line2)}
   /* 편집 영역 — 카드 안에서 한 단계 들어간 면으로 구분 */
+  /* 압축 보기 — 제목과 감성 버튼만 남긴다 */
+  #verifyList.compact .vcard{padding:9px 12px;margin-bottom:7px}
+  #verifyList.compact .vc-body,
+  #verifyList.compact .vc-more,
+  #verifyList.compact .vc-parent,
+  #verifyList.compact .vc-sec-label,
+  #verifyList.compact .vc-tworow,
+  #verifyList.compact .vc-clstoggle,
+  #verifyList.compact .vc-class,
+  #verifyList.compact .vc-actions{display:none}
+  #verifyList.compact .vc-panel{margin-top:8px;padding:8px 10px;background:transparent;border:0}
+  #verifyList.compact .vc-title{font-size:14px;margin:4px 0 0}
+  #verifyList.compact .vseg{gap:5px}
+  #verifyList.compact .vbtn{padding:5px 10px;font-size:12px}
+  #verifyList.compact .vcard.vactive .vc-tworow{display:flex}
+  #verifyList.compact .vcard.vactive .vc-actions{display:flex}
+  #verifyList.compact .vcard.vactive .vc-sec-label{display:block}
+  .acc-btn.on{background:var(--amber);border-color:var(--amber);color:#1a1205}
   .vc-panel{margin-top:13px;padding:13px 14px 14px;border:1px solid var(--line);
     border-radius:11px;background:var(--bg2)}
   .vc-panel .vc-sec-label:first-child{margin-top:0}
@@ -1719,6 +1740,8 @@
           <button class="acc-btn admin-only" id="autoVerifyBtn">🤖 자동 검증 실행</button>
           <button class="acc-btn admin-only" id="learnVizBtn">🧠 학습 현황</button>
           <button class="acc-btn admin-only" id="confirmAllAutoBtn" style="display:none">✅ 자동(검토) 모두 검증 완료</button>
+ <button class="acc-btn admin-only" id="confirmHighConfBtn" style="display:none">⚡ 신뢰도 90% 이상만 승인</button>
+ <button class="acc-btn" id="compactToggleBtn" title="제목과 감성 버튼만 보이는 압축 목록">≡ 압축 보기</button>
         </div>
         <div class="ctl-group">
           <span class="ctl-label">범위</span>
@@ -4834,6 +4857,60 @@ function classFieldsHTML(eff){
     + `<div class="vc-more" hidden>`+extra.map(fieldHTML).join('')+`</div>`;
 }
 
+// ── 이유 자동 추천 ──
+// 본문에 나온 표현을 이유 항목으로 연결한다. 감지되면 미리 선택해 주고, 틀리면 고치면 된다.
+const REASON_HINTS={
+  posReason:{
+    '시공 품질':['꼼꼼','깔끔','튼튼','잘 됐','잘됐','시공 잘','마감 좋','기술 좋'],
+    '가격/가성비':['가성비','저렴','합리적','싸게','가격 대비'],
+    '열차단/단열':['시원','단열','열차단','안 덥','덜 덥','시원해'],
+    '시야/선명도':['선명','잘 보','잘보','시야 좋','밝','또렷','안 어둡'],
+    '디자인/마감':['예쁘','이쁘','마감','색감','고급스'],
+    'A/S·응대':['친절','빠르','응대 좋','상담 좋','감사'],
+    '추천/재구매':['추천','강추','재구매','또 하','다시 하'],
+    '내구성':['튼튼','오래','변색 없','내구'],
+    '자외선 차단':['자외선','uv','UV','타지 않']
+  },
+  negReason:{
+    '기포/하자':['기포','들뜸','들뜬','박리','벗겨','버블','불량','하자','갈라','재시공','들떠'],
+    '내구성/변색':['변색','벗겨짐','바래','색 빠','노후','떨어져'],
+    '가격/비쌈':['비싸','비쌈','거품','부담','가격이'],
+    '열차단 부족':['안 시원','덥','더워','열차단 안','효과 없'],
+    '시야 저하':['어둡','시인성','안 보이','잘 안 보','흐릿','눈부','답답'],
+    'A/S 불만':['환불','반품','클레임','a/s','A/S','as 불만'],
+    '응대 불만':['불친절','짜증','응대','늦','지연','연락 안'],
+    '시공 품질':['엉망','최악','문제','시공 잘못','대충'],
+    '단속/규정':['단속','규정','불법','과태료']
+  }
+};
+function suggestReasons(r,key,limit){
+  try{
+    const txt=(((r&&r.title)||'')+' '+((r&&r.body)||'')).toLowerCase();
+    if(!txt.trim()) return [];
+    const avail=(key==='posReason'?effPosReasons():effNegReasons());
+    const map=REASON_HINTS[key]||{};
+    const hits=[];
+    avail.forEach(function(name){
+      const kws=map[name]; if(!kws) return;
+      for(let i=0;i<kws.length;i++){
+        if(txt.indexOf(String(kws[i]).toLowerCase())>=0){ hits.push(name); break; }
+      }
+    });
+    return hits.slice(0, limit||2);
+  }catch(e){ return []; }
+}
+// 감성을 정하는 순간 이유를 비워두지 않도록 추천값을 채워 준다(이미 값이 있으면 건드리지 않음)
+function applyReasonSuggestion(id, sent, into){
+  if(sent!=='긍정' && sent!=='부정') return null;
+  const key = sent==='긍정' ? 'posReason' : 'negReason';
+  const r=_rowById(id); if(!r) return null;
+  const eff=effRow(r);
+  const already=String((into&&into[key])||eff[key]||'').trim();
+  if(already) return null;
+  const sug=suggestReasons(r,key,2);
+  if(!sug.length) return null;
+  return {key:key, value:sug.join(', ')};
+}
 // ── 긍정/부정 이유 선택 드롭다운 (게시글 유형 옆) ──
 function reasonControlHTML(eff){
   const sent=eff.vSent||'';
@@ -5045,7 +5122,9 @@ function renderBulkBar(){
     + ['긍정','부정','중립','없음','바이럴'].map(s=>`<button class="bb-b" data-bulk="${s}">${s}</button>`).join('')
     + `<button class="bb-x" data-bulkx="1">해제</button>`;
 }
+let _reasonMode=null;   // {id, idx} — 이유를 키보드로 고르는 중
 function setVActive(i, noScroll){
+  _reasonMode=null;   // 카드를 옮기면 이유 선택 모드는 해제
   const list=document.getElementById('verifyList');
   const cards=[...document.querySelectorAll('#verifyList .vcard')];
   if(!cards.length){ vActive=-1; if(list) list.classList.remove('hasactive'); return; }
@@ -5058,17 +5137,66 @@ function vShortcutSet(sent){
   const cards=[...document.querySelectorAll('#verifyList .vcard')];
   if(vActive<0||vActive>=cards.length) return;
   const id=cards[vActive].dataset.id, keep=vActive;
+  // 긍정·부정은 바로 저장하지 않고 이유를 고르게 한다
+  // (지금 저장하면 '미검증만' 필터에서 카드가 사라져 이유를 넣을 수 없다)
+  if(sent==='긍정'||sent==='부정'){
+    const ed=cards[vActive];
+    ed.querySelectorAll('.vbtn[data-v]').forEach(b=>b.classList.toggle('on', b.dataset.v===sent));
+    stage(ed,{vSent:sent});
+    const sug=applyReasonSuggestion(id,sent,pending[id]);
+    if(sug) stage(ed,{[sug.key]:sug.value});
+    const slot=ed.querySelector('.vc-reasonslot');
+    if(slot){
+      slot.innerHTML=reasonControlHTML(effRow(_rowById(id)||{id:id}));
+      const pop=slot.querySelector('.vc-reasonpop'); if(pop) pop.removeAttribute('hidden');
+    }
+    _reasonMode={id:id, idx:keep};
+    _paintReasonKeys(ed);
+    return;
+  }
   if(!saveRow(id, {vSent:sent, vsrc:'manual', vconf:100})) return;
   renderVerify();
   const after=[...document.querySelectorAll('#verifyList .vcard')];
   let ni=keep; if(after[keep] && after[keep].dataset.id===id) ni=keep+1;
   setVActive(Math.min(ni, after.length-1));
 }
+// 팝오버 칩에 숫자 힌트를 붙인다 (1~9)
+function _paintReasonKeys(ed){
+  const chips=ed.querySelectorAll('.vc-reasonpop .vp-chip');
+  chips.forEach((c,i)=>{ if(i<9) c.setAttribute('data-kbi', String(i+1)); else c.removeAttribute('data-kbi'); });
+  const h=ed.querySelector('.vc-reasonpop-h');
+  if(h) h.insertAdjacentHTML('beforeend',' <b style="color:var(--amber)">· 숫자키 선택 · Enter 저장 · Esc 건너뛰기</b>');
+}
+function _reasonEditor(){
+  if(!_reasonMode) return null;
+  return document.querySelector(`#verifyList .vcard[data-id="${_reasonMode.id}"]`);
+}
+function _reasonPickByIndex(n){
+  const ed=_reasonEditor(); if(!ed) return;
+  const chip=ed.querySelector(`.vc-reasonpop .vp-chip[data-kbi="${n}"]`);
+  if(chip) chip.click();
+}
+function _reasonCommit(){
+  const ed=_reasonEditor(); const idx=_reasonMode?_reasonMode.idx:0;
+  _reasonMode=null;
+  if(!ed){ return; }
+  confirmAuto(ed);
+  setTimeout(()=>{
+    const after=[...document.querySelectorAll('#verifyList .vcard')];
+    if(after.length) setVActive(Math.min(idx, after.length-1));
+  }, 280);
+}
 function renderVerify(){
   if(!RAW){ return; }
+  _reasonMode=null;
+  setTimeout(applyCompact,0);
   updateVerifyHeader();
   const cab=document.getElementById('confirmAllAutoBtn');
-  if(cab){ const hasAuto=RAW.rows.some(r=>r.vsrc==='auto'); cab.style.display=(state.vfFilter==='auto'&&auth==='admin'&&hasAuto)?'':'none'; }
+  if(cab){ const hasAuto=RAW.rows.some(r=>r.vsrc==='auto'); cab.style.display=(state.vfFilter==='auto'&&auth==='admin'&&hasAuto)?'':'none';
+    const hcb=document.getElementById('confirmHighConfBtn');
+    if(hcb){ const n=RAW.rows.filter(r=>r.vsrc==='auto'&&(r.vconf||0)>=90).length;
+      hcb.style.display=(state.vfFilter==='auto'&&auth==='admin'&&n>0)?'':'none';
+      hcb.textContent=`⚡ 신뢰도 90% 이상만 승인 (${n.toLocaleString()}건)`; } }
   vActive=-1;
   const rows = verifyRows();
   const listEl=document.getElementById('verifyList');
@@ -5082,7 +5210,7 @@ function renderVerify(){
   }
   const shown = rows.slice(0, state.vfLimit);
   const sortedNote=(state.vfFilter==='todo'||state.vfFilter==='all')?`<div class="cap" style="margin:2px 0 4px;color:var(--ink3)">🧭 검토 대기열 — AI 확신도가 낮거나 애매한 글을 먼저 보여줍니다.</div>`:'';
-  const kbdHint = auth==='admin'?`<div class="vf-hint">⌨ 단축키 <b>1</b>긍정 <b>2</b>부정 <b>3</b>중립 <b>4</b>없음 <b>5</b>바이럴 · <b>↑</b><b>↓</b> 이동 · <b>스페이스</b> 선택 · 체크 후 아래 막대에서 <b>일괄 처리</b></div>`:'';
+  const kbdHint = auth==='admin'?`<div class="vf-hint">⌨ 단축키 <b>1</b>긍정 <b>2</b>부정 <b>3</b>중립 <b>4</b>없음 <b>5</b>바이럴 · 긍정·부정은 이어서 <b>숫자키</b>로 이유 선택 후 <b>Enter</b> 저장 · <b>↑</b><b>↓</b> 이동 · <b>스페이스</b> 선택 · 체크 후 아래 막대에서 <b>일괄 처리</b></div>`:'';
   listEl.innerHTML = sortedNote + kbdHint + shown.map(vCard).join('');
   moreEl.innerHTML = rows.length>shown.length
     ? `<button class="vf-more-btn" id="vfMore">+ ${Math.min(120, rows.length-shown.length)}건 더 보기 (전체 ${rows.length.toLocaleString()}건 중 ${shown.length.toLocaleString()}건)</button>`
@@ -5105,6 +5233,7 @@ function vCard(r){
   return `<div class="vcard editor ${done?'done':''} ${pending[r.id]?'dirty':''}" data-id="${r.id}">
     <div class="vc-top">
       <input type="checkbox" class="vsel" data-id="${r.id}" ${vSel.has(r.id)?'checked':''} title="선택(일괄 처리)">
+      <span class="vc-nowbadge">▶ 지금 검증 중</span>
       <span class="tagm cafe">${escapeHtml(r.cafe)}</span>
       ${r.date?`<span class="tagm date">${escapeHtml(r.date)}</span>`:''}
       <span class="tagm kind ${r.isPost?'':'c'}">${kind}</span>
@@ -5175,6 +5304,34 @@ function confirmAuto(editorEl){
     else { const r2=_rowById(id); const tmp=document.createElement('div'); tmp.innerHTML=vCard(r2); card.replaceWith(tmp.firstElementChild); }
   }
   toast('검증 완료되었습니다.');
+}
+// ── 압축 목록 모드 ──
+function applyCompact(){
+  const on = localStorage.getItem('rayno_vcompact')==='1';
+  const list=document.getElementById('verifyList');
+  if(list) list.classList.toggle('compact', on);
+  const b=document.getElementById('compactToggleBtn');
+  if(b){ b.textContent = on ? '≡ 상세 보기' : '≡ 압축 보기'; b.classList.toggle('on', on); }
+}
+function toggleCompact(){
+  const on = localStorage.getItem('rayno_vcompact')==='1';
+  try{ localStorage.setItem('rayno_vcompact', on?'0':'1'); }catch(e){}
+  applyCompact();
+}
+// ── 신뢰도 기준 일괄 승인 ──
+function confirmHighConf(min){
+  if(auth!=='admin'){ toast('관리자만 가능합니다.', true); return; }
+  min = min||90;
+  const store=loadStore();
+  const target=store.rows.filter(r=>r.vsrc==='auto' && isVerified(r) && (r.vconf||0)>=min);
+  if(!target.length){ toast(`신뢰도 ${min}% 이상인 자동 검증 데이터가 없습니다.`); return; }
+  if(!window.confirm(`신뢰도 ${min}% 이상 ${target.length.toLocaleString()}건을 검증 완료로 확정합니다.\n\n`
+    +`나머지 낮은 신뢰도 건은 그대로 남아 직접 확인하실 수 있습니다. 진행할까요?`)) return;
+  target.forEach(r=>{ r.vsrc='manual'; r.vconf=100; });
+  saveStore(store); rebuildRAW();
+  if(state.view==='dash'){ buildTypeChips(); render(); } else dashStale=true;
+  updateAccStat(); updateVerifyHeader(); renderVerify();
+  toast(`${target.length.toLocaleString()}건을 검증 완료로 이동했습니다.`);
 }
 function confirmAllAuto(){
   if(auth!=='admin'){ toast('관리자만 가능합니다.', true); return; }
@@ -5315,6 +5472,8 @@ function onEditorClick(e){
     const val=btn.dataset.v;
     editorEl.querySelectorAll('.vbtn[data-v]').forEach(b=>b.classList.toggle('on', b.dataset.v===val));
     stage(editorEl,{vSent:val});
+    const sug=applyReasonSuggestion(editorEl.dataset.id, val, pending[editorEl.dataset.id]);
+    if(sug){ stage(editorEl,{[sug.key]:sug.value}); }
     const rslot=editorEl.querySelector('.vc-reasonslot');
     if(rslot){
       const rid2=editorEl.dataset.id; const rr2=_rowById(rid2);
@@ -5475,6 +5634,11 @@ document.addEventListener('keydown', e=>{
   if(k==='ArrowDown'||k==='j'){ e.preventDefault(); setVActive(vActive<0?0:vActive+1); return; }
   if(k==='ArrowUp'||k==='k'){ e.preventDefault(); setVActive(vActive<0?0:vActive-1); return; }
   if(k===' '||k==='x'||k==='X'){ if(vActive>=0&&vActive<cards.length){ e.preventDefault(); const id=cards[vActive].dataset.id; if(vSel.has(id))vSel.delete(id); else vSel.add(id); renderBulkBar(); } return; }
+  if(_reasonMode){
+    if(k>='1' && k<='9'){ e.preventDefault(); _reasonPickByIndex(k); return; }
+    if(k==='Enter'){ e.preventDefault(); _reasonCommit(); return; }
+    if(k==='Escape'){ e.preventDefault(); _reasonCommit(); return; }
+  }
   if(k==='Escape'){ if(vSel.size){ vSel.clear(); renderBulkBar(); } return; }
   const map={'1':'긍정','2':'부정','3':'중립','4':'없음','5':'바이럴'};
   if(map[k]){ e.preventDefault(); if(vActive<0){ setVActive(0); } vShortcutSet(map[k]); }
@@ -5484,6 +5648,13 @@ document.addEventListener('keydown', e=>{
 document.getElementById('autoVerifyBtn').addEventListener('click', autoVerifyAll);
 document.getElementById('learnVizBtn').addEventListener('click', openLearnViz);
 document.getElementById('confirmAllAutoBtn').addEventListener('click', confirmAllAuto);
+(function(){
+  const hc=document.getElementById('confirmHighConfBtn');
+  if(hc) hc.addEventListener('click', ()=>confirmHighConf(90));
+  const ct=document.getElementById('compactToggleBtn');
+  if(ct) ct.addEventListener('click', toggleCompact);
+  applyCompact();
+})();
 document.getElementById('vfFrom').addEventListener('change', e=>{ state.vfFrom=e.target.value; state.vfLimit=60; renderVerify(); });
 document.getElementById('vfTo').addEventListener('change', e=>{ state.vfTo=e.target.value; state.vfLimit=60; renderVerify(); });
 document.getElementById('vfDateClear').addEventListener('click', ()=>{ state.vfFrom=''; state.vfTo=''; const a=document.getElementById('vfFrom'),b=document.getElementById('vfTo'); if(a)a.value=''; if(b)b.value=''; state.vfLimit=60; renderVerify(); });
