@@ -1035,6 +1035,13 @@
   .modal-more{border:1px dashed var(--line2);background:var(--bg2);color:var(--ink2);border-radius:8px;
     padding:8px 16px;font-size:12.5px;font-family:var(--font);cursor:pointer}
   .modal-more:hover{border-color:var(--amber);color:var(--amber)}
+  .rz-chip.flag{border-color:var(--amber);color:var(--amber)}
+  .rz-chip.flag:hover{background:var(--amber);color:#1a1205}
+  .vc-flagbtn.flagged{border-color:var(--amber);background:rgba(244,145,28,.12);color:var(--ink);font-weight:700}
+  .vc-flagclear{margin-top:8px;width:100%;border:1px dashed var(--line2);background:transparent;
+    color:var(--ink3);border-radius:7px;padding:6px 10px;font-size:12px;font-family:var(--font);cursor:pointer}
+  .vc-flagclear:hover{border-color:var(--neg);color:var(--neg)}
+  .vcard.flagged{box-shadow:inset 3px 0 0 0 var(--amber)}
   .rz-chip.rz-miss{border-style:dashed;font-size:11px;padding:3px 9px;color:var(--ink3);background:transparent}
   .rz-chip.rz-miss:hover{border-color:var(--ink2);color:var(--ink2)}
   .vp-more{display:inline-flex;align-items:center;border:1px dashed var(--line2);border-radius:11px;
@@ -1652,6 +1659,7 @@
     <div id="dashBrief"></div>
     <div class="grid kpis" id="kpis"></div>
     <div class="card" id="kpiReasons" style="display:none;margin-top:12px"></div>
+    <div class="card" id="kpiFlags" style="display:none;margin-top:12px"></div>
 
     <div class="grid cols">
       <div class="card">
@@ -1733,6 +1741,7 @@
             <button data-vf="todo" class="on">미검증만</button>
             <button data-vf="auto">🤖 자동(검토)</button>
             <button data-vf="done">검증완료</button>
+            <button data-vf="flag">⚑ 중요</button>
             <button data-vf="all">전체</button>
           </div>
         </div>
@@ -2011,6 +2020,8 @@ const CONFIG = {
   // 추천 주체 프리셋
   recommenderPresets: ['본인','지인','시공업체','카페회원','블로거','동호회','기타'],
   posReasonPresets: ['시공 품질','가격/가성비','열차단/단열','시야/선명도','디자인/마감','A/S·응대','추천/재구매','내구성','자외선 차단'],
+  // 내부 공유가 필요한 글에 다는 표시. 감성과 별개 축이다(중립이면서 중요할 수 있음).
+  flagReasonPresets: ['오정보·루머','이슈 확산 우려','경쟁사 대응 필요','법무·규정','고객 불만 심화','기타'],
   negReasonPresets: ['시공 품질','가격/비쌈','열차단 부족','기포/하자','A/S 불만','응대 불만','내구성/변색','시야 저하','단속/규정'],
 
   // 키워드 제외 기본값 (관리자가 화면에서 수정 가능 · 변경분은 브라우저에 저장)
@@ -2268,6 +2279,7 @@ function parseWorkbook(wb, fname, replaceBatch, rawPath){
     title:col('제목'), body:col('본문'), link:col('원문'),
     aiSent:headers.findIndex(h=>h.includes('AI감성')),
     vSent:headers.findIndex(h=>h.includes('검증_감성')),
+    vFlag:headers.findIndex(h=>h.includes('중요표시')),
     aiType:headers.findIndex(h=>h.includes('AI게시글유형')),
     vType:headers.findIndex(h=>h.includes('검증_게시글유형')),
   };
@@ -2293,6 +2305,7 @@ function parseWorkbook(wb, fname, replaceBatch, rawPath){
       link: String(r[IDX.link]||''),
       aiSent: clean(r[IDX.aiSent]),
       vSent:  cleanV(r[IDX.vSent]),     // 검증값은 '없음'을 보존(=감성없음으로 검증됨)
+      vFlag:  cleanV(r[IDX.vFlag]),     // 내부 공유용 '중요' 표시 사유
       aiType: clean(r[IDX.aiType]),
       vType:  cleanV(r[IDX.vType]),
     };
@@ -2992,6 +3005,29 @@ function renderKPIs(rows){
     });
   })();
 
+  // ── 중요 표시 요약 (내부 공유가 필요한 글) ──
+  (function(){
+    const box=document.getElementById('kpiFlags'); if(!box) return;
+    const m={};
+    considered.forEach(r=>{ const v=String(r.vFlag||'').trim(); if(v) m[v]=(m[v]||0)+1; });
+    const ent=Object.entries(m).sort((a,b)=>b[1]-a[1]);
+    if(!ent.length){ box.style.display='none'; box.innerHTML=''; return; }
+    box.style.display='';
+    const tot=ent.reduce((a,b)=>a+b[1],0);
+    box.innerHTML=`<h3><span class="dot"></span>⚑ 내부 공유 필요 <span style="color:var(--ink3);font-weight:600;font-size:12px">· ${tot.toLocaleString()}건</span></h3>
+      <div class="cap">검증 중 '중요'로 표시한 글입니다. 칩을 누르면 해당 글 목록이 열립니다.</div>
+      <div class="rz-chips">`+ent.map(([v,c])=>
+        `<span class="rz-chip flag" data-flag="${escapeHtml(v)}">${escapeHtml(v)} <b>${c}</b></span>`).join('')+`</div>`;
+    box.querySelectorAll('.rz-chip[data-flag]').forEach(el=>{
+      el.addEventListener('click',()=>{
+        const v=el.dataset.flag;
+        const list=considered.filter(r=>String(r.vFlag||'').trim()===v);
+        openDetail(`⚑ 내부 공유 · <span style="color:var(--amber)">${escapeHtml(v)}</span>`, list,
+          `'${v}'(으)로 표시된 글·댓글입니다`);
+      });
+    });
+  })();
+
   // 감성 카드 클릭 → 드릴다운 토글 (자세히 보기 버튼 클릭은 제외)
   document.querySelectorAll('#kpis .kpi.clickable').forEach(card=>{
     card.addEventListener('click', e=>{
@@ -3474,6 +3510,7 @@ let _hlRe=null,_hlMap=null;
 function effHlPos(){ const c=STORE&&STORE.config&&STORE.config.hlPos; return (Array.isArray(c)&&c.length)?c:POS_LEX; }
 function effHlNeg(){ const c=STORE&&STORE.config&&STORE.config.hlNeg; return (Array.isArray(c)&&c.length)?c:NEG_LEX; }
 function effPosReasons(){ const c=STORE&&STORE.config&&STORE.config.posReasons; return (Array.isArray(c)&&c.length)?c:CONFIG.posReasonPresets; }
+function effFlagReasons(){ const c=STORE&&STORE.config&&STORE.config.flagReasons; return (Array.isArray(c)&&c.length)?c:CONFIG.flagReasonPresets; }
 function effNegReasons(){ const c=STORE&&STORE.config&&STORE.config.negReasons; return (Array.isArray(c)&&c.length)?c:CONFIG.negReasonPresets; }
 function _hlInit(){ _hlMap={}; const all=[];
   effHlPos().forEach(w=>{const k=String(w).trim(); if(k){all.push(k); _hlMap[k.toLowerCase()]='pos';}});
@@ -4272,6 +4309,24 @@ function buildBrandEmail(){
     negReasonEnt.forEach(([reason,urls],i)=>{ const us=[...new Set(urls)].slice(0,3).join(' / '); L.push(`${i+1}. ${reason} [원문: ${us}]`); });
     L.push('');
   }
+  // ⚑ 내부 공유가 필요한 글 — 감성과 무관하게 팀이 알아야 할 사안
+  const flagged={};
+  cur.forEach(r=>{ const v=String(r.vFlag||'').trim(); if(!v) return;
+    (flagged[v]=flagged[v]||[]).push(r); });
+  const flagEnt=Object.entries(flagged).sort((a,b)=>b[1].length-a[1].length);
+  if(flagEnt.length){
+    L.push('[내부 공유 필요]');
+    flagEnt.forEach(([reason,rows])=>{
+      L.push(`· ${reason} (${rows.length}건)`);
+      rows.slice(0,3).forEach(r=>{
+        const t=(r.title||r.body||'').replace(/\s+/g,' ').trim().slice(0,45);
+        const u=(r.link||'').trim();
+        L.push(`   - ${t}${u?` [원문: ${u}]`:''}`);
+      });
+      if(rows.length>3) L.push(`   - 외 ${rows.length-3}건은 대시보드에서 확인`);
+    });
+    L.push('');
+  }
   L.push('[데이터 기반 부서별 제언] * 요약 제공');
   L.push('[브랜드전략실]');
   L.push(`- 최대 강점인 '${posR[0]?posR[0][0]:'시공 품질'}'(긍정 요인 1위, ${posR[0]?posR[0][1]:0}건)를 단순 저가 이미지가 아닌 '합리적인 프리미엄 선택'으로 포지셔닝하는 캠페인 메시지 강화`);
@@ -4765,6 +4820,7 @@ function verifyRows(){
   }
   if(state.vfFilter==='todo') rows = rows.filter(r=>!isVerified(r));
   if(state.vfFilter==='done') rows = rows.filter(r=> isVerified(r) && r.vsrc!=='auto');
+  if(state.vfFilter==='flag') rows = rows.filter(r=> String(r.vFlag||'').trim());
   if(state.vfFilter==='auto') rows = rows.filter(r=>r.vsrc==='auto').sort((a,b)=>(a.vconf||0)-(b.vconf||0));
   const q=state.vfSearch.trim().toLowerCase();
   if(q) rows = rows.filter(r=>(r.title+' '+r.body+' '+r.cafe).toLowerCase().includes(q));
@@ -4911,6 +4967,32 @@ function applyReasonSuggestion(id, sent, into){
   if(!sug.length) return null;
   return {key:key, value:sug.join(', ')};
 }
+// ── 중요 표시 (내부 공유용) ──
+//  감성과 별개 축이다. 중립·바이럴이어도 '오정보'처럼 공유가 필요한 글이 있다.
+function flagControlHTML(eff){
+  const cur=String(eff.vFlag||'').trim();
+  const presets=effFlagReasons();
+  const canEdit=(typeof auth!=='undefined' && auth==='admin');
+  const chips=(presets||[]).map(v=>
+    `<span class="vp-chip rchip ${cur===v?'on':''}" data-field="vFlag" data-kind="pick" data-val="${escapeHtml(v)}"${canEdit?' draggable="true"':''}>${escapeHtml(v)}${canEdit?`<button type="button" class="rchip-x" data-rdel="${escapeHtml(v)}" title="이 항목을 목록에서 삭제">×</button>`:''}</span>`).join('');
+  return `<div class="vc-reasonbox vc-flagbox" data-rkey="vFlag">
+    <div class="vc-sec-label">내부 공유</div>
+    <div class="vc-reasonwrap">
+      <button type="button" class="vc-reasonbtn vc-flagbtn ${cur?'flagged':''}" data-rbtn="1">
+        ${cur?`⚑ ${escapeHtml(cur)}`:'⚑ 중요 표시'} <span class="vc-caret">▾</span></button>
+      <div class="vc-reasonpop" hidden>
+        <div class="vc-reasonpop-h">중요 표시 사유 <span>· 하나만 선택${canEdit?' · ✕ 삭제 · 드래그로 순서 변경':''}</span></div>
+        <div class="vp-chips vc-rchips" data-rkey="vFlag">${chips}</div>
+        ${canEdit?`<div class="vc-radd">
+          <input class="vc-newreason" data-rkey="vFlag" placeholder="새 사유 추가 후 Enter">
+          <button type="button" class="vc-raddbtn" data-rkey="vFlag">＋ 추가</button>
+        </div>`:''}
+        ${cur?`<button type="button" class="vc-flagclear">표시 해제</button>`:''}
+        <input type="hidden" class="vc-input" data-field="vFlag" value="${escapeHtml(cur)}">
+      </div>
+    </div>
+  </div>`;
+}
 // ── 긍정/부정 이유 선택 드롭다운 (게시글 유형 옆) ──
 function reasonControlHTML(eff){
   const sent=eff.vSent||'';
@@ -4970,6 +5052,7 @@ function editorControls(r){
         <div class="vc-typewrap"><select class="vc-select" data-type="1">${typeOpts}</select>${aiTypeTxt}</div>
       </div>
       <div class="vc-tcol vc-reasonslot">${reasonControlHTML(eff)}</div>
+      <div class="vc-tcol vc-flagslot">${flagControlHTML(eff)}</div>
     </div>
     <button type="button" class="vc-clstoggle">${hasCls?'추가 분류 (입력됨) ▾':'＋ 추가 분류 입력'}</button>
     <div class="vc-class" hidden></div>
@@ -5230,7 +5313,8 @@ function vCard(r){
   const parentBlock = (!r.isPost && r.parentTitle) ? `<div class="vc-parent">↳ 원글: ${escapeHtml(r.parentTitle)}</div>` : '';
   const linkUrl = r.link || (!r.isPost ? r.parentLink : '');
   const linkBtn = linkUrl ? `<a class="vc-srcbtn" href="${safeHref(linkUrl)}" target="_blank" rel="noopener">🔗 원문 ${r.isPost?'보기':'글 보기'}</a>` : '';
-  return `<div class="vcard editor ${done?'done':''} ${pending[r.id]?'dirty':''}" data-id="${r.id}">
+  const _flagged = String(effRow(r).vFlag||'').trim();
+  return `<div class="vcard editor ${done?'done':''} ${pending[r.id]?'dirty':''} ${_flagged?'flagged':''}" data-id="${r.id}">
     <div class="vc-top">
       <input type="checkbox" class="vsel" data-id="${r.id}" ${vSel.has(r.id)?'checked':''} title="선택(일괄 처리)">
       <span class="vc-nowbadge">▶ 지금 검증 중</span>
@@ -5430,6 +5514,15 @@ function onEditorClick(e){
   }
   const rAdd=e.target.closest('.vc-raddbtn');
   if(rAdd){ _addReason(editorEl, rAdd.dataset.rkey); return; }
+  if(e.target.closest('.vc-flagclear')){
+    const inp=editorEl.querySelector('.vc-input[data-field="vFlag"]');
+    if(inp) inp.value='';
+    stage(editorEl,{vFlag:''});
+    const slot=editorEl.querySelector('.vc-flagslot');
+    if(slot){ const id=editorEl.dataset.id;
+      slot.innerHTML=flagControlHTML(effRow(_rowById(id)||{id:id})); }
+    return;
+  }
   const rBtn=e.target.closest('.vc-reasonbtn');
   if(rBtn){
     const pop=rBtn.parentElement.querySelector('.vc-reasonpop');
@@ -5464,7 +5557,14 @@ function onEditorClick(e){
     const newVal=cur.join(', '); input.value=newVal;
     editorEl.querySelectorAll(`.vp-chip[data-field="${key}"]`).forEach(c=>c.classList.toggle('on',cur.includes(c.dataset.val)));
     stage(editorEl,{[key]:newVal});
-    _syncReasonBtn(editorEl,key,newVal);
+    if(key==='vFlag'){
+      const slot=editorEl.querySelector('.vc-flagslot');
+      if(slot){ const id=editorEl.dataset.id;
+        slot.innerHTML=flagControlHTML(effRow(_rowById(id)||{id:id}));
+        const pop=slot.querySelector('.vc-reasonpop'); if(pop) pop.removeAttribute('hidden'); }
+    } else {
+      _syncReasonBtn(editorEl,key,newVal);
+    }
     return;
   }
   const btn=e.target.closest('.vbtn');
@@ -5511,11 +5611,14 @@ function _syncReasonBtn(editorEl,key,val){
   btn.classList.toggle('has', cur.length>0);
 }
 // ── 이유 목록(표준 명칭) 편집 — 설정 화면과 같은 저장소를 씁니다 ──
-function _reasonList(key){ return (key==='posReason'?effPosReasons():effNegReasons()).slice(); }
+function _reasonList(key){
+  if(key==='vFlag') return effFlagReasons().slice();
+  return (key==='posReason'?effPosReasons():effNegReasons()).slice();
+}
 function _saveReasonList(key,list){
   const clean=[...new Set(list.map(x=>String(x).trim()).filter(Boolean))];
   STORE.config=STORE.config||{};
-  STORE.config[key==='posReason'?'posReasons':'negReasons']=clean;
+  STORE.config[key==='vFlag'?'flagReasons':(key==='posReason'?'posReasons':'negReasons')]=clean;
   try{ saveStore(STORE); }catch(err){}
   try{ if(typeof flushCloudSave==='function') flushCloudSave(); }catch(err){}
 }
@@ -5692,14 +5795,14 @@ function exportData(){
   if(!RAW || !RAW.rows.length){ toast('내보낼 데이터가 없습니다.', true); return; }
   const store=loadStore();
   const rows=store.rows.slice().sort((a,b)=>(a.seq||0)-(b.seq||0));
-  const header=['날짜','카페','유형','제목','본문','원문링크','AI 감성','검증_감성','AI 게시글유형','검증_게시글유형',
+  const header=['날짜','카페','유형','제목','본문','원문링크','AI 감성','검증_감성','중요표시','AI 게시글유형','검증_게시글유형',
                 ...CLASS_FIELDS.map(f=>'검증_'+f.col)];
   const aoa=[header];
   rows.forEach(r=>aoa.push([r.date,r.cafe,r.isPost?'게시글':'댓글',r.title,r.body,r.link,
-                            r.aiSent||'',r.vSent||'',r.aiType||'',r.vType||'',
+                            r.aiSent||'',r.vSent||'',r.vFlag||'',r.aiType||'',r.vType||'',
                             ...CLASS_FIELDS.map(f=>r[f.key]||'')]));
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:12},{wch:16},{wch:8},{wch:30},{wch:50},{wch:24},{wch:9},{wch:10},{wch:14},{wch:16},
+  ws['!cols']=[{wch:12},{wch:16},{wch:8},{wch:30},{wch:50},{wch:24},{wch:9},{wch:10},{wch:15},{wch:14},{wch:16},
                ...CLASS_FIELDS.map(()=>({wch:16}))];
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, '수집 데이터');
