@@ -6200,11 +6200,31 @@ async function cloudSaveJSON(file,obj){
     toast('⚠ 저장 실패: '+_cloudErr, true); return false;
   }
 }
-const _SW_PRESET=['레이노','레이노썬팅','레이노스트라','레이노스트라700','레이노스트라900','레이노얼티넘XP','레이노F95','레이노S9','버텍스','루마썬팅','루마버텍스','후퍼옵틱','레인보우썬팅','솔라가드','브이쿨','글라스틴트','허버캠프','3M썬팅','블박포디','테라룩스','테라룩스썬팅','스미스클럽','티나인','칼트윈'];
+const _SW_PRESET=['레이노','레이노썬팅','레이노스트라','레이노스트라700','레이노스트라900','레이노얼티넘XP','레이노F95','레이노S9','버텍스','루마썬팅','루마버텍스','후퍼옵틱','레인보우썬팅','솔라가드','브이쿨','글라스틴트','하버캠프','3M썬팅','블락포디','테라룩스','테라룩스썬팅','스미스클럽','티나인','칼트윈'];
 let SWF={year:'', months:[], chartKws:null, chartMode:'trend', rankYm:'', focusKw:''};   // 검색량 필터·차트모드
 function _ymAdd(ym,n){ const a=String(ym).split('-'); let y=+a[0], m=(+a[1]-1)+n; y+=Math.floor(m/12); m=((m%12)+12)%12; return y+'-'+String(m+1).padStart(2,'0'); }
-function _bizMigrate(){ if(!BIZ||typeof BIZ!=='object')BIZ={rows:[]}; BIZ.rows=Array.isArray(BIZ.rows)?BIZ.rows:[]; if(!Array.isArray(BIZ.searchKeywords)||!BIZ.searchKeywords.length) BIZ.searchKeywords=_SW_PRESET.slice(); BIZ.rows.forEach(r=>{ if(!r.searches||typeof r.searches!=='object')r.searches={}; if(r.search!=null&&r.searches['레이노']==null)r.searches['레이노']=r.search; }); }
-async function ensureBiz(){ if(bizLoaded)return; const j=await cloudLoadJSON(SUPA.bizFile); if(j&&j.rows)BIZ=j; _bizMigrate(); bizLoaded=true; }
+// 검색량 키워드 오타 교정 — 이름만 바꾸면 월별 값이 옛 이름 밑에 남으므로 값까지 함께 옮긴다
+const _KW_RENAME={'허버캠프':'하버캠프','블박포디':'블락포디','칼튼윈':'칼트윈'};
+function _bizRenameKws(){
+  let n=0;
+  if(Array.isArray(BIZ.searchKeywords)){
+    const out=[];
+    BIZ.searchKeywords.forEach(k=>{ const nk=_KW_RENAME[k]||k; if(nk!==k) n++; if(out.indexOf(nk)<0) out.push(nk); });
+    BIZ.searchKeywords=out;
+  }
+  (BIZ.rows||[]).forEach(r=>{
+    if(!r.searches||typeof r.searches!=='object') return;
+    Object.keys(_KW_RENAME).forEach(old=>{
+      if(!(old in r.searches)) return;
+      const nk=_KW_RENAME[old];
+      if(r.searches[nk]==null && r.searches[old]!=null) r.searches[nk]=r.searches[old];
+      delete r.searches[old]; n++;
+    });
+  });
+  return n;
+}
+function _bizMigrate(){ if(!BIZ||typeof BIZ!=='object')BIZ={rows:[]}; BIZ.rows=Array.isArray(BIZ.rows)?BIZ.rows:[]; if(!Array.isArray(BIZ.searchKeywords)||!BIZ.searchKeywords.length) BIZ.searchKeywords=_SW_PRESET.slice(); BIZ.rows.forEach(r=>{ if(!r.searches||typeof r.searches!=='object')r.searches={}; if(r.search!=null&&r.searches['레이노']==null)r.searches['레이노']=r.search; }); return _bizRenameKws(); }
+async function ensureBiz(){ if(bizLoaded)return; const j=await cloudLoadJSON(SUPA.bizFile); if(j&&j.rows)BIZ=j; const _fixed=_bizMigrate(); bizLoaded=true; if(_fixed && typeof auth!=='undefined' && auth==='admin'){ try{ await saveBiz(); }catch(e){} } }
 async function ensureWarr(){ if(warrLoaded)return; const j=await cloudLoadJSON(SUPA.warrFile); if(j&&j.rows){ WARR=j; WARR.columns=WARR.columns||[]; warrDedupe(); ensureWarrCfg(); _dealerAggCache=null; } warrLoaded=true; }
 let WARR_PREV=null, _warrPrevLoaded=false, _warrPrevLoading=false;
 async function ensureWarrPrev(){ if(_warrPrevLoaded||_warrPrevLoading) return; _warrPrevLoading=true; try{ const j=await cloudLoadJSON('warranty_prev.json'); if(j&&j.rows) WARR_PREV=j; }catch(_){ } _warrPrevLoaded=true; _warrPrevLoading=false; if(typeof rview!=='undefined'&&rview==='warranty'&&typeof renderWarranty==='function'){ try{ renderWarranty(); }catch(_){ } } }
