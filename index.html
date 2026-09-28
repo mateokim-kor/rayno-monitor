@@ -475,11 +475,11 @@
   mark.hl-neg{background:#b01d14;color:#ffeb3b;border-radius:3px;padding:1px 4px;font-weight:800;box-shadow:none}
   mark.hl-user{border-radius:3px;padding:0 2px;cursor:pointer;font-weight:800;box-decoration-break:clone;-webkit-box-decoration-break:clone}
   mark.hl-user.hl-y{background:linear-gradient(180deg,transparent 8%,#ffe14d 8%,#ffd60a 88%,transparent 88%);color:#3a2e00}
-  mark.hl-user.hl-r{background:linear-gradient(180deg,transparent 8%,#f8d5dc 8%,#f2b8c4 88%,transparent 88%);color:#1a1a1f}
+  mark.hl-user.hl-r{background:#b01d14;color:#ffeb3b;padding:1px 4px}
   mark.hl-user:hover{outline:1px dashed rgba(0,0,0,.3)}
   #hlPop{position:absolute;z-index:9999;display:none;gap:5px;background:#1d1d1f;border-radius:11px;padding:6px;box-shadow:0 8px 26px rgba(0,0,0,.32)}
   #hlPop button{border:0;border-radius:8px;padding:7px 11px;font-family:var(--font);font-size:12.5px;font-weight:800;cursor:pointer;line-height:1}
-  #hlPop .hp-y{background:#ffd60a;color:#3a2e00} #hlPop .hp-r{background:#f8d5dc;color:#1a1a1f} #hlPop .hp-x{background:#3a3a3c;color:#fff}
+  #hlPop .hp-y{background:#ffd60a;color:#3a2e00} #hlPop .hp-r{background:#b01d14;color:#ffeb3b} #hlPop .hp-x{background:#3a3a3c;color:#fff}
   .modal-hl{background:var(--bg2);border:1px solid var(--line2);color:var(--ink3);font-family:var(--font);font-size:11.5px;font-weight:700;padding:7px 12px;border-radius:980px;cursor:pointer;white-space:nowrap;transition:.15s}
   .modal-hl.on{background:rgba(31,158,99,.12);border-color:var(--pos);color:#15784a}
   .rec-body{font-size:13px;line-height:1.7;color:var(--ink2);white-space:pre-wrap;word-break:break-word}
@@ -3608,7 +3608,7 @@ document.getElementById('modalHlBtn').addEventListener('click', e=>{ HL_ON=!HL_O
 // ── 글마다 드래그 하이라이트(관리자) — 본문에서 원하는 부분을 끌어서 형광펜 표시 ──
 let hlPending=null;
 const hlPop=document.createElement('div'); hlPop.id='hlPop';
-hlPop.innerHTML='<button class="hp-y" data-hlc="y">🟡 형광</button><button class="hp-r" data-hlc="r">🩷 표시</button><button class="hp-x" data-hlx="1">취소</button>';
+hlPop.innerHTML='<button class="hp-y" data-hlc="y">🟡 형광</button><button class="hp-r" data-hlc="r">🔴 표시</button><button class="hp-x" data-hlx="1">취소</button>';
 document.body.appendChild(hlPop);
 function hideHlPop(){ hlPop.style.display='none'; hlPending=null; }
 document.addEventListener('mouseup', e=>{
