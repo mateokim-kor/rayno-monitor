@@ -10334,12 +10334,18 @@ function renderCrawlBar(s){
   _lastCrawlStatus=s||null;
   const isAdmin=(auth==='admin');
   const inline=document.getElementById('crawlBar');
+  // 그리는 중 오류가 나면 빈 창으로 두지 않고, 무엇이 실패했는지 창 안에 보여준다
+  const _safe=(admin)=>{ try{ return crawlInnerHTML(s, admin); }
+    catch(err){ try{ console.error('[수집 패널]',err); }catch(_){}
+      return `<div class="crawl err"><div class="crawl-top"><span class="crawl-t">⚠ 수집 패널을 표시하지 못했습니다</span></div>`
+        +`<div class="crawl-msg">Ctrl+Shift+R 로 새로고침한 뒤 다시 열어주세요. 계속되면 아래 문구를 관리자에게 알려주세요.<br>`
+        +`<code style="font-size:11px">${escapeHtml((err&&err.message)||err)}</code></div></div>`; } };
   if(_crawlModalOpen){
     const mb=document.getElementById('crawlModalBody');
-    if(mb) mb.innerHTML=crawlInnerHTML(s, true);
+    if(mb) mb.innerHTML=_safe(true);
     if(inline){ inline.classList.remove('crawl-active'); inline.innerHTML=''; }
   }else{
-    if(inline){ inline.classList.toggle('crawl-active', _crawlIsActive(s)); inline.innerHTML=crawlInnerHTML(s, isAdmin); }
+    if(inline){ inline.classList.toggle('crawl-active', _crawlIsActive(s)); inline.innerHTML=_safe(isAdmin); }
   }
 }
 function crawlControls(){
